@@ -1,0 +1,13 @@
+{"environments":{
+    "local":{
+        "name":"environments local de dev",
+        "frontEndPoint":"localhost",
+        "backEndPoint":"http://localhost:5005"
+    },
+    "network":{
+        "name":"environments local de dev",
+        "frontEndPoint":"192.168.1.139",
+        "backEndPoint":"http://192.168.1.139:5005"
+    }
+
+}}
