@@ -300,6 +300,11 @@ export default {
   components: {
     Loading,
   },
+  layout() {
+    return parseInt(localStorage.getItem('access')) === 0
+      ? 'default'
+      : 'clientside'
+  },
   mixins: [defaultdata, price],
   middleware: 'auth',
   data: () => ({

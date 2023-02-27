@@ -35,9 +35,13 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-row v-else class="mt-5 justify-center">
+    <v-column v-else class="mt-5 justify-center">
       <v-btn color="primary" @click="$router.push('/menus')">Go to menus</v-btn>
-    </v-row>
+      <br />
+      <v-btn color="primary" @click="$router.push('/ordersStatuses')"
+        >Commandes</v-btn
+      >
+    </v-column>
   </v-container>
 </template>
 <script>
@@ -49,7 +53,12 @@ export default {
     Loading,
   },
   mixins: [listdashboard, defaultdata],
-  middleware: 'auth',
+  layout() {
+    return parseInt(localStorage.getItem('access')) === 0
+      ? 'default'
+      : 'clientside'
+  },
+  middleware: ['auth'],
   data() {
     return {
       loadPage: false,

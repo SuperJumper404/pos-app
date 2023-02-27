@@ -1,6 +1,7 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 export const state = () => ({
   dataOrders: [],
+  dataOrdersByUserId: [],
   message: '',
   detailOrder: [],
   lastCreatedOrder: null,
@@ -32,6 +33,25 @@ export const actions = {
       })
       .catch((error) => {
         dispatch('set/dataOrders', error.response.data.data)
+        return false
+      })
+  },
+  getOrdersByUserId({ dispatch }, params) {
+    return this.$axios
+      .get(
+        `/baseurl/api/v1/ordersbyUserId?userId=${params.userId}&filter=${params.filter}&keyword=${params.keyword}&page=${params.page}&limit=${params.limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then((response) => {
+        dispatch('set/dataOrdersByUserId', response.data.data)
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/dataOrdersByUserId', error.response.data.data)
         return false
       })
   },

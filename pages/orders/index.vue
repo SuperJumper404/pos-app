@@ -51,7 +51,7 @@
           <v-text-field
             v-model="searchFilter"
             placeholder="Rechercher table"
-            label="Seaching"
+            label="Rechercher table"
             outlined
             dense
             append-icon="mdi-card-search"

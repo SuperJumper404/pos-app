@@ -128,6 +128,11 @@ export default {
   },
   mixins: [price],
   middleware: 'auth',
+  layout() {
+    return parseInt(localStorage.getItem('access')) === 0
+      ? 'default'
+      : 'clientside'
+  },
   data: () => ({
     ppn: 0,
     total: 0,
@@ -169,6 +174,7 @@ export default {
     async paymentBtn() {
       const params = {
         customer: this.formuser.customer,
+        customerID: parseInt(localStorage.getItem('idUser')),
         operator: null,
         subtotal: this.total,
         payment: this.formuser.payment,
