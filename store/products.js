@@ -2,25 +2,21 @@ import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 export const state = () => ({
   dataProduct: [],
   detailProduct: [],
-  totalPage: 0,
   message: '',
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
-  getProducts({ dispatch }, params) {
+  getProducts({ dispatch }) {
     return this.$axios
-      .get(
-        `/baseurl/api/v1/products?filter=${params.filter}&keyword=${params.keyword}&sortby=products.id&orderby=${params.orderby}&page=${params.page}&limit=${params.limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      )
+      .get(`/baseurl/api/v1/products`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
       .then((response) => {
         dispatch('set/dataProduct', response.data.data)
-        dispatch('set/totalPage', response.data.pagination.totalPage)
+        console.log(response)
         return true
       })
       .catch((error) => {

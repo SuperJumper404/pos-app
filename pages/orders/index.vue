@@ -41,8 +41,8 @@
             color="red"
             elevation="3"
             style="color: white; height: 40px; margin: 0px 8px 2px 0px"
-            @click="deleteSelectedOrders()"
             :loading="deleteLoading"
+            @click="deleteSelectedOrders()"
             >Supprimer
             <v-icon small right>mdi-delete-forever</v-icon>
           </v-btn>
@@ -59,21 +59,21 @@
         </div>
       </v-app-bar>
       <v-data-table
+        v-model="selectedOrders"
         :headers="headers"
         :items="dataOrders"
         :search="searchFilter"
-        v-model="selectedOrders"
         show-select
       >
-        <template v-slot:[`item.created`]="{ item }">
+        <template #[`item.created`]="{ item }">
           <div>
             {{ orderTime(item.created) }}
           </div>
         </template>
-        <template v-slot:[`item.subtotal`]="{ item }">
+        <template #[`item.subtotal`]="{ item }">
           <div>{{ conversiRp(item.subtotal) }} €</div>
         </template>
-        <template v-slot:[`item.status`]="{ item }">
+        <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
             En preparation
@@ -81,7 +81,7 @@
           <v-chip v-if="item.status === 3" color="primary"> Terminer </v-chip>
           <v-chip v-if="item.status === 4" color="warning"> Annuler </v-chip>
         </template>
-        <template v-slot:[`item.actions`]="{ item }">
+        <template #[`item.actions`]="{ item }">
           <v-row>
             <v-card-actions v-if="item.status === 1">
               <v-btn
@@ -145,17 +145,16 @@
   </v-container>
 </template>
 <script>
-import defaultdata from '@/helpers/defaultdata'
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
 import VSnackbars from 'v-snackbars'
 export default {
-  mixins: [defaultdata, formatdate, price],
-  middleware: 'auth',
   components: {
     'v-snackbars': VSnackbars,
   },
+  mixins: [formatdate, price],
+  middleware: 'auth',
   data() {
     return {
       loadPage: false,
@@ -213,28 +212,25 @@ export default {
     user() {
       return this.$store.get('users/user')
     },
-    // userDetail() {
-    //   return this.$store.get('users/userDetail')
-    // },
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('orders/getAllOrder', this.setData)
-    // this.$store.dispatch('users/detailUser', this.user.id)
-    this.pollData()
-    setTimeout(() => {
+    this.$store.dispatch('orders/getAllOrder').finally(() => {
       this.loadPage = false
-    }, 3000)
+    })
+    this.pollData()
+  },
+  beforeDestroy() {
+    clearInterval(this.polling)
   },
   methods: {
     soundNotification() {
-      console.log(window.location.origin + '/soundnotif.ogg')
       const audio = new Audio(window.location.origin + '/soundnotif.ogg')
       audio.play()
     },
     pollData() {
       this.polling = setInterval(() => {
-        this.$store.dispatch('orders/getAllOrder', this.setData)
+        this.$store.dispatch('orders/getAllOrder')
         const newOrders = this.numberOfNewOrders()
         if (newOrders) {
           this.orderNotifications.push(
@@ -246,35 +242,28 @@ export default {
       }, 15000)
     },
     numberOfNewOrders() {
-      const newOrders = this.dataOrders.filter(
+      return this.dataOrders.filter(
         (x) => moment(x.created).diff(this.lastUpdate) > 0
       ).length
-      console.log('Number of new orders', newOrders)
-      return newOrders
     },
     searchData() {
-      this.$store.dispatch('orders/getAllOrder', this.setData)
+      this.$store.dispatch('orders/getAllOrder')
     },
     deleteSelectedOrders() {
       this.deleteLoading = true
-      this.selectedOrders.forEach((element) => {
-        const id = element.id
-        this.$store.dispatch('orders/deleteOrder', { id })
-      })
-      setTimeout(() => {
-        this.selectedOrders = []
 
-        this.deleteLoading = false
-      }, 3000)
-
-      // this.loadPage = true
-      this.$store.dispatch('orders/getAllOrder', this.setData)
-      // this.$store.dispatch('users/detailUser', this.user.id)
-      // setTimeout(() => {
-      //   this.loadPage = false
-      // }, 3000)
-
-      // this.$store.dispatch('orders/getAllOrder', this.setData)
+      Promise.all(
+        this.selectedOrders.map((element) =>
+          this.$store.dispatch('orders/deleteOrder', { id: element.id })
+        )
+      )
+        .then(() => {
+          this.selectedOrders = []
+          this.deleteLoading = false
+        })
+        .finally(() => {
+          this.$store.dispatch('orders/getAllOrder')
+        })
     },
     async btnApprove(id) {
       const data = {
@@ -283,7 +272,7 @@ export default {
       }
       const res = await this.$store.dispatch('orders/updateOrder', { id, data })
       if (res) {
-        this.$store.dispatch('orders/getAllOrder', this.setData)
+        this.$store.dispatch('orders/getAllOrder')
       } else {
         this.$store.set('orders/message', 'Failed request!')
         this.errMsg = true
@@ -296,7 +285,7 @@ export default {
       }
       const res = await this.$store.dispatch('orders/updateOrder', { id, data })
       if (res) {
-        this.$store.dispatch('orders/getAllOrder', this.setData)
+        this.$store.dispatch('orders/getAllOrder')
       } else {
         this.$store.set('orders/message', 'Failed request!')
         this.errMsg = true
@@ -309,23 +298,15 @@ export default {
       }
       const res = await this.$store.dispatch('orders/updateOrder', { id, data })
       if (res) {
-        this.$store.dispatch('orders/getAllOrder', this.setData)
+        this.$store.dispatch('orders/getAllOrder')
       } else {
         this.$store.set('orders/message', 'Failed request!')
         this.errMsg = true
       }
     },
     orderTime(time) {
-      const displayTime = moment(new Date(time)).format('DD/MM à HH:mm')
-      console.log(displayTime)
-      return displayTime
+      return moment(new Date(time)).format('DD/MM à HH:mm')
     },
   },
-  beforeDestroy() {
-    clearInterval(this.polling)
-  },
-  // created() {
-  //   this.pollData()
-  // },
 }
 </script>

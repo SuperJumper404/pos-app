@@ -6,16 +6,13 @@ export const state = () => ({
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
-  getAllStock({ dispatch }, params) {
+  getAllStock({ dispatch }) {
     return this.$axios
-      .get(
-        `/baseurl/api/v1/stocks?filter=${params.filter}&keyword=${params.keyword}&sortby=${params.sortby}&orderby=${params.orderby}&page=${params.page}&limit=${params.limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      )
+      .get(`/baseurl/api/v1/stocks`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
       .then((response) => {
         dispatch('set/dataStock', response.data.data)
         return true

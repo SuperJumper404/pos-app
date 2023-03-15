@@ -21,7 +21,6 @@
         <v-spacer></v-spacer>
         <div class="mt-6">
           <v-text-field
-            v-model="setData.keyword"
             placeholder="Search name tables"
             label="Seaching"
             outlined
@@ -65,7 +64,7 @@
                 '&password=' +
                 items.clearpass
               "
-            ></qr-code>
+            />
             <!-- <qrcode-vue value="items.email" size="300" level="H" /> -->
           </p>
         </v-card-text>
@@ -116,12 +115,12 @@
 <script>
 import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
-import defaultdata from '@/helpers/defaultdata'
 import formatdate from '@/helpers/formatdate'
 import Vue from 'vue'
 import VueQRCodeComponent from 'vue-qrcode-component/src/QRCode.vue'
 
 // Register the Vue component
+// eslint-disable-next-line vue/component-definition-name-casing
 Vue.component('qr-code', VueQRCodeComponent)
 export default {
   components: {
@@ -130,7 +129,7 @@ export default {
 
     // QrcodeVue,
   },
-  mixins: [defaultdata, formatdate],
+  mixins: [formatdate],
   middleware: 'auth',
   data() {
     return {
@@ -149,28 +148,20 @@ export default {
   computed: {
     dataTables() {
       const result = this.$store.get('tables/dataTables')
-      console.log('Result', result)
-      console.log('Tables', this.$store.get('tables'))
       return result.filter((x) => x.access === 2) || []
     },
     websiteUrl() {
-      console.log('Router', this.$router)
-      console.log('WindwHostname', window.location.hostname)
-
       return window.location.origin
     },
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('tables/getAllTables')
-    setTimeout(() => {
+    this.$store.dispatch('tables/getAllTables').finally(() => {
       this.loadPage = false
-    }, 3000)
+    })
   },
   methods: {
-    searchData() {
-      // this.$store.dispatch('tables/dataTables', this.setData)
-    },
+    searchData() {},
   },
 }
 </script>

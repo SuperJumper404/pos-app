@@ -77,12 +77,11 @@
 </template>
 <script>
 import Breadcrumbs from '@/components/breadcrumbs'
-import defaultdata from '@/helpers/defaultdata'
 export default {
   components: {
     Breadcrumbs,
   },
-  mixins: [defaultdata],
+  mixins: [],
   middleware: 'auth',
   data: () => ({
     isValue: false,
@@ -111,7 +110,7 @@ export default {
     },
   },
   mounted() {
-    this.$store.dispatch('categories/getAllCategories', this.setData)
+    this.$store.dispatch('categories/getAllCategories')
   },
   methods: {
     imgproduct(files) {

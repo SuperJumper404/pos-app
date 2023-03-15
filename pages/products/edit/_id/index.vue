@@ -44,7 +44,7 @@
             placeholder="Insert product name"
             required
             autofocus
-          ></v-text-field>
+          />
           <v-text-field
             v-model="formeditproduct.description"
             label="Description"
@@ -53,7 +53,7 @@
             placeholder="Insert product description"
             required
             autofocus
-          ></v-text-field>
+          />
           <v-text-field
             v-model="formeditproduct.stock"
             label="Stock"
@@ -61,7 +61,7 @@
             :rules="[(v) => !!v || 'Stock required']"
             placeholder="Insert product stock"
             required
-          ></v-text-field>
+          />
           <v-text-field
             v-model="formeditproduct.price"
             label="Price"
@@ -70,7 +70,7 @@
             :rules="[(v) => !!v || 'Price required']"
             placeholder="Insert product price"
             required
-          ></v-text-field>
+          />
           <v-select
             v-model="formeditproduct.categoryid"
             :items="allCategory"
@@ -99,13 +99,12 @@
 <script>
 import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
-import defaultdata from '@/helpers/defaultdata'
 export default {
   components: {
     Breadcrumbs,
     Loading,
   },
-  mixins: [defaultdata],
+  mixins: [],
   middleware: 'auth',
   data() {
     return {
@@ -145,18 +144,25 @@ export default {
     },
   },
   mounted() {
-    this.$store.dispatch('categories/getAllCategories', this.setData)
-    this.$store.dispatch('products/getDetailProduct', this.id)
     this.loadPage = true
-    setTimeout(() => {
-      this.loadPage = false
-      this.formeditproduct.name = this.detailProduct[0].name
-      this.formeditproduct.categoryid = this.detailProduct[0].categoryid
-      this.formeditproduct.price = this.detailProduct[0].price
-      this.formeditproduct.stock = this.detailProduct[0].stock
-      this.formeditproduct.description = this.detailProduct[0].description
-      this.image = this.detailProduct[0].image
-    }, 3000)
+
+    const calls = [
+      this.$store.dispatch('categories/getAllCategories'),
+      this.$store.dispatch('products/getDetailProduct', this.id),
+    ]
+
+    Promise.all(calls)
+      .then(() => {
+        this.formeditproduct.name = this.detailProduct[0].name
+        this.formeditproduct.categoryid = this.detailProduct[0].categoryid
+        this.formeditproduct.price = this.detailProduct[0].price
+        this.formeditproduct.stock = this.detailProduct[0].stock
+        this.formeditproduct.description = this.detailProduct[0].description
+        this.image = this.detailProduct[0].image
+      })
+      .finally(() => {
+        this.loadPage = false
+      })
   },
   methods: {
     async changeImgProduct(e) {

@@ -20,7 +20,6 @@
         <v-spacer></v-spacer>
         <div class="mt-6">
           <v-text-field
-            v-model="setData.keyword"
             placeholder="Search name product"
             label="Seaching"
             outlined
@@ -127,7 +126,6 @@
     <!-- pagination -->
     <v-row class="mt-2 justify-end">
       <v-pagination
-        v-model="setData.page"
         :length="totalPage"
         :total-visible="5"
         prev-icon="mdi-menu-left"
@@ -144,13 +142,12 @@
 import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
 import price from '@/helpers/price'
-import defaultdata from '@/helpers/defaultdata'
 export default {
   components: {
     Breadcrumbs,
     Loading,
   },
-  mixins: [price, defaultdata],
+  mixins: [price],
   middleware: 'auth',
   data() {
     return {
@@ -177,17 +174,16 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('products/getProducts', this.setData)
-    setTimeout(() => {
+    this.$store.dispatch('products/getProducts').finally(() => {
       this.loadPage = false
-    }, 3000)
+    })
   },
   methods: {
     searchData() {
-      this.$store.dispatch('products/getProducts', this.setData)
+      this.$store.dispatch('products/getProducts')
     },
     pageProduct() {
-      this.$store.dispatch('products/getProducts', this.setData)
+      this.$store.dispatch('products/getProducts')
     },
   },
 }

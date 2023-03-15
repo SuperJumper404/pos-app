@@ -91,24 +91,6 @@
              
             </div> -->
         </v-card>
-        <!-- pagination -->
-        <v-card class="mt-5" color="grey lighten-4">
-          <v-card-actions>
-            <!-- <v-select label="Limit" outlined class="ma-0"></v-select> -->
-            <v-spacer></v-spacer>
-            <v-pagination
-              v-model="setData.page"
-              :length="totalPage"
-              :total-visible="5"
-              prev-icon="mdi-menu-left"
-              next-icon="mdi-menu-right"
-              color="grey darken-2"
-              circle
-              small
-              @input="pageProduct('')"
-            ></v-pagination>
-          </v-card-actions>
-        </v-card>
       </v-col>
       <!-- kanan -->
       <v-col md="4" xs="6">
@@ -292,7 +274,6 @@
   </v-container>
 </template>
 <script>
-import defaultdata from '@/helpers/defaultdata'
 import Loading from '@/components/loading'
 import price from '@/helpers/price'
 // import * as config from '@/nuxt.config'
@@ -305,7 +286,7 @@ export default {
       ? 'default'
       : 'clientside'
   },
-  mixins: [defaultdata, price],
+  mixins: [price],
   middleware: 'auth',
   data: () => ({
     // config: config,
@@ -326,10 +307,6 @@ export default {
     }
   },
   computed: {
-    // breakpoint() {
-    //   console.log('eeee', this.$vuetify.breakpoint)
-    //   return JSON.stringify(this.$vuetify.breakpoint, null, null)
-    // },
     categories() {
       const items = this.$store
         .get('products/dataProduct')
@@ -352,12 +329,16 @@ export default {
   mounted() {
     this.loadPage = true
     this.cartItem = []
-    this.$store.dispatch('products/getProducts', this.setData)
-    this.$store.dispatch('cart/setTotal', 0)
-    this.$store.dispatch('cart/setIndex', 0)
-    setTimeout(() => {
+
+    const calls = [
+      this.$store.dispatch('products/getProducts'),
+      this.$store.dispatch('cart/setTotal', 0),
+      this.$store.dispatch('cart/setIndex', 0),
+    ]
+
+    Promise.all(calls).finally(() => {
       this.loadPage = false
-    }, 3000)
+    })
   },
   methods: {
     change() {
@@ -469,7 +450,7 @@ export default {
       this.$store.dispatch('cart/setIndex', 0)
     },
     pageProduct() {
-      this.$store.dispatch('products/getProducts', this.setData)
+      this.$store.dispatch('products/getProducts')
     },
   },
 }

@@ -20,7 +20,6 @@
         <v-spacer></v-spacer>
         <div class="mt-6">
           <v-text-field
-            v-model="setData.keyword"
             placeholder="Search name operator"
             label="Seaching"
             outlined
@@ -33,7 +32,6 @@
       <v-data-table
         :headers="headers"
         :items="dataStocks"
-        :search="setData.keyword"
         :items-per-page="5"
         class="elevation-1"
       >
@@ -47,14 +45,13 @@
 <script>
 import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
-import defaultdata from '@/helpers/defaultdata'
 import formatdate from '@/helpers/formatdate'
 export default {
   components: {
     Breadcrumbs,
     Loading,
   },
-  mixins: [defaultdata, formatdate],
+  mixins: [formatdate],
   middleware: 'auth',
   data() {
     return {
@@ -88,14 +85,13 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('stocks/getAllStock', this.setData)
-    setTimeout(() => {
+    this.$store.dispatch('stocks/getAllStock').finally(() => {
       this.loadPage = false
-    }, 3000)
+    })
   },
   methods: {
     searchData() {
-      this.$store.dispatch('stocks/getAllStock', this.setData)
+      this.$store.dispatch('stocks/getAllStock')
     },
   },
 }

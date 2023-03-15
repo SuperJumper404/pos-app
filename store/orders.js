@@ -9,16 +9,13 @@ export const state = () => ({
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
-  getAllOrder({ dispatch }, params) {
+  getAllOrder({ dispatch }) {
     return this.$axios
-      .get(
-        `/baseurl/api/v1/orders?filter=${params.filter}&keyword=${params.keyword}&page=${params.page}&limit=${params.limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      )
+      .get(`/baseurl/api/v1/orders`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
       .then((response) => {
         const lastCreatedOrder = response.data.data
           .map(function (e) {
@@ -38,14 +35,11 @@ export const actions = {
   },
   getOrdersByUserId({ dispatch }, params) {
     return this.$axios
-      .get(
-        `/baseurl/api/v1/ordersbyUserId?userId=${params.userId}&filter=${params.filter}&keyword=${params.keyword}&page=${params.page}&limit=${params.limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      )
+      .get(`/baseurl/api/v1/ordersbyUserId?userId=${params.userId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
       .then((response) => {
         dispatch('set/dataOrdersByUserId', response.data.data)
         return true
@@ -98,7 +92,7 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        console.log('Error delete')
+        console.error('Error delete')
         dispatch('set/message', error.response.data.message)
         return false
       })

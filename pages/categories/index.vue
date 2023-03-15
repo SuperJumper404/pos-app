@@ -20,7 +20,6 @@
         <v-spacer></v-spacer>
         <div class="mt-6">
           <v-text-field
-            v-model="setData.keyword"
             placeholder="Search name categories"
             label="Seaching"
             outlined
@@ -98,14 +97,13 @@
 <script>
 import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
-import defaultdata from '@/helpers/defaultdata'
 import formatdate from '@/helpers/formatdate'
 export default {
   components: {
     Breadcrumbs,
     Loading,
   },
-  mixins: [defaultdata, formatdate],
+  mixins: [formatdate],
   middleware: 'auth',
   data() {
     return {
@@ -126,14 +124,13 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('categories/getAllCategories', this.setData)
-    setTimeout(() => {
+    this.$store.dispatch('categories/getAllCategories').finally(() => {
       this.loadPage = false
-    }, 3000)
+    })
   },
   methods: {
     searchData() {
-      this.$store.dispatch('categories/getAllCategories', this.setData)
+      this.$store.dispatch('categories/getAllCategories')
     },
   },
 }

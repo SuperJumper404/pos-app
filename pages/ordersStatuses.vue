@@ -11,15 +11,15 @@
     <v-card v-else outlined class="mt-5">
       <v-app-bar flat color="grey lighten-4" light> </v-app-bar>
       <v-data-table :headers="headers" :items="dataOrders">
-        <template v-slot:[`item.created`]="{ item }">
+        <template #[`item.created`]="{ item }">
           <div>
             {{ orderTime(item.created) }}
           </div>
         </template>
-        <template v-slot:[`item.subtotal`]="{ item }">
+        <template #[`item.subtotal`]="{ item }">
           <div>{{ conversiRp(item.subtotal) }} €</div>
         </template>
-        <template v-slot:[`item.status`]="{ item }">
+        <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
             En preparation
@@ -27,28 +27,8 @@
           <v-chip v-if="item.status === 3" color="primary"> Terminer </v-chip>
           <v-chip v-if="item.status === 4" color="warning"> Annuler </v-chip>
         </template>
-        <template v-slot:[`item.actions`]="{ item }">
+        <template #[`item.actions`]="{ item }">
           <v-row>
-            <v-card-actions v-if="item.status === 1">
-              <v-btn
-                outlined
-                small
-                color="success"
-                class="text-capitalize"
-                @click="btnApprove(item.id)"
-                >Valider <v-icon small right>mdi-check-circle</v-icon>
-              </v-btn>
-            </v-card-actions>
-            <v-card-actions v-if="item.status === 2">
-              <v-btn
-                outlined
-                small
-                color="primary"
-                class="text-capitalize"
-                @click="btnFinish(item.id)"
-                >Prête <v-icon small right>mdi-check-circle</v-icon>
-              </v-btn>
-            </v-card-actions>
             <v-card-actions>
               <v-btn
                 outlined
@@ -60,7 +40,9 @@
                 <v-icon small right>mdi-information-outline</v-icon>
               </v-btn>
             </v-card-actions>
-            <v-card-actions v-if="item.status !== 4 && item.status !== 3">
+            <v-card-actions
+              v-if="item.status !== 4 && item.status !== 3 && item.status !== 2"
+            >
               <v-btn
                 outlined
                 small
@@ -81,13 +63,12 @@
   </v-container>
 </template>
 <script>
-import defaultdata from '@/helpers/defaultdata'
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import moment from 'moment'
 
 export default {
-  mixins: [defaultdata, formatdate, price],
+  mixins: [formatdate, price],
   middleware: 'auth',
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
@@ -99,6 +80,10 @@ export default {
       loadPage: false,
       deleteLoading: false,
       errMsg: false,
+      polling: null,
+      lastUpdate: moment(new Date()),
+      orderNotifications: [],
+      selectedOrders: [],
       headers: [
         { text: 'Date', value: 'created', filterable: true, width: '150px' },
         {
@@ -135,7 +120,9 @@ export default {
   },
   computed: {
     dataOrders() {
-      return this.$store.get('orders/dataOrdersByUserId')
+      return this.$store.get('orders/dataOrdersByUserId', {
+        userId: this.user.id,
+      })
     },
     message() {
       return this.$store.get('orders/message')
@@ -146,19 +133,39 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    console.log('USer func', this.user.id)
-    this.setData.userId = this.user.id
-    this.$store.dispatch('orders/getOrdersByUserId', this.setData)
-    // this.$store.dispatch('users/detailUser', this.user.id)
-    setTimeout(() => {
-      this.loadPage = false
-    }, 3000)
+    this.pollData()
+    this.$store
+      .dispatch('orders/getOrdersByUserId', { userId: this.user.id })
+      .finally(() => {
+        this.loadPage = false
+      })
   },
   methods: {
+    pollData() {
+      this.polling = setInterval(() => {
+        this.$store.dispatch('orders/getOrdersByUserId', {
+          userId: this.user.id,
+        })
+        this.lastUpdate = this.updateTimeStamp
+      }, 15000)
+    },
     orderTime(time) {
       const displayTime = moment(new Date(time)).format('DD/MM à HH:mm')
       console.log(displayTime)
       return displayTime
+    },
+    async btnCancel(id) {
+      const data = {
+        operator: this.user.id,
+        status: 4,
+      }
+      const res = await this.$store.dispatch('orders/updateOrder', { id, data })
+      if (res) {
+        this.$store.dispatch('orders/getAllOrder')
+      } else {
+        this.$store.set('orders/message', 'Failed request!')
+        this.errMsg = true
+      }
     },
   },
   // created() {

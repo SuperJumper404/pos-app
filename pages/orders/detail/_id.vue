@@ -42,9 +42,7 @@
     <v-card color="grey lighten-3" class="mt-5">
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="primary" outlined @click="$router.push('/orders')"
-          >Back</v-btn
-        >
+        <v-btn color="primary" outlined @click="$router.go(-1)">Back</v-btn>
       </v-card-actions>
     </v-card>
   </v-container>
@@ -54,6 +52,11 @@ import price from '@/helpers/price'
 export default {
   mixins: [price],
   middleware: 'auth',
+  layout() {
+    return parseInt(localStorage.getItem('access')) === 0
+      ? 'default'
+      : 'clientside'
+  },
   data() {
     return {
       id: this.$route.params.id,

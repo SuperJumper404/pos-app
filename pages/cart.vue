@@ -2,10 +2,7 @@
   <v-container>
     <v-row class="mt-8">
       <v-col md="8" sm="12" cols="12">
-        <v-card v-if="loadPage" outlined height="100%">
-          <Loading />
-        </v-card>
-        <v-card v-else outlined height="100%" class="pa-2 overflow-y-auto">
+        <v-card outlined height="100%" class="pa-2 overflow-y-auto">
           <v-card-text v-if="!dataCart" class="row justify-center">
             <p style="margin-top: 30vh">
               <v-icon large>mdi-emoticon-sad</v-icon> Your cart is empty!
@@ -21,7 +18,7 @@
             <v-img
               :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
               max-width="100px"
-            ></v-img>
+            />
             <v-card-subtitle class="d-md-flex d-sm-none d-none">
               <p class="font-weight-bold text-truncate">{{ itm.name }}</p>
             </v-card-subtitle>
@@ -163,12 +160,8 @@ export default {
     },
   },
   mounted() {
-    this.loadPage = true
-    setTimeout(() => {
-      this.loadPage = false
-      this.ppn = this.totalCart * 0.1
-      this.total = this.totalCart + this.ppn
-    }, 3000)
+    this.ppn = this.totalCart * 0.1
+    this.total = this.totalCart + this.ppn
   },
   methods: {
     async paymentBtn() {

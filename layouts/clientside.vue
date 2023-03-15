@@ -74,6 +74,11 @@ export default {
           to: '/orders',
         },
         {
+          icon: 'mdi-cash-register',
+          title: 'Cash Register',
+          to: '/cashregister',
+        },
+        {
           icon: 'mdi-apps',
           title: 'Stocks',
           to: '/stocks',

@@ -7,16 +7,13 @@ export const state = () => ({
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
-  getAllCategories({ dispatch }, params) {
+  getAllCategories({ dispatch }) {
     return this.$axios
-      .get(
-        `/baseurl/api/v1/categories?filter=${params.filter}&keyword=${params.keyword}&sortby=id&orderby=${params.orderby}&page=${params.page}&limit=${params.limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      )
+      .get(`/baseurl/api/v1/categories`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
       .then((response) => {
         dispatch('set/dataCategories', response.data.data)
         return true

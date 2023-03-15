@@ -14,7 +14,6 @@
         <v-spacer></v-spacer>
         <div class="mt-6">
           <v-text-field
-            v-model="setData.keyword"
             type="number"
             placeholder="Search ordernumber"
             label="Seaching"
@@ -66,14 +65,13 @@
 </template>
 <script>
 import Breadcrumbs from '@/components/breadcrumbs'
-import defaultdata from '@/helpers/defaultdata'
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 export default {
   components: {
     Breadcrumbs,
   },
-  mixins: [defaultdata, formatdate, price],
+  mixins: [formatdate, price],
   middleware: 'auth',
   data() {
     return {
@@ -94,14 +92,13 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('orders/getAllOrder', this.setData)
-    setTimeout(() => {
+    this.$store.dispatch('orders/getAllOrder').finally(() => {
       this.loadPage = false
-    }, 3000)
+    })
   },
   methods: {
     searchData() {
-      this.$store.dispatch('orders/getAllOrder', this.setData)
+      this.$store.dispatch('orders/getAllOrder')
     },
   },
 }

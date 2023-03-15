@@ -69,11 +69,12 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('categories/getDetailCategory', this.$route.params.id)
-    setTimeout(() => {
-      this.loadPage = false
-      this.formcategory.name = this.detailCategory[0].name
-    }, 3000)
+    this.$store
+      .dispatch('categories/getDetailCategory', this.$route.params.id)
+      .finally(() => {
+        this.loadPage = false
+        this.formcategory.name = this.detailCategory[0].name
+      })
   },
   methods: {
     async submitEditCategory() {
