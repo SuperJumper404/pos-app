@@ -120,9 +120,7 @@ export default {
   },
   computed: {
     dataOrders() {
-      return this.$store.get('orders/dataOrdersByUserId', {
-        userId: this.user.id,
-      })
+      return this.$store.get('orders/dataOrdersByUserId')
     },
     message() {
       return this.$store.get('orders/message')

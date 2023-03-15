@@ -22,12 +22,11 @@ export const actions = {
         },
       })
       .then((response) => {
-        console.log('Response All Users', response.data)
         dispatch('set/dataTables', response.data.data)
         return true
       })
       .catch((error) => {
-        console.log('Error Get Users')
+        console.error('Error Get Users')
         dispatch('set/message', error.response.data.message)
         return false
       })
@@ -49,7 +48,6 @@ export const actions = {
       })
   },
   deleteTable(params) {
-    console.log('Params', params)
     return this.$axios
       .delete(`/baseurl/api/v1/user/${params}`, {
         headers: {

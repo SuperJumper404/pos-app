@@ -22,7 +22,7 @@
             <p>Menu empty</p>
           </v-card-text>
         </v-card>
-        <v-card v-else outlined class="overflow-y-auto overflow-x-hidden pa-2">
+        <v-card v-else class="overflow-y-auto overflow-x-hidden pa-1">
           <v-expansion-panels accordion>
             <v-expansion-panel v-for="(category, i) in categories" :key="i">
               <v-expansion-panel-header
@@ -43,12 +43,12 @@
                         :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
                       ></v-img>
                       <v-card-title class="mb-n5">
-                        <h7
+                        <h6
                           class="text-truncate"
                           style="font-weight: bold; font-size: large"
                         >
                           {{ items.name }}
-                        </h7>
+                        </h6>
                       </v-card-title>
                       <v-card-text class="mb-n5">
                         <p

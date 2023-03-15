@@ -16,7 +16,6 @@ export const actions = {
     dispatch('set/indexCart', params)
   },
   setTocart({ dispatch }, params) {
-    // console.log(params)
     dispatch('set/dataCart', params)
   },
   postOrder({ dispatch }, params) {
