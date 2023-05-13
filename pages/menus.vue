@@ -85,12 +85,56 @@
               </v-expansion-panel-content>
             </v-expansion-panel>
           </v-expansion-panels>
-          <!-- 
-            <div v-for="category in categories" :key="category">
-              <h1>{{ category }}</h1>
-             
-            </div> -->
         </v-card>
+        <!-- <v-card outlined max-height="150px;">
+                    <v-img
+                      height="100px"
+                      :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
+                    ></v-img>
+                    <v-card-title class="mb-n5">
+                      <h6
+                        class="text-truncate"
+                        style="font-weight: bold; font-size: large"
+                      >
+                        {{ items.name }}
+                      </h6>
+                    </v-card-title>
+                    <v-card-text class="mb-n5">
+                      <p
+                        style="
+                          border: none;
+                          margin: inherit;
+                          height: 50px;
+                          overflow: auto;
+                          overflow-x: hidden;
+                        "
+                      >
+                        {{ items.description }}
+                      </p>
+                      <br />
+                      <span
+                        class="mb-2"
+                        style="font-weight: bold; font-size: medium"
+                        >{{ conversiRp(items.price) }} €</span
+                      >
+                    </v-card-text>
+                    <v-card-actions>
+                      <v-btn
+                        color="success"
+                        small
+                        width="100%"
+                        class="text-capitalize"
+                        @click="addToCart(items)"
+                        >Add</v-btn
+                      >
+                    </v-card-actions>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </div>
+          </div>
+          
+        </v-card> -->
       </v-col>
       <!-- kanan -->
       <v-col md="4" xs="6">

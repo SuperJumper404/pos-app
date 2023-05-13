@@ -13,13 +13,17 @@ export const actions = {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
+        params: {
+          shopid: localStorage.getItem('shopid'),
+        },
       })
       .then((response) => {
         dispatch('set/dataCategories', response.data.data)
         return true
       })
       .catch((error) => {
-        dispatch('set/dataCategories', error.response.data.data)
+        dispatch('set/message', error.response.data.data)
+        dispatch('set/dataCategories', [])
         return false
       })
   },
@@ -35,7 +39,8 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/detailCategory', error.response.data.data)
+        dispatch('set/message', error.response.data.data)
+        dispatch('set/detailCategory', [])
         return false
       })
   },

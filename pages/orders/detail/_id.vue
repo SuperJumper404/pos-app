@@ -45,6 +45,7 @@
         <v-btn color="primary" outlined @click="$router.go(-1)">Back</v-btn>
       </v-card-actions>
     </v-card>
+    <pre type="json">{{ detailOrder }}</pre>
   </v-container>
 </template>
 <script>

@@ -19,7 +19,8 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/dataProduct', error.response.data.data)
+        dispatch('set/message', error.response.data.data)
+        dispatch('set/dataProduct', [])
         return false
       })
   },
@@ -35,7 +36,8 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/detailProduct', error.response.data.data)
+        dispatch('set/message', error.response.data.data)
+        dispatch('set/detailProduct', [])
         return false
       })
   },

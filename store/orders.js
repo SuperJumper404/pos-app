@@ -4,6 +4,7 @@ export const state = () => ({
   dataOrdersByUserId: [],
   message: '',
   detailOrder: [],
+  AllDetailOrders: [],
   lastCreatedOrder: null,
 })
 export const mutations = { ...defaultMutations(state()) }
@@ -29,7 +30,8 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/dataOrders', error.response.data.data)
+        dispatch('set/message', error.response.data.data)
+        dispatch('set/dataOrders', [])
         return false
       })
   },
@@ -45,7 +47,8 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/dataOrdersByUserId', error.response.data.data)
+        dispatch('set/message', error.response.data.data)
+        dispatch('set/dataOrdersByUserId', [])
         return false
       })
   },
@@ -60,6 +63,27 @@ export const actions = {
         dispatch('set/detailOrder', response.data.data)
         return true
       })
+  },
+  getAllDetailOrders({ dispatch }, params) {
+    const requests = params.map((element) => {
+      return this.$axios.get(`/baseurl/api/v1/detailorder/${element}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+    })
+
+    Promise.all(requests)
+      .then((responses) => {
+        const allData = responses.map((response) => response.data.data)
+        console.log('All Order responses', allData)
+        dispatch('set/AllDetailOrders', allData)
+      })
+      .catch((error) => {
+        console.error('Error getting all order details:', error)
+      })
+
+    return true
   },
   updateOrder({ dispatch }, params) {
     return this.$axios
@@ -93,6 +117,26 @@ export const actions = {
       })
       .catch((error) => {
         console.error('Error delete')
+        dispatch('set/message', error.response.data.message)
+        return false
+      })
+  },
+  archiveOrder({ dispatch }, params) {
+    return this.$axios
+      .post(
+        `/baseurl/api/v1/orders/archive/${params.id}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then(() => {
+        return true
+      })
+      .catch((error) => {
+        console.error('Error to Archive order ')
         dispatch('set/message', error.response.data.message)
         return false
       })

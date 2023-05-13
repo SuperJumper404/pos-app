@@ -10,7 +10,7 @@
     >
       <Loading />
     </v-card>
-    <v-card v-else outlined class="mt-5 overflow-y-auto" style="height: 350px">
+    <v-card v-else outlined class="mt-5 overflow-y-auto">
       <v-app-bar flat color="grey lighten-4" light>
         <v-btn
           color="success"
@@ -147,7 +147,7 @@ export default {
   },
   computed: {
     dataTables() {
-      const result = this.$store.get('tables/dataTables')
+      const result = this.$store.get('tables/dataTables') || []
       return result.filter((x) => x.access === 2)
     },
     websiteUrl() {

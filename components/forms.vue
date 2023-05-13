@@ -197,11 +197,13 @@ export default {
           if (this.$store.get('users/message') === msg) {
             this.loadingBtn = false
             this.$store.set('users/message', 'Check email!')
+            console.log('Je passe dans cette condition ? ')
             this.$store.set('users/alertError', true)
             this.stsMsg = !this.stsMsg
           } else {
             this.loadingBtn = false
             this.$store.set('users/message', 'Email or pass wrong!')
+            console.log('Je passe dans cette condition ? ')
             this.$store.set('users/alertError', true)
             this.stsMsg = !this.stsMsg
           }
@@ -213,11 +215,14 @@ export default {
         )
         if (res) {
           this.loadingBtn = false
+          console.log('Je passe dans cette condition ? ')
+
           this.$store.set('users/alertSuccess', true)
           this.$store.set('users/message', 'Check email!')
           this.$router.push('/login')
         } else {
           this.loadingBtn = false
+          console.log('Je passe dans cette condition ? ')
           this.$store.set('users/alertError', true)
           this.stsMsg = !this.stsMsg
         }

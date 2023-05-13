@@ -82,7 +82,7 @@
           <v-chip v-if="item.status === 4" color="warning"> Annuler </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
-          <v-row>
+          <v-row class="d-flex flex-nowrap">
             <v-card-actions v-if="item.status === 1">
               <v-btn
                 outlined
@@ -128,7 +128,7 @@
         </template>
       </v-data-table>
     </v-card>
-    <!-- <pre type="json">{{ dataOrders }}</pre> -->
+    <pre type="json">{{ dataOrders }}</pre>
     <!-- <v-btn @click="soundNotification()"
       >Sound <v-icon small right>mdi-close-circle</v-icon>
     </v-btn> -->
@@ -166,17 +166,18 @@ export default {
       orderNotifications: [],
       selectedOrders: [],
       headers: [
-        { text: 'Date', value: 'created', filterable: true, width: '150px' },
+        { text: 'Date', value: 'created', filterable: true },
         {
           text: 'Numero de commande',
           value: 'ordernumber',
           filterable: true,
         },
-        { text: 'Client', value: 'customer', filterable: true, width: '100px' },
+        { text: 'Table', value: 'username', filterable: true },
+        { text: 'Client', value: 'customer', filterable: true },
         // { text: 'Operateur', value: 'operator' },
-        { text: 'Total', value: 'subtotal', filterable: true, width: '100px' },
+        { text: 'Total', value: 'subtotal', filterable: true },
         { text: 'Status', value: 'status', filterable: true },
-        { text: 'Actions', value: 'actions', width: '500px' },
+        { text: 'Actions', value: 'actions' },
       ],
       items: [
         {

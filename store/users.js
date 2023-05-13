@@ -7,6 +7,7 @@ export const state = () => ({
     id: null,
     access: null,
     token: null,
+    shopid: null,
   },
   userDetail: [],
 })
@@ -14,6 +15,7 @@ export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
   postRegister({ dispatch }, params) {
+    params.shopid = localStorage.getItem('shopid')
     return this.$axios
       .post('/baseurl/api/v1/register', params)
       .then((response) => {
@@ -32,13 +34,17 @@ export const actions = {
         localStorage.setItem('idUser', response.data.data[0].id)
         localStorage.setItem('access', response.data.data[0].access)
         localStorage.setItem('token', response.data.data[0].token)
+        localStorage.setItem('shopid', response.data.data[0].shopid)
+        console.log('REspondse DAta', response.data.data)
         dispatch('set/user.id', response.data.data[0].id)
         dispatch('set/user.access', response.data.data[0].access)
         dispatch('set/user.token', response.data.data[0].token)
+        dispatch('set/user.shopid', response.data.data[0].shopid)
         dispatch('set/message', response.data.message)
         return true
       })
       .catch((error) => {
+        console.log('RR', error.response)
         dispatch('set/message', error.response.data.message)
         return false
       })
@@ -55,16 +61,22 @@ export const actions = {
           },
         }
       )
-      .then(() => {
+      .then((response) => {
         localStorage.removeItem('idUser')
         localStorage.removeItem('access')
         localStorage.removeItem('token')
+        localStorage.removeItem('shopid')
         dispatch('set/user.id', null)
         dispatch('set/user.access', null)
         dispatch('set/user.token', null)
+        dispatch('set/message', response.data.message)
+        dispatch('set/alertSuccess', true)
+        dispatch('set/user.shopid', null)
         return true
       })
       .catch((error) => {
+        dispatch('set/message', error.response.data.message)
+
         return false || error.response
       })
   },

@@ -27,7 +27,8 @@ export const actions = {
       })
       .catch((error) => {
         console.error('Error Get Users')
-        dispatch('set/message', error.response.data.message)
+        dispatch('set/message', error.response.data.data)
+        dispatch('set/dataTables', [])
         return false
       })
   },

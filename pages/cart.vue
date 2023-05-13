@@ -172,6 +172,7 @@ export default {
         subtotal: this.total,
         payment: this.formuser.payment,
         status: 1, // 1 pending & 2 approve
+        created: new Date(),
       }
       const res = await this.$store.dispatch('cart/postOrder', params)
       if (res) {

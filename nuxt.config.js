@@ -2,9 +2,9 @@ import colors from 'vuetify/es5/util/colors'
 const config = require('./config/config.json')
 console.log(config)
 console.log(process.env.ENV)
-function getHost(){
-  const env = process.env.ENV;
-  let currentEnvConfig= config.environments[env]
+function getHost() {
+  const env = process.env.ENV
+  let currentEnvConfig = config.environments[env]
   console.log(currentEnvConfig)
   return currentEnvConfig
 }
@@ -12,12 +12,12 @@ function getHost(){
 getHost()
 // export NODE_OPTIONS=--openssl-legacy-provider
 export default {
-   server: {
-     host: getHost().frontEndPoint // default: localhost or IP_ADRESSE 192.168.1.139
+  server: {
+    host: getHost().frontEndPoint, // default: localhost or IP_ADRESSE 192.168.1.139
     //  host: '192.168.1.139' // default: localhost or IP_ADRESSE 192.168.1.139
-  //  host: '127.0.0.1' // default: localhost or IP_ADRESSE 192.168.1.139
+    //  host: '127.0.0.1' // default: localhost or IP_ADRESSE 192.168.1.139
   },
-  ssr:false,
+  ssr: false,
   head: {
     titleTemplate: '%s - pos-app',
     title: 'pos-app',
@@ -32,12 +32,15 @@ export default {
     link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }],
   },
   css: ['~/assets/css/styles', '~/assets/scss/test.scss'],
-  plugins: [{ src: '~/plugins/persistedState.client.js' ,srr:false}],
+  plugins: [
+    { src: '~/plugins/persistedState.client.js', srr: false },
+    { src: '~/plugins/axios.js' },
+  ],
   components: true,
   buildModules: ['@nuxtjs/eslint-module', '@nuxtjs/vuetify'],
   modules: ['@nuxtjs/axios'],
   env: {
-    privateURL:getHost().backEndPoint,
+    privateURL: getHost().backEndPoint,
   },
   axios: {
     proxy: true,

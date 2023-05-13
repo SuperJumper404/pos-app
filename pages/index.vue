@@ -54,19 +54,18 @@ export default {
   mounted() {
     this.loadPage = true
     this.accessUser = parseInt(localStorage.getItem('access'))
+    if (this.accessUser === 2) this.$router.push('/menus')
 
     const calls = [
       this.$store.dispatch('products/getProducts'),
-      this.$store.dispatch('categories/getAllCategories'),
-      this.$store.dispatch('stocks/getAllStock'),
+      // this.$store.dispatch('categories/getAllCategories'),
+      // this.$store.dispatch('stocks/getAllStock'),
       this.$store.dispatch('orders/getAllOrder'),
     ]
 
     Promise.all(calls).finally(() => {
       this.loadPage = false
     })
-
-    if (this.accessUser === 2) this.$router.push('/menus')
   },
 }
 </script>

@@ -38,7 +38,6 @@
       </v-card-title>
       <v-card
         v-for="items in dataCategories"
-        v-else
         :key="items.id"
         outlined
         class="pa-2 d-flex justify-space-between align-center ma-3"
