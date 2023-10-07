@@ -80,6 +80,83 @@
             label="Categories"
             required
           ></v-select>
+          <v-btn
+            color="success"
+            class="text-capitalize mr-3 mb-4"
+            @click.stop="addCustomization"
+            ><v-icon>mdi-plus</v-icon>Ajouter choix </v-btn
+          ><br />
+          <div
+            v-for="(custom, index) in formeditproduct.product_customization"
+            :key="index"
+          >
+            <v-row>
+              <!-- Row for Customization Name and Message -->
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="formeditproduct.product_customization[index].name"
+                  label="Customization Name"
+                  :rules="[(v) => !!v || 'Name required']"
+                  placeholder="Enter name"
+                  required
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="
+                    formeditproduct.product_customization[index].description
+                  "
+                  label="Customization Message"
+                  :rules="[(v) => !!v || 'Name required']"
+                  placeholder="Enter description"
+                  required
+                ></v-text-field>
+              </v-col>
+
+              <!-- Row for Max Choices, Switch, and Combobox -->
+              <v-col cols="12" md="6">
+                <v-combobox
+                  v-model="formeditproduct.product_customization[index].items"
+                  label="Select a favorite activity or create a new one"
+                  chips
+                  multiple
+                  :item-text="displayItem"
+                  @change="processComboboxInput(index)"
+                ></v-combobox> </v-col
+              ><v-col cols="12" md="3">
+                <v-text-field
+                  v-model="
+                    formeditproduct.product_customization[index].limit_choice
+                  "
+                  label="Max Choices"
+                  type="number"
+                  :rules="[(v) => !!v || 'Max Choices required']"
+                  placeholder="Enter max choices"
+                  required
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-switch
+                  v-model="
+                    formeditproduct.product_customization[index].mandatory
+                  "
+                  inset
+                  label="Choix obligatoire ?"
+                ></v-switch>
+              </v-col>
+            </v-row>
+            <v-card
+              v-if="formeditproduct.product_customization.length > 1"
+              class="mx-auto"
+              max-width="400"
+            >
+              <v-progress-linear
+                color="success"
+                rounded
+                value="0"
+              ></v-progress-linear>
+            </v-card>
+          </div>
           <v-btn color="warning" @click.stop="$router.push('/products')"
             >Cancel</v-btn
           >
@@ -94,6 +171,8 @@
         </v-form>
       </v-col>
     </v-row>
+    <pre type="json">{{ detailProduct }}</pre>
+    <pre type="json">{{ formeditproduct }}</pre>
   </v-container>
 </template>
 <script>
@@ -121,6 +200,7 @@ export default {
         categoryid: '',
         price: '',
         stock: '',
+        product_customization: [],
       },
     }
   },
@@ -158,6 +238,9 @@ export default {
         this.formeditproduct.price = this.detailProduct[0].price
         this.formeditproduct.stock = this.detailProduct[0].stock
         this.formeditproduct.description = this.detailProduct[0].description
+        this.formeditproduct.product_customization = JSON.parse(
+          JSON.stringify(this.detailProduct[0].product_customization)
+        )
         this.image = this.detailProduct[0].image
       })
       .finally(() => {
@@ -165,6 +248,55 @@ export default {
       })
   },
   methods: {
+    processComboboxInput(index) {
+      const lastItem =
+        this.formeditproduct.product_customization[index].items.slice(-1)[0]
+
+      if (typeof lastItem === 'string') {
+        // Regex to match pattern 'Name (Price)'
+        const match = lastItem.match(/^(.*)\s\(([\d,.]+)\)$/)
+
+        if (match) {
+          const name = match[1].trim()
+          const price = parseFloat(match[2].replace(',', '.')) // Convert , to . if needed
+
+          // Replace the last string item with an object
+          this.formeditproduct.product_customization[index].items.splice(
+            -1,
+            1,
+            {
+              name,
+              price,
+            }
+          )
+        } else {
+          // If no pattern match, consider the entire string as a name with a default price
+          this.formeditproduct.product_customization[index].items.splice(
+            -1,
+            1,
+            {
+              name: lastItem,
+              price: 0,
+            }
+          )
+        }
+      }
+    },
+    displayItem(item) {
+      // Check if price is present and not zero to display it.
+      return item.price && item.price !== 0
+        ? `${item.name} (+${item.price}€)`
+        : item.name
+    },
+    addCustomization() {
+      this.formeditproduct.product_customization.push({
+        name: '',
+        description: '',
+        limit_choice: null,
+        items: [],
+        mandatory: false,
+      }) // Ajoute une nouvelle option vide
+    },
     async changeImgProduct(e) {
       const image = e.target.files[0]
       if (image) {

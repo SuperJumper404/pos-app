@@ -210,7 +210,7 @@ export default {
   computed: {
     dataTables() {
       const result = this.$store.get('tables/dataTables') || []
-      return result.filter((x) => x.access === 2)
+      return result.filter((x) => x.access === 2 || x.access === 0)
     },
 
     getAllOrders() {

@@ -3,7 +3,6 @@
     <div v-if="errMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <Breadcrumbs />
     <div class="mt-5">
       <h3>Form New Product</h3>
     </div>
@@ -61,6 +60,78 @@
         required
         @change="imgproduct"
       ></v-file-input>
+
+      <v-btn
+        color="success"
+        class="text-capitalize mr-3 mb-4"
+        @click.stop="addCustomization"
+        ><v-icon>mdi-plus</v-icon>Ajouter choix </v-btn
+      ><br />
+      <div
+        v-for="(custom, index) in formproduct.product_customization"
+        :key="index"
+      >
+        <v-row>
+          <!-- Row for Customization Name and Message -->
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formproduct.product_customization[index].name"
+              label="Customization Name"
+              :rules="[(v) => !!v || 'Name required']"
+              placeholder="Enter name"
+              required
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formproduct.product_customization[index].description"
+              label="Customization Message"
+              :rules="[(v) => !!v || 'Name required']"
+              placeholder="Enter description"
+              required
+            ></v-text-field>
+          </v-col>
+
+          <!-- Row for Max Choices, Switch, and Combobox -->
+          <v-col cols="12" md="6">
+            <v-combobox
+              v-model="formproduct.product_customization[index].items"
+              label="Select a favorite activity or create a new one"
+              chips
+              multiple
+              :item-text="displayItem"
+              @change="processComboboxInput(index)"
+            ></v-combobox> </v-col
+          ><v-col cols="12" md="3">
+            <v-text-field
+              v-model="formproduct.product_customization[index].limit_choice"
+              label="Max Choices"
+              type="number"
+              :rules="[(v) => !!v || 'Max Choices required']"
+              placeholder="Enter max choices"
+              required
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" md="3">
+            <v-switch
+              v-model="formproduct.product_customization[index].mandatory"
+              inset
+              label="Choix obligatoire ?"
+            ></v-switch>
+          </v-col>
+        </v-row>
+        <v-card
+          v-if="formproduct.product_customization.length > 1"
+          class="mx-auto"
+          max-width="400"
+        >
+          <v-progress-linear
+            color="success"
+            rounded
+            value="0"
+          ></v-progress-linear>
+        </v-card>
+      </div>
       <v-btn color="warning" @click.stop="$router.push('/products')"
         >Cancel</v-btn
       >
@@ -73,14 +144,12 @@
         >Submit</v-btn
       >
     </v-form>
+    <pre>{{ formproduct }}</pre>
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 export default {
-  components: {
-    Breadcrumbs,
-  },
+  components: {},
   mixins: [],
   middleware: 'auth',
   data: () => ({
@@ -94,6 +163,7 @@ export default {
       price: '',
       stock: '',
       image: '',
+      product_customization: [],
     },
   }),
   head() {
@@ -113,6 +183,47 @@ export default {
     this.$store.dispatch('categories/getAllCategories')
   },
   methods: {
+    processComboboxInput(index) {
+      const lastItem =
+        this.formproduct.product_customization[index].items.slice(-1)[0]
+
+      if (typeof lastItem === 'string') {
+        // Regex to match pattern 'Name (Price)'
+        const match = lastItem.match(/^(.*)\s\(([\d,.]+)\)$/)
+
+        if (match) {
+          const name = match[1].trim()
+          const price = parseFloat(match[2].replace(',', '.')) // Convert , to . if needed
+
+          // Replace the last string item with an object
+          this.formproduct.product_customization[index].items.splice(-1, 1, {
+            name,
+            price,
+          })
+        } else {
+          // If no pattern match, consider the entire string as a name with a default price
+          this.formproduct.product_customization[index].items.splice(-1, 1, {
+            name: lastItem,
+            price: 0,
+          })
+        }
+      }
+    },
+    displayItem(item) {
+      // Check if price is present and not zero to display it.
+      return item.price && item.price !== 0
+        ? `${item.name} (+${item.price}€)`
+        : item.name
+    },
+    addCustomization() {
+      this.formproduct.product_customization.push({
+        name: '',
+        message: '',
+        limit_choice: null,
+        items: [],
+        mandatory: false,
+      }) // Ajoute une nouvelle option vide
+    },
     imgproduct(files) {
       const image = files
       if (image) {
@@ -136,6 +247,11 @@ export default {
       fd.append('categoryid', this.formproduct.categoryid)
       fd.append('image', this.formproduct.image)
       fd.append('description', this.formproduct.description)
+      fd.append(
+        'product_customization',
+        JSON.stringify(this.formproduct.product_customization)
+      )
+
       this.loadingBtn = true
       const res = await this.$store.dispatch('products/postProducts', fd)
       if (res) {
@@ -150,3 +266,33 @@ export default {
   },
 }
 </script>
+<style>
+hr.zig,
+hr.zag {
+  border: none;
+  height: 30px;
+  margin: 0 50px;
+}
+
+hr.zig {
+  background: linear-gradient(-135deg, #fff 20px, rgba(0, 0, 0, 0) 0) 0 5px,
+    linear-gradient(135deg, #fff 20px, rgba(0, 0, 0, 0) 0) 0 5px;
+  background-color: rgba(0, 0, 0, 0);
+  background-position: center bottom;
+  background-repeat: repeat-x;
+  background-size: 20px 40px;
+  z-index: 100;
+  position: relative;
+}
+
+hr.zag {
+  background: linear-gradient(-135deg, #333 20px, rgba(0, 0, 0, 0) 0) 0 5px,
+    linear-gradient(135deg, #333 20px, #fff 0) 0 5px;
+  background-color: rgba(0, 0, 0, 0);
+  background-position: center bottom;
+  background-repeat: repeat-x;
+  background-size: 20px 40px;
+  z-index: 50;
+  margin-top: -28px;
+}
+</style>

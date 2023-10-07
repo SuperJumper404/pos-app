@@ -1,7 +1,6 @@
 <!-- Here we need to understand that user are table in a functionnal way-->
 <template>
   <v-container>
-    <Breadcrumbs />
     <v-card
       v-if="loadPage"
       outlined
@@ -70,22 +69,22 @@
         </v-card-text>
         <v-card-actions class="d-block">
           <!-- md to sm -->
-          <v-btn
+          <!-- <v-btn
             color="primary"
             class="text-capitalize mb-3 d-sm-block d-none"
             width="100%"
             @click="$router.push(`/tables/edit/${items.id}`)"
             >Edit</v-btn
-          >
+          > -->
           <!-- xs -->
-          <v-btn
+          <!-- <v-btn
             color="primary"
             class="text-capitalize mb-3 d-sm-none d-block"
             width="100%"
             small
             @click="$router.push(`/tables/edit/${items.id}`)"
             >Edit</v-btn
-          >
+          > -->
           <v-spacer></v-spacer>
           <!-- md to sm -->
           <v-btn
@@ -113,7 +112,6 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
 import formatdate from '@/helpers/formatdate'
 import Vue from 'vue'
@@ -124,7 +122,6 @@ import VueQRCodeComponent from 'vue-qrcode-component/src/QRCode.vue'
 Vue.component('qr-code', VueQRCodeComponent)
 export default {
   components: {
-    Breadcrumbs,
     Loading,
 
     // QrcodeVue,
@@ -161,7 +158,9 @@ export default {
     })
   },
   methods: {
-    searchData() {},
+    searchData() {
+      this.$store.dispatch('tables/getAllTables')
+    },
   },
 }
 </script>

@@ -3,7 +3,6 @@
     <div v-if="errMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <Breadcrumbs />
     <div class="mt-5">
       <h3>Form New Category</h3>
     </div>
@@ -32,11 +31,8 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 export default {
-  components: {
-    Breadcrumbs,
-  },
+  components: {},
   middleware: 'auth',
   data() {
     return {

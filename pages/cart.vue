@@ -8,36 +8,37 @@
               <v-icon large>mdi-emoticon-sad</v-icon> Your cart is empty!
             </p>
           </v-card-text>
-          <v-card
-            v-for="itm in dataCart"
-            v-else
-            :key="itm.id"
-            outlined
-            class="mb-2 pa-2 d-flex justify-space-between align-center"
-          >
-            <v-img
-              :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
-              max-width="100px"
-            />
-            <v-card-subtitle class="d-md-flex d-sm-none d-none">
-              <p class="font-weight-bold text-truncate">{{ itm.name }}</p>
-            </v-card-subtitle>
-            <v-card-subtitle>
-              <p class="text-truncate">Qty : {{ itm.qty }} item</p>
-            </v-card-subtitle>
-          </v-card>
+          <div v-else>
+            <v-card
+              v-for="itm in dataCart"
+              :key="itm.id"
+              outlined
+              class="mb-2 pa-2 d-flex justify-space-between align-center"
+            >
+              <v-img
+                :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                max-width="100px"
+              />
+              <v-card-subtitle class="d-md-flex d-sm-none d-none">
+                <p class="font-weight-bold text-truncate">{{ itm.name }}</p>
+              </v-card-subtitle>
+              <v-card-subtitle class="d-md-flex d-sm-none d-none">
+                <p class="font-weight-bold text-truncate">
+                  {{ itm.subtotal }}€
+                </p>
+              </v-card-subtitle>
+              <v-card-subtitle class="d-md-flex d-sm-none d-none">
+                <p class="font-weight-bold text-truncate">{{ itm.qty }} Pcs</p>
+              </v-card-subtitle>
+            </v-card>
+          </div>
         </v-card>
       </v-col>
       <v-col md="4" sm="12" cols="12">
-        <v-card v-if="loadPage" outlined height="440px" class="pa-2">
+        <v-card v-if="loadPage" outlined class="pa-2">
           <Loading />
         </v-card>
-        <v-card
-          v-else
-          outlined
-          height="440px"
-          class="pa-2 overflow-x-hidden overflow-y-auto"
-        >
+        <v-card v-else outlined class="pa-2 overflow-x-hidden overflow-y-auto">
           <v-card-actions v-if="!dataCart">
             <v-btn
               color="primary"
@@ -55,6 +56,17 @@
               label="Name Customer"
               :rules="[(v) => !!v || 'Name customer required']"
               placeholder="Input name customer"
+              required
+            ></v-text-field>
+            <v-text-field
+              v-model="formuser.phone"
+              type="tel"
+              label="Phone Number"
+              :rules="[
+                (v) =>
+                  /^[0-9]+$/.test(v) || 'Seuls les chiffres sont autorisés',
+              ]"
+              placeholder="Input phone number"
               class="mb-5"
               required
             ></v-text-field>
@@ -63,8 +75,15 @@
               :items="items"
               label="Payment methods"
               :rules="[(v) => !!v || 'Paymen methods required']"
-              dense
             ></v-select>
+            <v-textarea
+              v-model="formuser.notes"
+              label="Note à la commande"
+              :rows="2"
+              filled
+              prepend-inner-icon="mdi-comment"
+              placeholder="Ajouter une note à la commande"
+            ></v-textarea>
             <!-- struc -->
             <v-card-title>
               <h5>Struck</h5>
@@ -138,7 +157,9 @@ export default {
     loadPage: false,
     formuser: {
       customer: '',
+      phone: '',
       payment: '',
+      notes: '',
     },
     items: ['Cash', 'Gopay', 'Ovo', 'Dana', 'Shopee Pay'],
   }),
@@ -171,6 +192,8 @@ export default {
         operator: null,
         subtotal: this.total,
         payment: this.formuser.payment,
+        remark: this.formuser.notes,
+        phone: this.formuser.phone,
         status: 1, // 1 pending & 2 approve
         created: new Date(),
       }

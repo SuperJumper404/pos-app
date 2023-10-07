@@ -39,6 +39,7 @@ export default {
   },
   computed: {
     totalProduct() {
+      console.log('Init Product')
       return this.$store.get('products/dataProduct')
     },
     totalCategory() {
@@ -52,18 +53,36 @@ export default {
     },
   },
   mounted() {
+    // Initialisation des variables
     this.loadPage = true
     this.accessUser = parseInt(localStorage.getItem('access'))
-    if (this.accessUser === 2) this.$router.push('/menus')
+    const apiCalls = []
 
-    const calls = [
-      this.$store.dispatch('products/getProducts'),
-      // this.$store.dispatch('categories/getAllCategories'),
-      // this.$store.dispatch('stocks/getAllStock'),
-      this.$store.dispatch('orders/getAllOrder'),
-    ]
+    // Configurer les appels API en fonction du niveau d'accès de l'utilisateur
+    if (this.accessUser === 2) {
+      this.$router.push('/menus')
+      apiCalls.push(
+        this.$store.dispatch('products/getProducts'),
+        this.$store.dispatch('orders/getAllOrder')
+      )
+    }
 
-    Promise.all(calls).finally(() => {
+    if (this.accessUser === 0) {
+      apiCalls.push(
+        this.$store.dispatch('products/getProducts'),
+        this.$store.dispatch('categories/getAllCategories'),
+        this.$store.dispatch('stocks/getAllStock'),
+        this.$store.dispatch('orders/getAllOrder'),
+        this.$store.dispatch('tables/getAllTables'),
+        this.$store.dispatch('shop/getShopInfo')
+      )
+    }
+
+    // Affichage d'un message de confirmation dans la console
+    console.log('Initialisation du magasin effectuée avec succès')
+
+    // Attendre que tous les appels API soient terminés avant de désactiver loadPage
+    Promise.all(apiCalls).finally(() => {
       this.loadPage = false
     })
   },

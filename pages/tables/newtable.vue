@@ -15,9 +15,6 @@
         :rules="[(v) => !!v || 'Name table required']"
         placeholder="Insert table name"
         required
-        @keyup="
-          formtable.email = formtable.name.replace(/[\s\/]/g, '') + '@gmail.com'
-        "
         autofocus
       ></v-text-field>
 
@@ -74,6 +71,7 @@
 </template>
 <script>
 import Breadcrumbs from '@/components/breadcrumbs'
+import { v4 as uuidv4 } from 'uuid'
 export default {
   components: {
     Breadcrumbs,
@@ -90,7 +88,7 @@ export default {
       formtable: {
         name: '',
         clearpass: 'PassworD_1',
-        email: '',
+        email: uuidv4() + '@' + this.$store.get('shop/shop_name') + '.com',
       },
     }
   },
@@ -106,15 +104,22 @@ export default {
 
       return window.location.origin
     },
+    shopName() {
+      const shopName = this.$store.get('shop/shop_name')
+      console.log('Shop Name Value', shopName)
+      return shopName
+    },
   },
   methods: {
     async submitTable() {
       this.loadingBtn = true
+      const generatedUUID = uuidv4() // Generate a UUID
+      const email = `${generatedUUID}@${this.shopName}.com` // Combine UUID with shopName
       const params = {
         username: this.formtable.name,
         password: this.formtable.clearpass,
         clearpass: this.formtable.clearpass,
-        email: this.formtable.email,
+        email,
         phone: '000000000000',
         status: 1,
         access: 2,

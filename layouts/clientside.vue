@@ -54,7 +54,7 @@ export default {
           to: '/',
         },
         {
-          icon: 'mdi-bookmark',
+          icon: 'mdi-shape-plus',
           title: 'Products',
           to: '/products',
         },

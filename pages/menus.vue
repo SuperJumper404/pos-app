@@ -37,7 +37,7 @@
                     sm="4"
                     cols="6"
                   >
-                    <v-card outlined max-height="150px;">
+                    <v-card hover outlined max-height="150px;">
                       <v-img
                         height="100px"
                         :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
@@ -76,7 +76,7 @@
                           width="100%"
                           class="text-capitalize"
                           @click="addToCart(items)"
-                          >Add</v-btn
+                          >Ajouter</v-btn
                         >
                       </v-card-actions>
                     </v-card>
@@ -86,6 +86,7 @@
             </v-expansion-panel>
           </v-expansion-panels>
         </v-card>
+        <pre type="json">{{ dataProduct }}</pre>
         <!-- <v-card outlined max-height="150px;">
                     <v-img
                       height="100px"
@@ -254,7 +255,7 @@
             <!-- </v-avatar> -->
             <v-card-text class="d-block">
               <p class="font-weight-bold">{{ itm.name }}</p>
-              <p>Qxxxxxty: {{ conversiRp(itm.qty) }}</p>
+              <p>Qty: {{ conversiRp(itm.qty) }}</p>
             </v-card-text>
 
             <v-card-actions>
@@ -311,10 +312,79 @@
         </div>
       </v-card>
     </v-dialog>
+    <v-dialog v-model="itemDialog" max-width="350">
+      <v-form ref="formItem">
+        <v-card>
+          <v-toolbar color="primary" dark>Opening from the bottom</v-toolbar>
+          <v-card-text>
+            {{ selectedItem }}
+            <div
+              v-for="(item, itemId) in selectedItem.product_customization"
+              :key="itemId"
+            >
+              <div class="text-h4 text--primary">{{ item.name }}</div>
+              <p>
+                {{ item.description }}
+                {{ item.limit_choice ? 'Max(' + item.limit_choice + ')' : '' }}
+              </p>
+              <div>
+                <!-- Condition for checkboxes -->
+                <template v-if="item.limit_choice > 1">
+                  <div v-for="(choice, i) in item.items" :key="'checkbox-' + i">
+                    <v-checkbox
+                      class="custom-spacing"
+                      v-model="currentItem[itemId]"
+                      multiple
+                      :label="
+                        choice.price > 0
+                          ? `${choice.name} (+${choice.price}€)`
+                          : `${choice.name}`
+                      "
+                      :disabled="
+                        currentItem[itemId].length >= item.limit_choice &&
+                        currentItem[itemId]
+                          .map((x) => x.id)
+                          .indexOf(choice.id) === -1
+                      "
+                      :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
+                      :value="choice"
+                    ></v-checkbox>
+                  </div>
+                </template>
 
+                <!-- Condition for radio buttons -->
+                <v-radio-group
+                  v-if="item.limit_choice === 1"
+                  v-model="currentItem[itemId]"
+                  row
+                >
+                  <v-radio
+                    v-for="(choice, i) in item.items"
+                    :key="'radio-' + i"
+                    :label="
+                      choice.price > 0
+                        ? `${choice.name} (+${choice.price}€)`
+                        : choice.name
+                    "
+                    :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
+                    :value="choice"
+                  ></v-radio>
+                </v-radio-group>
+              </div>
+            </div>
+            <pre type="json">{{ currentItem }}</pre>
+          </v-card-text>
+          <v-card-actions class="justify-end">
+            <v-btn color="warning" @click="resetForm()">Retour</v-btn>
+            <v-btn color="success" @click="submitFormItem()">Valider</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-form>
+    </v-dialog>
     <!-- <pre>{{ dataProduct }}</pre> -->
     <!-- <pre>server{{ mainconfig.default.server }}</pre> -->
     <!-- <pre>{{ breakpoint }}</pre> -->
+    <pre>ici {{ itemDialog }}</pre>
   </v-container>
 </template>
 <script>
@@ -333,6 +403,10 @@ export default {
   mixins: [price],
   middleware: 'auth',
   data: () => ({
+    itemDialog: false,
+    selectedItem: [],
+    currentItem: [],
+
     // config: config,
     alert: null,
     alertType: null,
@@ -354,7 +428,7 @@ export default {
     categories() {
       const items = this.$store
         .get('products/dataProduct')
-        .map((x) => x.category)
+        .map((x) => x.categoryid)
       return [...new Set(items)]
     },
     staticURL() {
@@ -379,18 +453,50 @@ export default {
       this.$store.dispatch('cart/setTotal', 0),
       this.$store.dispatch('cart/setIndex', 0),
     ]
-
+    console.log('result', this.$store.get('products/dataProduct'))
     Promise.all(calls).finally(() => {
       this.loadPage = false
     })
   },
+  watch: {
+    itemDialog(newVal) {
+      if (newVal) {
+        console.log('Watch New Val', newVal)
+        // if the dialog is opened
+        if (this.$refs.formItem) {
+          this.$refs.formItem.resetValidation()
+          this.$refs.formItem.reset()
+        }
+      }
+    },
+  },
   methods: {
+    resetForm() {
+      if (this.$refs.formItem) {
+        this.$refs.formItem.resetValidation()
+        this.$refs.formItem.reset()
+        this.itemDialog = false
+      }
+    },
+    submitFormItem() {
+      const isValid = this.$refs.formItem.validate()
+      console.log('Is FOrm Item Valid', isValid)
+      if (isValid) this.itemDialog = false
+    },
+
+    rulesCheckboxes(value, mandatory) {
+      // Check if the value length is 0 and the field is mandatory
+      if (mandatory && (!value || value.length === 0)) {
+        return 'Selectionner au moins un choix'
+      }
+      return true
+    },
     change() {
       this.dialog = this.stateDialog
     },
     getProductPerCategorie(category) {
       return this.dataProduct.filter(function (x) {
-        return x.category === category
+        return x.categoryid === category
       })
     },
     totalPrice() {
@@ -419,6 +525,13 @@ export default {
     addToCart(params) {
       if (params.stock < 1) {
         this.showAlert('Produit non disponible', 'error')
+      }
+      if (params.product_customization.length > 0) {
+        this.itemDialog = true
+        this.selectedItem = this.dataProduct.find((x) => x.id === params.id)
+        this.currentItem = this.selectedItem.product_customization.map(
+          (x) => []
+        )
       } else {
         const cek = this.cartItem.filter((item) => {
           return item.id === params.id

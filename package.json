@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": " cross-env ENV=local nuxt",
-    "network":" cross-env ENV=network nuxt",
-    "build": "nuxt build",
+    "network": " cross-env ENV=network nuxt",
+    "build": " cross-env ENV=network nuxt build",
     "start": "nuxt start",
     "generate": "nuxt generate",
     "lint:js": "eslint --ext \".js,.vue\" --ignore-path .gitignore .",
@@ -17,6 +17,7 @@
     "core-js": "^3.9.1",
     "moment": "^2.29.4",
     "nuxt": "^2.15.3",
+    "uuid": "^9.0.0",
     "v-snackbars": "^3.2.8",
     "vue-qrcode-component": "^2.1.1",
     "vuex-easy-access": "^3.1.8",

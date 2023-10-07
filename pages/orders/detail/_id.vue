@@ -39,6 +39,17 @@
         </v-card-text>
       </v-card>
     </v-card>
+    <v-alert
+      class="my-4"
+      outlined
+      text
+      type="info"
+      transition="scroll-x-transition"
+      border="left"
+      v-if="detailOrder[0] !== undefined && detailOrder[0].remark !== null"
+    >
+      Notes : {{ detailOrder[0].remark }}
+    </v-alert>
     <v-card color="grey lighten-3" class="mt-5">
       <v-card-actions>
         <v-spacer></v-spacer>

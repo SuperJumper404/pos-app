@@ -15,7 +15,7 @@
         </v-row>
       </v-alert>
     </div>
-    <div style="background: #f5f5f5" class="mt-5">
+    <!-- <div style="background: #f5f5f5" class="mt-5">
       <v-breadcrumbs :items="items">
         <template #item="{ item }">
           <v-breadcrumbs-item :to="item.to" :disabled="item.disabled">
@@ -23,7 +23,7 @@
           </v-breadcrumbs-item>
         </template>
       </v-breadcrumbs>
-    </div>
+    </div> -->
     <v-card
       v-if="loadPage"
       outlined

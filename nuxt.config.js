@@ -13,11 +13,15 @@ getHost()
 // export NODE_OPTIONS=--openssl-legacy-provider
 export default {
   server: {
-    host: getHost().frontEndPoint, // default: localhost or IP_ADRESSE 192.168.1.139
+    host: getHost().frontEndPoint,
+    port: 8083, // default: localhost or IP_ADRESSE 192.168.1.139
     //  host: '192.168.1.139' // default: localhost or IP_ADRESSE 192.168.1.139
     //  host: '127.0.0.1' // default: localhost or IP_ADRESSE 192.168.1.139
   },
   ssr: false,
+  generate: {
+    //subFolders: false
+  },
   head: {
     titleTemplate: '%s - pos-app',
     title: 'pos-app',
@@ -42,6 +46,7 @@ export default {
   env: {
     privateURL: getHost().backEndPoint,
   },
+  target: 'static',
   axios: {
     proxy: true,
     // baseURL: `${process.env.VUE_APP_BASEURL}`,
@@ -69,5 +74,11 @@ export default {
       },
     },
   },
-  build: {},
+  build: {
+    splitChunks: {
+      layouts: false,
+      pages: false,
+      commons: false,
+    },
+  },
 }

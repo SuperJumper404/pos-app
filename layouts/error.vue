@@ -9,8 +9,17 @@
         Go to dashboard
       </v-btn>
     </div>
+
     <div v-else>
-      {{ otherError }}
+      <div class="error-message">
+        <h2>Une erreur est survenue</h2>
+        <p>Nous sommes désolés, mais une erreur inattendue s'est produite.</p>
+        <p>
+          Veuillez rafraîchir la page pour tenter de résoudre le problème. Si
+          l'erreur persiste, veuillez contacter notre support technique.
+        </p>
+        <p>Contactez le support : admin@smarteat.fr</p>
+      </div>
     </div>
   </v-app>
 </template>
@@ -27,7 +36,8 @@ export default {
   data() {
     return {
       pageNotFound: '404 Not Found',
-      otherError: 'An error occurred',
+      otherError:
+        ' Nous sommes désolés, mais une erreur inattendue s est produite. ',
     }
   },
   head() {

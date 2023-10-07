@@ -1,6 +1,5 @@
 <template>
   <v-container>
-    <Breadcrumbs />
     <v-card
       v-if="loadPage"
       outlined
@@ -9,7 +8,7 @@
     >
       <Loading />
     </v-card>
-    <v-card v-else outlined class="mt-5 overflow-y-auto" style="height: 350px">
+    <v-card v-else outlined class="mt-5 overflow-y-auto">
       <v-app-bar flat color="grey lighten-4" light>
         <v-btn
           color="success"
@@ -94,12 +93,10 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
 import formatdate from '@/helpers/formatdate'
 export default {
   components: {
-    Breadcrumbs,
     Loading,
   },
   mixins: [formatdate],

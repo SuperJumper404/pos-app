@@ -2,7 +2,7 @@ const listdashboard = {
   data: () => ({
     list: [
       {
-        icon: 'mdi-bookmark',
+        icon: 'mdi-shape-plus',
         title: 'Products',
         to: '/products',
       },
