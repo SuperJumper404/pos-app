@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Build and Deploy Nuxt App to EC2
 
 on:
   push:
@@ -8,14 +8,30 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to EC2 via SSH
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Nuxt app
+        run: npm run generate
+
+      - name: Upload dist folder to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: 'dist/*'
+          target: '/home/ubuntu/smarteat/frontend'
+
+      - name: Post-deploy (optional permissions or config on EC2)
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -23,14 +39,5 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            # Cloner le projet si dossier manquant
-            if [ ! -d /home/ubuntu/smarteat/frontend ]; then
-              cd /home/ubuntu/smarteat
-              mkdir frontend
-              git clone --branch staging git@github.com:SuperJumper404/pos-app.git frontend
-            fi
-            cd /home/ubuntu/smarteat/frontend
-            git fetch origin
-            git reset --hard origin/staging
-            npm install
-            npx pm2 start ecosystem.config.js --env staging || npx pm2 restart frontend_smart_eat_staging
+            echo "✅ Déploiement terminé dans /home/ubuntu/smarteat/frontend"
+            # Par exemple : chmod -R 755 ou chown www-data selon ton serveur web
