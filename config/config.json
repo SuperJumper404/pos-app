@@ -9,6 +9,11 @@
       "name": "environments network",
       "frontEndPoint": "192.168.1.139",
       "backEndPoint": "http://192.168.1.139:5005"
+    },
+    "staging": {
+      "name": "environments staging",
+      "frontEndPoint": "23.20.248.221",
+      "backEndPoint": "http://23.20.248.221:5005"
     }
   }
 }

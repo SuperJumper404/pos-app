@@ -6,8 +6,9 @@
     "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=local nuxt",
     "network": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=network nuxt",
     "build": " cross-env ENV=network nuxt build",
+    "build-local": " cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=local nuxt build",
     "start": "nuxt start",
-    "generate": "nuxt generate",
+    "generate": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=local nuxt generate",
     "lint:js": "eslint --ext \".js,.vue\" --ignore-path .gitignore .",
     "lint": "npm run lint:js"
   },
