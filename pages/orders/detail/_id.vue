@@ -20,16 +20,55 @@
           max-width="120px"
         ></v-img>
         <v-card-text class="d-sm-flex d-none justify-space-between">
-          <p class="font-weight-bold">{{ itm.name }}</p>
-          <p>
-            Order number: <b>{{ itm.ordernumber }}</b>
-          </p>
-          <p>
-            Customer: <b>{{ itm.customer }}</b>
-          </p>
-          <p>
-            Qty: <b>{{ itm.qty }}</b> item
-          </p>
+          <h6
+            class="text-center text-truncate"
+            style="
+              font-weight: bold;
+              font-size: large;
+              color: rgba(0, 0, 0, 0.8);
+            "
+          >
+            {{ itm.name }}<br />
+            {{ itm.subtotal }} €
+          </h6>
+
+          <div v-if="itm.customizationList">
+            <v-chip
+              v-for="(customization, i) in itm.customizationList"
+              :key="i"
+              >{{ customization.name }}</v-chip
+            >
+          </div>
+          <div style="text-align: center">
+            Numéro de commande
+            <h6
+              class="text-center text-truncate"
+              style="
+                font-weight: bold;
+                font-size: large;
+                color: rgba(0, 0, 0, 0.8);
+              "
+            >
+              #{{ itm.ordernumber }}
+            </h6>
+          </div>
+          <div style="text-align: center">
+            Client
+            <h6
+              class="text-center text-truncate"
+              style="
+                font-weight: bold;
+                font-size: large;
+                color: rgba(0, 0, 0, 0.8);
+              "
+            >
+              {{ itm.customer }}
+            </h6>
+          </div>
+
+          <v-btn style="font-size: x-large" color="success" fab small dark>
+            {{ itm.qty }}</v-btn
+          >
         </v-card-text>
         <v-card-text class="d-sm-none d-block">
           <p class="font-weight-bold">{{ itm.name }}</p>
@@ -56,7 +95,7 @@
         <v-btn color="primary" outlined @click="$router.go(-1)">Back</v-btn>
       </v-card-actions>
     </v-card>
-    <pre type="json">{{ detailOrder }}</pre>
+    <!-- <pre type="json">{{ detailOrder }}</pre> -->
   </v-container>
 </template>
 <script>

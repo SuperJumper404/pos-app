@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <v-card outlined class="d-flex align-center mt-10">
-      <v-card-title class="pa-5 d-block" style="width: 50%%">
+      <v-card-title class="pa-5 d-block" style="width: 50%">
         <h3>Welcome</h3>
         <h1>LE MOOD</h1>
         <!-- <h5 v-if="accessUser === 0">You are logged in as administrator.</h5>
@@ -34,7 +34,7 @@ export default {
   },
   head() {
     return {
-      title: 'Dashboard',
+      title: 'Accueil',
     }
   },
   computed: {

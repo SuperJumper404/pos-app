@@ -1,4 +1,6 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
+
+console.log('Store env', process.env.privateURL)
 export const state = () => ({
   authenticated: false,
   staticURL: process.env.privateURL,

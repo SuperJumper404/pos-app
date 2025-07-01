@@ -64,9 +64,9 @@
         >Submit</v-btn
       >
     </v-form>
-    <pre type="json">
-        {{ formtable }}
-    </pre>
+    <!-- <pre type="json"> -->
+    <!-- {{ formtable }} -->
+    <!-- </pre> -->
   </v-container>
 </template>
 <script>

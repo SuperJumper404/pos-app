@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": " cross-env ENV=local nuxt",
-    "network": " cross-env ENV=network nuxt",
+    "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=local nuxt",
+    "network": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=network nuxt",
     "build": " cross-env ENV=network nuxt build",
     "start": "nuxt start",
     "generate": "nuxt generate",

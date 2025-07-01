@@ -128,12 +128,12 @@
         </template>
       </v-data-table>
     </v-card>
-    <pre type="json">{{ dataOrders }}</pre>
+    <!-- <pre type="json">{{ dataOrders }}</pre> -->
     <!-- <v-btn @click="soundNotification()"
       >Sound <v-icon small right>mdi-close-circle</v-icon>
     </v-btn> -->
-    <pre type="json">{{ lastUpdate }}</pre>
-    <pre type="json">{{ selectedOrders }}</pre>
+    <!-- <pre type="json">{{ lastUpdate }}</pre> -->
+    <!-- <pre type="json">{{ selectedOrders }}</pre> -->
 
     <v-snackbars
       :messages.sync="orderNotifications"

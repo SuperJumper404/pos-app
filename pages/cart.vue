@@ -8,7 +8,10 @@
               <v-icon large>mdi-emoticon-sad</v-icon> Your cart is empty!
             </p>
           </v-card-text>
-          <div v-else>
+          <div
+            v-else
+            :style="$vuetify.breakpoint.smAndDown ? 'width: fit-content' : ''"
+          >
             <v-card
               v-for="itm in dataCart"
               :key="itm.id"
@@ -16,19 +19,43 @@
               class="mb-2 pa-2 d-flex justify-space-between align-center"
             >
               <v-img
+                class="rounded-lg"
                 :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
                 max-width="100px"
               />
-              <v-card-subtitle class="d-md-flex d-sm-none d-none">
-                <p class="font-weight-bold text-truncate">{{ itm.name }}</p>
+              <v-card-subtitle class="d-md-flex">
+                <h6
+                  class="text-center text-truncate"
+                  style="
+                    font-weight: bold;
+                    font-size: large;
+                    color: rgba(0, 0, 0, 0.8);
+                  "
+                >
+                  {{ itm.name }} <br />
+                  {{ itm.price }} €
+                </h6>
               </v-card-subtitle>
-              <v-card-subtitle class="d-md-flex d-sm-none d-none">
-                <p class="font-weight-bold text-truncate">
-                  {{ itm.subtotal }}€
-                </p>
+              <v-card-subtitle class="d-md-flex">
+                <v-col>
+                  <v-chip
+                    v-for="(choice, index) in itm.customizationList"
+                    :key="index"
+                  >
+                    {{ choice.name }}
+                  </v-chip>
+                </v-col>
               </v-card-subtitle>
-              <v-card-subtitle class="d-md-flex d-sm-none d-none">
-                <p class="font-weight-bold text-truncate">{{ itm.qty }} Pcs</p>
+              <v-card-subtitle class="d-md-flex">
+                <v-btn
+                  style="font-size: x-large"
+                  color="success"
+                  fab
+                  small
+                  dark
+                >
+                  {{ itm.qty }}</v-btn
+                >
               </v-card-subtitle>
             </v-card>
           </div>
@@ -86,16 +113,16 @@
             ></v-textarea>
             <!-- struc -->
             <v-card-title>
-              <h5>Struck</h5>
+              <h5>Total</h5>
               <v-spacer></v-spacer>
-              <h5>Code Pesanan</h5>
+              <h5>{{ conversiRp(total) }} €</h5>
             </v-card-title>
             <v-card-text>
               <!-- <div class="d-flex justify-space-between">
                 <p>Cashier</p>
                 <p class="font-weight-bold">Mika Tambayong</p>
               </div> -->
-              <div class="d-flex justify-space-between">
+              <!-- <div class="d-flex justify-space-between">
                 <p>Subtotal</p>
                 <p class="font-weight-bold">{{ conversiRp(totalCart) }} €</p>
               </div>
@@ -106,7 +133,7 @@
               <div class="d-flex justify-space-between">
                 <p>Total</p>
                 <p class="font-weight-bold">{{ conversiRp(total) }} €</p>
-              </div>
+              </div> -->
             </v-card-text>
             <v-card-actions>
               <v-btn
@@ -126,13 +153,14 @@
                 dark
                 class="text-capitalize"
                 @click="cancelCart"
-                >Cencel</v-btn
+                >Cancel</v-btn
               >
             </v-card-actions>
           </v-form>
         </v-card>
       </v-col>
     </v-row>
+    {{ dataCart }}
   </v-container>
 </template>
 <script>
@@ -161,7 +189,7 @@ export default {
       payment: '',
       notes: '',
     },
-    items: ['Cash', 'Gopay', 'Ovo', 'Dana', 'Shopee Pay'],
+    items: ['Carte Bleu ', 'Espece', 'Ticket Restaurant'],
   }),
   computed: {
     staticURL() {
@@ -181,8 +209,7 @@ export default {
     },
   },
   mounted() {
-    this.ppn = this.totalCart * 0.1
-    this.total = this.totalCart + this.ppn
+    this.total = this.totalCart
   },
   methods: {
     async paymentBtn() {
@@ -207,6 +234,7 @@ export default {
             qty: e.qty,
             total: e.qty * e.price,
             remark: 'Transaction',
+            customizationList: e.customizationList,
             operator: 2,
           }
           const detail = this.$store.dispatch(

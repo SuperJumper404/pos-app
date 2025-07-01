@@ -76,7 +76,7 @@
           <v-col cols="12" md="6">
             <v-text-field
               v-model="formproduct.product_customization[index].name"
-              label="Customization Name"
+              label="Nom du choix "
               :rules="[(v) => !!v || 'Name required']"
               placeholder="Enter name"
               required
@@ -85,7 +85,7 @@
           <v-col cols="12" md="6">
             <v-text-field
               v-model="formproduct.product_customization[index].description"
-              label="Customization Message"
+              label="Description du choix"
               :rules="[(v) => !!v || 'Name required']"
               placeholder="Enter description"
               required
@@ -96,7 +96,7 @@
           <v-col cols="12" md="6">
             <v-combobox
               v-model="formproduct.product_customization[index].items"
-              label="Select a favorite activity or create a new one"
+              label="Liste des choix possibles"
               chips
               multiple
               :item-text="displayItem"
@@ -105,10 +105,10 @@
           ><v-col cols="12" md="3">
             <v-text-field
               v-model="formproduct.product_customization[index].limit_choice"
-              label="Max Choices"
+              label="Nombre de choix maximum"
               type="number"
               :rules="[(v) => !!v || 'Max Choices required']"
-              placeholder="Enter max choices"
+              placeholder="Enter nombre de choix max"
               required
             ></v-text-field>
           </v-col>
@@ -144,7 +144,7 @@
         >Submit</v-btn
       >
     </v-form>
-    <pre>{{ formproduct }}</pre>
+    <!-- <pre>{{ formproduct }}</pre> -->
   </v-container>
 </template>
 <script>

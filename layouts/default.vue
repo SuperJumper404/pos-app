@@ -14,15 +14,17 @@
       fixed
       app
     >
-      <v-list>
+      <!-- active-class="deep-purple--text text--accent-4" -->
+      <v-list nav>
         <v-list-item
           v-for="(item, i) in admin"
           :key="i"
-          :to="item.title != 'Logout' ? item.to : ''"
+          :to="item.to ? item.to : ''"
           router
           exact
-          :class="item.title == 'Logout' ? 'cursor list' : 'cursor list'"
-          @click="item.title == 'Logout' ? logout() : ''"
+          active-class="primary--text text--accent-4"
+          :class="'cursor list'"
+          @click="item.name == 'logout' ? logout() : ''"
         >
           <v-list-item-action>
             <v-icon>{{ item.icon }}</v-icon>
@@ -64,7 +66,7 @@
       <v-toolbar-title
         v-text="
           $route.name == 'index'
-            ? 'Dashboard'
+            ? 'Accueil '
             : $route.name.charAt(0).toUpperCase() + $route.name.slice(1)
         "
       />
@@ -138,17 +140,17 @@ export default {
       admin: [
         {
           icon: 'mdi-home',
-          title: 'Dashboard',
+          title: 'Accueil',
           to: '/',
         },
         {
           icon: 'mdi-shape-plus',
-          title: 'Products',
+          title: 'Produits',
           to: '/products',
         },
         {
           icon: 'mdi-bookmark',
-          title: 'Categories',
+          title: 'Catégories',
           to: '/categories',
         },
         {
@@ -158,12 +160,12 @@ export default {
         },
         {
           icon: 'mdi-order-bool-descending',
-          title: 'Orders',
+          title: 'Commandes',
           to: '/orders',
         },
         {
           icon: 'mdi-cash-register',
-          title: 'Cash Register',
+          title: 'Tiroir-caisse',
           to: '/cashregister',
         },
         {
@@ -173,7 +175,7 @@ export default {
         },
         {
           icon: 'mdi-notebook',
-          title: 'Reports',
+          title: 'Rapports',
           to: '/reports',
         },
 
@@ -183,8 +185,14 @@ export default {
           to: '/tables',
         },
         {
+          icon: 'mdi-store-cog',
+          title: 'Réglages',
+          to: '/settings',
+        },
+        {
           icon: 'mdi-logout',
-          title: 'Logout',
+          name: 'logout',
+          title: 'Déconnexion',
         },
       ],
       miniVariant: false,

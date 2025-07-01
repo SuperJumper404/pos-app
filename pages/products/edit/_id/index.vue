@@ -171,8 +171,8 @@
         </v-form>
       </v-col>
     </v-row>
-    <pre type="json">{{ detailProduct }}</pre>
-    <pre type="json">{{ formeditproduct }}</pre>
+    <!-- <pre type="json">{{ detailProduct }}</pre> -->
+    <!-- <pre type="json">{{ formeditproduct }}</pre> -->
   </v-container>
 </template>
 <script>

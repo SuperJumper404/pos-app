@@ -1,7 +1,6 @@
 <template>
-  <div style="heigh: 100%">
-    <v-row>
-      <v-col md="7" sm="6" class="img-form d-none d-sm-block"> </v-col>
+  <div style="height: 100%">
+    <v-row justify="center" align="center" style="height: 100%">
       <v-col md="5" sm="6" cols="12">
         <Forms :formprops="setForm" />
       </v-col>

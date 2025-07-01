@@ -32,7 +32,11 @@
     </div>
     <div class="f-secondary">
       <h1>{{ formprops.title }}</h1>
-      <h3>Welcome, coffee lover's</h3>
+      <h3>
+        {{
+          formprops.title === 'Register' ? 'Inscrivez-vous' : 'Connectez-vous'
+        }}
+      </h3>
     </div>
     <v-form
       v-model="isValue"

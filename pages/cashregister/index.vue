@@ -154,11 +154,11 @@
       </v-card>
     </v-row>
     <div>
-      <pre type="json "> {{ selectedOrders }} </pre>
-      <pre type="json "> {{ tableGlobalData }} </pre>
-      <pre type="json "> {{ CanceledOrderPerTable }} </pre>
-      <pre type="json "> {{ getAllOrders }} </pre>
-      <pre type="json">{{ dataTables }}</pre>
+      <!-- <pre type="json "> {{ selectedOrders }} </pre> -->
+      <!-- <pre type="json "> {{ tableGlobalData }} </pre> -->
+      <!-- <pre type="json "> {{ CanceledOrderPerTable }} </pre> -->
+      <!-- <pre type="json "> {{ getAllOrders }} </pre> -->
+      <!-- <pre type="json">{{ dataTables }}</pre> -->
     </div>
   </v-container>
 </template>

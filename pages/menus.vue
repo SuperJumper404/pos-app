@@ -22,8 +22,8 @@
             <p>Menu empty</p>
           </v-card-text>
         </v-card>
-        <v-card v-else class="overflow-y-auto overflow-x-hidden pa-1">
-          <v-expansion-panels accordion>
+        <v-card v-else>
+          <v-expansion-panels>
             <v-expansion-panel v-for="(category, i) in categories" :key="i">
               <v-expansion-panel-header
                 ><h3>{{ category }}</h3></v-expansion-panel-header
@@ -86,7 +86,7 @@
             </v-expansion-panel>
           </v-expansion-panels>
         </v-card>
-        <pre type="json">{{ dataProduct }}</pre>
+        <!-- <pre type="json">{{ dataProduct }}</pre> -->
         <!-- <v-card outlined max-height="150px;">
                     <v-img
                       height="100px"
@@ -154,28 +154,45 @@
               <p class="font-weight-bold">Your cart is an empty!</p>
             </div>
           </div>
-          <div v-else class="box overflow-y-auto" height="100%">
+          <div v-else class="overflow-y-auto mx-0 my-0" height="100%">
             <v-card
               v-for="itm in cartItem"
               :key="itm.id"
               outlined
-              class="mb-2 d-flex"
+              class="d-flex mb-2"
+              rounded="7"
             >
-              <v-card-text class="d-block">
-                <v-row>
-                  <v-avatar size="75" rounded>
+              <v-card-text>
+                <v-row align="center" class="d-flex">
+                  <v-avatar class="mx-auto" size="75" rounded tile>
                     <v-img
+                      class="rounded-lg"
                       :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
                     ></v-img>
                   </v-avatar>
-                  <p
-                    class="font-weight-bold"
-                    style="font-weight: bold; font-size: large"
-                  >
-                    {{ itm.name }}
-                    <br />
-                    Qty: {{ conversiRp(itm.qty) }}
-                  </p>
+                  <br />
+                  <v-card-title>
+                    <h6
+                      class="text-center text-truncate"
+                      style="
+                        font-weight: bold;
+                        font-size: large;
+                        color: rgba(0, 0, 0, 0.8);
+                      "
+                    >
+                      {{ itm.name }} <br />
+                      {{ itm.price }} €
+                    </h6>
+                  </v-card-title>
+                  <br />
+                  <v-col>
+                    <v-chip
+                      v-for="(choice, index) in itm.customizationList"
+                      :key="index"
+                    >
+                      {{ choice.name }}
+                    </v-chip>
+                  </v-col>
                 </v-row>
               </v-card-text>
               <v-card-actions>
@@ -188,17 +205,27 @@
                   @click="minusBtn(itm)"
                   ><v-icon>mdi-minus</v-icon></v-btn
                 >
+                <v-btn
+                  style="font-size: x-large"
+                  color="success"
+                  fab
+                  small
+                  dark
+                >
+                  {{ itm.qty }}</v-btn
+                >
                 <v-btn outlined color="success" small icon @click="plusBtn(itm)"
                   ><v-icon>mdi-plus</v-icon></v-btn
                 >
-                <v-btn
+
+                <!-- <v-btn
                   color="red lighten-2"
                   outlined
                   small
                   icon
                   @click="deleteBtn(itm)"
                   ><v-icon>mdi-close</v-icon>
-                </v-btn>
+                </v-btn> -->
               </v-card-actions>
             </v-card>
           </div>
@@ -226,7 +253,7 @@
       </v-col>
     </v-row>
     <!-- modals -->
-    <v-dialog v-model="stateDialog" max-width="350">
+    <v-dialog v-model="stateDialog" persistent max-width="350">
       <v-card>
         <v-card-title>
           <h4>Cart items</h4>
@@ -317,16 +344,16 @@
         <v-card>
           <v-toolbar color="primary" dark>Opening from the bottom</v-toolbar>
           <v-card-text>
-            {{ selectedItem }}
+            <!-- {{ selectedItem }} -->
             <div
               v-for="(item, itemId) in selectedItem.product_customization"
               :key="itemId"
             >
               <div class="text-h4 text--primary">{{ item.name }}</div>
-              <p>
+              <!-- <p>
                 {{ item.description }}
                 {{ item.limit_choice ? 'Max(' + item.limit_choice + ')' : '' }}
-              </p>
+              </p> -->
               <div>
                 <!-- Condition for checkboxes -->
                 <template v-if="item.limit_choice > 1">
@@ -372,7 +399,8 @@
                 </v-radio-group>
               </div>
             </div>
-            <pre type="json">{{ currentItem }}</pre>
+            <!-- <pre type="json">{{ currentItem }}</pre> -->
+            <!-- <pre type="json">{{ [...currentItem] }}</pre> -->
           </v-card-text>
           <v-card-actions class="justify-end">
             <v-btn color="warning" @click="resetForm()">Retour</v-btn>
@@ -432,6 +460,8 @@ export default {
       return [...new Set(items)]
     },
     staticURL() {
+      console.log('Static URL', this.$store.get('staticURL'))
+      console.log('Static URL', this.$store)
       return this.$store.get('staticURL')
     },
     dataProduct() {
@@ -481,7 +511,33 @@ export default {
     submitFormItem() {
       const isValid = this.$refs.formItem.validate()
       console.log('Is FOrm Item Valid', isValid)
-      if (isValid) this.itemDialog = false
+      if (isValid) {
+        this.itemDialog = false
+      }
+
+      const customizationList = [].concat(...this.currentItem)
+      const customizationPrice = customizationList.reduce((acc, item) => {
+        if (item && item.price) acc += item.price
+        return acc
+      }, 0)
+      console.log('CustimzationPrice', customizationPrice)
+      console.log('customisation List', customizationList)
+      const price = this.selectedItem.price + customizationPrice
+      const newData = {
+        id: this.selectedItem.id,
+        name: this.selectedItem.name,
+        categoryid: this.selectedItem.categoryid,
+        image: this.selectedItem.image,
+        stock: this.selectedItem.stock,
+        price,
+        subtotal: 1 * price,
+        qty: 1,
+        customizationList,
+      }
+      this.cartItem = [...this.cartItem, newData]
+
+      this.totalPrice()
+      this.indexCart()
     },
 
     rulesCheckboxes(value, mandatory) {
@@ -533,25 +589,19 @@ export default {
           (x) => []
         )
       } else {
-        const cek = this.cartItem.filter((item) => {
-          return item.id === params.id
-        })
-        if (cek.length >= 1) {
-          this.showAlert('Produit déja selectionner ', 'info')
-        } else {
-          const newData = {
-            id: params.id,
-            name: params.name,
-            categoryid: params.categoryid,
-            image: params.image,
-            stock: params.stock,
-            price: params.price,
-            subtotal: 1 * params.price,
-            qty: 1,
-          }
-          this.cartItem = [...this.cartItem, newData]
-          this.idItem = params.id
+        const newData = {
+          id: params.id,
+          name: params.name,
+          categoryid: params.categoryid,
+          image: params.image,
+          stock: params.stock,
+          price: params.price,
+          subtotal: 1 * params.price,
+          qty: 1,
         }
+        this.cartItem = [...this.cartItem, newData]
+        this.idItem = params.id
+
         this.totalPrice()
         this.indexCart()
       }
@@ -562,8 +612,9 @@ export default {
           e.qty -= 1
           e.subtotal = e.qty * e.price
           if (e.qty < 1) {
-            e.qty = 1
-            e.subtotal = 1 * e.price
+            this.deleteBtn(params)
+            // e.qty = 1
+            // e.subtotal = 1 * e.price
           }
         }
       })

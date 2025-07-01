@@ -27,7 +27,7 @@ export default {
     return {
       items: [
         {
-          text: 'Dashboard',
+          text: 'Accueil',
           disabled: false,
           to: '/',
         },

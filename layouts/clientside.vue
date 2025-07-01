@@ -50,17 +50,17 @@ export default {
       admin: [
         {
           icon: 'mdi-home',
-          title: 'Dashboard',
+          title: 'Accueil',
           to: '/',
         },
         {
           icon: 'mdi-shape-plus',
-          title: 'Products',
+          title: 'Produits',
           to: '/products',
         },
         {
           icon: 'mdi-bookmark',
-          title: 'Categories',
+          title: 'Catégories',
           to: '/categories',
         },
         {
@@ -70,12 +70,12 @@ export default {
         },
         {
           icon: 'mdi-order-bool-descending',
-          title: 'Orders',
+          title: 'Commandes',
           to: '/orders',
         },
         {
           icon: 'mdi-cash-register',
-          title: 'Cash Register',
+          title: 'Tiroir-caisse',
           to: '/cashregister',
         },
         {
@@ -85,7 +85,7 @@ export default {
         },
         {
           icon: 'mdi-notebook',
-          title: 'Reports',
+          title: 'Rapports',
           to: '/reports',
         },
 
@@ -95,8 +95,13 @@ export default {
           to: '/tables',
         },
         {
+          icon: 'mdi-store-cog',
+          title: 'Réglages',
+          to: '/settings',
+        },
+        {
           icon: 'mdi-logout',
-          title: 'Logout',
+          title: 'Déconnexion',
         },
       ],
       miniVariant: false,
