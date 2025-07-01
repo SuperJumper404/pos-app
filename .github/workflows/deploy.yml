@@ -27,7 +27,7 @@ jobs:
             if [ ! -d /home/ubuntu/smarteat/frontend ]; then
               cd /home/ubuntu/smarteat
               mkdir frontend
-              git clone --branch staging git@github.com:SuperJumper404/express-pos.git frontend
+              git clone --branch staging git@github.com:SuperJumper404/pos-app.git frontend
             fi
             cd /home/ubuntu/smarteat/frontend
             git fetch origin
