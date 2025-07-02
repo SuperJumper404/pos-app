@@ -18,6 +18,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Env vars setup
+        run: echo 'VUE_APP_BASEURL=http://23.20.248.221:5005' >> .env
+        run: echo 'ENV=staging' >> .env
+        run: echo 'privateURL=23.20.248.221' >> .env
+
+
       - name: Build Nuxt app
         run: npm run generate
 
