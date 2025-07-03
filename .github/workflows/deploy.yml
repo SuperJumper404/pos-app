@@ -1,10 +1,9 @@
-name: Build and Deploy Nuxt App to EC2
+name: Clone, Build and Deploy Nuxt App to EC2
 
 on:
   push:
     branches:
       - staging
-
   workflow_dispatch:
 
 jobs:
@@ -12,35 +11,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Clone staging branch manually
+        run: |
+          git clone --branch staging https://github.com/SuperJumper404/pos-app.git frontend
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          cd frontend
+          npm install
 
-      - name: Env vars setup 1
-        run: echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' >> .env
-
-      - name: Env vars setup 2
-        run: echo 'ENV=staging' >> .env
-
-      - name: Env vars setup 3
-        run: echo 'privateURL=staging.smarteat.fr' >> .env
+      - name: Set environment variables
+        run: |
+          echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' > frontend/.env
+          echo 'ENV=staging' >> frontend/.env
+          echo 'privateURL=staging.smarteat.fr' >> frontend/.env
 
       - name: Build Nuxt app
-        run: npm run generate
+        run: |
+          cd frontend
+          npm run generate
 
-      # - name: Upload dist folder to EC2
-      #   uses: appleboy/scp-action@v0.1.4
-      #   with:
-      #     host: ${{ secrets.EC2_HOST }}
-      #     username: ${{ secrets.EC2_USER }}
-      #     key: ${{ secrets.EC2_SSH_KEY }}
-      #     port: 22
-      #     source: 'dist/*'
-      #     target: '/home/ubuntu/smarteat/frontend'
+      - name: Upload whole frontend folder to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: 'frontend/*'
+          target: '/home/ubuntu/smarteat/frontend'
 
-      - name: Deploy to EC2 via SSH
+      - name: Launch frontend with pm2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -48,17 +49,6 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            # Cloner le projet si dossier manquant
-            if [ ! -d /home/ubuntu/smarteat/frontend ]; then
-              cd /home/ubuntu/smarteat
-              mkdir frontend
-              echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' >> .env
-              echo 'ENV=staging' >> .env
-              echo 'privateURL=staging.smarteat.fr' >> .env
-              git clone --branch staging git@github.com:SuperJumper404/pos-app.git frontend
-            fi
             cd /home/ubuntu/smarteat/frontend
-            git fetch origin
-            git reset --hard origin/staging
-            npm install
+            pm2 delete frontend || true
             pm2 start
