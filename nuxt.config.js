@@ -43,6 +43,7 @@ export default {
   buildModules: ['@nuxtjs/eslint-module', '@nuxtjs/vuetify'],
   modules: ['@nuxtjs/axios'],
   env: {
+    ENV: process.env.ENV,
     privateURL: getHost().backEndPoint,
   },
   target: 'static',
