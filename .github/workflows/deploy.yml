@@ -13,6 +13,7 @@ jobs:
     steps:
       - name: Clone staging branch manually
         run: |
+          rm -rf frontend
           git clone --branch staging https://github.com/SuperJumper404/pos-app.git frontend
 
       - name: Install dependencies
