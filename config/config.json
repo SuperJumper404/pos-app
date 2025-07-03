@@ -13,7 +13,7 @@
     "staging": {
       "name": "environments staging",
       "frontEndPoint": "https://staging.smarteat.fr/",
-      "backEndPoint": "https://staging.smarteat.fr/"
+      "backEndPoint": "https://api.smarteat.fr/"
     }
   }
 }

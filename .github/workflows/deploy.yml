@@ -51,5 +51,4 @@ jobs:
           port: 22
           script: |
             cd /home/ubuntu/smarteat/frontend
-            pm2 delete frontend || true
-            pm2 start
+            pm2 restart all
