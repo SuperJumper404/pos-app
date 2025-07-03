@@ -19,13 +19,13 @@ jobs:
         run: npm install
 
       - name: Env vars setup 1
-        run: echo 'VUE_APP_BASEURL=http://23.20.248.221:5005' >> .env
+        run: echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' >> .env
 
       - name: Env vars setup 2
         run: echo 'ENV=staging' >> .env
 
       - name: Env vars setup 3
-        run: echo 'privateURL=23.20.248.221' >> .env
+        run: echo 'privateURL=staging.smarteat.fr' >> .env
 
       - name: Build Nuxt app
         run: npm run generate
