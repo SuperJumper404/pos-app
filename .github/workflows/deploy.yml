@@ -13,36 +13,29 @@ jobs:
     steps:
       - name: Clone staging branch manually
         run: |
+          pwd
           git clone --branch staging https://github.com/SuperJumper404/pos-app.git frontend
 
       - name: Install dependencies
         run: |
+          pwd
           cd frontend
           npm install
 
       - name: Set environment variables
         run: |
+          pwd
           echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' > frontend/.env
           echo 'ENV=staging' >> frontend/.env
           echo 'privateURL=staging.smarteat.fr' >> frontend/.env
 
       - name: Build Nuxt app
         run: |
+          pwd
           cd frontend
           npm run generate
 
-      - name: Clean old frontend folder on EC2
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            rm -rf /home/ubuntu/smarteat/frontend
-            mkdir -p /home/ubuntu/smarteat/frontend
-
-      - name: Upload frontend folder to EC2 (including dist and code)
+      - name: Upload whole frontend folder to EC2
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -50,9 +43,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: 'frontend/*'
-          target: '/home/ubuntu/smarteat/frontend'
+          target: '/home/ubuntu/smarteat/'
 
-      - name: Launch frontend with PM2
+      - name: Launch frontend with pm2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -60,6 +53,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
+            pwd
             cd /home/ubuntu/smarteat/frontend
+            pwd
             pm2 delete frontend || true
             pm2 start
