@@ -22,13 +22,12 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' > frontend/.env
-          echo 'ENV=staging' >> frontend/.env
-          echo 'privateURL=staging.smarteat.fr' >> frontend/.env
+          echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' > .env
+          echo 'ENV=staging' >> .env
+          echo 'privateURL=staging.smarteat.fr' >> .env
 
       - name: Build Nuxt app
         run: |
-          cd frontend
           npm run generate
 
       - name: Upload whole frontend folder to EC2
@@ -39,7 +38,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: 'frontend/*'
-          target: '/home/ubuntu/smarteat/frontend'
+          target: '/home/ubuntu/smarteat/'
 
       - name: Launch frontend with pm2
         uses: appleboy/ssh-action@v1.0.0
