@@ -47,15 +47,15 @@ export default {
   },
   target: 'static',
   axios: {
-    proxy: true,
-    // baseURL: `${process.env.VUE_APP_BASEURL}`,
+    proxy: false,
+    baseURL: `${getHost().backEndPoint}`,
   },
-  proxy: {
+  /*proxy: {
     '/baseurl': {
       target: `${getHost().backEndPoint}`,
       pathRewrite: { '^/baseurl': '' },
     },
-  },
+  },*/
   vuetify: {
     // customVariables: ['~/assets/variables.scss'],
     theme: {

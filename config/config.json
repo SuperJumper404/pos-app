@@ -12,8 +12,8 @@
     },
     "staging": {
       "name": "environments staging",
-      "frontEndPoint": "23.20.248.221",
-      "backEndPoint": "http://23.20.248.221:5005"
+      "frontEndPoint": "https://staging.smarteat.fr/",
+      "backEndPoint": "https://staging.smarteat.fr:5005"
     }
   }
 }
