@@ -30,15 +30,15 @@ jobs:
       - name: Build Nuxt app
         run: npm run generate
 
-      - name: Upload dist folder to EC2
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          source: 'dist/*'
-          target: '/home/ubuntu/smarteat/frontend'
+      # - name: Upload dist folder to EC2
+      #   uses: appleboy/scp-action@v0.1.4
+      #   with:
+      #     host: ${{ secrets.EC2_HOST }}
+      #     username: ${{ secrets.EC2_USER }}
+      #     key: ${{ secrets.EC2_SSH_KEY }}
+      #     port: 22
+      #     source: 'dist/*'
+      #     target: '/home/ubuntu/smarteat/frontend'
 
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.0
@@ -49,9 +49,12 @@ jobs:
           port: 22
           script: |
             # Cloner le projet si dossier manquant
-            if [ ! -d /home/ubuntu/smarteat/frontend/config ]; then
+            if [ ! -d /home/ubuntu/smarteat/frontend ]; then
               cd /home/ubuntu/smarteat
               mkdir frontend
+              echo 'VUE_APP_BASEURL=https://staging.smarteat.fr:5005' >> .env
+              echo 'ENV=staging' >> .env
+              echo 'privateURL=staging.smarteat.fr' >> .env
               git clone --branch staging git@github.com:SuperJumper404/pos-app.git frontend
             fi
             cd /home/ubuntu/smarteat/frontend
