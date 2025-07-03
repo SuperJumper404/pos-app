@@ -40,7 +40,7 @@ jobs:
           source: 'dist/*'
           target: '/home/ubuntu/smarteat/frontend'
 
-      - name: Post-deploy (optional permissions or config on EC2)
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -48,5 +48,14 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            echo "✅ Déploiement terminé dans /home/ubuntu/smarteat/frontend"
-            # Par exemple : chmod -R 755 ou chown www-data selon ton serveur web
+            # Cloner le projet si dossier manquant
+            if [ ! -d /home/ubuntu/smarteat/frontend ]; then
+              cd /home/ubuntu/smarteat
+              mkdir frontend
+              git clone --branch staging git@github.com:SuperJumper404/pos-app.git frontend
+            fi
+            cd /home/ubuntu/smarteat/frontend
+            git fetch origin
+            git reset --hard origin/staging
+            npm install
+            pm2 start
