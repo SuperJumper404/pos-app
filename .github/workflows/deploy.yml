@@ -51,4 +51,5 @@ jobs:
           port: 22
           script: |
             cd /home/ubuntu/smarteat/frontend
-            pm2 restart all
+            sudo rm -rf /var/www/smarteat-staging
+            sudo cp -r dist /var/www/smarteat-staging

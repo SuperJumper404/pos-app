@@ -18,6 +18,7 @@ export default {
     //  host: '127.0.0.1' // default: localhost or IP_ADRESSE 192.168.1.139
   },
   ssr: false,
+  target: 'static',
   generate: {
     //subFolders: false
   },
@@ -46,7 +47,6 @@ export default {
     ENV: process.env.ENV,
     privateURL: getHost().backEndPoint,
   },
-  target: 'static',
   axios: {
     proxy: false,
     baseURL: `${getHost().backEndPoint}`,
