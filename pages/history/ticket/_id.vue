@@ -22,7 +22,7 @@
         ></iframe>
       </div>
       <div>
-        <v-btn @click="printReceipt()"> Imprimer Ticket </v-btn>
+        <v-btn @click="printReceipt()"> Imprimer Ticket QZ </v-btn>
       </div>
       <div>
         <v-btn @click="printReceiptSOAP()"> Imprimer Ticket </v-btn>
