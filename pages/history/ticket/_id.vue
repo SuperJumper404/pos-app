@@ -87,7 +87,7 @@ export default {
   methods: {
     printReceiptSOAP() {
       const PRINTER_IP = '192.168.1.94' // ← remplace par l’adresse IP de ton imprimante
-      const SOAP_URL = `http://${PRINTER_IP}/cgi-bin/epos/service.cgi`
+      const SOAP_URL = `https://${PRINTER_IP}/cgi-bin/epos/service.cgi`
       // const req =
       //   '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">' +
       //   '<s:Header>' +
