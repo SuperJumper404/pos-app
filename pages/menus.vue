@@ -581,27 +581,40 @@ export default {
     addToCart(params) {
       if (params.stock < 1) {
         this.showAlert('Produit non disponible', 'error')
+        return
       }
+
       if (params.product_customization.length > 0) {
         this.itemDialog = true
         this.selectedItem = this.dataProduct.find((x) => x.id === params.id)
-        this.currentItem = this.selectedItem.product_customization.map(
-          (x) => []
-        )
+        this.currentItem = this.selectedItem.product_customization.map(() => [])
       } else {
-        const newData = {
-          id: params.id,
-          name: params.name,
-          categoryid: params.categoryid,
-          image: params.image,
-          stock: params.stock,
-          price: params.price,
-          subtotal: 1 * params.price,
-          qty: 1,
-        }
-        this.cartItem = [...this.cartItem, newData]
-        this.idItem = params.id
+        const existingIndex = this.cartItem.findIndex(
+          (item) => item.id === params.id
+        )
 
+        if (existingIndex !== -1) {
+          // Si l’item est déjà dans le panier, on augmente juste la quantité
+          this.cartItem[existingIndex].qty += 1
+          this.cartItem[existingIndex].subtotal =
+            this.cartItem[existingIndex].qty *
+            this.cartItem[existingIndex].price
+        } else {
+          // Sinon on l’ajoute
+          const newData = {
+            id: params.id,
+            name: params.name,
+            categoryid: params.categoryid,
+            image: params.image,
+            stock: params.stock,
+            price: params.price,
+            subtotal: params.price,
+            qty: 1,
+          }
+          this.cartItem = [...this.cartItem, newData]
+        }
+
+        this.idItem = params.id
         this.totalPrice()
         this.indexCart()
       }

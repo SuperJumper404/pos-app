@@ -39,11 +39,9 @@
   </v-app>
 </template>
 <script>
-import * as parameters from '../config/parameters'
 export default {
   data() {
     return {
-      parameters,
       clipped: false,
       drawer: false,
       fixed: false,

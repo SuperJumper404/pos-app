@@ -169,6 +169,11 @@ export default {
           to: '/cashregister',
         },
         {
+          icon: 'mdi-history',
+          title: 'Historique',
+          to: '/history',
+        },
+        {
           icon: 'mdi-apps',
           title: 'Stocks',
           to: '/stocks',

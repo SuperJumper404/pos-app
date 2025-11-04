@@ -14,8 +14,12 @@
   },
   "dependencies": {
     "@nuxtjs/axios": "^5.13.1",
+    "chart.js": "^4.5.0",
     "cli-cursor": "^4.0.0",
     "core-js": "^3.9.1",
+    "html2pdf.js": "^0.10.3",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
     "moment": "^2.29.4",
     "nuxt": "^2.15.3",
     "uuid": "^9.0.0",

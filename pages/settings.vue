@@ -15,9 +15,7 @@
     <v-row style="justify-content: space-between">
       <v-col md="4" sm="5" cols="12">
         <v-card outlined style="height: 100%">
-          <v-img
-            src="https://www.coffeebeancompany.co.uk/app/uploads/2017/04/Coffee-Shop-1024x765.jpg"
-          />
+          <v-img :src="imageUrl" />
           <v-card-actions class="text-center">
             <input
               id="fileImageProfile"
@@ -95,6 +93,16 @@
         </div>
       </v-col>
     </v-row>
+    <v-row>
+      <v-btn
+        color="primary"
+        rounded
+        :href="`/click-and-collect/${shopId}/${shop_name}`"
+        target="_blank"
+      >
+        Voir le site de mon restaurant <v-icon> mdi-arrow-top-right </v-icon>
+      </v-btn>
+    </v-row>
 
     <v-form v-model="isValue" @submit.prevent="submitShopEdit">
       <v-row>
@@ -133,6 +141,15 @@
         </v-col>
         <v-col cols="6">
           <v-text-field
+            v-model="formShop.shop_status"
+            label="Status / Message d'information pour vos client"
+            type="text"
+            placeholder="Un status particulier, évenements..."
+            required
+          ></v-text-field>
+        </v-col>
+        <v-col cols="6">
+          <v-text-field
             v-model="formShop.shop_adress"
             label="Adresse"
             type="text"
@@ -150,6 +167,16 @@
             chips
           ></v-combobox>
         </v-col>
+        <v-col cols="6">
+          <v-text-field
+            v-model="formShop.shop_printer_ip"
+            label="Adresse IP de l'imprimante"
+            type="text"
+            :rules="[(v) => !!v || 'Adresse Ip requise']"
+            placeholder="Insérez l'adresse Ip de l'imprimante"
+            required
+          ></v-text-field>
+        </v-col>
       </v-row>
       <v-btn color="warning" @click.stop="$router.push('/restaurants')"
         >Annuler</v-btn
@@ -164,6 +191,8 @@
       >
     </v-form>
     <pre type="json">{{ formShop }}</pre>
+    <pre type="json">{{ staticURL }}</pre>
+    <pre type="json">{{ imageUrl }}</pre>
   </v-container>
 </template>
 <script>
@@ -195,14 +224,18 @@ export default {
     loadingBtnImg: false,
     isValue: true,
     loadingBtn: false,
+    shopId: localStorage.getItem('shopid'),
     AllPaymentsMethods: ['Cheques', 'Especes', 'Tickets Restaurants'],
-    image: '',
+    imageUrl: '',
     formShop: {
       shop_name: '',
       shop_description: '',
       shop_phone: '',
+      shop_status: '',
       shop_hours: [],
       shop_payment_methods: [],
+      shop_profile_image: '',
+      shop_printer_ip: '',
     },
     valid: true,
     nameRules: [
@@ -242,10 +275,18 @@ export default {
     shop_payment_methods() {
       return this.$store.get('shop/shop_payment_methods')
     },
+    shop_profile_image() {
+      return this.$store.get('shop/shop_profile_image')
+    },
+    shop_status() {
+      return this.$store.get('shop/shop_status')
+    },
+    shop_printer_ip() {
+      return this.$store.get('shop/shop_printer_ip')
+    },
   },
   mounted() {
     this.loadPage = true
-
     const calls = [this.$store.dispatch('shop/getShopInfo')]
 
     Promise.all(calls)
@@ -253,11 +294,18 @@ export default {
         this.formShop.shop_name = this.shop_name
         this.formShop.shop_adress = this.shop_adress
         this.formShop.shop_phone = this.shop_phone
+        this.formShop.shop_status = this.shop_status
         this.formShop.shop_description = this.shop_description
         this.formShop.shop_payment_methods = this.shop_payment_methods
         this.formShop.shop_hours = JSON.parse(JSON.stringify(this.shop_hours))
+        this.formShop.shop_profile_image = this.shop_profile_image
+        this.formShop.shop_printer_ip = this.shop_printer_ip
 
         console.log('Form Shop', this.formShop)
+        this.imageUrl = `${this.staticURL()}/api/v1/imgprofile/${
+          this.formShop.shop_profile_image
+        }`
+        console.log(this.imageUrl)
       })
       .finally(() => {
         this.loadPage = false
@@ -283,7 +331,7 @@ export default {
           fd.append('image', this.imageRaw)
 
           this.loadingBtnImg = true
-          const res = await this.$store.dispatch('products/updateProduct', {
+          const res = await this.$store.dispatch('shop/updateShopInfo', {
             id: this.id,
             data: fd,
           })
@@ -305,6 +353,7 @@ export default {
       if (this.isValue) {
         this.loadingBtn = true
         const res = await this.$store.dispatch('shop/updateShopInfo', {
+          id: this.id,
           data: this.formShop,
         })
         if (res) {

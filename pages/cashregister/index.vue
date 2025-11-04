@@ -13,12 +13,7 @@
         <v-card-text v-if="table.canceled || table.waiting || table.preparing">
           <!-- <span class="me-1">{{ clientNamesPerTable[table.id] }}</span> -->
           <v-chip-group>
-            <v-chip
-              v-if="table.canceled"
-              filter
-              color="#FFE0B2"
-              variant="outlined"
-            >
+            <v-chip v-if="table.canceled" color="#FFE0B2" variant="outlined">
               <v-avatar
                 color="#FFA726"
                 size="x-small"
@@ -28,12 +23,7 @@
               </v-avatar>
               Annuler
             </v-chip>
-            <v-chip
-              v-if="table.waiting"
-              filter
-              color="#CFD8DC"
-              variant="outlined"
-            >
+            <v-chip v-if="table.waiting" color="#CFD8DC" variant="outlined">
               <v-avatar
                 color="#90A4AE"
                 size="x-small"
@@ -43,12 +33,7 @@
               </v-avatar>
               En attente
             </v-chip>
-            <v-chip
-              v-if="table.preparing"
-              filter
-              color="#C5E1A5"
-              variant="outlined"
-            >
+            <v-chip v-if="table.preparing" color="#C5E1A5" variant="outlined">
               <v-avatar
                 color="#7CB342"
                 size="x-small"
