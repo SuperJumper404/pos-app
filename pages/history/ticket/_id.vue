@@ -22,7 +22,7 @@
         ></iframe>
       </div>
       <div>
-        <v-btn @click="printReceip()"> Imprimer Ticket </v-btn>
+        <v-btn @click="printReceipt()"> Imprimer Ticket </v-btn>
       </div>
       <div>
         <v-btn @click="printReceiptSOAP()"> Imprimer Ticket </v-btn>
@@ -143,10 +143,20 @@ x54aRxF0NBCKfCIjQd0j75+XK6f3CzUNk596zGWHAoGBAMYezUrbq2RRiCAudlkc
 7qcMNo+8wyA6QvG1f50FmZfH
 -----END PRIVATE KEY-----`
 
-        // -- 2️⃣ Configuration sécurité QZ (clé + signature)
-        qz.security.setCertificatePromise(() => Promise.resolve(CERT_PEM))
+        console.log('✅ Certificat et clé chargés.')
+
+        // -- 1️⃣ Sécurité QZ Tray
+        console.log('⚙️ Configuration de QZ Tray Security...')
+        qz.security.setCertificatePromise(() => {
+          console.log('📜 QZ → Certificate Promise appelée')
+          return Promise.resolve(CERT_PEM)
+        })
 
         qz.security.setSignaturePromise((toSign) => {
+          console.log(
+            '✍️ QZ → Signature Promise appelée avec message :',
+            toSign
+          )
           return (resolve, reject) => {
             try {
               const pk = KEYUTIL.getKey(PRIVATE_KEY_PEM)
@@ -154,21 +164,28 @@ x54aRxF0NBCKfCIjQd0j75+XK6f3CzUNk596zGWHAoGBAMYezUrbq2RRiCAudlkc
               sig.init(pk)
               sig.updateString(toSign)
               const b64 = sig.sign()
+              console.log('✅ Signature générée :', b64.slice(0, 30) + '...')
               resolve(b64)
             } catch (e) {
+              console.error('❌ Erreur lors de la signature :', e)
               reject(e)
             }
           }
         })
 
-        // -- 3️⃣ Connexion à QZ Tray
+        // -- 2️⃣ Connexion à QZ Tray
+        console.log('🔌 Tentative de connexion à QZ Tray...')
         await qz.websocket.connect()
+        console.log('✅ Connecté à QZ Tray sur', qz.websocket.getConnection())
 
-        // -- 4️⃣ Trouver l’imprimante Epson
-        const printer = await qz.printers.find('Generic') // ou nom exact
+        // -- 3️⃣ Recherche de l’imprimante
+        console.log('🔍 Recherche de l’imprimante...')
+        const printer = await qz.printers.find('Generic / Text Only') // à adapter
+        console.log('🖨️ Imprimante trouvée :', printer)
         const config = qz.configs.create(printer)
 
-        // -- 5️⃣ Construire ton ticket (tu peux adapter selon tes données)
+        // -- 4️⃣ Construction du ticket
+        console.log('🧾 Construction du ticket...')
         const order = this.dataArchivedOrder
         const items = this.detailArchivedOrder
         const total = this.totalAmount.toFixed(2)
@@ -198,16 +215,26 @@ x54aRxF0NBCKfCIjQd0j75+XK6f3CzUNk596zGWHAoGBAMYezUrbq2RRiCAudlkc
         lines.push('\x1B\x69') // cut
 
         const data = [{ type: 'raw', format: 'plain', data: lines.join('') }]
+        console.log("🧩 Données d'impression prêtes :", lines.join(''))
 
-        // -- 6️⃣ Impression
+        // -- 5️⃣ Impression
+        console.log('🖨️ Envoi du ticket à l’imprimante...')
         await qz.print(config, data)
+        console.log('✅ Impression terminée !')
         this.$toast.success('Ticket imprimé avec succès ✅')
       } catch (err) {
-        console.error('Erreur impression :', err)
+        console.error('❌ Erreur globale dans printReceipt :', err)
         this.$toast.error('Erreur lors de l’impression ❌')
       } finally {
-        // -- 7️⃣ Optionnel : déconnecter QZ Tray
-        if (qz.websocket.isActive()) qz.websocket.disconnect()
+        // -- 6️⃣ Déconnexion
+        if (qz.websocket.isActive()) {
+          console.log('🔌 Déconnexion de QZ Tray...')
+          await qz.websocket.disconnect()
+          console.log('✅ Déconnecté de QZ Tray.')
+        } else {
+          console.log('ℹ️ QZ Tray déjà déconnecté.')
+        }
+        console.log('🔴 [END] Impression terminée.')
       }
     },
 
