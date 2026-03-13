@@ -1,4 +1,7 @@
 {
     "dimmer.enabled": false,
-    "BracketHighlighter.enableExtension": true
+    "BracketHighlighter.enableExtension": true,
+    "editor.quickSuggestions": {
+    "strings": true
+    }
 }

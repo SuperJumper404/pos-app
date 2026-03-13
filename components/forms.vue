@@ -31,8 +31,12 @@
       </v-alert>
     </div>
     <div class="f-secondary">
-      <h1>{{ formprops.title }}</h1>
-      <h3>
+      <div class="d-flex flex-column align-center justify-center">
+        <v-img src="/logo.png" contain height="100" width="190"></v-img>
+        <h1 class="">Smart<span style="color: #7e22ce">Eat</span></h1>
+      </div>
+
+      <h3 class="mt-10">
         {{
           formprops.title === 'Register' ? 'Inscrivez-vous' : 'Connectez-vous'
         }}
@@ -40,7 +44,7 @@
     </div>
     <v-form
       v-model="isValue"
-      :class="formprops.access !== 1 ? 'mt-5 mb-10' : 'mt-15 mb-10'"
+      :class="formprops.access !== 1 ? 'mt-5 mb-5' : 'mt-5 mb-5'"
       @submit.prevent="sumitforms"
     >
       <v-text-field
@@ -69,52 +73,57 @@
       </v-text-field>
       <v-text-field
         v-model="formsdata.email"
-        label="Email"
+        label="E-mail de connexion"
         type="email"
         :rules="emailRules"
-        placeholder="Input your email"
+        placeholder="Saisir votre e-mail"
         required
         :autofocus="formprops.access !== 2 ? true : false"
       ></v-text-field>
       <v-text-field
         v-model="formsdata.password"
-        label="Password"
+        label="Mot de passe"
         :type="statePass ? 'text' : 'password'"
         :append-icon="statePass ? 'mdi-eye-off' : 'mdi-eye'"
         :rules="passRules"
-        placeholder="Input your password"
+        placeholder="Saisir votre mot de passe"
         required
         class="mb-4"
         @click:append="statePass = !statePass"
       >
       </v-text-field>
       <div v-if="formprops.access === 1" class="mb-8 float-end f-secondary">
-        <nuxt-link to="/forgotpassword">Forgot Password</nuxt-link>
+        <nuxt-link to="/forgotpassword">Mot de passe oublié ?</nuxt-link>
       </div>
-      <v-btn
-        :disabled="!isValue"
-        :loading="loadingBtn"
-        type="submit"
-        color="yellow darken-1"
-        :class="
-          formprops.access !== 1
-            ? 'mt-10 text-capitalize f-secondary'
-            : 'text-capitalize f-secondary'
-        "
-        block
-        x-large
-        rounded
-        >{{ formprops.access !== 1 ? 'Register' : 'Login' }}</v-btn
-      >
+      <v-hover v-slot="{ hover }">
+        <v-btn
+          :disabled="!isValue"
+          :loading="loadingBtn"
+          type="submit"
+          :class="
+            hover
+              ? 'primaryPurple--text text-none'
+              : 'primaryWhite--text text-none'
+          "
+          color="primaryPurple"
+          block
+          :text="hover"
+          x-large
+          rounded
+          >{{
+            formprops.access !== 1 ? 'Créer un compte' : 'Se connecter'
+          }}</v-btn
+        >
+      </v-hover>
     </v-form>
     <div class="text-center f-secondary">
       <p v-if="formprops.access === 1">
-        You don't have an account yet?
-        <nuxt-link to="/register">Register.</nuxt-link>
+        Vous n'avez pas de compte ?
+        <nuxt-link to="/register">Creer un compte</nuxt-link>
       </p>
       <p v-else>
-        You have an account yet?
-        <nuxt-link to="/login">Login.</nuxt-link>
+        Vous n'avez pas de compte ?
+        <nuxt-link to="/login">Connectez-vous.</nuxt-link>
       </p>
     </div>
   </div>
@@ -141,20 +150,21 @@ export default {
         password: '',
       },
       usernameRules: [
-        (v) => !!v || 'Username required',
+        (v) => !!v || "Nom d'utilisateur requis",
         (v) =>
-          (v && v.length <= 15) || 'Username must be less than 15 characters',
+          (v && v.length <= 15) ||
+          "Nom d'utilisateur doit être inférieur à 15 caractères",
       ],
       phoneRules: [
-        (v) => !!v || 'Phone number required',
-        (v) => (v && v.length <= 10) || 'Phone number must be valid!',
+        (v) => !!v || 'Numéro de téléphone requis',
+        (v) => (v && v.length <= 10) || 'Numéro de téléphone invalide!',
       ],
       emailRules: [
-        (v) => !!v || 'Email required',
-        (v) => /.+@.+\..+/.test(v) || 'E-mail must be valid',
+        (v) => !!v || 'E-mail requis',
+        (v) => /.+@.+\..+/.test(v) || "Le format de l'e-mail est incorrect",
       ],
       passRules: [
-        (v) => !!v || 'Password required',
+        (v) => !!v || 'Mot de passe requis',
         (v) =>
           /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@,#,_])[0-9a-zA-Z@#_]{8,}$/.test(
             v

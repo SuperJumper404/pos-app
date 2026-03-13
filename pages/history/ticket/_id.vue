@@ -18,20 +18,22 @@
           class="w-full"
         ></iframe>
       </div>
-
-      <div>
-        <v-btn @click="printReceipt()"> Imprimer Ticket </v-btn>
+      <pre type="json">{{ shopInfo }}</pre>
+      <div v-if="shopInfo.smart_print_app">
+        <v-btn @click="printReceiptSmartPrint()">
+          Impression avec SmartPrint</v-btn
+        >
       </div>
-      <div>
-        <v-btn @click="printReceiptSOAP()"> Imprimer Ticket SOAP </v-btn>
+      <div v-else>
+        <v-btn @click="printReceiptCloud()"> Impression Cloud </v-btn>
       </div>
     </template>
 
     <!-- <pre type="json"> {{ id }}</pre> -->
-    <pre type="json"> order id :{{ orderId }}</pre>
+    <!-- <pre type="json"> order id :{{ orderId }}</pre>
     <pre type="json"> {{ dataArchivedOrder }} </pre>
     <pre type="json"> {{ detailArchivedOrder }}</pre>
-    <pre type="json"> {{ totalAmount }}</pre>
+    <pre type="json"> {{ totalAmount }}</pre> -->
   </v-container>
 </template>
 <script>
@@ -69,8 +71,10 @@ export default {
       return {
         shop_name: this.$store.get('shop/shop_name'),
         shop_adress: this.$store.get('shop/shop_adress'),
+        shop_siret: this.$store.get('shop/shop_siret'),
         shop_phone: this.$store.get('shop/shop_phone'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
+        smart_print_app: this.$store.get('shop/smart_print_app'),
       }
     },
     totalAmount() {
@@ -86,7 +90,7 @@ export default {
     this.generateCleanTicketPDF(size)
   },
   methods: {
-    async printReceipt() {
+    async printReceiptSmartPrint() {
       const escposBuffer = this.generateEscPos()
       console.log('ESC/POS BUFFER:', escposBuffer)
       const dataFormatESCPOS = escposBuffer.toString('base64')
@@ -102,90 +106,25 @@ export default {
       })
     },
 
-    printReceiptSOAP() {
-      const PRINTER_IP = '192.168.1.46' // ← remplace par l’adresse IP de ton imprimante
-      const SOAP_URL = `https://${PRINTER_IP}/cgi-bin/epos/service.cgi`
-      // const req =
-      //   '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">' +
-      //   '<s:Header>' +
-      //   '<parameter xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
-      //   '<devid>local_printer</devid>' +
-      //   '<timeout>10000</timeout>' +
-      //   '</parameter>' +
-      //   '</s:Header>' +
-      //   '<s:Body>' +
-      //   '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
-      //   // ==== Contenu du ticket ====
-      //   '<text align="center" font="font_a" width="2" height="2">' +
-      //   this.shopInfo.shop_name +
-      //   '</text><br/>' +
-      //   '<text align="center">TEL : ' +
-      //   this.shopInfo.shop_phone +
-      //   '</text><br/>' +
-      //   '<text align="center">' +
-      //   this.shopInfo.shop_adress +
-      //   '</text>' +
-      //   '<feed line="2"/>' +
-      //   '<text align="left">Client : ' +
-      //   this.dataArchivedOrder.username +
-      //   '</text><br/>' +
-      //   '<text align="left">Commande n°' +
-      //   this.dataArchivedOrder.ordernumber +
-      //   '</text><br/>' +
-      //   '<text align="left">Date : ' +
-      //   this.currentDate +
-      //   '</text>' +
-      //   '<feed line="2"/>' +
-      //   '<text>--------------------------------</text><br/>' +
-      //   // Produits
-      //   this.detailArchivedOrder
-      //     .map(
-      //       (item) =>
-      //         '<text align="left">' +
-      //         item.qty +
-      //         'x ' +
-      //         item.name +
-      //         '</text>' +
-      //         '<text align="right">' +
-      //         item.total.toFixed(2) +
-      //         ' €</text><br/>'
-      //     )
-      //     .join('') +
-      //   '<feed line="2"/>' +
-      //   '<text>--------------------------------</text><br/>' +
-      //   // Totaux
-      //   '<text align="right">Sous-total : ' +
-      //   (this.totalAmount * 0.8).toFixed(2) +
-      //   ' €</text><br/>' +
-      //   '<text align="right">TVA (20%) : ' +
-      //   (this.totalAmount * 0.2).toFixed(2) +
-      //   ' €</text><br/>' +
-      //   '<text width="2" height="2" align="right">TOTAL : ' +
-      //   this.totalAmount.toFixed(2) +
-      //   ' €</text>' +
-      //   '<feed line="2"/>' +
-      //   '<text align="right">Paiement : CB</text>' +
-      //   '<feed line="2"/>' +
-      //   '<text align="center">À très bientôt</text><br/>' +
-      //   '<text align="center">' +
-      //   this.shopInfo.shop_name +
-      //   '</text><br/>' +
-      //   '<text align="center">Made with smarteat.fr</text>' +
-      //   '<feed line="2"/>' +
-      //   '<cut/>' +
-      //   '</epos-print>' +
-      //   '</s:Body>' +
-      //   '</s:Envelope>'
+    printReceiptCloud() {
+      const address = this.shopInfo.shop_adress || ''
+      const addressLines = this.splitByWords(address, 30)
 
+      const addressXml = addressLines.reduce((prev, line) => {
+        return (
+          prev +
+          `<text width="1" height="1" align="center">${line}</text><feed line="1"/>\n`
+        )
+      }, '')
       const req =
-        '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">' +
-        '<s:Header>' +
-        '<parameter xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
+        '<?xml version="1.0" encoding="utf-8" ?>' +
+        '<PrintRequestInfo>' +
+        '<ePOSPrint>' +
+        '<Parameter>' +
         '<devid>local_printer</devid>' +
         '<timeout>10000</timeout>' +
-        '</parameter>' +
-        '</s:Header>' +
-        '<s:Body>' +
+        '</Parameter>' +
+        '<PrintData>' +
         '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
         // === En-tête ===
         '<text smooth="true"></text>' +
@@ -197,9 +136,11 @@ export default {
         this.shopInfo.shop_phone +
         '</text>' +
         '<feed line="1"/>' +
-        '<text width="1" height="1" align="center">' +
-        this.shopInfo.shop_adress +
+        '<text width="1" height="1" em="false" align="center">SIRET : ' +
+        this.shopInfo.shop_siret +
         '</text>' +
+        '<feed line="1"/>' +
+        addressXml +
         '<feed line="2"/>' +
         // === Commande ===
         '<text em="true" align="left" width="1" height="1">' +
@@ -207,15 +148,19 @@ export default {
         '</text>' +
         '<feed line="1"/>' +
         '<text em="false">Commande n°</text>' +
-        '<text em="true" smooth="true" width="3" height="3">' +
+        '<text em="true" smooth="true" width="1" height="1">' +
         this.dataArchivedOrder.ordernumber +
         '</text>' +
         '<feed line="1"/>' +
-        '<text em="false" smooth="true" width="1" height="1">Date : ' +
+        '<text em="false" smooth="true" width="1" height="1">Date :</text> ' +
+        '<text em="true" smooth="true" width="1" height="1">' +
         this.currentDate +
         '</text>' +
         '<feed line="2"/>' +
-        '<text>--------------------------------</text>' +
+        '<text> ' +
+        'QTE   PRODUIT                PRIX\n\n' +
+        '</text>' +
+        '<text  em="false">--------------------------------</text>' +
         '<feed line="1"/>' +
         // === Produits ===
         this.detailArchivedOrder
@@ -223,17 +168,16 @@ export default {
             (item) =>
               '<text>' +
               item.qty +
-              'x ' +
-              item.name +
-              '  ' +
-              item.total.toFixed(2) +
+              'x '.padEnd(5) +
+              item.name.padEnd(20).slice(0, 20) +
+              item.total.toFixed(2).padStart(7) +
               ' €</text><feed line="1"/>'
           )
           .join('') +
         '<text>--------------------------------</text>' +
         '<feed line="1"/>' +
         // === Totaux ===
-        '<text>Sous-total : ' +
+        '<text align="right" >Sous-total : ' +
         (this.totalAmount * 0.8).toFixed(2) +
         ' €</text>' +
         '<feed line="1"/>' +
@@ -245,10 +189,14 @@ export default {
         this.totalAmount.toFixed(2) +
         ' €</text>' +
         '<feed line="2"/>' +
-        '<text>Paiement : CB</text>' +
+        '<text em="false"  width="1" height="1" >Paiement :' +
+        this.dataArchivedOrder.payment +
+        '</text>' +
+        '<feed line="1"/>' +
+        '<text>--------------------------------</text>' +
         '<feed line="2"/>' +
         // === Pied de ticket ===
-        '<text align="center">À très bientôt</text>' +
+        '<text align="center">À très bientôt !</text>' +
         '<feed line="1"/>' +
         '<text align="center">' +
         this.shopInfo.shop_name +
@@ -258,19 +206,15 @@ export default {
         '<feed line="3"/>' +
         '<cut/>' +
         '</epos-print>' +
-        '</s:Body>' +
-        '</s:Envelope>'
+        '</PrintData>' +
+        '</ePOSPrint>' +
+        '</PrintRequestInfo>'
 
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', SOAP_URL, true)
-      xhr.setRequestHeader('Content-Type', 'text/xml; charset=utf-8')
-      xhr.setRequestHeader('SOAPAction', '""')
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          console.log('SOAP RESPONSE:', xhr.status, xhr.responseText)
-        }
-      }
-      xhr.send(req)
+      this.$store.dispatch('printing/postPrintingJob', {
+        requete: req,
+        ticketType: 'caisse',
+        orderId: this.orderId,
+      })
     },
 
     generateEscPos() {
@@ -307,6 +251,7 @@ export default {
       push(doubleOff(), boldOff())
 
       push(alignCenter(), esc('TEL: ' + this.shopInfo.shop_phone + '\n'))
+      push(alignCenter(), esc('SIRET: ' + this.shopInfo.shop_siret + '\n'))
 
       const address = this.shopInfo.shop_adress || ''
       const addressLines = this.splitByWords(address, 30)
@@ -340,7 +285,7 @@ export default {
       push(line())
 
       this.detailArchivedOrder.forEach((item) => {
-        const qty = (item.qty + '').padEnd(5)
+        const qty = (item.qty + 'x').padEnd(5)
         const name = (item.name + '').padEnd(20).slice(0, 20)
         const price = item.total.toFixed(2).padStart(7)
 
@@ -371,7 +316,10 @@ export default {
       )
       push(doubleOff(), boldOff(), esc('\n'))
 
-      push(alignRight(), esc('Paiement : CB\n'))
+      push(
+        alignRight(),
+        esc('Paiement : ' + this.dataArchivedOrder.payment + '\n')
+      )
       push(line())
 
       // ---------------------------------------

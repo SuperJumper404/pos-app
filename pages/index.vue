@@ -1,172 +1,110 @@
 <template>
   <v-container>
-    <v-card outlined class="d-flex align-center mt-10">
-      <v-card-title class="pa-5 d-block" style="width: 50%">
-        <v-row dense>
-          <!-- FROM -->
-          <v-col cols="12" sm="6" md="4">
-            <v-menu
-              v-model="menuFrom"
-              :close-on-content-click="false"
-              transition="scale-transition"
-              offset-y
-              min-width="auto"
-            >
-              <template v-slot:activator="{ on, attrs }">
-                <v-text-field
-                  v-model="from"
-                  label="Date de début"
-                  prepend-icon="mdi-calendar"
-                  readonly
-                  v-bind="attrs"
-                  v-on="on"
-                ></v-text-field>
-              </template>
-              <v-date-picker
-                v-model="from"
-                locale="fr"
-                @input="menuFrom = false"
-              ></v-date-picker>
-            </v-menu>
-          </v-col>
-
-          <!-- TO -->
-          <v-col cols="12" sm="6" md="4">
-            <v-menu
-              v-model="menuTo"
-              :close-on-content-click="false"
-              transition="scale-transition"
-              offset-y
-              min-width="auto"
-            >
-              <template v-slot:activator="{ on, attrs }">
-                <v-text-field
-                  v-model="to"
-                  label="Date de fin"
-                  prepend-icon="mdi-calendar"
-                  readonly
-                  v-bind="attrs"
-                  v-on="on"
-                ></v-text-field>
-              </template>
-              <v-date-picker
-                v-model="to"
-                :min="from"
-                locale="fr"
-                @input="menuTo = false"
-              ></v-date-picker>
-            </v-menu>
-          </v-col>
-
-          <!-- Bouton charger -->
-          <v-col cols="12" md="4" class="d-flex align-end">
-            <v-btn color="primary" @click="fetchMetrics">
-              Charger les KPI
-            </v-btn>
-          </v-col>
-        </v-row>
-
-        <!-- <h5 v-if="accessUser === 0">You are logged in as administrator.</h5>
-        <h5 v-else-if="accessUser === 1">You are logged in as cashier.</h5>
-        <h5 v-else>You are logged in as customer.</h5> -->
-      </v-card-title>
-    </v-card>
-
-    <v-card outlined class="d-flex align-center mt-10">
-      <v-row>
-        <h2>Total Caisse</h2>
-      </v-row>
-      <br />
-      <h1>{{ metrics.totalRevenue }}</h1></v-card
-    >
-    <Loading v-if="loadPage && !accessUser" />
-
-    <!-- <pre type="json">{{ totalProduct }}</pre> -->
-    <pre type="json">{{ metrics }}</pre>
-    <!-- <pre type="json">{{ totalCategory }}</pre> -->
-    <!-- <pre type="json">{{ totalProduct }}</pre>
-    <pre type="json">{{ totalStock }}</pre> -->
-  </v-container>
-</template>
-
-<template>
-  <v-container>
     <!-- Filtres de date -->
-    <v-card outlined class="d-flex align-center mt-10">
-      <v-card-title class="pa-5 d-block" style="width: 100%">
-        <v-row dense>
-          <v-btn small outlined color="primary" @click="setToday"
-            >Aujourd’hui</v-btn
-          >
-          <v-btn small outlined color="secondary" @click="setYesterday"
-            >Hier</v-btn
-          >
-          <v-btn small outlined color="success" @click="setThisWeek"
-            >Semaine en cours</v-btn
-          >
+    <v-card outlined class="mt-10">
+      <v-card-title class="pt-0 pb-0 d-flex justify-center" style="width: 100%">
+        <v-spacer></v-spacer>
+        <v-btn
+          class="mr-2 ml-2"
+          small
+          :outlined="!(currentDateButton === 1)"
+          color="primary"
+          @click="setToday"
+          >Aujourd’hui</v-btn
+        >
+        <v-btn
+          class="mr-2 ml-2"
+          small
+          :outlined="!(currentDateButton === 2)"
+          color="secondary"
+          @click="setYesterday"
+          >Hier</v-btn
+        >
+        <v-btn
+          class="mr-2 ml-2"
+          small
+          :outlined="!(currentDateButton === 3)"
+          color="success"
+          @click="setThisWeek"
+          >Semaine en cours</v-btn
+        >
+        <v-btn
+          :class="[
+            'mr-2',
+            'ml-2',
+            {
+              'primaryWhite--text': currentDateButton === 4,
+            },
+          ]"
+          small
+          :outlined="!(currentDateButton === 4)"
+          color="primaryPurple"
+          @click="setThisMonth"
+        >
+          Mois en cours
+        </v-btn>
 
-          <!-- FROM -->
-          <v-col cols="12" sm="2" md="2">
-            <v-menu
-              v-model="menuFrom"
-              :close-on-content-click="false"
-              transition="scale-transition"
-              offset-y
-              min-width="auto"
-            >
-              <template v-slot:activator="{ on, attrs }">
-                <v-text-field
-                  v-model="from"
-                  label="Date de début"
-                  prepend-icon="mdi-calendar"
-                  readonly
-                  v-bind="attrs"
-                  v-on="on"
-                ></v-text-field>
-              </template>
-              <v-date-picker
+        <v-spacer></v-spacer>
+        <!-- FROM -->
+        <v-col cols="12" sm="2" md="2">
+          <v-menu
+            v-model="menuFrom"
+            :close-on-content-click="false"
+            transition="scale-transition"
+            offset-y
+            min-width="auto"
+          >
+            <template v-slot:activator="{ on, attrs }">
+              <v-text-field
                 v-model="from"
-                locale="fr"
-                @input="menuFrom = false"
-              ></v-date-picker>
-            </v-menu>
-          </v-col>
+                label="Date de début"
+                prepend-icon="mdi-calendar"
+                readonly
+                v-bind="attrs"
+                v-on="on"
+              ></v-text-field>
+            </template>
+            <v-date-picker
+              v-model="from"
+              locale="fr"
+              @input="menuFrom = false"
+            ></v-date-picker>
+          </v-menu>
+        </v-col>
 
-          <!-- TO -->
-          <v-col cols="12" sm="6" md="2">
-            <v-menu
-              v-model="menuTo"
-              :close-on-content-click="false"
-              transition="scale-transition"
-              offset-y
-              min-width="auto"
-            >
-              <template v-slot:activator="{ on, attrs }">
-                <v-text-field
-                  v-model="to"
-                  label="Date de fin"
-                  prepend-icon="mdi-calendar"
-                  readonly
-                  v-bind="attrs"
-                  v-on="on"
-                ></v-text-field>
-              </template>
-              <v-date-picker
+        <!-- TO -->
+        <v-col cols="12" sm="6" md="2">
+          <v-menu
+            v-model="menuTo"
+            :close-on-content-click="false"
+            transition="scale-transition"
+            offset-y
+            min-width="auto"
+          >
+            <template v-slot:activator="{ on, attrs }">
+              <v-text-field
                 v-model="to"
-                :min="from"
-                locale="fr"
-                @input="menuTo = false"
-              ></v-date-picker>
-            </v-menu>
-          </v-col>
-
-          <!-- Bouton charger -->
-          <v-col cols="12" md="4" class="d-flex align-end">
-            <v-btn color="primary" @click="fetchMetrics">
-              Charger les KPI
-            </v-btn>
-          </v-col>
-        </v-row>
+                label="Date de fin"
+                prepend-icon="mdi-calendar"
+                readonly
+                v-bind="attrs"
+                v-on="on"
+              ></v-text-field>
+            </template>
+            <v-date-picker
+              v-model="to"
+              :min="from"
+              locale="fr"
+              @input="menuTo = false"
+            ></v-date-picker>
+          </v-menu>
+        </v-col>
+        <v-spacer></v-spacer>
+        <!-- Bouton charger -->
+        <v-btn color="primary" class="text-none" @click="fetchMetrics">
+          Raffraîchir
+        </v-btn>
+        <v-spacer></v-spacer>
       </v-card-title>
     </v-card>
 
@@ -265,29 +203,13 @@ export default {
       accessUser: 0,
       menuFrom: false,
       menuTo: false,
+      currentDateButton: 1,
       from: '',
       to: '',
     }
   },
-  head() {
-    return {
-      title: 'Accueil',
-    }
-  },
+
   computed: {
-    // totalProduct() {
-    //   console.log('Init Product')
-    //   return this.$store.get('products/dataProduct')
-    // },
-    // totalCategory() {
-    //   return this.$store.get('categories/dataCategories')
-    // },
-    // totalStock() {
-    //   return this.$store.get('stocks/dataStock')
-    // },
-    // totalOrder() {
-    //   return this.$store.get('orders/dataOrders')
-    // },
     metrics() {
       return this.$store.get('history/metrics')
     },
@@ -299,7 +221,7 @@ export default {
     const apiCalls = []
 
     // Configurer les appels API en fonction du niveau d'accès de l'utilisateur
-    if (this.accessUser === 2) {
+    if (this.accessUser === 2 || this.accessUser === 3) {
       this.$router.push('/menus')
       apiCalls.push(
         this.$store.dispatch('products/getProducts'),
@@ -314,8 +236,8 @@ export default {
         this.$store.dispatch('stocks/getAllStock'),
         this.$store.dispatch('orders/getAllOrder'),
         this.$store.dispatch('tables/getAllTables'),
-        this.$store.dispatch('shop/getShopInfo'),
-        this.$store.dispatch('history/getMetrics')
+        this.$store.dispatch('history/getMetrics'),
+        this.$store.dispatch('shop/getShopInfo')
       )
     }
 
@@ -335,6 +257,7 @@ export default {
       })
     },
     setToday() {
+      this.currentDateButton = 1
       const today = new Date()
       const iso = today.toISOString().slice(0, 10)
       this.from = iso
@@ -342,6 +265,7 @@ export default {
       this.fetchMetrics()
     },
     setYesterday() {
+      this.currentDateButton = 2
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
       const iso = yesterday.toISOString().slice(0, 10)
@@ -350,12 +274,25 @@ export default {
       this.fetchMetrics()
     },
     setThisWeek() {
+      this.currentDateButton = 3
       const today = new Date()
       const dayOfWeek = today.getDay() // 0 = dimanche, 1 = lundi, ..., 6 = samedi
       const monday = new Date(today)
       monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7)) // Lundi
 
       const fromIso = monday.toISOString().slice(0, 10)
+      const toIso = today.toISOString().slice(0, 10)
+
+      this.from = fromIso
+      this.to = toIso
+      this.fetchMetrics()
+    },
+    setThisMonth() {
+      this.currentDateButton = 4
+      const today = new Date()
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1) // First day of the month
+
+      const fromIso = firstDayOfMonth.toISOString().slice(0, 10)
       const toIso = today.toISOString().slice(0, 10)
 
       this.from = fromIso

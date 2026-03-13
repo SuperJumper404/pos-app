@@ -10,23 +10,13 @@
     </v-card>
     <v-card v-else outlined class="mt-5 overflow-y-auto">
       <v-app-bar flat color="grey lighten-4" light>
+        <v-spacer></v-spacer>
         <v-btn
           color="success"
-          class="text-capitalize mr-3"
+          class="mr-3 text-none"
           @click="$router.push('/categories/newcategory')"
-          ><v-icon>mdi-plus</v-icon> Category</v-btn
+          ><v-icon>mdi-plus</v-icon> Ajouter une catégorie</v-btn
         >
-        <v-spacer></v-spacer>
-        <div class="mt-6">
-          <v-text-field
-            placeholder="Search name categories"
-            label="Seaching"
-            outlined
-            dense
-            append-icon="mdi-card-search"
-            @keyup="searchData()"
-          ></v-text-field>
-        </div>
       </v-app-bar>
       <v-card-title
         v-if="dataCategories.length == 0"
@@ -43,53 +33,49 @@
       >
         <v-card-text class="d-block justify-space-between mt-5">
           <p class="font-weight-bold">{{ items.name }}</p>
-          <p>Created: {{ setFormatDate(items.created) }}</p>
-          <p>
-            Updated:
-            {{ !items.updated ? '-' : setFormatDate(items.updated) }}
-          </p>
         </v-card-text>
         <v-card-actions class="d-block">
           <!-- md to sm -->
           <v-btn
             color="primary"
-            class="text-capitalize mb-3 d-sm-block d-none"
+            class="text-none mb-3 d-sm-block d-none"
             width="100%"
             @click="$router.push(`/categories/edit/${items.id}`)"
-            >Edit</v-btn
+            >Modifier</v-btn
           >
           <!-- xs -->
           <v-btn
             color="primary"
-            class="text-capitalize mb-3 d-sm-none d-block"
+            class="text-none mb-3 d-sm-none d-block"
             width="100%"
             small
             @click="$router.push(`/categories/edit/${items.id}`)"
-            >Edit</v-btn
+            >Modifier</v-btn
           >
           <v-spacer></v-spacer>
           <!-- md to sm -->
           <v-btn
             color="red darken-1"
             dark
-            class="text-capitalize d-sm-block d-none"
+            class="text-none d-sm-block d-none"
             width="100%"
             @click="$router.push(`/categories/delete/${items.id}?modals=true`)"
-            >Delete</v-btn
+            >Supprimer</v-btn
           >
           <!-- xs -->
           <v-btn
             color="red darken-1"
             dark
-            class="text-capitalize d-sm-none d-block"
+            class="text-none d-sm-none d-block"
             width="100%"
             small
             @click="$router.push(`/categories/delete/${items.id}?modals=true`)"
-            >Delete</v-btn
+            >Supprimer</v-btn
           >
         </v-card-actions>
       </v-card>
     </v-card>
+    <NuxtChild />
   </v-container>
 </template>
 <script>
@@ -106,16 +92,13 @@ export default {
       loadPage: false,
     }
   },
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
+
   computed: {
     dataCategories() {
       return this.$store.get('categories/dataCategories')
+    },
+    showModal() {
+      return this.$route.name === 'categorie-edit-id'
     },
   },
   mounted() {

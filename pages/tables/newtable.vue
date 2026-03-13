@@ -3,17 +3,14 @@
     <div v-if="errMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <Breadcrumbs />
-    <div class="mt-5">
-      <h3>Form New Tables</h3>
-    </div>
+
     <v-form v-model="isValue" @submit.prevent="submitTable">
       <v-text-field
         v-model="formtable.name"
-        label="Name"
+        label="Nom de la table"
         type="text"
-        :rules="[(v) => !!v || 'Name table required']"
-        placeholder="Insert table name"
+        :rules="[(v) => !!v || 'Nom de la table requis']"
+        placeholder="Insérer le nom de la table"
         required
         autofocus
       ></v-text-field>
@@ -24,11 +21,11 @@
       ></v-switch>
       <v-text-field
         v-model="formtable.clearpass"
-        label="Password"
+        label="Mot de passe"
         :disabled="!editableForm"
         type="text"
-        :rules="[(v) => !!v || 'Table Password required']"
-        placeholder="Insert table password"
+        :rules="[(v) => !!v || 'Mot de passe requis']"
+        placeholder="Insérer le mot de passe"
         required
         autofocus
       ></v-text-field>
@@ -37,8 +34,8 @@
         label="Email"
         type="text"
         disabled
-        :rules="[(v) => !!v || 'Table mail required']"
-        placeholder="Insert table mail"
+        :rules="[(v) => !!v || 'Email de la table requis']"
+        placeholder="Insérer l'email de la table"
         required
         autofocus
       ></v-text-field>
@@ -52,16 +49,19 @@
         :placeholder="websiteUrl"
         autofocus
       ></v-text-field>
-      <v-btn color="warning" @click.stop="$router.push('/tables')"
-        >Cancel</v-btn
-      >
       <v-btn
         :disabled="!isValue"
         :loading="loadingBtn"
-        class="ml-4"
+        class="ml-4 text-none"
         type="submit"
         color="primary"
-        >Submit</v-btn
+        >Valider</v-btn
+      >
+      <v-btn
+        color="warning"
+        class="text-none"
+        @click.stop="$router.push('/tables')"
+        >Annuler</v-btn
       >
     </v-form>
     <!-- <pre type="json"> -->
@@ -70,12 +70,8 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 import { v4 as uuidv4 } from 'uuid'
 export default {
-  components: {
-    Breadcrumbs,
-  },
   middleware: 'auth',
   data() {
     return {
@@ -92,11 +88,7 @@ export default {
       },
     }
   },
-  head() {
-    return {
-      title: 'New table',
-    }
-  },
+
   computed: {
     websiteUrl() {
       console.log('Router', this.$router)

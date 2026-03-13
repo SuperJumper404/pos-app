@@ -5,63 +5,86 @@
         <v-card outlined height="100%" class="pa-2 overflow-y-auto">
           <v-card-text v-if="!dataCart" class="row justify-center">
             <p style="margin-top: 30vh">
-              <v-icon large>mdi-emoticon-sad</v-icon> Your cart is empty!
+              <v-icon size="90">mdi-room-service-outline</v-icon> Votre assiette
+              est vide !
             </p>
           </v-card-text>
-          <div
-            v-else
-            :style="$vuetify.breakpoint.smAndDown ? 'width: fit-content' : ''"
-          >
+          <div v-else>
             <v-card
               v-for="itm in dataCart"
               :key="itm.id"
               outlined
-              class="mb-2 pa-2 d-flex justify-space-between align-center"
+              class="d-flex mb-2 flex-column"
+              rounded="7"
             >
-              <v-img
-                class="rounded-lg"
-                :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
-                max-width="100px"
-              />
-              <v-card-subtitle class="d-md-flex">
-                <h6
-                  class="text-center text-truncate"
-                  style="
-                    font-weight: bold;
-                    font-size: large;
-                    color: rgba(0, 0, 0, 0.8);
-                  "
-                >
-                  {{ itm.name }} <br />
-                  {{ itm.price }} €
-                </h6>
-              </v-card-subtitle>
-              <v-card-subtitle class="d-md-flex">
-                <v-col>
-                  <v-chip
-                    v-for="(choice, index) in itm.customizationList"
-                    :key="index"
-                  >
-                    {{ choice.name }}
-                  </v-chip>
+              <v-row class="d-flex align-center mr-2 ml-2 mt-2" no-gutters>
+                <!-- Left block: avatar + texts -->
+                <v-col class="d-flex align-center">
+                  <v-avatar size="75" rounded tile class="mr-3">
+                    <v-img
+                      class="rounded-lg"
+                      :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                    />
+                  </v-avatar>
+
+                  <div class="min-w-0">
+                    <div
+                      class="text-truncate font-weight-bold"
+                      style="font-size: large; color: rgba(0, 0, 0, 0.8)"
+                    >
+                      {{ itm.name }}
+                    </div>
+                    <div
+                      class="font-weight-bold"
+                      style="color: rgba(0, 0, 0, 0.8)"
+                    >
+                      {{ itm.price }} €
+                    </div>
+                  </div>
                 </v-col>
-              </v-card-subtitle>
-              <v-card-subtitle class="d-md-flex">
-                <v-btn
-                  style="font-size: x-large"
-                  color="success"
-                  fab
-                  small
-                  dark
+
+                <!-- Right block: qty -->
+                <v-col class="d-flex align-center justify-end" cols="auto">
+                  <v-btn
+                    class="mx-2"
+                    style="font-size: x-large"
+                    color="success"
+                    fab
+                    small
+                    dark
+                  >
+                    {{ itm.qty }}
+                  </v-btn>
+                </v-col>
+              </v-row>
+
+              <!-- Chips below -->
+              <v-col class="pt-2">
+                <v-chip
+                  v-for="(choice, index) in itm.customizationList"
+                  :key="index"
+                  class="mr-1 mt-1"
                 >
-                  {{ itm.qty }}</v-btn
-                >
-              </v-card-subtitle>
+                  {{ choice.name }}
+                </v-chip>
+              </v-col>
             </v-card>
           </div>
         </v-card>
       </v-col>
       <v-col md="4" sm="12" cols="12">
+        <v-card v-if="access === 0" outlined class="pa-2 mb-3">
+          <v-select
+            v-model="selectedTable"
+            :items="dataTables"
+            item-text="username"
+            item-value="id"
+            :rules="[(v) => !!v || 'Veuillez sélectionner une table']"
+            label="Sélectionner une table"
+            default
+            required
+          ></v-select>
+        </v-card>
         <v-card v-if="loadPage" outlined class="pa-2">
           <Loading />
         </v-card>
@@ -71,37 +94,38 @@
               color="primary"
               width="100%"
               dark
-              class="text-capitalize"
+              class="text-none"
               @click="$router.push('/menus')"
-              >Back to menu</v-btn
+              >Retourner au menu</v-btn
             >
           </v-card-actions>
           <v-form v-else v-model="isValue" @submit.prevent="paymentBtn">
             <v-text-field
               v-model="formuser.customer"
               type="text"
-              label="Name Customer"
-              :rules="[(v) => !!v || 'Name customer required']"
-              placeholder="Input name customer"
+              label="Nom du client"
+              :rules="[(v) => !!v || 'Veuillez saisir le nom']"
+              placeholder="Saisir le nom du client"
               required
             ></v-text-field>
             <v-text-field
               v-model="formuser.phone"
               type="tel"
-              label="Phone Number"
+              prepend-inner-icon="mdi-phone"
+              label="Numéro de téléphone"
               :rules="[
                 (v) =>
                   /^[0-9]+$/.test(v) || 'Seuls les chiffres sont autorisés',
               ]"
-              placeholder="Input phone number"
+              placeholder="Saisir le numéro de téléphone"
               class="mb-5"
               required
             ></v-text-field>
             <v-select
               v-model="formuser.payment"
               :items="items"
-              label="Payment methods"
-              :rules="[(v) => !!v || 'Paymen methods required']"
+              label="Méthodes de paiement"
+              :rules="[(v) => !!v || 'Méthodes de paiement requises']"
             ></v-select>
             <v-textarea
               v-model="formuser.notes"
@@ -117,50 +141,34 @@
               <v-spacer></v-spacer>
               <h5>{{ conversiRp(total) }} €</h5>
             </v-card-title>
-            <v-card-text>
-              <!-- <div class="d-flex justify-space-between">
-                <p>Cashier</p>
-                <p class="font-weight-bold">Mika Tambayong</p>
-              </div> -->
-              <!-- <div class="d-flex justify-space-between">
-                <p>Subtotal</p>
-                <p class="font-weight-bold">{{ conversiRp(totalCart) }} €</p>
-              </div>
-              <div class="d-flex justify-space-between">
-                <p>ppn * 10%</p>
-                <p class="font-weight-bold">{{ conversiRp(ppn) }} €</p>
-              </div>
-              <div class="d-flex justify-space-between">
-                <p>Total</p>
-                <p class="font-weight-bold">{{ conversiRp(total) }} €</p>
-              </div> -->
-            </v-card-text>
+            <v-card-text> </v-card-text>
             <v-card-actions>
               <v-btn
                 :disabled="!isValue"
                 :loading="loadingBtn"
                 type="submit"
                 color="success"
-                width="100%"
-                class="text-capitalize"
-                >Order</v-btn
+                width="50%"
+                class="text-none"
+                >Commander</v-btn
               >
-            </v-card-actions>
-            <v-card-actions>
+
               <v-btn
                 color="red lighten-1"
-                width="100%"
+                width="50%"
                 dark
-                class="text-capitalize"
+                class="text-none"
                 @click="cancelCart"
-                >Cancel</v-btn
+                >Annuler</v-btn
               >
             </v-card-actions>
           </v-form>
         </v-card>
       </v-col>
     </v-row>
-    {{ dataCart }}
+    <!-- {{ dataCart }}
+    <pre>acces :{{ access }}</pre>
+    <pre>current table : {{ selectedTable }}</pre> -->
   </v-container>
 </template>
 <script>
@@ -183,6 +191,8 @@ export default {
     isValue: false,
     loadingBtn: false,
     loadPage: false,
+    selectedTable: parseInt(localStorage.getItem('idUser')),
+    access: parseInt(localStorage.getItem('access')),
     formuser: {
       customer: '',
       phone: '',
@@ -207,6 +217,12 @@ export default {
     message() {
       return this.$store.get('cart/message')
     },
+    dataTables() {
+      // ICI on ne  filtre pas les tables car on veut tout recup sinon on filter sur  acces === 2
+      const result = this.$store.get('tables/dataTables') || []
+      // const filtered = result.filter((x) => x.access === 2)
+      return result
+    },
   },
   mounted() {
     this.total = this.totalCart
@@ -215,8 +231,7 @@ export default {
     async paymentBtn() {
       const params = {
         customer: this.formuser.customer,
-        customerID: parseInt(localStorage.getItem('idUser')),
-        operator: null,
+        customerID: this.selectedTable,
         subtotal: this.total,
         payment: this.formuser.payment,
         remark: this.formuser.notes,
@@ -224,6 +239,7 @@ export default {
         status: 1, // 1 pending & 2 approve
         created: new Date(),
       }
+      console.log('Parametre de la commande ', params)
       const res = await this.$store.dispatch('cart/postOrder', params)
       if (res) {
         this.dataCart.forEach((e) => {
@@ -246,7 +262,6 @@ export default {
             this.$store.set('stateDialog', false)
             this.$router.push('/menus')
           } else {
-            alert('Oder bermasalah!')
             this.$store.set('stateDialog', false)
             this.$router.push('/menus')
           }

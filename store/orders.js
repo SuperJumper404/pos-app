@@ -125,7 +125,7 @@ export const actions = {
     return this.$axios
       .post(
         `/baseurl/api/v1/orders/archive/${params.id}`,
-        {},
+        { payment_method: params.payment_method },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,

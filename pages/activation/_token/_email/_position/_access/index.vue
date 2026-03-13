@@ -45,11 +45,7 @@ export default {
   data: () => ({
     status: 'loading',
   }),
-  head() {
-    return {
-      title: 'Activation',
-    }
-  },
+
   mounted() {
     setTimeout(() => {
       this.$axios

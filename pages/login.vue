@@ -19,12 +19,5 @@ export default {
       },
     }
   },
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
 }
 </script>

@@ -6,23 +6,21 @@
           <v-icon size="80" color="warning">mdi-information-outline</v-icon>
         </div>
         <v-card-title class="justify-center">
-          <h3>Delete Product?</h3>
+          <h3>Supprimer la catégorie</h3>
         </v-card-title>
         <v-card-text class="text-center">
-          <p>are you sure delete this product?</p>
+          <p>Êtes-vous sûr de vouloir supprimer cette catégorie ?</p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" class="text-capitalize" @click="btnNo"
-            >No</v-btn
-          >
+          <v-btn color="primary" class="text-none" @click="btnNo">Non</v-btn>
           <v-btn
             :loading="loadingBtn"
             color="#e53935"
             dark
-            class="text-capitalize"
+            class="text-none"
             @click="btnYes"
-            >Yes, delete!</v-btn
+            >OUI, supprimer!</v-btn
           >
         </v-card-actions>
       </v-card>
@@ -39,11 +37,7 @@ export default {
       loadingBtn: false,
     }
   },
-  head() {
-    return {
-      title: 'Delete Category',
-    }
-  },
+
   methods: {
     btnNo() {
       this.dialog = false

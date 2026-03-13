@@ -4,7 +4,6 @@
       alertText
     }}</v-alert>
     <v-row class="mt-5">
-      <!-- kiri -->
       <v-col v-if="loadPage" md="8" xs="6" cols="12">
         <v-card outlined height="425px" class="overflow-y-auto">
           <Loading />
@@ -19,7 +18,7 @@
         >
           <v-card-text class="text-center" style="margin-top: 25vh">
             <v-icon large>mdi-emoticon-sad-outline</v-icon>
-            <p>Menu empty</p>
+            <p>Menu vide</p>
           </v-card-text>
         </v-card>
         <v-card v-else>
@@ -37,47 +36,55 @@
                     sm="4"
                     cols="6"
                   >
-                    <v-card hover outlined max-height="150px;">
+                    <v-card
+                      hover
+                      outlined
+                      class="d-flex flex-column"
+                      height="300"
+                    >
+                      <!-- Image 5/4 -->
                       <v-img
-                        height="100px"
                         :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
-                      ></v-img>
-                      <v-card-title class="mb-n5">
-                        <h6
-                          class="text-truncate"
-                          style="font-weight: bold; font-size: large"
+                        aspect-ratio="5/4"
+                        class="rounded-t"
+                      />
+
+                      <!-- Title -->
+                      <v-card-title class="py-2 pb-0 mb-0">
+                        <div
+                          class="text-truncate font-weight-bold"
+                          style="font-size: large"
                         >
                           {{ items.name }}
-                        </h6>
+                        </div>
                       </v-card-title>
-                      <v-card-text class="mb-n5">
-                        <p
-                          style="
-                            border: none;
-                            margin: inherit;
-                            height: 50px;
-                            overflow: auto;
-                            overflow-x: hidden;
-                          "
-                        >
+
+                      <!-- Text -->
+                      <v-card-text class="pt-0 mb-0 pb-1">
+                        <div class="text--secondary line-clamp-2">
                           {{ items.description }}
-                        </p>
-                        <br />
-                        <span
-                          class="mb-2"
-                          style="font-weight: bold; font-size: medium"
-                          >{{ conversiRp(items.price) }} €</span
+                        </div>
+
+                        <div
+                          class="mt-2 font-weight-bold"
+                          style="font-size: medium"
                         >
+                          {{ conversiRp(items.price) }} €
+                        </div>
                       </v-card-text>
-                      <v-card-actions>
+
+                      <!-- Actions always bottom -->
+                      <v-card-actions class="mt-auto px-4 pb-3">
                         <v-btn
                           color="success"
                           small
-                          width="100%"
-                          class="text-capitalize"
+                          block
+                          class="text-none font-weight-bold"
                           @click="addToCart(items)"
-                          >Ajouter</v-btn
                         >
+                          <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
+                          Ajouter
+                        </v-btn>
                       </v-card-actions>
                     </v-card>
                   </v-col>
@@ -124,7 +131,7 @@
                         color="success"
                         small
                         width="100%"
-                        class="text-capitalize"
+                        class="text-none"
                         @click="addToCart(items)"
                         >Add</v-btn
                       >
@@ -137,212 +144,131 @@
           
         </v-card> -->
       </v-col>
-      <!-- kanan -->
       <v-col md="4" xs="6">
         <!-- <v-col md="4" class="d-none d-sm-none d-md-block"> -->
         <v-card v-if="loadPage" outlined height="425px">
           <Loading />
         </v-card>
-        <v-card v-else outlined height="100%" class="pa-2">
-          <div
-            v-if="cartItem.length === 0"
-            class="text-center"
-            style="height: 300px"
-          >
-            <div style="margin-top: 30px">
-              <v-icon large>mdi-cart-outline</v-icon>
-              <p class="font-weight-bold">Your cart is an empty!</p>
-            </div>
-          </div>
-          <div v-else class="overflow-y-auto mx-0 my-0" height="100%">
-            <v-card
-              v-for="itm in cartItem"
-              :key="itm.id"
-              outlined
-              class="d-flex mb-2"
-              rounded="7"
+        <div v-else>
+          <v-card outlined height="100%" class="pa-2">
+            <div
+              v-if="cartItem.length === 0"
+              class="text-center"
+              style="height: 300px"
             >
-              <v-card-text>
-                <v-row align="center" class="d-flex">
-                  <v-avatar class="mx-auto" size="75" rounded tile>
-                    <v-img
-                      class="rounded-lg"
-                      :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
-                    ></v-img>
-                  </v-avatar>
-                  <br />
-                  <v-card-title>
-                    <h6
-                      class="text-center text-truncate"
-                      style="
-                        font-weight: bold;
-                        font-size: large;
-                        color: rgba(0, 0, 0, 0.8);
-                      "
+              <div style="margin-top: 30px">
+                <v-icon size="90">mdi-room-service-outline</v-icon>
+                <p class="font-weight-bold">Votre assiette est vide !</p>
+              </div>
+            </div>
+            <div v-else height="100%">
+              <v-card
+                v-for="(itm, itemIndex) in cartItem"
+                :key="itm.id"
+                outlined
+                class="d-flex mb-2 flex-column"
+                rounded="7"
+              >
+                <v-row class="d-flex align-center mr-2 ml-2 mt-2" no-gutters>
+                  <!-- Left block: avatar + texts -->
+                  <v-col class="d-flex align-center">
+                    <v-avatar size="75" rounded tile class="mr-3">
+                      <v-img
+                        class="rounded-lg"
+                        :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                      />
+                    </v-avatar>
+
+                    <div>
+                      <div
+                        class="text-truncate font-weight-bold"
+                        style="font-size: large; color: rgba(0, 0, 0, 0.8)"
+                      >
+                        {{ itm.name }}
+                      </div>
+                      <div
+                        class="font-weight-bold"
+                        style="color: rgba(0, 0, 0, 0.8)"
+                      >
+                        {{ itm.price }} €
+                      </div>
+                    </div>
+                  </v-col>
+
+                  <!-- Right block: actions -->
+                  <v-col class="d-flex align-center justify-end" cols="auto">
+                    <v-btn
+                      outlined
+                      color="warning"
+                      small
+                      icon
+                      @click="minusBtn(itm, itemIndex)"
                     >
-                      {{ itm.name }} <br />
-                      {{ itm.price }} €
-                    </h6>
-                  </v-card-title>
-                  <br />
-                  <v-col>
-                    <v-chip
-                      v-for="(choice, index) in itm.customizationList"
-                      :key="index"
+                      <v-icon>mdi-minus</v-icon>
+                    </v-btn>
+
+                    <v-btn
+                      class="mx-2"
+                      style="font-size: x-large"
+                      color="success"
+                      fab
+                      small
+                      dark
                     >
-                      {{ choice.name }}
-                    </v-chip>
+                      {{ itm.qty }}
+                    </v-btn>
+
+                    <v-btn
+                      outlined
+                      color="success"
+                      small
+                      icon
+                      @click="plusBtn(itm, itemIndex)"
+                    >
+                      <v-icon>mdi-plus</v-icon>
+                    </v-btn>
                   </v-col>
                 </v-row>
-              </v-card-text>
-              <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn
-                  outlined
-                  color="warning"
-                  small
-                  icon
-                  @click="minusBtn(itm)"
-                  ><v-icon>mdi-minus</v-icon></v-btn
-                >
-                <v-btn
-                  style="font-size: x-large"
-                  color="success"
-                  fab
-                  small
-                  dark
-                >
-                  {{ itm.qty }}</v-btn
-                >
-                <v-btn outlined color="success" small icon @click="plusBtn(itm)"
-                  ><v-icon>mdi-plus</v-icon></v-btn
-                >
 
-                <!-- <v-btn
-                  color="red lighten-2"
-                  outlined
-                  small
-                  icon
-                  @click="deleteBtn(itm)"
-                  ><v-icon>mdi-close</v-icon>
-                </v-btn> -->
-              </v-card-actions>
-            </v-card>
-          </div>
-          <v-card-actions v-if="cartItem.length > 0" class="d-block">
-            <v-btn
-              color="success"
-              small
-              width="100%"
-              class="text-capitalize mt-3 mb-3"
-              @click="btnOrder"
-              >Order</v-btn
-            >
-            <v-spacer></v-spacer>
-            <v-btn
-              color="red ligthen-1"
-              small
-              width="100%"
-              class="text-capitalize"
-              dark
-              @click="btnCancel"
-              >Cancel</v-btn
-            >
-          </v-card-actions>
-        </v-card>
-      </v-col>
-    </v-row>
-    <!-- modals -->
-    <v-dialog v-model="stateDialog" persistent max-width="350">
-      <v-card>
-        <v-card-title>
-          <h4>Cart items</h4>
-        </v-card-title>
-        <div
-          v-if="cartItem.length === 0"
-          class="text-center"
-          style="height: 300px"
-        >
-          <div style="margin-top: 30px">
-            <v-icon large>mdi-cart-outline</v-icon>
-            <p class="font-weight-bold">Your cart is an empty!</p>
-          </div>
-        </div>
-        <div v-else class="box overflow-y-auto" style="height: 310px">
-          <v-card
-            v-for="itm in cartItem"
-            :key="itm.id"
-            outlined
-            class="mb-2 d-flex"
-          >
-            <!-- <v-avatar class="ma-3" size="125" tile> -->
-            <!-- <v-img
-              :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
-            ></v-img> -->
-            <!-- </v-avatar> -->
-            <v-card-text class="d-block">
-              <p class="font-weight-bold">{{ itm.name }}</p>
-              <p>Qty: {{ conversiRp(itm.qty) }}</p>
-            </v-card-text>
-
-            <v-card-actions>
-              <v-spacer></v-spacer>
-              <v-btn outlined color="warning" small icon @click="minusBtn(itm)"
-                ><v-icon>mdi-minus</v-icon></v-btn
-              >
-              <v-btn outlined color="success" small icon @click="plusBtn(itm)"
-                ><v-icon>mdi-plus</v-icon></v-btn
+                <v-col>
+                  <v-chip
+                    v-for="(choice, index) in itm.customizationList"
+                    :key="index"
+                    class="mr-1 mt-1"
+                  >
+                    {{ choice.name }}
+                  </v-chip>
+                </v-col>
+              </v-card>
+            </div>
+            <v-card-actions v-if="cartItem.length > 0">
+              <v-btn
+                color="primary"
+                width="50%"
+                class="text-none mt-3 mb-3"
+                @click="btnOrder"
+                >Commander</v-btn
               >
               <v-btn
-                color="red lighten-2"
-                outlined
-                small
-                icon
-                @click="deleteBtn(itm)"
-                ><v-icon>mdi-close</v-icon>
-              </v-btn>
+                color="red ligthen-1"
+                width="50%"
+                class="text-none"
+                dark
+                @click="btnCancel"
+                >Annuler</v-btn
+              >
             </v-card-actions>
           </v-card>
         </div>
-        <div class="d-block pa-3">
-          <v-btn
-            v-show="cartItem.length != 0"
-            outlined
-            small
-            color="success"
-            width="100%"
-            class="mb-3 text-capitalize"
-            @click="btnOrder"
-            >Order</v-btn
-          >
-          <v-btn
-            v-show="cartItem.length != 0"
-            outlined
-            small
-            dark
-            color="red ligthen-1"
-            width="100%"
-            class="mb-3 text-capitalize"
-            @click="btnCancel"
-            >Cancel</v-btn
-          >
-          <v-btn
-            outlined
-            small
-            dark
-            color="primary"
-            width="100%"
-            class="mb-3 text-capitalize"
-            @click="$store.dispatch('setDialog', false)"
-            >Close</v-btn
-          >
-        </div>
-      </v-card>
-    </v-dialog>
+      </v-col>
+    </v-row>
+
     <v-dialog v-model="itemDialog" max-width="350">
       <v-form ref="formItem">
         <v-card>
-          <v-toolbar color="primary" dark>Opening from the bottom</v-toolbar>
+          <v-toolbar color="primary" dark
+            >Sélectionner les suppléments</v-toolbar
+          >
           <v-card-text>
             <!-- {{ selectedItem }} -->
             <div
@@ -357,10 +283,12 @@
               <div>
                 <!-- Condition for checkboxes -->
                 <template v-if="item.limit_choice > 1">
+                  <pre>item {{ item }}</pre>
+                  <pre>currentITem {{ currentItem }}</pre>
                   <div v-for="(choice, i) in item.items" :key="'checkbox-' + i">
                     <v-checkbox
-                      class="custom-spacing"
                       v-model="currentItem[itemId]"
+                      class="custom-spacing"
                       multiple
                       :label="
                         choice.price > 0
@@ -368,10 +296,11 @@
                           : `${choice.name}`
                       "
                       :disabled="
-                        currentItem[itemId].length >= item.limit_choice &&
-                        currentItem[itemId]
-                          .map((x) => x.id)
-                          .indexOf(choice.id) === -1
+                        (currentItem[itemId] || []).length >=
+                          Number(item.limit_choice || 0) &&
+                        !(currentItem[itemId] || []).some(
+                          (x) => x.id === choice.id
+                        )
                       "
                       :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
                       :value="choice"
@@ -403,8 +332,16 @@
             <!-- <pre type="json">{{ [...currentItem] }}</pre> -->
           </v-card-text>
           <v-card-actions class="justify-end">
-            <v-btn color="warning" @click="resetForm()">Retour</v-btn>
-            <v-btn color="success" @click="submitFormItem()">Valider</v-btn>
+            <v-btn color="warning" class="text-none" @click="resetForm()"
+              >Retour</v-btn
+            >
+            <v-btn
+              color="success"
+              class="text-none"
+              :disabled="disableCustomizationValidation()"
+              @click="submitFormItem()"
+              >Valider</v-btn
+            >
           </v-card-actions>
         </v-card>
       </v-form>
@@ -412,7 +349,8 @@
     <!-- <pre>{{ dataProduct }}</pre> -->
     <!-- <pre>server{{ mainconfig.default.server }}</pre> -->
     <!-- <pre>{{ breakpoint }}</pre> -->
-    <pre>ici {{ itemDialog }}</pre>
+    <!-- <pre>acces :{{ access }}</pre>
+    <pre>ici {{ itemDialog }}</pre> -->
   </v-container>
 </template>
 <script>
@@ -423,18 +361,17 @@ export default {
   components: {
     Loading,
   },
+  mixins: [price],
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
       : 'clientside'
   },
-  mixins: [price],
   middleware: 'auth',
   data: () => ({
     itemDialog: false,
     selectedItem: [],
     currentItem: [],
-
     // config: config,
     alert: null,
     alertType: null,
@@ -445,18 +382,13 @@ export default {
     total: 0,
     idxCart: 0,
   }),
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
+
   computed: {
     categories() {
+      console.log('dataProduct', this.$store.get('products/dataProduct'))
       const items = this.$store
         .get('products/dataProduct')
-        .map((x) => x.categoryid)
+        .map((x) => x.category)
       return [...new Set(items)]
     },
     staticURL() {
@@ -465,13 +397,27 @@ export default {
       return this.$store.get('staticURL')
     },
     dataProduct() {
-      return this.$store.get('products/dataProduct')
+      return this.$store
+        .get('products/dataProduct')
+        .filter((x) => x.archived === 0)
     },
     totalPage() {
       return this.$store.get('products/totalPage')
     },
     stateDialog() {
       return this.$store.get('stateDialog')
+    },
+  },
+  watch: {
+    itemDialog(newVal) {
+      if (newVal) {
+        console.log('Watch New Val', newVal)
+        // if the dialog is opened
+        if (this.$refs.formItem) {
+          this.$refs.formItem.resetValidation()
+          this.$refs.formItem.reset()
+        }
+      }
     },
   },
   mounted() {
@@ -488,18 +434,7 @@ export default {
       this.loadPage = false
     })
   },
-  watch: {
-    itemDialog(newVal) {
-      if (newVal) {
-        console.log('Watch New Val', newVal)
-        // if the dialog is opened
-        if (this.$refs.formItem) {
-          this.$refs.formItem.resetValidation()
-          this.$refs.formItem.reset()
-        }
-      }
-    },
-  },
+
   methods: {
     resetForm() {
       if (this.$refs.formItem) {
@@ -547,12 +482,27 @@ export default {
       }
       return true
     },
+    disableCustomizationValidation() {
+      let result = false
+      if (!this.selectedItem || !this.selectedItem.product_customization) {
+        return false
+      }
+      this.selectedItem.product_customization.forEach((item, index) => {
+        if (item.mandatory) {
+          const currentSelection = this.currentItem[index]
+          if (!currentSelection || currentSelection.length === 0) {
+            result = true
+          }
+        }
+      })
+      return result
+    },
     change() {
       this.dialog = this.stateDialog
     },
     getProductPerCategorie(category) {
       return this.dataProduct.filter(function (x) {
-        return x.categoryid === category
+        return x.category === category
       })
     },
     totalPrice() {
@@ -619,32 +569,36 @@ export default {
         this.indexCart()
       }
     },
-    minusBtn(params) {
-      this.cartItem.forEach((e) => {
-        if (e.id === params.id) {
-          e.qty -= 1
-          e.subtotal = e.qty * e.price
-          if (e.qty < 1) {
-            this.deleteBtn(params)
-            // e.qty = 1
-            // e.subtotal = 1 * e.price
-          }
-        }
-      })
+    minusBtn(params, index) {
+      console.log('Index Minus Btn', this.cartItem, index, params)
+      const item = this.cartItem[index]
+      if (!item) return
+
+      if (item.qty <= 1) {
+        this.cartItem.splice(index, 1)
+      } else {
+        item.qty -= 1
+        item.subtotal = item.qty * item.price
+      }
+
       this.totalPrice()
       this.indexCart()
     },
-    plusBtn(params) {
-      this.cartItem.forEach((e) => {
-        if (e.id === params.id) {
-          e.qty += 1
-          e.subtotal = e.qty * e.price
-          if (e.qty > e.stock) {
-            e.qty = e.stock
-            e.subtotal = e.stock * e.price
-          }
-        }
-      })
+    plusBtn(params, index) {
+      console.log('Index Plus Btn', index, params)
+      this.cartItem[index].qty += 1
+      this.cartItem[index].subtotal =
+        this.cartItem[index].qty * this.cartItem[index].price
+      // this.cartItem.forEach((e) => {
+      //   if (e.id === params.id) {
+      //     e.qty += 1
+      //     e.subtotal = e.qty * e.price
+      //     if (e.qty > e.stock) {
+      //       e.qty = e.stock
+      //       e.subtotal = e.stock * e.price
+      //     }
+      //   }
+      // })
       this.totalPrice()
       this.indexCart()
     },
@@ -679,5 +633,12 @@ export default {
 <style scoped>
 .box {
   border: 1px solid #eeeeee;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

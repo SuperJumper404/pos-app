@@ -3,147 +3,150 @@
     <div v-if="errMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <div class="mt-5">
-      <h3>Form New Product</h3>
-    </div>
-    <v-form v-model="isValue" @submit.prevent="submitProduct">
-      <v-text-field
-        v-model="formproduct.name"
-        label="Name"
-        type="text"
-        :rules="[(v) => !!v || 'Name products required']"
-        placeholder="Insert product name"
-        required
-        autofocus
-      ></v-text-field>
-      <v-text-field
-        v-model="formproduct.description"
-        label="Description"
-        type="text"
-        :rules="[(v) => !!v || 'Description products required']"
-        placeholder="Insert product description"
-        required
-        autofocus
-      ></v-text-field>
-      <v-text-field
-        v-model="formproduct.stock"
-        label="Stock"
-        type="number"
-        :rules="[(v) => !!v || 'Stock required']"
-        placeholder="Insert product stock"
-        required
-      ></v-text-field>
+    <v-row v-else class="mt-5">
+      <v-col md="4" sm="5" cols="12">
+        <ImageCropper v-model="productImg" />
+      </v-col>
+      <v-col>
+        <v-form v-model="isValue" @submit.prevent="submitProduct">
+          <v-text-field
+            v-model="formproduct.name"
+            label="Nom du produit"
+            type="text"
+            :rules="[(v) => !!v || 'Le nom du produit est requis']"
+            placeholder="Saisir le nom du produit"
+            required
+          ></v-text-field>
+          <v-text-field
+            v-model="formproduct.description"
+            label="Description"
+            type="text"
+            :rules="[(v) => !!v || 'Description du produit requise']"
+            placeholder="Saisir la description du produit"
+            required
+          ></v-text-field>
+          <v-text-field
+            v-model="formproduct.stock"
+            label="Stock"
+            type="number"
+            :rules="[(v) => !!v || 'Quantité en stock requise']"
+            placeholder="Saisir la quantité en stock"
+            required
+          ></v-text-field>
 
-      <v-text-field
-        v-model="formproduct.price"
-        label="Price"
-        type="number"
-        prepend-inner-icon="mdi-cash"
-        :rules="[(v) => !!v || 'Price required']"
-        placeholder="Insert product price"
-        required
-      ></v-text-field>
-      <v-select
-        v-model="formproduct.categoryid"
-        :items="allCategory"
-        :rules="[(v) => !!v || 'Categories riquired']"
-        item-value="id"
-        item-text="name"
-        label="Categories"
-        required
-      ></v-select>
-      <v-file-input
-        accept="image/png/jpg"
-        label="Image"
-        :rules="[(v) => !!v || 'Image required']"
-        placeholder="Insert product image"
-        required
-        @change="imgproduct"
-      ></v-file-input>
+          <v-text-field
+            v-model="formproduct.price"
+            label="Prix HT"
+            type="number"
+            append-outer-icon="mdi-currency-eur"
+            :rules="[(v) => !!v || 'Le prix du produit est requis']"
+            placeholder="Saisir le prix du produit"
+            required
+          ></v-text-field>
+          <v-select
+            v-model="formproduct.categoryid"
+            label="Catégorie"
+            :items="allCategory"
+            :rules="[(v) => !!v || 'La catégorie est requise']"
+            item-value="id"
+            item-text="name"
+            placeholder=""
+            required
+          ></v-select>
 
-      <v-btn
-        color="success"
-        class="text-capitalize mr-3 mb-4"
-        @click.stop="addCustomization"
-        ><v-icon>mdi-plus</v-icon>Ajouter choix </v-btn
-      ><br />
-      <div
-        v-for="(custom, index) in formproduct.product_customization"
-        :key="index"
-      >
-        <v-row>
-          <!-- Row for Customization Name and Message -->
-          <v-col cols="12" md="6">
-            <v-text-field
-              v-model="formproduct.product_customization[index].name"
-              label="Nom du choix "
-              :rules="[(v) => !!v || 'Name required']"
-              placeholder="Enter name"
-              required
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" md="6">
-            <v-text-field
-              v-model="formproduct.product_customization[index].description"
-              label="Description du choix"
-              :rules="[(v) => !!v || 'Name required']"
-              placeholder="Enter description"
-              required
-            ></v-text-field>
-          </v-col>
-
-          <!-- Row for Max Choices, Switch, and Combobox -->
-          <v-col cols="12" md="6">
-            <v-combobox
-              v-model="formproduct.product_customization[index].items"
-              label="Liste des choix possibles"
-              chips
-              multiple
-              :item-text="displayItem"
-              @change="processComboboxInput(index)"
-            ></v-combobox> </v-col
-          ><v-col cols="12" md="3">
-            <v-text-field
-              v-model="formproduct.product_customization[index].limit_choice"
-              label="Nombre de choix maximum"
-              type="number"
-              :rules="[(v) => !!v || 'Max Choices required']"
-              placeholder="Enter nombre de choix max"
-              required
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" md="3">
-            <v-switch
-              v-model="formproduct.product_customization[index].mandatory"
-              inset
-              label="Choix obligatoire ?"
-            ></v-switch>
-          </v-col>
-        </v-row>
-        <v-card
-          v-if="formproduct.product_customization.length > 1"
-          class="mx-auto"
-          max-width="400"
-        >
-          <v-progress-linear
+          <v-btn
             color="success"
-            rounded
-            value="0"
-          ></v-progress-linear>
-        </v-card>
-      </div>
-      <v-btn color="warning" @click.stop="$router.push('/products')"
-        >Cancel</v-btn
-      >
-      <v-btn
-        :disabled="!isValue"
-        :loading="loadingBtn"
-        class="ml-4"
-        type="submit"
-        color="primary"
-        >Submit</v-btn
-      >
-    </v-form>
+            class="text-none mr-3 mb-4"
+            @click.stop="addCustomization"
+            ><v-icon>mdi-plus</v-icon>Ajouter un choix </v-btn
+          ><br />
+          <div
+            v-for="(custom, index) in formproduct.product_customization"
+            :key="index"
+          >
+            <v-row>
+              <!-- Row for Customization Name and Message -->
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="formproduct.product_customization[index].name"
+                  label="Nom du choix "
+                  :rules="[(v) => !!v || 'Name required']"
+                  placeholder="Enter name"
+                  required
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="formproduct.product_customization[index].description"
+                  label="Description du choix"
+                  :rules="[(v) => !!v || 'Name required']"
+                  placeholder="Enter description"
+                  required
+                ></v-text-field>
+              </v-col>
+
+              <!-- Row for Max Choices, Switch, and Combobox -->
+              <v-col cols="12" md="6">
+                <v-combobox
+                  v-model="formproduct.product_customization[index].items"
+                  label="Liste des choix possibles"
+                  chips
+                  multiple
+                  :item-text="displayItem"
+                  @change="processComboboxInput(index)"
+                ></v-combobox> </v-col
+              ><v-col cols="12" md="3">
+                <v-text-field
+                  v-model="
+                    formproduct.product_customization[index].limit_choice
+                  "
+                  label="Nombre de choix maximum"
+                  type="number"
+                  :rules="[(v) => !!v || 'Nombre de choix maximum requis']"
+                  placeholder="Saisir le nombre de choix maximum"
+                  required
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-switch
+                  v-model="formproduct.product_customization[index].mandatory"
+                  inset
+                  label="Choix obligatoire ?"
+                ></v-switch>
+              </v-col>
+            </v-row>
+            <v-card
+              v-if="formproduct.product_customization.length > 1"
+              class="mx-auto"
+              max-width="400"
+            >
+              <v-progress-linear
+                color="success"
+                rounded
+                value="0"
+              ></v-progress-linear>
+            </v-card>
+          </div>
+
+          <v-btn
+            :disabled="!isValue"
+            :loading="loadingBtn"
+            class="text-none"
+            type="submit"
+            color="primary"
+            >Valider</v-btn
+          >
+
+          <v-btn
+            class="text-none ml-4"
+            color="warning"
+            @click.stop="$router.push('/products')"
+            >Annuler</v-btn
+          >
+        </v-form>
+      </v-col>
+    </v-row>
+
     <!-- <pre>{{ formproduct }}</pre> -->
   </v-container>
 </template>
@@ -153,6 +156,7 @@ export default {
   mixins: [],
   middleware: 'auth',
   data: () => ({
+    productImg: null,
     isValue: false,
     loadingBtn: false,
     errMsg: false,
@@ -166,17 +170,21 @@ export default {
       product_customization: [],
     },
   }),
-  head() {
-    return {
-      title: 'New Product',
-    }
-  },
+
   computed: {
     allCategory() {
       return this.$store.get('categories/dataCategories')
     },
     message() {
       return this.$store.get('products/message')
+    },
+  },
+  watch: {
+    productImg(newBlob) {
+      const ext = newBlob.type === 'image/png' ? 'png' : 'jpg'
+      const filename = `product_${Date.now()}.${ext}`
+      const file = new File([newBlob], filename, { type: newBlob.type })
+      this.formproduct.image = file
     },
   },
   mounted() {
@@ -222,22 +230,7 @@ export default {
         limit_choice: null,
         items: [],
         mandatory: false,
-      }) // Ajoute une nouvelle option vide
-    },
-    imgproduct(files) {
-      const image = files
-      if (image) {
-        if (
-          image.type !== 'image/jpeg' &&
-          image.type !== 'image/png' &&
-          image.type !== 'image/JPEG' &&
-          image.type !== 'image/PNG'
-        ) {
-          alert('Please enter a jpg/jpeg/png')
-        } else {
-          this.formproduct.image = image
-        }
-      }
+      })
     },
     async submitProduct() {
       const fd = new FormData()

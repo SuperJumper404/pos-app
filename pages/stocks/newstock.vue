@@ -3,7 +3,6 @@
     <div v-if="errMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <Breadcrumbs />
     <div class="mt-5">
       <h3>Form New Category</h3>
     </div>
@@ -38,7 +37,7 @@
       <!-- sm upto md lg -->
       <div class="d-sm-flex d-none">
         <v-btn color="warning" @click.stop="$router.push('/stocks')"
-          >Cancel</v-btn
+          >Annuler</v-btn
         >
         <v-btn
           :disabled="!isValue"
@@ -76,7 +75,7 @@
             small
             width="100%"
             @click.stop="$router.push('/stocks')"
-            >Cancel</v-btn
+            >Annuler</v-btn
           >
         </v-col>
         <v-col cols="6">
@@ -120,11 +119,7 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 export default {
-  components: {
-    Breadcrumbs,
-  },
   mixins: [],
   middleware: 'auth',
   data: () => ({

@@ -16,6 +16,7 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/dataProduct', response.data.data)
+        console.log('Products received', response.data.data)
         return true
       })
       .catch((error) => {

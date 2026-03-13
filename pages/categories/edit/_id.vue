@@ -3,10 +3,7 @@
     <div v-if="stsMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <Breadcrumbs />
-    <div class="mt-5">
-      <h3>Form Edit Category</h3>
-    </div>
+
     <Loading v-if="loadPage" />
     <div v-else>
       <v-form v-model="isValue" @submit.prevent="submitEditCategory">
@@ -20,7 +17,7 @@
           autofocus
         ></v-text-field>
         <v-btn color="warning" @click.stop="$router.push('/categories')"
-          >Cancel</v-btn
+          >Annuler</v-btn
         >
         <v-btn
           :disabled="!isValue"
@@ -35,11 +32,9 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
 export default {
   components: {
-    Breadcrumbs,
     Loading,
   },
   middleware: 'auth',
@@ -54,11 +49,7 @@ export default {
       },
     }
   },
-  head() {
-    return {
-      title: 'Edit Category',
-    }
-  },
+
   computed: {
     detailCategory() {
       return this.$store.get('categories/detailCategory')

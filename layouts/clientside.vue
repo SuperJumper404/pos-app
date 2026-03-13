@@ -45,63 +45,7 @@ export default {
       clipped: false,
       drawer: false,
       fixed: false,
-      admin: [
-        {
-          icon: 'mdi-home',
-          title: 'Accueil',
-          to: '/',
-        },
-        {
-          icon: 'mdi-shape-plus',
-          title: 'Produits',
-          to: '/products',
-        },
-        {
-          icon: 'mdi-bookmark',
-          title: 'Catégories',
-          to: '/categories',
-        },
-        {
-          icon: 'mdi-food',
-          title: 'Menus',
-          to: '/menus',
-        },
-        {
-          icon: 'mdi-order-bool-descending',
-          title: 'Commandes',
-          to: '/orders',
-        },
-        {
-          icon: 'mdi-cash-register',
-          title: 'Tiroir-caisse',
-          to: '/cashregister',
-        },
-        {
-          icon: 'mdi-apps',
-          title: 'Stocks',
-          to: '/stocks',
-        },
-        {
-          icon: 'mdi-notebook',
-          title: 'Rapports',
-          to: '/reports',
-        },
 
-        {
-          icon: 'mdi-table-chair',
-          title: 'Tables',
-          to: '/tables',
-        },
-        {
-          icon: 'mdi-store-cog',
-          title: 'Réglages',
-          to: '/settings',
-        },
-        {
-          icon: 'mdi-logout',
-          title: 'Déconnexion',
-        },
-      ],
       miniVariant: false,
       right: true,
       rightDrawer: false,

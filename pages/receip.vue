@@ -19,16 +19,16 @@
         ></iframe>
       </div>
     </template>
-    <div>
+    <!-- <div>
       Hello
       <pre type="json">{{ receipToken }}</pre>
-    </div>
+    </div> -->
     <!-- <pre type="json"> {{ id }}</pre> -->
-    <pre type="json"> order id :{{ currentDate }}</pre>
+    <!-- <pre type="json"> order id :{{ currentDate }}</pre>
     <pre type="json">dataArchivedOrder{{ dataArchivedOrder }} ++++++++</pre>
     <pre type="json"> {{ detailArchivedOrder }}</pre>
     <pre type="json"> {{ totalAmount }}</pre>
-    <pre type="json"> {{ shopInfo }}</pre>
+    <pre type="json"> {{ shopInfo }}</pre> -->
   </v-container>
 </template>
 <script>

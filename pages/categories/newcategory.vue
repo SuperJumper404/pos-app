@@ -3,29 +3,30 @@
     <div v-if="errMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <div class="mt-5">
-      <h3>Form New Category</h3>
-    </div>
+
     <v-form v-model="isValue" @submit.prevent="submitCategory">
       <v-text-field
         v-model="formcategory.name"
-        label="Name"
+        label="Nom de la catégorie"
         type="text"
-        :rules="[(v) => !!v || 'Name category required']"
-        placeholder="Insert category name"
+        :rules="[(v) => !!v || 'Le nom de la catégorie est requis']"
+        placeholder="Saisir le nom de la catégorie"
         required
         autofocus
       ></v-text-field>
-      <v-btn color="warning" @click.stop="$router.push('/categories')"
-        >Cancel</v-btn
-      >
       <v-btn
         :disabled="!isValue"
         :loading="loadingBtn"
-        class="ml-4"
+        class="ml-4 text-none"
         type="submit"
         color="primary"
-        >Submit</v-btn
+        >Valider</v-btn
+      >
+      <v-btn
+        color="warning"
+        class="text-none"
+        @click.stop="$router.push('/categories')"
+        >Annuler</v-btn
       >
     </v-form>
   </v-container>
@@ -45,11 +46,7 @@ export default {
       },
     }
   },
-  head() {
-    return {
-      title: 'New Category',
-    }
-  },
+
   methods: {
     async submitCategory() {
       this.loadingBtn = true

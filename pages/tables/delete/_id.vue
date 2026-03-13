@@ -13,14 +13,12 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" class="text-capitalize" @click="btnNo"
-            >No</v-btn
-          >
+          <v-btn color="primary" class="text-none" @click="btnNo">No</v-btn>
           <v-btn
             :loading="loadingBtn"
             color="#e53935"
             dark
-            class="text-capitalize"
+            class="text-none"
             @click="btnYes"
             >Yes, delete!</v-btn
           >
@@ -41,7 +39,7 @@ export default {
   },
   head() {
     return {
-      title: 'Delete Table',
+      title: 'Supprimer la table',
     }
   },
   methods: {

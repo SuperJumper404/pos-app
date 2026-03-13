@@ -9,24 +9,13 @@
       <Loading />
     </v-card>
     <v-card v-else outlined class="mt-5 overflow-y-auto">
-      <v-app-bar flat color="grey lighten-4" light>
+      <v-app-bar flat color="grey lighten-4" light class="d-flex justify-end">
         <v-btn
-          color="success"
-          class="text-capitalize mr-3"
+          color="primaryPurple lighten-1"
+          class="primaryWhite--text text--lighten-1 mr-3 text-none"
           @click="$router.push('/products/newproduct')"
-          ><v-icon>mdi-plus</v-icon> Product</v-btn
+          ><v-icon>mdi-plus</v-icon> Ajouter un produit</v-btn
         >
-        <v-spacer></v-spacer>
-        <div class="mt-6">
-          <v-text-field
-            placeholder="Search name product"
-            label="Seaching"
-            outlined
-            dense
-            append-icon="mdi-card-search"
-            @keyup="searchData()"
-          ></v-text-field>
-        </div>
       </v-app-bar>
       <v-card-title
         v-if="dataProduct.length == 0"
@@ -41,6 +30,7 @@
           v-for="items in dataProduct"
           :key="items.id"
           outlined
+          :disabled="items.archived === 1"
           class="pa-2 d-md-flex d-sm-none d-none justify-space-between ma-3"
         >
           <v-img
@@ -51,26 +41,49 @@
             "
             width="120"
           ></v-img>
-          <v-card-text class="d-md-flex justify-space-between mt-5">
-            <p class="font-weight-bold">{{ items.name }}</p>
-            <p>{{ items.category }}</p>
-            <p>{{ conversiRp(items.price) }} €</p>
-            <p>Stock: {{ items.stock }}</p>
+          <v-card-text
+            class="d-flex justify-content-between align-items-center mt-5"
+          >
+            <p class="font-weight-bold mr-4" style="flex: 1">
+              {{ items.name }}
+            </p>
+            <p class="mr-4" style="flex: 1">{{ items.category }}</p>
+            <p class="mr-4" style="flex: 1">{{ conversiRp(items.price) }} €</p>
+            <p class="mr-4" style="flex: 1">Stock: {{ items.stock }}</p>
           </v-card-text>
+
           <v-card-actions class="d-md-flex">
-            <v-btn
-              color="primary"
-              class="text-capitalize"
-              @click="$router.push(`/products/edit/${items.id}`)"
-              >Edit</v-btn
-            >
-            <v-btn
-              color="red darken-1"
-              dark
-              class="text-capitalize"
-              @click="$router.push(`/products/delete/${items.id}?modals=true`)"
-              >Delete</v-btn
-            >
+            <!-- Si pas archivé : boutons visibles -->
+            <template v-if="items.archived === 0">
+              <v-btn
+                color="primary"
+                class="text-none"
+                @click="$router.push(`/products/edit/${items.id}`)"
+              >
+                Modifier
+              </v-btn>
+
+              <v-btn
+                color="red darken-1"
+                dark
+                class="text-none"
+                @click="
+                  $router.push(`/products/delete/${items.id}?modals=true`)
+                "
+              >
+                Supprimer
+              </v-btn>
+            </template>
+
+            <!-- Si archivé : on garde 2 boutons "fantômes" (même taille) -->
+            <template v-else>
+              <v-btn class="text-none" disabled style="visibility: hidden"
+                >Modifier</v-btn
+              >
+              <v-btn class="text-none" disabled style="visibility: hidden"
+                >Supprimer</v-btn
+              >
+            </template>
           </v-card-actions>
         </v-card>
       </div>
@@ -89,6 +102,7 @@
           v-for="itm in dataProduct"
           :key="itm.name"
           outlined
+          :disabled="itm.archived === 1"
           class="pa-2 d-block d-sm-block d-md-none ma-5"
         >
           <v-img
@@ -105,23 +119,38 @@
             <p>{{ conversiRp(itm.price) }} €</p>
             <p>Stock: {{ itm.stock }}</p>
           </v-card-text>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn
-              color="primary"
-              small
-              class="text-capitalize"
-              @click="$router.push(`/products/edit/${itm.id}`)"
-              >Edit</v-btn
-            >
-            <v-btn
-              color="red darken-1"
-              small
-              dark
-              class="text-capitalize"
-              @click="$router.push(`/products/delete/${itm.id}?modals=true`)"
-              >Delete</v-btn
-            >
+          <v-card-actions class="d-md-flex">
+            <!-- Si pas archivé : boutons visibles -->
+            <template v-if="itm.archived === 0">
+              <v-btn
+                color="primary"
+                class="text-none"
+                @click="$router.push(`/products/edit/${items.id}`)"
+              >
+                Modifier
+              </v-btn>
+
+              <v-btn
+                color="red darken-1"
+                dark
+                class="text-none"
+                @click="
+                  $router.push(`/products/delete/${items.id}?modals=true`)
+                "
+              >
+                Supprimer
+              </v-btn>
+            </template>
+
+            <!-- Si archivé : on garde 2 boutons "fantômes" (même taille) -->
+            <template v-else>
+              <v-btn class="text-none" disabled style="visibility: hidden"
+                >Modifier</v-btn
+              >
+              <v-btn class="text-none" disabled style="visibility: hidden"
+                >Supprimer</v-btn
+              >
+            </template>
           </v-card-actions>
         </v-card>
       </div>
@@ -155,19 +184,14 @@ export default {
       loadPage: false,
     }
   },
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
+
   computed: {
     staticurl() {
       return this.$store.get('staticURL')
     },
     dataProduct() {
-      return this.$store.get('products/dataProduct')
+      const arr = this.$store.get('products/dataProduct') || []
+      return [...arr].sort((a, b) => (a.archived ?? 0) - (b.archived ?? 0))
     },
     totalPage() {
       return this.$store.get('products/totalPage')
@@ -180,9 +204,6 @@ export default {
     })
   },
   methods: {
-    searchData() {
-      this.$store.dispatch('products/getProducts')
-    },
     pageProduct() {
       this.$store.dispatch('products/getProducts')
     },

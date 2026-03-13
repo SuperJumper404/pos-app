@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <v-dialog v-model="dialog" max-width="350">
+    <v-dialog v-model="dialog" persistent max-width="350">
       <v-card class="pa-3">
         <div class="text-center">
           <v-icon size="80" color="warning">mdi-information-outline</v-icon>
@@ -11,6 +11,15 @@
             {{ id }} ?
           </h3>
           <h6>commandes : {{ ordersToArchive.join(', ') }}</h6>
+
+          <v-radio-group v-model="selectedPaymentMethod">
+            <v-radio
+              v-for="method in shop_payment_methods"
+              :key="method"
+              :label="method"
+              :value="method"
+            ></v-radio>
+          </v-radio-group>
         </v-card-title>
         <v-card-text class="text-center">
           <p>Assurez vous d'avoir encaissé avant de valider</p>
@@ -20,13 +29,13 @@
 
           <v-btn
             :loading="loadingBtn"
-            color="#e53935"
-            dark
-            class="text-capitalize"
+            :disabled="selectedPaymentMethod === null"
+            color="success"
+            class="text-none"
             @click="btnYes"
-            >Valider</v-btn
+            >Encaisser</v-btn
           >
-          <v-btn color="primary" class="text-capitalize" @click="btnNo"
+          <v-btn color="primary" class="text-none" @click="btnNo"
             >Annuler</v-btn
           >
         </v-card-actions>
@@ -43,12 +52,13 @@ export default {
       dialog: this.$route.query.modals,
       ordersToArchive: this.$route.query.orders,
       loadingBtn: false,
+      selectedPaymentMethod: null,
     }
   },
-  head() {
-    return {
-      title: 'Payout Order',
-    }
+  computed: {
+    shop_payment_methods() {
+      return this.$store.get('shop/shop_payment_methods')
+    },
   },
   mounted() {
     console.log('Ordres to Archives', this.ordersToArchive)
@@ -61,7 +71,10 @@ export default {
     async btnYes() {
       this.loadingBtn = true
       const ordersToArchive = this.ordersToArchive.map(async (x) => {
-        return await this.$store.dispatch('orders/archiveOrder', { id: x })
+        return await this.$store.dispatch('orders/archiveOrder', {
+          id: x,
+          payment_method: this.selectedPaymentMethod,
+        })
       })
       console.log('OrderToArchive', ordersToArchive)
       await Promise.all(ordersToArchive).finally(async () => {

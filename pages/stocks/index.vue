@@ -1,6 +1,5 @@
 <template>
   <v-container>
-    <Breadcrumbs />
     <v-card
       v-if="loadPage"
       outlined
@@ -13,7 +12,7 @@
       <v-app-bar flat color="grey lighten-4" light>
         <v-btn
           color="success"
-          class="text-capitalize mr-3"
+          class="text-none mr-3"
           @click="$router.push('/stocks/newstock')"
           ><v-icon>mdi-plus</v-icon> Stocks</v-btn
         >
@@ -43,12 +42,10 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
 import formatdate from '@/helpers/formatdate'
 export default {
   components: {
-    Breadcrumbs,
     Loading,
   },
   mixins: [formatdate],
@@ -71,13 +68,7 @@ export default {
       ],
     }
   },
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
+
   computed: {
     dataStocks() {
       return this.$store.get('stocks/dataStock')

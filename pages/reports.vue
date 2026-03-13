@@ -1,6 +1,5 @@
 <template>
   <v-container>
-    <Breadcrumbs />
     <v-card
       v-if="loadPage"
       outlined
@@ -64,13 +63,9 @@
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 export default {
-  components: {
-    Breadcrumbs,
-  },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {

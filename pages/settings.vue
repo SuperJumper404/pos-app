@@ -9,34 +9,32 @@
       <Loading />
     </v-card>
 
-    <div class="mt-5">
-      <h3>Informations & Réglages de votre établissment</h3>
+    <div class="mt-5 mb-5">
+      <h2>Informations & Réglages de votre établissment</h2>
     </div>
     <v-row style="justify-content: space-between">
       <v-col md="4" sm="5" cols="12">
-        <v-card outlined style="height: 100%">
-          <v-img :src="imageUrl" />
-          <v-card-actions class="text-center">
-            <input
-              id="fileImageProfile"
-              type="file"
-              accept="image/png/jpg"
-              class="d-none"
-              @input="changeImg"
-            />
-            <v-btn
-              :loading="loadingBtnImg"
-              outlined
-              color="success"
-              rounded
-              onclick="document.getElementById('fileImageProfile').click()"
-              class="text-capitalize mt-5 mb-5"
-              width="100%"
-            >
-              Change
-            </v-btn>
-          </v-card-actions>
-        </v-card>
+        <div class="mb-5 flex" style="justify-items: center">
+          <h3>Photo de votre établissement</h3>
+        </div>
+
+        <ImageCropper
+          v-model="shopImg"
+          :preview-url-prop="imageUrl"
+          :ratio="4 / 1"
+        />
+
+        <v-row class="mt-8 pt-4 d-flex justify-center">
+          <v-btn
+            color="primary"
+            rounded
+            :href="`/click-and-collect/${shopId}/${shop_name}`"
+            target="_blank"
+          >
+            Voir le site de mon restaurant
+            <v-icon> mdi-arrow-top-right </v-icon>
+          </v-btn>
+        </v-row>
       </v-col>
 
       <v-col cols="6">
@@ -93,16 +91,6 @@
         </div>
       </v-col>
     </v-row>
-    <v-row>
-      <v-btn
-        color="primary"
-        rounded
-        :href="`/click-and-collect/${shopId}/${shop_name}`"
-        target="_blank"
-      >
-        Voir le site de mon restaurant <v-icon> mdi-arrow-top-right </v-icon>
-      </v-btn>
-    </v-row>
 
     <v-form v-model="isValue" @submit.prevent="submitShopEdit">
       <v-row>
@@ -148,6 +136,7 @@
             required
           ></v-text-field>
         </v-col>
+
         <v-col cols="6">
           <v-text-field
             v-model="formShop.shop_adress"
@@ -169,30 +158,129 @@
         </v-col>
         <v-col cols="6">
           <v-text-field
-            v-model="formShop.shop_printer_ip"
-            label="Adresse IP de l'imprimante"
+            v-model="formShop.shop_siret"
+            label="Numéro de S.I.R.E.T"
             type="text"
-            :rules="[(v) => !!v || 'Adresse Ip requise']"
-            placeholder="Insérez l'adresse Ip de l'imprimante"
+            :rules="[(v) => !!v || 'Numéro de S.I.R.E.T requis']"
+            placeholder="Insérez le numéro de S.I.R.E.T"
             required
-          ></v-text-field>
+          ></v-text-field
+        ></v-col>
+        <v-col cols="6"></v-col>
+        <v-col cols="6">
+          <div class="mb-5 flex" style="justify-items: center">
+            <h3>Réglages de l'imprimante</h3>
+          </div>
+          <div class="d-inline-flex">
+            <v-text-field
+              v-model="formShop.shop_printer_ip"
+              label="Adresse IP de l'imprimante"
+              type="text"
+              :disabled="!formShop.smart_print_app"
+              max-width="20%"
+              :rules="[(v) => !!v || 'Adresse Ip requise']"
+              placeholder="Insérez l'adresse Ip de l'imprimante"
+              required
+            ></v-text-field>
+            <v-switch
+              v-model="formShop.smart_print_app"
+              class="ml-8"
+              label="Imprimer avec Smart Print App"
+              color="success"
+            ></v-switch>
+          </div>
+        </v-col>
+        <v-col cols="6">
+          <div class="mb-5 flex" style="justify-items: center">
+            <h3>Réseaux Sociaux</h3>
+          </div>
+          <div class="d-flex justify-center">
+            <v-text-field
+              v-model="formShop.shop_social_media.instagram"
+              prepend-icon="mdi-instagram"
+              label="Instagram"
+              type="text"
+              class="d-inline-flex"
+              style="max-width: 50%"
+              max-width="50%"
+              placeholder="Insérez le lien Instagram"
+            ></v-text-field>
+          </div>
+          <div class="d-flex justify-center">
+            <v-text-field
+              v-model="formShop.shop_social_media.facebook"
+              prepend-icon="mdi-facebook"
+              label="Facebook"
+              type="text"
+              class="d-inline-flex"
+              style="max-width: 50%"
+              max-width="50%"
+              placeholder="Insérez le lien Facebook"
+            ></v-text-field>
+          </div>
+          <div class="d-flex justify-center">
+            <v-text-field
+              v-model="formShop.shop_social_media.tiktok"
+              prepend-icon="mdi-tiktokbvcbcv"
+              label="TikTok"
+              type="text"
+              class="d-inline-flex"
+              style="max-width: 50%"
+              max-width="50%"
+              placeholder="Insérez le lien TikTok"
+            >
+              <template v-slot:prepend>
+                <div class="mt-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    fill="grey"
+                    class="bi bi-tiktok"
+                    viewBox="0 0 16 16"
+                  >
+                    <path
+                      d="M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3 0 1 0 3 3z"
+                    />
+                  </svg>
+                </div>
+              </template>
+            </v-text-field>
+          </div>
+          <div class="d-flex justify-center">
+            <v-text-field
+              v-model="formShop.shop_social_media.snapchat"
+              prepend-icon="mdi-snapchat"
+              label="Snapchat"
+              type="text"
+              class="d-inline-flex"
+              style="max-width: 50%"
+              max-width="50%"
+              placeholder="Insérez le lien Snapchat"
+            >
+            </v-text-field>
+          </div>
         </v-col>
       </v-row>
-      <v-btn color="warning" @click.stop="$router.push('/restaurants')"
-        >Annuler</v-btn
-      >
+
       <v-btn
         :disabled="!isValue"
         :loading="loadingBtn"
-        class="ml-4"
+        class="ml-4 text-none"
         type="submit"
         color="primary"
         >Soumettre</v-btn
       >
+      <v-btn
+        class="text-none"
+        color="warning"
+        @click.stop="$router.push('/restaurants')"
+        >Annuler</v-btn
+      >
     </v-form>
-    <pre type="json">{{ formShop }}</pre>
+    <!-- <pre type="json">{{ formShop }}</pre>
     <pre type="json">{{ staticURL }}</pre>
-    <pre type="json">{{ imageUrl }}</pre>
+    <pre type="json">{{ imageUrl }}</pre> -->
   </v-container>
 </template>
 <script>
@@ -226,7 +314,8 @@ export default {
     loadingBtn: false,
     shopId: localStorage.getItem('shopid'),
     AllPaymentsMethods: ['Cheques', 'Especes', 'Tickets Restaurants'],
-    imageUrl: '',
+    shopImg: null,
+    imageUrl: null,
     formShop: {
       shop_name: '',
       shop_description: '',
@@ -234,8 +323,16 @@ export default {
       shop_status: '',
       shop_hours: [],
       shop_payment_methods: [],
+      shop_social_media: {
+        instagram: '',
+        snapchat: '',
+        facebook: '',
+        tiktok: '',
+        twitter: '',
+      },
       shop_profile_image: '',
       shop_printer_ip: '',
+      smart_print_app: '',
     },
     valid: true,
     nameRules: [
@@ -270,7 +367,10 @@ export default {
       return this.$store.get('shop/shop_description')
     },
     shop_hours() {
-      return [...this.$store.get('shop/shop_hours')]
+      return this.$store.get('shop/shop_hours')
+    },
+    shop_social_media() {
+      return this.$store.get('shop/shop_social_media')
     },
     shop_payment_methods() {
       return this.$store.get('shop/shop_payment_methods')
@@ -284,6 +384,54 @@ export default {
     shop_printer_ip() {
       return this.$store.get('shop/shop_printer_ip')
     },
+    shop_siret() {
+      return this.$store.get('shop/shop_siret')
+    },
+    smart_print_app() {
+      return this.$store.get('shop/smart_print_app')
+    },
+    staticURL() {
+      return this.$store.get('staticURL')
+    },
+  },
+  watch: {
+    shopImg: {
+      immediate: false,
+      async handler(newBlob) {
+        if (!newBlob || !newBlob.type) return
+
+        try {
+          this.loadingBtnImg = true
+
+          const ext = newBlob.type === 'image/png' ? 'png' : 'jpg'
+          const filename = `shop_${Date.now()}.${ext}`
+          const file = new File([newBlob], filename, { type: newBlob.type })
+
+          this.formShop.shop_profile_image = file
+          this.imageRaw = file
+
+          const fd = new FormData()
+          fd.append('image', this.imageRaw)
+
+          const res = await this.$store.dispatch('shop/updateShopInfo', {
+            id: this.id,
+            data: fd,
+          })
+
+          this.stsMsg = true
+
+          if (res) {
+            this.$router.push('/settings')
+          }
+        } catch (e) {
+          this.stsMsg = true
+          // optionnel: afficher l'erreur
+          // console.error(e)
+        } finally {
+          this.loadingBtnImg = false
+        }
+      },
+    },
   },
   mounted() {
     this.loadPage = true
@@ -296,15 +444,25 @@ export default {
         this.formShop.shop_phone = this.shop_phone
         this.formShop.shop_status = this.shop_status
         this.formShop.shop_description = this.shop_description
-        this.formShop.shop_payment_methods = this.shop_payment_methods
+        this.formShop.shop_payment_methods = JSON.parse(
+          JSON.stringify(this.shop_payment_methods)
+        )
+        console.log(
+          ' shop_hours',
+          this.shop_hours,
+          JSON.stringify(this.shop_hours)
+        )
         this.formShop.shop_hours = JSON.parse(JSON.stringify(this.shop_hours))
+        this.formShop.shop_social_media = JSON.parse(
+          JSON.stringify(this.shop_social_media)
+        )
         this.formShop.shop_profile_image = this.shop_profile_image
         this.formShop.shop_printer_ip = this.shop_printer_ip
+        this.formShop.shop_siret = this.shop_siret
+        this.formShop.smart_print_app = this.smart_print_app
 
         console.log('Form Shop', this.formShop)
-        this.imageUrl = `${this.staticURL()}/api/v1/imgprofile/${
-          this.formShop.shop_profile_image
-        }`
+        this.imageUrl = `${this.staticURL}/api/v1/imgprofile/${this.formShop.shop_profile_image}`
         console.log(this.imageUrl)
       })
       .finally(() => {
@@ -312,43 +470,6 @@ export default {
       })
   },
   methods: {
-    async changeImg(e) {
-      const image = e.target.files[0]
-      if (image) {
-        if (
-          image.type !== 'image/jpeg' &&
-          image.type !== 'image/png' &&
-          image.type !== 'image/JPEG' &&
-          image.type !== 'image/PNG'
-        ) {
-          alert('Please enter a jpg/jpeg/png')
-        } else {
-          this.imageUrl = ''
-          this.imageRaw = ''
-          this.imageUrl = URL.createObjectURL(image)
-          this.imageRaw = image
-          const fd = new FormData()
-          fd.append('image', this.imageRaw)
-
-          this.loadingBtnImg = true
-          const res = await this.$store.dispatch('shop/updateShopInfo', {
-            id: this.id,
-            data: fd,
-          })
-          if (res) {
-            this.stsMsg = true
-            this.loadingBtnImg = false
-            this.$router.push('/settings')
-          } else {
-            this.stsMsg = true
-            this.loadingBtnImg = false
-          }
-        }
-      }
-    },
-    staticURL() {
-      return this.$store.get('staticURL')
-    },
     async submitShopEdit() {
       if (this.isValue) {
         this.loadingBtn = true

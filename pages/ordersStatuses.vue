@@ -8,9 +8,90 @@
     >
       <Loading />
     </v-card>
-    <v-card v-else outlined class="mt-5">
-      <v-app-bar flat color="grey lighten-4" light> </v-app-bar>
-      <v-data-table :headers="headers" :items="dataOrders">
+    <v-row>
+      <v-col
+        v-for="(item, index) in dataOrdersFilteredByOrdersSent"
+        :key="index"
+        cols="12"
+        sm="6"
+        md="4"
+        lg="3"
+      >
+        <v-card outlined class="pa-4 border-radius-10">
+          <v-card-title> Commande #{{ item.ordernumber }} </v-card-title>
+
+          <v-card-subtitle class="pt-0">
+            <div class="mb-2 primary--text">
+              {{ orderTime(item.created) }}
+            </div>
+
+            <div class="mb-1 black--text">
+              Client : <b>{{ item.customer }}</b>
+            </div>
+
+            <div class="mb-1 black--text">
+              Total : <b>{{ conversiRp(item.subtotal) }} €</b>
+            </div>
+
+            <div class="mb-1 black--text">
+              Paiement : <b>{{ item.payment }}</b>
+            </div>
+          </v-card-subtitle>
+          <v-card-text>
+            <v-chip v-if="item.status === 1" color="grey" class="mb-2">
+              En attente
+            </v-chip>
+            <v-chip v-if="item.status === 2" color="success" class="mb-2">
+              En préparation
+            </v-chip>
+            <v-chip v-if="item.status === 3" color="primary" class="mb-2">
+              Terminé
+            </v-chip>
+            <v-chip v-if="item.status === 4" color="warning" class="mb-2">
+              Annulé
+            </v-chip>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn
+              outlined
+              small
+              color="default"
+              @click="$router.push(`orders/detail/${item.id}`)"
+            >
+              Détails
+              <v-icon small right>mdi-information-outline</v-icon>
+            </v-btn>
+            <v-btn
+              v-if="item.status !== 4 && item.status !== 3 && item.status !== 2"
+              outlined
+              small
+              color="red"
+              @click="btnCancel(item.id)"
+            >
+              Annuler
+              <v-icon small right>mdi-close-circle</v-icon>
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-col>
+    </v-row>
+    <div v-if="dataOrdersFilteredByOrdersSent.length === 0">
+      <div
+        style="margin-top: 30px"
+        class="d-flex flex-column align-items-center"
+      >
+        <v-icon size="90">mdi-room-service-outline</v-icon>
+        <div class="font-weight-bold d-flex justify-center">
+          Votre assiette est vide !
+        </div>
+      </div>
+    </div>
+    <!-- <v-data-table
+        :headers="headers"
+        :items="dataOrders"
+        :sort-by="['created']"
+        disable-sort
+      >
         <template #[`item.created`]="{ item }">
           <div>
             {{ orderTime(item.created) }}
@@ -34,7 +115,7 @@
                 outlined
                 small
                 color="default"
-                class="text-capitalize"
+                class="text-none"
                 @click="$router.push(`orders/detail/${item.id}`)"
                 >Details
                 <v-icon small right>mdi-information-outline</v-icon>
@@ -47,19 +128,20 @@
                 outlined
                 small
                 color="red"
-                class="text-capitalize"
+                class="text-none"
                 @click="btnCancel(item.id)"
                 >Annuler <v-icon small right>mdi-close-circle</v-icon>
               </v-btn>
             </v-card-actions>
           </v-row>
         </template>
-      </v-data-table>
-    </v-card>
+      </v-data-table> -->
     <!-- <pre type="json">{{ dataOrders }}</pre> -->
     <!-- <v-btn @click="soundNotification()"
-      >Sound <v-icon small right>mdi-close-circle</v-icon>
-    </v-btn> -->
+    >Sound <v-icon small right>mdi-close-circle</v-icon>
+  </v-btn> -->
+    <!-- all ordersSent {{ allOrdersSent }} allORders
+    <pre>{{ dataOrders }}</pre> -->
   </v-container>
 </template>
 <script>
@@ -111,22 +193,37 @@ export default {
       ],
     }
   },
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
+
   computed: {
-    dataOrders() {
-      return this.$store.get('orders/dataOrdersByUserId')
-    },
     message() {
       return this.$store.get('orders/message')
     },
     user() {
       return this.$store.get('users/user')
+    },
+    allOrdersSent() {
+      return this.$store.get('cart/allOrdersSent')
+    },
+    dataOrders() {
+      return this.$store.get('orders/dataOrdersByUserId')
+    },
+    dataOrdersFilteredByOrdersSent() {
+      console.log('Acces', localStorage.getItem('access'))
+      if (localStorage.getItem('access') !== '3') {
+        return this.dataOrders
+      }
+      const orders = this.$store.get('orders/dataOrdersByUserId') || []
+
+      // ✅ FIX: ids = allOrdersSent (pas dataOrders)
+      const ids = (this.allOrdersSent || []).map((x) => String(x))
+
+      console.log('orders', orders)
+      console.log('ids', ids)
+
+      const filteredOrders = orders.filter((o) => ids.includes(String(o.id)))
+
+      console.log('filteredOrders', filteredOrders)
+      return filteredOrders
     },
   },
   mounted() {

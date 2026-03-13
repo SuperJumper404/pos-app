@@ -15,15 +15,7 @@
         </v-row>
       </v-alert>
     </div>
-    <!-- <div style="background: #f5f5f5" class="mt-5">
-      <v-breadcrumbs :items="items">
-        <template #item="{ item }">
-          <v-breadcrumbs-item :to="item.to" :disabled="item.disabled">
-            {{ item.text }}
-          </v-breadcrumbs-item>
-        </template>
-      </v-breadcrumbs>
-    </div> -->
+
     <v-card
       v-if="loadPage"
       outlined
@@ -34,6 +26,9 @@
     </v-card>
     <v-card v-else outlined class="mt-5">
       <v-app-bar flat color="grey lighten-4" light>
+        <v-spacer></v-spacer>
+        <v-spacer></v-spacer>
+        <v-spacer></v-spacer>
         <v-spacer></v-spacer>
         <div>
           <v-btn
@@ -47,16 +42,15 @@
             <v-icon small right>mdi-delete-forever</v-icon>
           </v-btn>
         </div>
-        <div class="mt-6">
-          <v-text-field
-            v-model="searchFilter"
-            placeholder="Rechercher table"
-            label="Rechercher table"
-            outlined
-            dense
-            append-icon="mdi-card-search"
-          ></v-text-field>
-        </div>
+        <v-text-field
+          v-model="searchFilter"
+          class="mt-6"
+          placeholder="Recherche une commande, table ou client"
+          label="Rechercher une commande, table ou client"
+          outlined
+          dense
+          append-icon="mdi-card-search"
+        ></v-text-field>
       </v-app-bar>
       <v-data-table
         v-model="selectedOrders"
@@ -169,7 +163,7 @@
                 outlined
                 small
                 color="primary"
-                class="text-capitalize"
+                class="text-none"
                 @click="showInvoice(item.id)"
                 >Ticket <v-icon small right>mdi-invoice-text</v-icon>
               </v-btn>
@@ -183,10 +177,10 @@
       >Sound <v-icon small right>mdi-close-circle</v-icon>
     </v-btn> -->
     <!-- <pre type="json">{{ lastUpdate }}</pre> -->
-    <pre type="json">{{ dataAllDetailsArchivedOrders }}</pre>
+    <!-- <pre type="json">{{ dataAllDetailsArchivedOrders }}</pre>
 
     <pre type="json">la{{ detailArchivedOrder }}</pre>
-    <pre type="json">{{ dataArchivedOrders }}</pre>
+    <pre type="json">{{ dataArchivedOrders }}</pre> -->
 
     <v-snackbars
       :messages.sync="orderNotifications"
@@ -247,13 +241,7 @@ export default {
       ],
     }
   },
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
+
   computed: {
     // dataArchivedDetailOrders() {
     //   const archivedOrdersIds = this.dataArchivedOrders.map((x) => x.id)

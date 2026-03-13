@@ -17,7 +17,7 @@
       <!-- active-class="deep-purple--text text--accent-4" -->
       <v-list nav>
         <v-list-item
-          v-for="(item, i) in admin"
+          v-for="(item, i) in navigationAdminItems"
           :key="i"
           :to="item.to ? item.to : ''"
           router
@@ -50,26 +50,14 @@
         v-if="idUser.access === 0"
         @click.stop="drawer = !drawer"
       />
-      <v-btn
-        v-if="idUser.access === 0"
-        icon
-        @click.stop="miniVariant = !miniVariant"
-      >
-        <v-icon>mdi-{{ `chevron-${miniVariant ? 'right' : 'left'}` }}</v-icon>
+      <v-btn v-if="idUser.access === 0" icon @click="previousPage()">
+        <v-icon>mdi-chevron-left</v-icon>
       </v-btn>
       <v-btn v-if="idUser.access === 0" icon @click.stop="clipped = !clipped">
-        <v-icon>mdi-application</v-icon>
+        <v-icon>{{ currentPage.icon }}</v-icon>
       </v-btn>
-      <!-- <v-btn icon @click.stop="fixed = !fixed">
-        <v-icon>mdi-minus</v-icon>
-      </v-btn> -->
-      <v-toolbar-title
-        v-text="
-          $route.name == 'index'
-            ? 'Accueil '
-            : $route.name.charAt(0).toUpperCase() + $route.name.slice(1)
-        "
-      />
+
+      <v-toolbar-title>{{ currentPage.title }}</v-toolbar-title>
       <v-spacer />
       <v-btn
         v-if="idUser.access !== 0 && idUser.access !== 2"
@@ -109,97 +97,18 @@
       <nuxt />
       <!-- </v-container> -->
     </v-main>
-    <!-- <v-navigation-drawer
-      v-if="idUser.access !== 0"
-      v-model="rightDrawer"
-      :right="right"
-      temporary
-      fixed
-    >
-      <v-list>
-        <v-list-item @click.native="right = !right">
-          <v-list-item-action>
-            <v-icon light> mdi-repeat </v-icon>
-          </v-list-item-action>
-          <v-list-item-title>Switch drawer (click me)</v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-navigation-drawer> -->
-    <!-- <v-footer :absolute="!fixed" app>
-      <span>&copy; {{ new Date().getFullYear() }}</span>
-    </v-footer> -->
   </v-app>
 </template>
 <script>
+import listdashboard from '@/helpers/listdashboard'
 export default {
+  mixins: [listdashboard],
   data() {
     return {
       clipped: false,
       drawer: false,
       fixed: false,
-      admin: [
-        {
-          icon: 'mdi-home',
-          title: 'Accueil',
-          to: '/',
-        },
-        {
-          icon: 'mdi-shape-plus',
-          title: 'Produits',
-          to: '/products',
-        },
-        {
-          icon: 'mdi-bookmark',
-          title: 'Catégories',
-          to: '/categories',
-        },
-        {
-          icon: 'mdi-food',
-          title: 'Menus',
-          to: '/menus',
-        },
-        {
-          icon: 'mdi-order-bool-descending',
-          title: 'Commandes',
-          to: '/orders',
-        },
-        {
-          icon: 'mdi-cash-register',
-          title: 'Tiroir-caisse',
-          to: '/cashregister',
-        },
-        {
-          icon: 'mdi-history',
-          title: 'Historique',
-          to: '/history',
-        },
-        {
-          icon: 'mdi-apps',
-          title: 'Stocks',
-          to: '/stocks',
-        },
-        {
-          icon: 'mdi-notebook',
-          title: 'Rapports',
-          to: '/reports',
-        },
 
-        {
-          icon: 'mdi-table-chair',
-          title: 'Tables',
-          to: '/tables',
-        },
-        {
-          icon: 'mdi-store-cog',
-          title: 'Réglages',
-          to: '/settings',
-        },
-        {
-          icon: 'mdi-logout',
-          name: 'logout',
-          title: 'Déconnexion',
-        },
-      ],
       miniVariant: false,
       right: true,
       rightDrawer: false,
@@ -207,6 +116,9 @@ export default {
     }
   },
   computed: {
+    navigationAdminItems() {
+      return this.list.filter((item) => item.isAdmin === true)
+    },
     idUser() {
       return this.$store.get('users/user')
     },
@@ -216,9 +128,29 @@ export default {
     totalCart() {
       return this.$store.get('cart/totalCart')
     },
+    currentPage() {
+      const title = this.list.find(
+        (item) => item.routeName === this.$route.name
+      ) || {
+        title: this.$route.name,
+        icon: '',
+      }
+      console.log('Current Page Title', title, 'route', this.$route)
+      return title
+    },
   },
-  mounted() {},
+  mounted() {
+    console.log('Mixins List Dashbord', this.list)
+    console.log('route', this.$route)
+    console.log('router', this.$router)
+    console.log('currentPage', this.shopInfo)
+  },
   methods: {
+    previousPage() {
+      if (this.$route.path === '/') return
+
+      this.$router.back()
+    },
     cartBtn() {
       this.$store.dispatch('setDialog', true)
     },

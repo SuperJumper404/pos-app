@@ -24,6 +24,7 @@
     "nuxt": "^2.15.3",
     "uuid": "^9.0.0",
     "v-snackbars": "^3.2.8",
+    "vue-advanced-cropper": "^1.11.7",
     "vue-qrcode-component": "^2.1.1",
     "vuex-easy-access": "^3.1.8",
     "vuex-persistedstate": "^4.1.0"

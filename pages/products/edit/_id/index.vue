@@ -3,45 +3,26 @@
     <div v-if="stsMsg">
       <p class="red--text">{{ message }}</p>
     </div>
-    <Breadcrumbs />
-    <div class="mt-5">
-      <h3>Form Edit Product</h3>
-    </div>
+
     <Loading v-if="loadPage" />
     <v-row v-else class="mt-5">
       <v-col md="4" sm="5" cols="12">
-        <v-card outlined style="height: 100%">
-          <v-img :src="`${staticURL}/api/v1/imgproducts/${image}`" />
-          <v-card-actions class="text-center">
-            <input
-              id="fileImageProfile"
-              type="file"
-              accept="image/png/jpg"
-              class="d-none"
-              @input="changeImgProduct"
-            />
-            <v-btn
-              :loading="loadingBtnImg"
-              outlined
-              color="success"
-              rounded
-              onclick="document.getElementById('fileImageProfile').click()"
-              class="text-capitalize mt-5 mb-5"
-              width="100%"
-            >
-              Change
-            </v-btn>
-          </v-card-actions>
+        <v-card outlined>
+          <!-- <v-img :src="`${staticURL}/api/v1/imgproducts/${image}`" /> -->
+          <ImageCropper
+            v-model="productImg"
+            :preview-url-prop="`${staticURL}/api/v1/imgproducts/${formeditproduct.image}`"
+          />
         </v-card>
       </v-col>
       <v-col md="8" sm="7" cols="12">
         <v-form v-model="isValue" @submit.prevent="submitEditProduct">
           <v-text-field
             v-model="formeditproduct.name"
-            label="Name"
+            label="Nom du produit"
             type="text"
-            :rules="[(v) => !!v || 'Name products required']"
-            placeholder="Insert product name"
+            :rules="[(v) => !!v || 'Nom du produit requis']"
+            placeholder="Saisir le nom du produit"
             required
             autofocus
           />
@@ -49,42 +30,48 @@
             v-model="formeditproduct.description"
             label="Description"
             type="text"
-            :rules="[(v) => !!v || 'Description products required']"
-            placeholder="Insert product description"
+            :rules="[(v) => !!v || 'Description du produit requise']"
+            placeholder="Saisir la description du produit"
             required
             autofocus
           />
           <v-text-field
             v-model="formeditproduct.stock"
             label="Stock"
+            class="d-inline-flex"
             type="number"
             :rules="[(v) => !!v || 'Stock required']"
-            placeholder="Insert product stock"
+            placeholder="Saisir le stock du produit"
             required
           />
+          <br />
           <v-text-field
             v-model="formeditproduct.price"
-            label="Price"
+            label="Prix HT"
             type="number"
-            prepend-inner-icon="mdi-cash"
+            class="d-inline-flex"
+            append-outer-icon="mdi-currency-eur"
             :rules="[(v) => !!v || 'Price required']"
-            placeholder="Insert product price"
+            placeholder="Saisir le prix du produit"
             required
           />
+          <br />
           <v-select
             v-model="formeditproduct.categoryid"
             :items="allCategory"
-            :rules="[(v) => !!v || 'Categories riquired']"
+            :rules="[(v) => !!v || 'Catégorie requise']"
             item-value="id"
+            class="d-inline-flex"
             item-text="name"
-            label="Categories"
+            label="Catégorie"
             required
           ></v-select>
+          <br />
           <v-btn
             color="success"
-            class="text-capitalize mr-3 mb-4"
+            class="text-none mr-3 mb-4"
             @click.stop="addCustomization"
-            ><v-icon>mdi-plus</v-icon>Ajouter choix </v-btn
+            ><v-icon>mdi-plus</v-icon>Ajouter un choix </v-btn
           ><br />
           <div
             v-for="(custom, index) in formeditproduct.product_customization"
@@ -95,9 +82,9 @@
               <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formeditproduct.product_customization[index].name"
-                  label="Customization Name"
-                  :rules="[(v) => !!v || 'Name required']"
-                  placeholder="Enter name"
+                  label="Nom du choix "
+                  :rules="[(v) => !!v || 'Nom du choix requis']"
+                  placeholder="Saisir le nom du choix"
                   required
                 ></v-text-field>
               </v-col>
@@ -106,9 +93,9 @@
                   v-model="
                     formeditproduct.product_customization[index].description
                   "
-                  label="Customization Message"
-                  :rules="[(v) => !!v || 'Name required']"
-                  placeholder="Enter description"
+                  label="Description du choix"
+                  :rules="[(v) => !!v || 'Description requise']"
+                  placeholder="Saisir la description du choix"
                   required
                 ></v-text-field>
               </v-col>
@@ -117,7 +104,7 @@
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="formeditproduct.product_customization[index].items"
-                  label="Select a favorite activity or create a new one"
+                  label="Options du choix"
                   chips
                   multiple
                   :item-text="displayItem"
@@ -128,10 +115,10 @@
                   v-model="
                     formeditproduct.product_customization[index].limit_choice
                   "
-                  label="Max Choices"
+                  label="Nombre maximum de choix"
                   type="number"
-                  :rules="[(v) => !!v || 'Max Choices required']"
-                  placeholder="Enter max choices"
+                  :rules="[(v) => !!v || 'Nombre de choix maximum requis']"
+                  placeholder="Saisir le nombre de choix maximum"
                   required
                 ></v-text-field>
               </v-col>
@@ -157,38 +144,41 @@
               ></v-progress-linear>
             </v-card>
           </div>
-          <v-btn color="warning" @click.stop="$router.push('/products')"
-            >Cancel</v-btn
+          <v-btn
+            color="warning"
+            class="text-none"
+            @click.stop="$router.push('/products')"
+            >Annuler</v-btn
           >
           <v-btn
             :disabled="!isValue"
             :loading="loadingBtn"
-            class="ml-4"
+            class="ml-4 text-none"
             type="submit"
             color="primary"
-            >Update</v-btn
+            >Valider</v-btn
           >
         </v-form>
       </v-col>
     </v-row>
-    <!-- <pre type="json">{{ detailProduct }}</pre> -->
-    <!-- <pre type="json">{{ formeditproduct }}</pre> -->
+    <!-- <pre type="json">{{ detailProduct }}</pre>
+    <pre type="json">{{ formeditproduct }}</pre>
+    <pre type="json">{{ allCategory }}</pre> -->
   </v-container>
 </template>
 <script>
-import Breadcrumbs from '@/components/breadcrumbs'
 import Loading from '@/components/loading'
 export default {
   components: {
-    Breadcrumbs,
     Loading,
   },
-  mixins: [],
+
   middleware: 'auth',
   data() {
     return {
       id: this.$route.params.id,
       isValue: false,
+      productImg: null,
       loadingBtn: false,
       loadingBtnImg: false,
       loadPage: false,
@@ -200,15 +190,12 @@ export default {
         categoryid: '',
         price: '',
         stock: '',
+        image: '',
         product_customization: [],
       },
     }
   },
-  head() {
-    return {
-      title: 'Edit Products',
-    }
-  },
+
   computed: {
     staticURL() {
       return this.$store.get('staticURL')
@@ -223,6 +210,32 @@ export default {
       return this.$store.get('products/message')
     },
   },
+  watch: {
+    async productImg(newBlob) {
+      const ext = newBlob.type === 'image/png' ? 'png' : 'jpg'
+      const filename = `product_${Date.now()}.${ext}`
+      const file = new File([newBlob], filename, { type: newBlob.type })
+      this.formeditproduct.image = file
+
+      this.imageRaw = file
+      const fd = new FormData()
+      fd.append('image', this.imageRaw)
+
+      this.loadingBtnImg = true
+      const res = await this.$store.dispatch('products/updateProduct', {
+        id: this.id,
+        data: fd,
+      })
+      if (res) {
+        this.stsMsg = true
+        this.loadingBtnImg = false
+        this.$router.push('/products')
+      } else {
+        this.stsMsg = true
+        this.loadingBtnImg = false
+      }
+    },
+  },
   mounted() {
     this.loadPage = true
 
@@ -235,18 +248,20 @@ export default {
       .then(() => {
         this.formeditproduct.name = this.detailProduct[0].name
         this.formeditproduct.categoryid = this.detailProduct[0].categoryid
+        console.log('category id', this.formeditproduct)
         this.formeditproduct.price = this.detailProduct[0].price
         this.formeditproduct.stock = this.detailProduct[0].stock
         this.formeditproduct.description = this.detailProduct[0].description
         this.formeditproduct.product_customization = JSON.parse(
           JSON.stringify(this.detailProduct[0].product_customization)
         )
-        this.image = this.detailProduct[0].image
+        this.formeditproduct.image = this.detailProduct[0].image
       })
       .finally(() => {
         this.loadPage = false
       })
   },
+
   methods: {
     processComboboxInput(index) {
       const lastItem =
@@ -297,40 +312,23 @@ export default {
         mandatory: false,
       }) // Ajoute une nouvelle option vide
     },
-    async changeImgProduct(e) {
-      const image = e.target.files[0]
-      if (image) {
-        if (
-          image.type !== 'image/jpeg' &&
-          image.type !== 'image/png' &&
-          image.type !== 'image/JPEG' &&
-          image.type !== 'image/PNG'
-        ) {
-          alert('Please enter a jpg/jpeg/png')
-        } else {
-          this.imageUrl = ''
-          this.imageRaw = ''
-          this.imageUrl = URL.createObjectURL(image)
-          this.imageRaw = image
-          const fd = new FormData()
-          fd.append('image', this.imageRaw)
-
-          this.loadingBtnImg = true
-          const res = await this.$store.dispatch('products/updateProduct', {
-            id: this.id,
-            data: fd,
-          })
-          if (res) {
-            this.stsMsg = true
-            this.loadingBtnImg = false
-            this.$router.push('/products')
-          } else {
-            this.stsMsg = true
-            this.loadingBtnImg = false
-          }
-        }
-      }
-    },
+    // changeImgProduct(e) {
+    //   const image = e.target.files[0]
+    //   if (image) {
+    //     if (
+    //       image.type !== 'image/jpeg' &&
+    //       image.type !== 'image/png' &&
+    //       image.type !== 'image/JPEG' &&
+    //       image.type !== 'image/PNG'
+    //     ) {
+    //       alert('Please enter a jpg/jpeg/png')
+    //     } else {
+    //       this.imageUrl = ''
+    //       this.imageRaw = ''
+    //       this.imageUrl = URL.createObjectURL(image)
+    //     }
+    //   }
+    // },
     async submitEditProduct() {
       this.loadingBtn = true
       const res = await this.$store.dispatch('products/updateProduct', {

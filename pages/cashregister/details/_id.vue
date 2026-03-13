@@ -127,7 +127,7 @@
                 outlined
                 small
                 color="primary"
-                class="text-capitalize"
+                class="text-none"
                 @click="btnFinish(item.id)"
                 >Prête <v-icon small right>mdi-check-circle</v-icon>
               </v-btn>
@@ -137,7 +137,7 @@
                 outlined
                 small
                 color="default"
-                class="text-capitalize"
+                class="text-none"
                 @click="$router.push(`/orders/detail/${item.id}`)"
                 >Details
                 <v-icon small right>mdi-information-outline</v-icon>
@@ -148,7 +148,7 @@
                 outlined
                 small
                 color="red"
-                class="text-capitalize"
+                class="text-none"
                 @click="btnCancel(item.id)"
                 >Annuler <v-icon small right>mdi-close-circle</v-icon>
               </v-btn>
@@ -216,13 +216,7 @@ export default {
       ],
     }
   },
-  head() {
-    return {
-      title: `${
-        this.$route.name.charAt(0).toUpperCase() + this.$route.name.slice(1)
-      }`,
-    }
-  },
+
   computed: {
     dataOrders() {
       return this.$store.get('orders/dataOrdersByUserId')

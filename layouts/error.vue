@@ -40,13 +40,7 @@ export default {
         ' Nous sommes désolés, mais une erreur inattendue s est produite. ',
     }
   },
-  head() {
-    const title =
-      this.error.statusCode === 404 ? this.pageNotFound : this.otherError
-    return {
-      title,
-    }
-  },
+
   computed: {
     idUser() {
       return this.$store.get('users/user')

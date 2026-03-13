@@ -108,13 +108,14 @@
             outlined
             small
             color="primary"
-            class="text-capitalize"
+            class="text-none"
             @click="
-              ($event) =>
-                $router.push({
-                  path: `/cashregister/payout/${table.tableName}?modals=true`,
-                  query: { orders: OrderIdsToArchives() },
-                })
+              selectedOrders && selectedOrders.length > 0
+                ? $router.push({
+                    path: `/cashregister/payout/${table.tableName}?modals=true`,
+                    query: { orders: OrderIdsToArchives() },
+                  })
+                : null
             "
           >
             Encaisser
@@ -124,7 +125,7 @@
             outlined
             small
             color="default"
-            class="text-capitalize"
+            class="text-none"
             @click="
               ($event) =>
                 $router.push(
@@ -191,11 +192,12 @@ export default {
       tableGlobalData: [],
     }
   },
-  head() {},
   computed: {
     dataTables() {
       const result = this.$store.get('tables/dataTables') || []
-      return result.filter((x) => x.access === 2 || x.access === 0)
+      return result.filter(
+        (x) => x.access === 2 || x.access === 0 || x.access === 3
+      )
     },
 
     getAllOrders() {
