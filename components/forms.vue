@@ -168,7 +168,8 @@ export default {
         (v) =>
           /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@,#,_])[0-9a-zA-Z@#_]{8,}$/.test(
             v
-          ) || 'Use a combination of a-z, A-Z, 0-9 and symbol (@,#,_,)',
+          ) ||
+          'Utiliser au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial (@,#,_)',
       ],
     }
   },
