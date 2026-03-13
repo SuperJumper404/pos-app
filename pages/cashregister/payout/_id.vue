@@ -61,7 +61,7 @@ export default {
     },
   },
   mounted() {
-    console.log('Ordres to Archivess', this.ordersToArchive)
+    console.log('Ordres to Archivesss', this.ordersToArchive)
   },
   methods: {
     btnNo() {
