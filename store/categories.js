@@ -52,10 +52,12 @@ export const actions = {
         },
       })
       .then((response) => {
+        console.log('Response postCategory', response)
         dispatch('set/message', response.data.message)
         return true
       })
       .catch((error) => {
+        console.log('Error postCategory', error)
         dispatch('set/message', error.response.data.message)
         return false
       })
