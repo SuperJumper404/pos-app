@@ -3,7 +3,7 @@ name: Clone, Build and Deploy Nuxt App to EC2
 on:
   push:
     branches:
-      - staging
+      - main
   workflow_dispatch:
 
 jobs:

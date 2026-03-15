@@ -1,4 +1,4 @@
-name: Deploy Nuxt Generate to EC2
+name: Deploy Frontend to Staging
 
 on:
   push:
