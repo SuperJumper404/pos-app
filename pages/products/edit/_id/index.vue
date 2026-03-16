@@ -198,6 +198,7 @@ export default {
 
   computed: {
     staticURL() {
+      console.log('staticURL', this.$store.get('staticURL'))
       return this.$store.get('staticURL')
     },
     allCategory() {
