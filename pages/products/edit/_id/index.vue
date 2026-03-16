@@ -8,10 +8,10 @@
     <v-row v-else class="mt-5">
       <v-col md="4" sm="5" cols="12">
         <v-card outlined>
-          <!-- <v-img :src="`${staticURL}/api/v1/imgproducts/${image}`" /> -->
+          <!-- <v-img :src="`${staticURL}api/v1/imgproducts/${image}`" /> -->
           <ImageCropper
             v-model="productImg"
-            :preview-url-prop="`${staticURL}/api/v1/imgproducts/${formeditproduct.image}`"
+            :preview-url-prop="`${staticURL}api/v1/imgproducts/${formeditproduct.image}`"
           />
         </v-card>
       </v-col>

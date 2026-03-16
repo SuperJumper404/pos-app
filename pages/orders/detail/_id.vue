@@ -22,7 +22,7 @@
           class="mb-3 d-flex justify-space-between align-center pa-2"
         >
           <v-img
-            :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+            :src="`${staticURL}api/v1/imgproducts/${itm.image}`"
             max-width="120px"
           ></v-img>
           <!-- //TODO Faire en sorte que les colonnes soient bien alignées sur mobile -->
@@ -164,7 +164,7 @@
               <v-avatar size="75" rounded tile class="mr-3">
                 <v-img
                   class="rounded-lg"
-                  :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                  :src="`${staticURL}api/v1/imgproducts/${itm.image}`"
                 />
               </v-avatar>
 
