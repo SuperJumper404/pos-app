@@ -12,7 +12,7 @@
       <div class="pr-0 pl-0 pt-0 pb-0">
         <v-col class="pr-0 pl-0 pt-0 pb-0">
           <v-img
-            :src="`${staticURL}/api/v1/imgprofile/${shopInfo.shop_profile_image}`"
+            :src="`${staticURL}api/v1/imgprofile/${shopInfo.shop_profile_image}`"
             height="70%"
             position="relative"
             class="rounded-lg"

@@ -72,7 +72,7 @@
               class="mb-3 d-flex justify-space-evenly align-items-center pa-2"
             >
               <v-img
-                :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                :src="`${staticURL}api/v1/imgproducts/${itm.image}`"
                 max-width="120px"
               ></v-img>
               <v-divider vertical></v-divider>

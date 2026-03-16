@@ -44,7 +44,7 @@
                     >
                       <!-- Image 5/4 -->
                       <v-img
-                        :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
+                        :src="`${staticURL}api/v1/imgproducts/${items.image}`"
                         aspect-ratio="5/4"
                         class="rounded-t"
                       />
@@ -97,7 +97,7 @@
         <!-- <v-card outlined max-height="150px;">
                     <v-img
                       height="100px"
-                      :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
+                      :src="`${staticURL}api/v1/imgproducts/${items.image}`"
                     ></v-img>
                     <v-card-title class="mb-n5">
                       <h6
@@ -175,7 +175,7 @@
                     <v-avatar size="75" rounded tile class="mr-3">
                       <v-img
                         class="rounded-lg"
-                        :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                        :src="`${staticURL}api/v1/imgproducts/${itm.image}`"
                       />
                     </v-avatar>
 

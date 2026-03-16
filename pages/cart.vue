@@ -23,7 +23,7 @@
                   <v-avatar size="75" rounded tile class="mr-3">
                     <v-img
                       class="rounded-lg"
-                      :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                      :src="`${staticURL}api/v1/imgproducts/${itm.image}`"
                     />
                   </v-avatar>
 
