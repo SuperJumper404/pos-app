@@ -36,8 +36,8 @@
           <v-img
             :src="
               items.image
-                ? `${staticurl}api/v1/imgproducts/${items.image}`
-                : `${staticurl}api/v1/imgproducts/default.png`
+                ? `${staticurl}/api/v1/imgproducts/${items.image}`
+                : `${staticurl}/api/v1/imgproducts/default.png`
             "
             width="120"
           ></v-img>
@@ -108,8 +108,8 @@
           <v-img
             :src="
               itm.image
-                ? `${staticurl}api/v1/imgproducts/${itm.image}`
-                : `${staticurl}api/v1/imgproducts/default.png`
+                ? `${staticurl}/api/v1/imgproducts/${itm.image}`
+                : `${staticurl}/api/v1/imgproducts/default.png`
             "
             width="100%"
           ></v-img>
@@ -187,7 +187,7 @@ export default {
 
   computed: {
     staticurl() {
-      return this.$store.get('staticURL')
+      return this.$store.get('staticURL').replace(/\/+$/, '')
     },
     dataProduct() {
       const arr = this.$store.get('products/dataProduct') || []

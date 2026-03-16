@@ -34,7 +34,7 @@
               class="mb-3 d-flex justify-space-between align-center pa-2"
             >
               <v-img
-                :src="`${staticURL}api/v1/imgproducts/${itm.image}`"
+                :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
                 max-width="120px"
               ></v-img>
               <v-divider vertical></v-divider>
@@ -228,7 +228,7 @@ export default {
       return this.$store.get('orders/message')
     },
     staticURL() {
-      return this.$store.get('staticURL')
+      return this.$store.get('staticURL').replace(/\/+$/, '')
     },
     user() {
       return { id: this.$route.params.id }

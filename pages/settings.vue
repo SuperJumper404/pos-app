@@ -391,7 +391,7 @@ export default {
       return this.$store.get('shop/smart_print_app')
     },
     staticURL() {
-      return this.$store.get('staticURL')
+      return this.$store.get('staticURL').replace(/\/+$/, '')
     },
   },
   watch: {
@@ -462,7 +462,7 @@ export default {
         this.formShop.smart_print_app = this.smart_print_app
 
         console.log('Form Shop', this.formShop)
-        this.imageUrl = `${this.staticURL}api/v1/imgprofile/${this.formShop.shop_profile_image}`
+        this.imageUrl = `${this.staticURL}/api/v1/imgprofile/${this.formShop.shop_profile_image}`
         console.log(this.imageUrl)
       })
       .finally(() => {

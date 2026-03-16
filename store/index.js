@@ -12,7 +12,7 @@ function getHost() {
 console.log('Store env', process.env.privateURL)
 export const state = () => ({
   authenticated: false,
-  staticURL: getHost().backEndPoint,
+  staticURL: getHost().backEndPoint.replace(/\/+$/, ''),
   stateDialog: false,
 })
 export const mutations = { ...defaultMutations(state()) }

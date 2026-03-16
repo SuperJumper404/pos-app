@@ -23,7 +23,7 @@
                   <v-avatar size="75" rounded tile class="mr-3">
                     <v-img
                       class="rounded-lg"
-                      :src="`${staticURL}api/v1/imgproducts/${itm.image}`"
+                      :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
                     />
                   </v-avatar>
 
@@ -203,7 +203,7 @@ export default {
   }),
   computed: {
     staticURL() {
-      return this.$store.get('staticURL')
+      return this.$store.get('staticURL').replace(/\/+$/, '')
     },
     dataCart() {
       return this.$store.get('cart/dataCart')
