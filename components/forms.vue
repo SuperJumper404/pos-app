@@ -201,7 +201,7 @@ export default {
         )
         if (res) {
           this.loadingBtn = false
-          console.log('STore', this.$store)
+          console.log('Store', this.$store)
 
           this.$store.set('authenticated', true)
           console.log('SToree', this.$store)
