@@ -22,9 +22,6 @@ export default {
   generate: {
     //subFolders: false
   },
-  router: {
-    trailingSlash: true,
-  },
   head: {
     titleTemplate: '%s - pos-app',
     title: 'pos-app',
