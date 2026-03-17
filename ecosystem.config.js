@@ -2,11 +2,10 @@ module.exports = {
   apps: [
     {
       name: 'frontend_smart_eat_staging',
-      script: 'serve',
+      script: './serve-dist-folder.js',
       env: {
-        PM2_SERVE_PATH: './dist',
-        PM2_SERVE_PORT: 3000,
-        PM2_SERVE_SPA: 'true',
+        NODE_ENV: 'production',
+        PORT: 3000,
       },
       autorestart: true,
       watch: false,
