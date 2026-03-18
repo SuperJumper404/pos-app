@@ -2,9 +2,10 @@ module.exports = {
   apps: [
     {
       name: 'frontend_smart_eat_staging',
-      script: './serve-dist-folder.js',
+      script: 'npm',
+      args: 'run start:static',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'staging',
         PORT: 3000,
       },
       autorestart: true,
