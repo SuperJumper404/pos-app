@@ -8,7 +8,7 @@ const indexPath = path.join(distPath, 'index.html')
 
 app.use(express.static(distPath, { index: false }))
 
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(indexPath)
 })
 
