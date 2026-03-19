@@ -2,8 +2,9 @@ module.exports = {
   apps: [
     {
       name: 'frontend_smart_eat_staging',
-      script: 'npm',
-      args: 'run start:static',
+      cwd: '/chemin/absolu/vers/ton/projet',
+      script: './serve-dist-folder.js',
+      interpreter: 'node',
       env: {
         NODE_ENV: 'staging',
         PORT: 3000,

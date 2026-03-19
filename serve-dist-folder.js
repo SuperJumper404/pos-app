@@ -4,12 +4,17 @@ const express = require('express')
 const app = express()
 const PORT = process.env.PORT || 3000
 const distPath = path.join(__dirname, 'dist')
+
+console.log('process.cwd() =', process.cwd())
+console.log('__dirname =', __dirname)
 console.log('Serving static files from:', distPath)
+
 app.use(express.static(distPath))
 
 app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
-app.listen(PORT, () => {
+
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Frontend servi sur le port ${PORT}`)
 })
