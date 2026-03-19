@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'frontend_smart_eat_staging',
-      cwd: '/chemin/absolu/vers/ton/projet',
+      cwd: '/home/webserversmarteat/smarteat/frontend',
       script: './serve-dist-folder.js',
       interpreter: 'node',
       env: {
