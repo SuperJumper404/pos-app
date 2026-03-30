@@ -23,7 +23,7 @@ jobs:
             set -e
 
             APP_DIR=/home/webserversmarteat/smarteat/frontend
-            APP_NAME=smarteat-staging
+            APP_NAME=frontend_smart_eat_staging
             BRANCH=staging
             REPO_URL=https://github.com/SuperJumper404/pos-app.git
             SERVE_PORT=3000

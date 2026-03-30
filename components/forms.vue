@@ -165,11 +165,11 @@ export default {
       ],
       passRules: [
         (v) => !!v || 'Mot de passe requis',
-        (v) =>
-          /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@,#,_])[0-9a-zA-Z@#_]{8,}$/.test(
-            v
-          ) ||
-          'Utiliser au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial (@,#,_)',
+        // (v) =>
+        //   /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@,#,_])[0-9a-zA-Z@#_]{8,}$/.test(
+        //     v
+        //   ) ||
+        //   'Utiliser au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial (@,#,_)',
       ],
     }
   },
@@ -208,16 +208,22 @@ export default {
           console.log('Connected')
           this.$router.push('/')
         } else {
-          const msg = `Your account isn't activated yet! Check your email!`
+          const msg = `Votre compte n'est pas encore activé! Vérifiez votre e-mail!`
           if (this.$store.get('users/message') === msg) {
             this.loadingBtn = false
-            this.$store.set('users/message', 'Check email!')
+            this.$store.set(
+              'users/message',
+              "Votre compte n'est pas encore activé! Vérifiez votre e-mail!"
+            )
             console.log('Je passe dans cette condition ? ')
             this.$store.set('users/alertError', true)
             this.stsMsg = !this.stsMsg
           } else {
             this.loadingBtn = false
-            this.$store.set('users/message', 'Email or pass wrong!')
+            this.$store.set(
+              'users/message',
+              'Identifiant ou mot de passe incorrect!'
+            )
             console.log('Je passe dans cette condition ? ')
             this.$store.set('users/alertError', true)
             this.stsMsg = !this.stsMsg
