@@ -44,7 +44,7 @@
             }}
           </p>
 
-          <p>
+          <div :ref="`qr-${items.id}`" class="qr-code-download-wrapper">
             <qr-code
               :text="
                 websiteUrl +
@@ -54,30 +54,55 @@
                 items.clearpass
               "
             />
-            <!-- <qrcode-vue value="items.email" size="300" level="H" /> -->
-          </p>
+          </div>
+          <!-- <qrcode-vue value="items.email" size="300" level="H" /> -->
         </v-card-text>
         <v-card-actions class="d-block">
-          <v-spacer></v-spacer>
-          <!-- md to sm -->
+          <!-- Desktop / tablette -->
           <v-btn
             color="red darken-1"
             dark
-            class="text-none d-sm-block d-none"
+            class="text-none d-sm-block d-none mb-2"
             width="100%"
             @click="$router.push(`/tables/delete/${items.id}?modals=true`)"
-            >Supprimer</v-btn
           >
-          <!-- xs -->
+            Supprimer <v-icon small right>mdi-delete</v-icon>
+          </v-btn>
+
+          <v-btn
+            color="primary"
+            dark
+            class="text-none d-sm-block d-none mb-2 ml-0"
+            width="100%"
+            @click="downloadQrCode(items.id)"
+          >
+            Télécharger
+            <v-icon right>mdi-download</v-icon>
+          </v-btn>
+
+          <!-- Mobile -->
           <v-btn
             color="red darken-1"
             dark
-            class="text-none d-sm-none d-block"
+            class="text-none d-sm-none d-block mb-2"
             width="100%"
             small
             @click="$router.push(`/tables/delete/${items.id}?modals=true`)"
-            >Supprimer</v-btn
           >
+            Supprimer <v-icon small right>mdi-delete</v-icon>
+          </v-btn>
+
+          <v-btn
+            color="primary"
+            dark
+            class="text-none d-sm-none d-block ml-0 mb-2"
+            width="100%"
+            small
+            @click="downloadQrCode(items.id)"
+          >
+            Télécharger
+            <v-icon right small>mdi-download</v-icon>
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-card>
@@ -133,6 +158,57 @@ export default {
   methods: {
     searchData() {
       this.$store.dispatch('tables/getAllTables')
+    },
+    downloadQrCode(id) {
+      let wrapper = this.$refs[`qr-${id}`]
+      if (!wrapper) return
+      if (Array.isArray(wrapper)) {
+        wrapper = wrapper[0]
+      }
+      if (wrapper && wrapper.$el) {
+        wrapper = wrapper.$el
+      }
+      if (!wrapper || typeof wrapper.querySelector !== 'function') return
+
+      const svg = wrapper.querySelector('svg')
+      if (svg) {
+        const serializer = new XMLSerializer()
+        const svgString = serializer.serializeToString(svg)
+        const blob = new Blob([svgString], {
+          type: 'image/svg+xml;charset=utf-8',
+        })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `qr-${id}.svg`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        return
+      }
+
+      const canvas = wrapper.querySelector('canvas')
+      if (canvas) {
+        const url = canvas.toDataURL('image/png')
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `qr-${id}.png`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        return
+      }
+
+      const img = wrapper.querySelector('img')
+      if (img && img.src) {
+        const link = document.createElement('a')
+        link.href = img.src
+        link.download = `qr-${id}.png`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
     },
   },
 }

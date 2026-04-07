@@ -9,26 +9,36 @@
       <Loading />
     </v-card>
     <template>
-      <div v-if="urlPDF" class="border rounded shadow">
-        <iframe
-          :src="urlPDF"
-          width="50%"
-          height="600px"
-          frameborder="0"
-          class="w-full"
-        ></iframe>
-      </div>
-      <pre type="json">{{ shopInfo }}</pre>
-      <div v-if="shopInfo.smart_print_app">
-        <v-btn @click="printReceiptSmartPrint()">
-          Impression avec SmartPrint</v-btn
-        >
-      </div>
-      <div v-else>
-        <v-btn @click="printReceiptCloud()"> Impression Cloud </v-btn>
-      </div>
-    </template>
+      <v-row>
+        <v-col cols="12" md="6">
+          <div v-if="urlPDF" class="border rounded shadow">
+            <iframe
+              :src="urlPDF"
+              width="60%"
+              height="600px"
+              frameborder="0"
+              class="w-full"
+            ></iframe>
+          </div>
+        </v-col>
 
+        <v-col cols="12" md="6" class="d-flex justify-start mt-3">
+          <div v-if="shopInfo.smart_print_app" class="mt-10">
+            <v-btn @click="printReceiptSmartPrint()">
+              <v-icon class="mr-2">mdi-printer</v-icon>
+              Impression avec SmartPrint
+            </v-btn>
+          </div>
+
+          <div v-else class="mt-10">
+            <v-btn @click="printReceiptCloud()">
+              <v-icon class="mr-2">mdi-printer</v-icon>
+              Impression Cloud
+            </v-btn>
+          </div>
+        </v-col>
+      </v-row>
+    </template>
     <!-- <pre type="json"> {{ id }}</pre> -->
     <!-- <pre type="json"> order id :{{ orderId }}</pre>
     <pre type="json"> {{ dataArchivedOrder }} </pre>
@@ -75,6 +85,7 @@ export default {
         shop_phone: this.$store.get('shop/shop_phone'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
+        activate_tva: this.$store.get('shop/activate_tva'),
       }
     },
     totalAmount() {
@@ -190,7 +201,7 @@ export default {
         ' €</text>' +
         '<feed line="2"/>' +
         '<text em="false"  width="1" height="1" >Paiement :' +
-        this.dataArchivedOrder.payment +
+        this.dataArchivedOrder.used_payment_method +
         '</text>' +
         '<feed line="1"/>' +
         '<text>--------------------------------</text>' +
@@ -318,7 +329,7 @@ export default {
 
       push(
         alignRight(),
-        esc('Paiement : ' + this.dataArchivedOrder.payment + '\n')
+        esc('Paiement : ' + this.dataArchivedOrder.used_payment_method + '\n')
       )
       push(line())
 
@@ -449,8 +460,14 @@ export default {
       )
       doc.setFont('courier', 'normal')
 
-      doc.text('Paiement : CB', 53, (y += bigGap), { align: 'right' })
-      this.drawDashLine(doc, (y += bigGap))
+      const text = 'Paiement : ' + this.dataArchivedOrder.used_payment_method
+
+      const paymentLines = this.splitByWords(text, 20)
+      console.log('Payment lines :', paymentLines)
+      doc.text(paymentLines, 53, (y += bigGap), {
+        align: 'right',
+      })
+      this.drawDashLine(doc, (y += bigGap * paymentLines.length))
 
       doc.setFontSize(8)
       doc.text('À très bientôt ', center, (y += bigGap), {

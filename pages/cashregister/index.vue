@@ -61,6 +61,7 @@
             show-select
             @item-selected="selectionHandler(table.tableName)"
             :hide-default-footer="true"
+            :disable-sort="$vuetify.breakpoint.smAndDown"
           >
             <template #[`item.created`]="{ item }">
               <div>

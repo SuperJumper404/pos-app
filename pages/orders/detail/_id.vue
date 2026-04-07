@@ -182,7 +182,11 @@
             </v-col>
 
             <!-- RIGHT: customer + order + qty -->
-            <v-col cols="auto" class="d-flex align-center justify-center">
+            <v-col
+              cols="auto"
+              class="d-flex align-center justify-center ml-auto"
+              style="flex-wrap: nowrap"
+            >
               <div class="text-right mr-8">
                 <div
                   class="text-truncate font-weight-bold"

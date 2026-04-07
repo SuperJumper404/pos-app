@@ -166,7 +166,14 @@
             required
           ></v-text-field
         ></v-col>
-        <v-col cols="6"></v-col>
+        <v-col cols="6">
+          <v-switch
+            v-model="formShop.activate_tva"
+            class="ml-8"
+            label="Activer la TVA"
+            color="success"
+          ></v-switch>
+        </v-col>
         <v-col cols="6">
           <div class="mb-5 flex" style="justify-items: center">
             <h3>Réglages de l'imprimante</h3>
@@ -333,6 +340,7 @@ export default {
       shop_profile_image: '',
       shop_printer_ip: '',
       smart_print_app: '',
+      activate_tva: false,
     },
     valid: true,
     nameRules: [

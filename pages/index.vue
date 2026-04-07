@@ -1,5 +1,5 @@
 <template>
-  <v-container>
+  <v-container fluid class="full-width pa-5">
     <!-- Filtres de date -->
     <v-card outlined class="mt-10">
       <v-card-title class="pt-0 pb-0 d-flex justify-center" style="width: 100%">
@@ -45,6 +45,7 @@
         </v-btn>
 
         <v-spacer></v-spacer>
+
         <!-- FROM -->
         <v-col cols="12" sm="2" md="2">
           <v-menu
@@ -102,7 +103,7 @@
         <v-spacer></v-spacer>
         <!-- Bouton charger -->
         <v-btn color="primary" class="text-none" @click="fetchMetrics">
-          Raffraîchir
+          <v-icon class="mr-2">mdi-refresh</v-icon> Raffraîchir
         </v-btn>
         <v-spacer></v-spacer>
       </v-card-title>
@@ -121,7 +122,7 @@
 
       <v-col cols="12" sm="6" md="3">
         <v-card outlined>
-          <v-card-title>📦 Commandes</v-card-title>
+          <v-card-title>🍽️ Commandes</v-card-title>
           <v-card-text
             ><strong>{{ metrics.totalOrders }}</strong></v-card-text
           >
@@ -160,6 +161,7 @@
         ]"
         :items="metrics.paymentsSummary"
         dense
+        :disable-sort="$vuetify.breakpoint.smAndDown"
         hide-default-footer
       />
     </v-card>

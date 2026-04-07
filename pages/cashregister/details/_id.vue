@@ -24,6 +24,7 @@
         show-expand
         single-expand
         hide-default-headers
+        :disable-sort="$vuetify.breakpoint.smAndDown"
       >
         <template v-slot:expanded-item="{ item }">
           <td colspan="12">

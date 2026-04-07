@@ -29,9 +29,14 @@ const listdashboard = {
         },
         {
           icon: 'mdi-shape-plus',
-          title: 'Modification produit',
+          title: 'Modifier le produit',
           routeName: 'products-edit-id',
           isAdmin: false,
+        },
+        {
+          icon: 'mdi-shape-plus',
+          title: 'Supprimer le produit',
+          routeName: 'products-delete-id',
         },
         {
           icon: 'mdi-shape-plus',
@@ -66,11 +71,26 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-order-bool-descending',
+          title: 'Détail de la commande',
+          routeName: 'orders-detail-id',
+        },
+        {
           icon: 'mdi-cash-register',
           title: 'Tiroir-caisse',
           routeName: 'cashregister',
           to: '/cashregister',
           isAdmin: true,
+        },
+        {
+          icon: 'mdi-cash-register',
+          title: 'Detail du tiroir-caisse',
+          routeName: 'cashregister-details-id',
+        },
+        {
+          icon: 'mdi-cash-register',
+          title: 'Encaisser la table',
+          routeName: 'cashregister-payout-id',
         },
         {
           icon: 'mdi-history',
@@ -80,18 +100,23 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-receipt-text-check-outline',
+          title: 'Ticket de caisse',
+          routeName: 'history-ticket-id',
+        },
+        {
           icon: 'mdi-apps',
           title: 'Stocks',
           routeName: 'stocks',
           to: '/stocks',
-          isAdmin: true,
+          isAdmin: false,
         },
         {
           icon: 'mdi-notebook',
           title: 'Rapports',
           routeName: 'reports',
           to: '/reports',
-          isAdmin: true,
+          isAdmin: false,
         },
         {
           icon: 'mdi-table-chair',
@@ -99,6 +124,16 @@ const listdashboard = {
           routeName: 'tables',
           to: '/tables',
           isAdmin: true,
+        },
+        {
+          icon: 'mdi-table-chair',
+          title: 'Ajouter une nouvelle table',
+          routeName: 'tables-newtable',
+        },
+        {
+          icon: 'mdi-table-chair',
+          title: 'Supprimer la table',
+          routeName: 'tables-delete-id',
         },
         {
           icon: 'mdi-store-cog',

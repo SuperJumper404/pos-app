@@ -121,12 +121,12 @@
               class="mb-5"
               required
             ></v-text-field>
-            <v-select
+            <!-- <v-select
               v-model="formuser.payment"
               :items="items"
               label="Méthodes de paiement"
               :rules="[(v) => !!v || 'Méthodes de paiement requises']"
-            ></v-select>
+            ></v-select> -->
             <v-textarea
               v-model="formuser.notes"
               label="Note à la commande"
@@ -196,10 +196,11 @@ export default {
     formuser: {
       customer: '',
       phone: '',
-      payment: '',
+      payment: 'Espèce',
       notes: '',
     },
-    items: ['Carte Bleu ', 'Espece', 'Ticket Restaurant'],
+    // Pour le moment on a que l'espece
+    items: ['Carte Bleu ', 'Espèce', 'Ticket Restaurant'],
   }),
   computed: {
     staticURL() {

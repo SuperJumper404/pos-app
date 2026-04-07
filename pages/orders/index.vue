@@ -1,5 +1,5 @@
 <template>
-  <v-container class="full-width">
+  <v-container fluid class="full-width pa-5">
     <div>
       <v-alert v-model="errMsg" outlined text type="error">
         <v-row align="center" no-gutters>
@@ -58,6 +58,7 @@
         :headers="headers"
         :items="dataOrders"
         :search="searchFilter"
+        :hide-default-header="$vuetify.breakpoint.smAndDown"
         show-select
       >
         <template #[`item.created`]="{ item }">
@@ -77,7 +78,7 @@
           <v-chip v-if="item.status === 4" color="warning"> Annuler </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
-          <v-row class="d-flex flex-nowrap">
+          <v-row class="d-flex flex-nowrap" dense>
             <v-card-actions v-if="item.status === 1">
               <v-btn
                 outlined

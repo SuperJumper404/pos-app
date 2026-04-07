@@ -14,6 +14,7 @@ export const state = () => ({
   shop_status: '',
   shop_printer_ip: '',
   smart_print_app: '',
+  activate_tva: false,
   clickAndCollectTable: '',
 })
 export const mutations = { ...defaultMutations(state()) }
@@ -32,6 +33,7 @@ export const actions = {
         dispatch('set/shop_name', response.data.data[0].shop_name)
         dispatch('set/shop_adress', response.data.data[0].shop_adress)
         dispatch('set/shop_siret', response.data.data[0].shop_siret)
+        dispatch('set/activate_tva', response.data.data[0].activate_tva)
         dispatch('set/shop_phone', response.data.data[0].shop_phone)
         dispatch('set/shop_status', response.data.data[0].shop_status)
         dispatch('set/shop_mail', response.data.data[0].shop_mail)

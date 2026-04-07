@@ -6,22 +6,22 @@
           <v-icon size="80" color="warning">mdi-information-outline</v-icon>
         </div>
         <v-card-title class="justify-center">
-          <h3>Delete Tables?</h3>
+          <h3>Supprimer la table?</h3>
         </v-card-title>
         <v-card-text class="text-center">
-          <p>are you sure delete this tables?</p>
+          <p>Etes vous sur de vouloir supprimer cette table?</p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" class="text-none" @click="btnNo">No</v-btn>
           <v-btn
             :loading="loadingBtn"
             color="#e53935"
             dark
             class="text-none"
             @click="btnYes"
-            >Yes, delete!</v-btn
+            >Oui, supprimer !</v-btn
           >
+          <v-btn color="primary" class="text-none" @click="btnNo">Non</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

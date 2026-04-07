@@ -203,8 +203,14 @@ export default {
       )
       doc.setFont('courier', 'normal')
 
-      doc.text('Paiement : CB', 53, (y += bigGap), { align: 'right' })
-      this.drawDashLine(doc, (y += bigGap))
+      const text = 'Paiement : ' + this.dataArchivedOrder.used_payment_method
+
+      const paymentLines = this.splitByWords(text, 20)
+      console.log('Payment lines :', paymentLines)
+      doc.text(paymentLines, 53, (y += bigGap), {
+        align: 'right',
+      })
+      this.drawDashLine(doc, (y += bigGap * paymentLines.length))
 
       doc.setFontSize(8)
       doc.text('À très bientôt ', center, (y += bigGap), {
@@ -262,6 +268,27 @@ export default {
       const centerX = pageWidth / 2
 
       doc.text(dashLine, centerX, y, { align: 'center' })
+    },
+
+    splitByWords(text, maxLen = 30) {
+      const words = text.split(' ')
+      const lines = []
+      let current = ''
+
+      words.forEach((word) => {
+        if ((current + word).length > maxLen) {
+          lines.push(current.trim())
+          current = word + ' '
+        } else {
+          current += word + ' '
+        }
+      })
+
+      if (current.trim().length > 0) {
+        lines.push(current.trim())
+      }
+
+      return lines
     },
   },
 }
