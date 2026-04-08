@@ -370,7 +370,7 @@ export default {
       push(alignCenter(), esc(this.shopInfo.shop_name + '\n'))
       push(alignCenter(), esc('Made with smarteat.fr\n'))
       if (!this.isTvaActive) {
-        push(alignCenter(), esc('* TVA non applicable, exoneree de TVA\n'))
+        push(alignCenter(), esc('* TVA non applicable, art. 293 B du CGI\n'))
       }
       push(esc('\n\n\n\n'))
 
