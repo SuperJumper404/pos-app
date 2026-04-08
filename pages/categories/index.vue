@@ -41,7 +41,7 @@
             class="text-none mb-3 d-sm-block d-none"
             width="100%"
             @click="$router.push(`/categories/edit/${items.id}`)"
-            >Modifier</v-btn
+            >Modifier <v-icon small right>mdi-pencil</v-icon></v-btn
           >
           <!-- xs -->
           <v-btn
@@ -50,7 +50,7 @@
             width="100%"
             small
             @click="$router.push(`/categories/edit/${items.id}`)"
-            >Modifier</v-btn
+            >Modifier <v-icon small right>mdi-pencil</v-icon></v-btn
           >
           <v-spacer></v-spacer>
           <!-- md to sm -->
@@ -60,7 +60,7 @@
             class="text-none d-sm-block d-none"
             width="100%"
             @click="$router.push(`/categories/delete/${items.id}?modals=true`)"
-            >Supprimer</v-btn
+            >Supprimer <v-icon small right>mdi-trash-can</v-icon></v-btn
           >
           <!-- xs -->
           <v-btn
@@ -70,7 +70,7 @@
             width="100%"
             small
             @click="$router.push(`/categories/delete/${items.id}?modals=true`)"
-            >Supprimer</v-btn
+            >Supprimer <v-icon small right>mdi-trash-can</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>

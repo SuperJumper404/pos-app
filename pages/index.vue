@@ -10,7 +10,7 @@
           :outlined="!(currentDateButton === 1)"
           color="primary"
           @click="setToday"
-          >Aujourd’hui</v-btn
+          >Aujourd'hui <v-icon small right>mdi-calendar-today</v-icon></v-btn
         >
         <v-btn
           class="mr-2 ml-2"
@@ -18,7 +18,7 @@
           :outlined="!(currentDateButton === 2)"
           color="secondary"
           @click="setYesterday"
-          >Hier</v-btn
+          >Hier <v-icon small right>mdi-calendar-arrow-left</v-icon></v-btn
         >
         <v-btn
           class="mr-2 ml-2"
@@ -26,7 +26,8 @@
           :outlined="!(currentDateButton === 3)"
           color="success"
           @click="setThisWeek"
-          >Semaine en cours</v-btn
+          >Semaine en cours
+          <v-icon small right>mdi-calendar-week</v-icon></v-btn
         >
         <v-btn
           :class="[
@@ -41,7 +42,7 @@
           color="primaryPurple"
           @click="setThisMonth"
         >
-          Mois en cours
+          Mois en cours <v-icon small right>mdi-calendar-month</v-icon>
         </v-btn>
 
         <v-spacer></v-spacer>

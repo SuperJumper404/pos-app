@@ -130,7 +130,7 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="primary" class="text-none" @click="$router.go(-1)"
-            >Retour</v-btn
+            >Retour <v-icon small right>mdi-arrow-left</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>
@@ -244,7 +244,7 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="primary" class="text-none" @click="$router.go(-1)"
-            >Retour</v-btn
+            >Retour <v-icon small right>mdi-arrow-left</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>

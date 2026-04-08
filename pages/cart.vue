@@ -96,7 +96,8 @@
               dark
               class="text-none"
               @click="$router.push('/menus')"
-              >Retourner au menu</v-btn
+              >Retourner au menu
+              <v-icon small right>mdi-arrow-left</v-icon></v-btn
             >
           </v-card-actions>
           <v-form v-else v-model="isValue" @submit.prevent="paymentBtn">
@@ -150,7 +151,8 @@
                 color="success"
                 width="50%"
                 class="text-none"
-                >Commander</v-btn
+                >Commander
+                <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
 
               <v-btn
@@ -159,7 +161,7 @@
                 dark
                 class="text-none"
                 @click="cancelCart"
-                >Annuler</v-btn
+                >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
               >
             </v-card-actions>
           </v-form>

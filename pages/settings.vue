@@ -276,13 +276,13 @@
         class="ml-4 text-none"
         type="submit"
         color="primary"
-        >Soumettre</v-btn
+        >Soumettre <v-icon small right>mdi-content-save</v-icon></v-btn
       >
       <v-btn
         class="text-none"
         color="warning"
         @click.stop="$router.push('/restaurants')"
-        >Annuler</v-btn
+        >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
       >
     </v-form>
     <!-- <pre type="json">{{ formShop }}</pre>

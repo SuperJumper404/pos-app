@@ -247,7 +247,8 @@
                 width="50%"
                 class="text-none mt-3 mb-3"
                 @click="btnOrder"
-                >Commander</v-btn
+                >Commander
+                <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
               <v-btn
                 color="red ligthen-1"
@@ -255,7 +256,7 @@
                 class="text-none"
                 dark
                 @click="btnCancel"
-                >Annuler</v-btn
+                >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
               >
             </v-card-actions>
           </v-card>
@@ -333,14 +334,14 @@
           </v-card-text>
           <v-card-actions class="justify-end">
             <v-btn color="warning" class="text-none" @click="resetForm()"
-              >Retour</v-btn
+              >Retour <v-icon small right>mdi-arrow-left</v-icon></v-btn
             >
             <v-btn
               color="success"
               class="text-none"
               :disabled="disableCustomizationValidation()"
               @click="submitFormItem()"
-              >Valider</v-btn
+              >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
             >
           </v-card-actions>
         </v-card>

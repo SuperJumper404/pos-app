@@ -33,10 +33,10 @@
             color="success"
             class="text-none"
             @click="btnYes"
-            >Encaisser</v-btn
+            >Encaisser <v-icon small right>mdi-cash-multiple</v-icon></v-btn
           >
           <v-btn color="primary" class="text-none" @click="btnNo"
-            >Annuler</v-btn
+            >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>

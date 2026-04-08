@@ -20,13 +20,13 @@
         class="ml-4 text-none"
         type="submit"
         color="primary"
-        >Valider</v-btn
+        >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
       >
       <v-btn
         color="warning"
         class="text-none"
         @click.stop="$router.push('/categories')"
-        >Annuler</v-btn
+        >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
       >
     </v-form>
   </v-container>

@@ -56,14 +56,14 @@
         class="text-none ml-2 mr-2 mt-4 mb-4"
         color="primary"
         @click="crop"
-        >Valider</v-btn
+        >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
       >
       <v-btn
         v-if="!previewUrl || previewUrlLocal === null"
         class="text-none ml-2 mr-2 mt-4 mb-4"
         color="warning"
         @click="reset"
-        >Changer</v-btn
+        >Changer <v-icon small right>mdi-image-edit</v-icon></v-btn
       >
     </div>
   </v-card>

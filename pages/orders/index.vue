@@ -39,7 +39,7 @@
             :loading="deleteLoading"
             @click="deleteSelectedOrders()"
             >Supprimer
-            <v-icon small right>mdi-delete-forever</v-icon>
+            <v-icon small right>mdi-trash-can</v-icon>
           </v-btn>
         </div>
 

@@ -17,7 +17,7 @@
           autofocus
         ></v-text-field>
         <v-btn color="warning" @click.stop="$router.push('/categories')"
-          >Annuler</v-btn
+          >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
         >
         <v-btn
           :disabled="!isValue"
@@ -25,7 +25,7 @@
           class="ml-4"
           type="submit"
           color="primary"
-          >Submit</v-btn
+          >Submit <v-icon small right>mdi-check-circle</v-icon></v-btn
         >
       </v-form>
     </div>

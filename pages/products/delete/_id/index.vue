@@ -20,10 +20,10 @@
             dark
             class="text-none"
             @click="btnYes"
-            >Oui, supprimer !</v-btn
+            >Oui, supprimer ! <v-icon small right>mdi-trash-can</v-icon></v-btn
           >
           <v-btn color="primary" class="text-none" @click="btnNo"
-            >Annuler</v-btn
+            >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>

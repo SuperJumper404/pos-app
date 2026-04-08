@@ -13,14 +13,16 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" class="text-none" @click="btnNo">Non</v-btn>
+          <v-btn color="primary" class="text-none" @click="btnNo"
+            >Non <v-icon small right>mdi-close-circle</v-icon></v-btn
+          >
           <v-btn
             :loading="loadingBtn"
             color="#e53935"
             dark
             class="text-none"
             @click="btnYes"
-            >OUI, supprimer!</v-btn
+            >OUI, supprimer! <v-icon small right>mdi-trash-can</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>

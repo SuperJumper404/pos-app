@@ -66,7 +66,7 @@
             width="100%"
             @click="$router.push(`/tables/delete/${items.id}?modals=true`)"
           >
-            Supprimer <v-icon small right>mdi-delete</v-icon>
+            Supprimer <v-icon small right>mdi-trash-can</v-icon>
           </v-btn>
 
           <v-btn
@@ -89,7 +89,7 @@
             small
             @click="$router.push(`/tables/delete/${items.id}?modals=true`)"
           >
-            Supprimer <v-icon small right>mdi-delete</v-icon>
+            Supprimer <v-icon small right>mdi-trash-can</v-icon>
           </v-btn>
 
           <v-btn

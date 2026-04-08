@@ -37,7 +37,7 @@
       <!-- sm upto md lg -->
       <div class="d-sm-flex d-none">
         <v-btn color="warning" @click.stop="$router.push('/stocks')"
-          >Annuler</v-btn
+          >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
         >
         <v-btn
           :disabled="!isValue"
@@ -46,7 +46,7 @@
           color="success"
           dark
           @click="addStock"
-          >Add</v-btn
+          >Add <v-icon small right>mdi-plus-circle</v-icon></v-btn
         >
         <v-btn
           :disabled="!isValue"
@@ -55,7 +55,7 @@
           color="primary"
           dark
           @click="reduceStock"
-          >Reduce</v-btn
+          >Reduce <v-icon small right>mdi-minus-circle</v-icon></v-btn
         >
         <v-btn
           :disabled="!isValue"
@@ -64,7 +64,7 @@
           color="red ligthen-4"
           dark
           @click="adjusmentStock"
-          >Adjusment</v-btn
+          >Adjusment <v-icon small right>mdi-tune</v-icon></v-btn
         >
       </div>
       <!-- xs -->
@@ -75,7 +75,7 @@
             small
             width="100%"
             @click.stop="$router.push('/stocks')"
-            >Annuler</v-btn
+            >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
           >
         </v-col>
         <v-col cols="6">
@@ -87,7 +87,7 @@
             small
             width="100%"
             @click="addStock"
-            >Add</v-btn
+            >Add <v-icon small right>mdi-plus-circle</v-icon></v-btn
           >
         </v-col>
         <v-col cols="6">
@@ -99,7 +99,7 @@
             small
             width="100%"
             @click="reduceStock"
-            >Reduce</v-btn
+            >Reduce <v-icon small right>mdi-minus-circle</v-icon></v-btn
           >
         </v-col>
         <v-col cols="6">
@@ -111,7 +111,7 @@
             small
             width="100%"
             @click="adjusmentStock"
-            >Adjusment</v-btn
+            >Adjusment <v-icon small right>mdi-tune</v-icon></v-btn
           >
         </v-col>
       </v-row>

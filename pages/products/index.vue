@@ -60,7 +60,7 @@
                 class="text-none"
                 @click="$router.push(`/products/edit/${items.id}`)"
               >
-                Modifier
+                Modifier <v-icon small right>mdi-pencil</v-icon>
               </v-btn>
 
               <v-btn
@@ -71,7 +71,7 @@
                   $router.push(`/products/delete/${items.id}?modals=true`)
                 "
               >
-                Supprimer
+                Supprimer <v-icon small right>mdi-trash-can</v-icon>
               </v-btn>
             </template>
 
@@ -127,7 +127,7 @@
                 class="text-none"
                 @click="$router.push(`/products/edit/${items.id}`)"
               >
-                Modifier
+                Modifier <v-icon small right>mdi-pencil</v-icon>
               </v-btn>
 
               <v-btn
@@ -138,7 +138,7 @@
                   $router.push(`/products/delete/${items.id}?modals=true`)
                 "
               >
-                Supprimer
+                Supprimer <v-icon small right>mdi-trash-can</v-icon>
               </v-btn>
             </template>
 

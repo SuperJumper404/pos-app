@@ -134,14 +134,14 @@
             class="text-none"
             type="submit"
             color="primary"
-            >Valider</v-btn
+            >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
           >
 
           <v-btn
             class="text-none ml-4"
             color="warning"
             @click.stop="$router.push('/products')"
-            >Annuler</v-btn
+            >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
           >
         </v-form>
       </v-col>
