@@ -29,11 +29,30 @@
         outlined
         class="pa-2 d-flex justify-space-between align-center ma-3"
       >
-        <v-card-text class="d-block justify-space-between mt-5">
-          <p class="font-weight-bold">{{ items.username }}</p>
-          <p>Identifiant: {{ items.email }}</p>
-          <p>Password: {{ items.clearpass }}</p>
-          <div class="font-weight-bold text--darken-1 mb-1">
+        <v-card-text class="d-block justify-space-between py-4">
+          <div class="text-h6 font-weight-bold mb-4">
+            {{ items.username }}
+          </div>
+
+          <div class="mb-3">
+            <div class="caption text-uppercase grey--text text--darken-1">
+              Identifiant
+            </div>
+            <div class="body-2">
+              {{ items.email }}
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <div class="caption text-uppercase grey--text text--darken-1">
+              Mot de passe
+            </div>
+            <div class="body-2">
+              {{ items.clearpass }}
+            </div>
+          </div>
+
+          <div class="subtitle-2 font-weight-bold text--darken-1 mb-1">
             URL de connexion automatique:
           </div>
           <v-sheet
@@ -43,7 +62,7 @@
             max-width="100%"
           >
             <div class="d-flex align-center">
-              <div class="body-2 break-all">
+              <div class="body-2 break-all grey--text text--darken-3">
                 {{
                   websiteUrl +
                   '/login?username=' +

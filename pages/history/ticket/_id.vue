@@ -517,7 +517,7 @@ export default {
       if (!this.isTvaActive) {
         doc.setFontSize(6)
         doc.text(
-          '* TVA non applicable, exoneree de TVA',
+          '* TVA non applicable, art. 293 B du CGI',
           center,
           (y += bigGap),
           {
