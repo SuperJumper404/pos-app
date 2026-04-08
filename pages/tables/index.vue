@@ -33,16 +33,30 @@
           <p class="font-weight-bold">{{ items.username }}</p>
           <p>Identifiant: {{ items.email }}</p>
           <p>Password: {{ items.clearpass }}</p>
-          <p>
-            Url Connection:
-            {{
-              websiteUrl +
-              '/login?username=' +
-              items.email +
-              '&password=' +
-              items.clearpass
-            }}
-          </p>
+          <div class="font-weight-bold text--darken-1 mb-1">
+            URL de connexion automatique:
+          </div>
+          <v-sheet
+            color="grey lighten-4"
+            rounded="lg"
+            class="mt-3 mb-3 px-3 py-2 d-inline-block"
+            max-width="100%"
+          >
+            <div class="d-flex align-center">
+              <div class="body-2 break-all">
+                {{
+                  websiteUrl +
+                  '/login?username=' +
+                  items.email +
+                  '&password=' +
+                  items.clearpass
+                }}
+              </div>
+              <v-btn icon small class="ml-1" @click="copyTableUrl(items)">
+                <v-icon small>mdi-content-copy</v-icon>
+              </v-btn>
+            </div>
+          </v-sheet>
 
           <div :ref="`qr-${items.id}`" class="qr-code-download-wrapper">
             <qr-code
@@ -158,6 +172,25 @@ export default {
   methods: {
     searchData() {
       this.$store.dispatch('tables/getAllTables')
+    },
+    async copyTableUrl(item) {
+      const url =
+        this.websiteUrl +
+        '/login?username=' +
+        item.email +
+        '&password=' +
+        item.clearpass
+
+      try {
+        await navigator.clipboard.writeText(url)
+      } catch (error) {
+        const input = document.createElement('textarea')
+        input.value = url
+        document.body.appendChild(input)
+        input.select()
+        document.execCommand('copy')
+        document.body.removeChild(input)
+      }
     },
     downloadQrCode(id) {
       let wrapper = this.$refs[`qr-${id}`]
