@@ -67,10 +67,20 @@ export default {
         shop_name: this.$store.get('shop/shop_name'),
         shop_adress: this.$store.get('shop/shop_adress'),
         shop_phone: this.$store.get('shop/shop_phone'),
+        activate_tva: this.$store.get('shop/activate_tva'),
       }
     },
     totalAmount() {
       return this.detailArchivedOrder.reduce((sum, item) => sum + item.total, 0)
+    },
+    isTvaActive() {
+      return [true, 1, '1', 'true'].includes(this.shopInfo.activate_tva)
+    },
+    subtotalWithoutTva() {
+      return this.totalAmount - this.tvaAmount
+    },
+    tvaAmount() {
+      return this.totalAmount * 0.2
     },
   },
   mounted() {
@@ -169,32 +179,32 @@ export default {
       // Totaux
       y = doc.lastAutoTable.finalY + gap
       this.drawDashLine(doc, y)
-
       // doc.line(2, y, 56, y)
-      doc.setFontSize(8)
-      doc.text(
-        'Sous-total: ' +
-          (this.totalAmount - this.totalAmount * 0.2).toFixed(2) +
-          ' €',
-        53,
-        (y += bigGap),
-        {
-          align: 'right',
-        }
-      )
-      doc.text(
-        'Dont TVA (20%): ' + (this.totalAmount * 0.2).toFixed(2) + ' €',
-        53,
-        (y += bigGap),
-        {
-          align: 'right',
-        }
-      )
+      if (this.isTvaActive) {
+        doc.setFontSize(8)
+        doc.text(
+          'Sous-total: ' + this.formatPrice(this.subtotalWithoutTva),
+          53,
+          (y += bigGap),
+          {
+            align: 'right',
+          }
+        )
+        doc.text(
+          'Dont TVA (20%): ' + this.formatPrice(this.tvaAmount),
+          53,
+          (y += bigGap),
+          {
+            align: 'right',
+          }
+        )
+      }
       doc.setFontSize(10)
       doc.setFont('courier', 'bold')
 
       doc.text(
-        'TOTAL TTC: ' + this.totalAmount.toFixed(2) + ' €',
+        `TOTAL${this.isTvaActive ? ' TTC' : '*'}: ` +
+          this.formatPrice(this.totalAmount),
         53,
         (y += bigGap),
         {
@@ -222,6 +232,19 @@ export default {
       doc.text('Made with smarteat.fr ', center, (y += bigGap), {
         align: 'center',
       })
+
+      if (!this.isTvaActive) {
+        doc.setFontSize(6)
+        doc.text(
+          '* TVA non applicable, exoneree de TVA',
+          center,
+          (y += bigGap),
+          {
+            align: 'center',
+          }
+        )
+        doc.setFontSize(8)
+      }
 
       const blob = doc.output('blob')
       this.urlPDF = URL.createObjectURL(blob)

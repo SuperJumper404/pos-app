@@ -91,6 +91,15 @@ export default {
     totalAmount() {
       return this.detailArchivedOrder.reduce((sum, item) => sum + item.total, 0)
     },
+    isTvaActive() {
+      return [true, 1, '1', 'true'].includes(this.shopInfo.activate_tva)
+    },
+    subtotalWithoutTva() {
+      return this.totalAmount - this.tvaAmount
+    },
+    tvaAmount() {
+      return this.totalAmount * 0.2
+    },
   },
   mounted() {
     this.loadPage = true
@@ -120,6 +129,7 @@ export default {
     printReceiptCloud() {
       const address = this.shopInfo.shop_adress || ''
       const addressLines = this.splitByWords(address, 30)
+      const totalsXml = this.generateCloudTotalsXml()
 
       const addressXml = addressLines.reduce((prev, line) => {
         return (
@@ -188,17 +198,7 @@ export default {
         '<text>--------------------------------</text>' +
         '<feed line="1"/>' +
         // === Totaux ===
-        '<text align="right" >Sous-total : ' +
-        (this.totalAmount * 0.8).toFixed(2) +
-        ' €</text>' +
-        '<feed line="1"/>' +
-        '<text>TVA (20%) : ' +
-        (this.totalAmount * 0.2).toFixed(2) +
-        ' €</text>' +
-        '<feed line="1"/>' +
-        '<text width="2" height="2">TOTAL : ' +
-        this.totalAmount.toFixed(2) +
-        ' €</text>' +
+        totalsXml +
         '<feed line="2"/>' +
         '<text em="false"  width="1" height="1" >Paiement :' +
         this.dataArchivedOrder.used_payment_method +
@@ -226,6 +226,30 @@ export default {
         ticketType: 'caisse',
         orderId: this.orderId,
       })
+    },
+
+    generateCloudTotalsXml() {
+      if (!this.isTvaActive) {
+        return (
+          '<text width="2" height="2">TOTAL* : ' +
+          this.formatPrice(this.totalAmount) +
+          '</text>'
+        )
+      }
+
+      return (
+        '<text align="right" >Sous-total : ' +
+        this.formatPrice(this.subtotalWithoutTva) +
+        '</text>' +
+        '<feed line="1"/>' +
+        '<text>TVA (20%) : ' +
+        this.formatPrice(this.tvaAmount) +
+        '</text>' +
+        '<feed line="1"/>' +
+        '<text width="2" height="2">TOTAL TTC : ' +
+        this.formatPrice(this.totalAmount) +
+        '</text>'
+      )
     },
 
     generateEscPos() {
@@ -308,20 +332,26 @@ export default {
       // ---------------------------------------
       // 🧾 TOTAUX
       // ---------------------------------------
-      const subtotal = (this.totalAmount - this.totalAmount * 0.2).toFixed(2)
-      const tva = (this.totalAmount * 0.2).toFixed(2)
+      if (this.isTvaActive) {
+        const subtotal = this.subtotalWithoutTva.toFixed(2)
+        const tva = this.tvaAmount.toFixed(2)
 
-      push(
-        alignRight(),
-        esc(`Sous-total : ${subtotal} `),
-        euroSymbol,
-        esc('\n')
-      )
-      push(alignRight(), esc(`TVA 20%    : ${tva} `), euroSymbol, esc('\n'))
+        push(
+          alignRight(),
+          esc(`Sous-total : ${subtotal} `),
+          euroSymbol,
+          esc('\n')
+        )
+        push(alignRight(), esc(`TVA 20%    : ${tva} `), euroSymbol, esc('\n'))
+      }
 
       push(alignRight(), boldOn(), doubleOn())
       push(
-        esc(`TOTAL : ${this.totalAmount.toFixed(2)} `),
+        esc(
+          `TOTAL${this.isTvaActive ? ' TTC' : '*'} : ${this.totalAmount.toFixed(
+            2
+          )} `
+        ),
         euroSymbol,
         esc('\n')
       )
@@ -338,7 +368,11 @@ export default {
       // ---------------------------------------
       push(alignCenter(), esc('À très bientôt !\n'))
       push(alignCenter(), esc(this.shopInfo.shop_name + '\n'))
-      push(alignCenter(), esc('Made with smarteat.fr\n\n\n\n\n'))
+      push(alignCenter(), esc('Made with smarteat.fr\n'))
+      if (!this.isTvaActive) {
+        push(alignCenter(), esc('* TVA non applicable, exoneree de TVA\n'))
+      }
+      push(esc('\n\n\n\n'))
 
       push(cut())
 
@@ -426,32 +460,32 @@ export default {
       // Totaux
       y = doc.lastAutoTable.finalY + gap
       this.drawDashLine(doc, y)
-
       // doc.line(2, y, 56, y)
-      doc.setFontSize(8)
-      doc.text(
-        'Sous-total: ' +
-          (this.totalAmount - this.totalAmount * 0.2).toFixed(2) +
-          ' €',
-        53,
-        (y += bigGap),
-        {
-          align: 'right',
-        }
-      )
-      doc.text(
-        'Dont TVA (20%): ' + (this.totalAmount * 0.2).toFixed(2) + ' €',
-        53,
-        (y += bigGap),
-        {
-          align: 'right',
-        }
-      )
+      if (this.isTvaActive) {
+        doc.setFontSize(8)
+        doc.text(
+          'Sous-total: ' + this.formatPrice(this.subtotalWithoutTva),
+          53,
+          (y += bigGap),
+          {
+            align: 'right',
+          }
+        )
+        doc.text(
+          'Dont TVA (20%): ' + this.formatPrice(this.tvaAmount),
+          53,
+          (y += bigGap),
+          {
+            align: 'right',
+          }
+        )
+      }
       doc.setFontSize(10)
       doc.setFont('courier', 'bold')
 
       doc.text(
-        'TOTAL TTC: ' + this.totalAmount.toFixed(2) + ' €',
+        `TOTAL${this.isTvaActive ? ' TTC' : '*'}: ` +
+          this.formatPrice(this.totalAmount),
         53,
         (y += bigGap),
         {
@@ -479,6 +513,19 @@ export default {
       doc.text('Made with smarteat.fr ', center, (y += bigGap), {
         align: 'center',
       })
+
+      if (!this.isTvaActive) {
+        doc.setFontSize(6)
+        doc.text(
+          '* TVA non applicable, exoneree de TVA',
+          center,
+          (y += bigGap),
+          {
+            align: 'center',
+          }
+        )
+        doc.setFontSize(8)
+      }
 
       const blob = doc.output('blob')
       this.urlPDF = URL.createObjectURL(blob)

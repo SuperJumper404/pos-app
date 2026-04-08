@@ -93,6 +93,13 @@ export const actions = {
             root: true,
           }
         )
+        dispatch(
+          'shop/set/activate_tva',
+          response.data.data.shopInfo[0].activate_tva,
+          {
+            root: true,
+          }
+        )
 
         return true
       })
