@@ -23,8 +23,8 @@ export default {
     //subFolders: false
   },
   head: {
-    titleTemplate: '%s - pos-app',
-    title: 'pos-app',
+    titleTemplate: 'Smart Eat',
+    title: 'Smart Eat',
     htmlAttrs: {
       lang: 'en',
     },
@@ -33,7 +33,7 @@ export default {
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { hid: 'description', name: 'description', content: '' },
     ],
-    link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }],
+    link: [{ rel: 'icon', type: 'image/x-icon', href: '/logo.png' }],
   },
   css: [
     '~/assets/css/styles',
