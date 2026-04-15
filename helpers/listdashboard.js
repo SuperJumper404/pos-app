@@ -52,6 +52,12 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-shape-plus',
+          title: 'Ajouter un nouvelle catégorie',
+          routeName: 'categories-newcategory',
+          isAdmin: false,
+        },
+        {
           icon: 'mdi-food',
           title: 'Menus',
           routeName: 'menus',
