@@ -43,11 +43,12 @@ jobs:
             cd "$APP_DIR"
 
             cat > .env.staging <<EOF
-            BUILD_ENV=staging
+            ENV=staging
             NODE_ENV=staging
             APP_PORT=3000
+            PORT=3000
+            HOST=0.0.0.0
             CONTAINER_NAME=frontend_smart_eat_staging
-            ENV=staging
             EOF
 
             docker compose --env-file .env.staging -f "$COMPOSE_FILE" down --remove-orphans || true

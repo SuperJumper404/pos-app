@@ -1,15 +1,14 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 const config = require('../config/config.json')
-console.log(config)
-console.log('HOST', getHost())
+
 function getHost() {
   const env = process.env.ENV
   const currentEnvConfig = config.environments[env]
   console.log(currentEnvConfig)
   return currentEnvConfig
 }
-
-console.log('Store env', process.env.privateURL)
+console.log(config)
+console.log('HOST', getHost())
 export const state = () => ({
   authenticated: false,
   staticURL: getHost().backEndPoint.replace(/\/+$/, ''),
