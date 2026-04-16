@@ -151,7 +151,7 @@
           <v-combobox
             v-model="formShop.shop_payment_methods"
             :items="AllPaymentsMethods"
-            label="Selectionner les moyens de paiements disponible"
+            label="Sélectionner les moyens de paiements disponible"
             multiple
             chips
           ></v-combobox>

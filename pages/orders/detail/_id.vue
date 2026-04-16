@@ -49,7 +49,7 @@
                       color: rgba(0, 0, 0, 0.8);
                     "
                   >
-                    {{ itm.subtotal }} €
+                    {{ itm.total }} €
                   </div>
                 </div>
               </v-col>

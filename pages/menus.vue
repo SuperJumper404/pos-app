@@ -284,8 +284,8 @@
               <div>
                 <!-- Condition for checkboxes -->
                 <template v-if="item.limit_choice > 1">
-                  <pre>item {{ item }}</pre>
-                  <pre>currentITem {{ currentItem }}</pre>
+                  <!-- <pre>item {{ item }}</pre>
+                  <pre>currentITem {{ currentItem }}</pre> -->
                   <div v-for="(choice, i) in item.items" :key="'checkbox-' + i">
                     <v-checkbox
                       v-model="currentItem[itemId]"
@@ -482,7 +482,7 @@ export default {
     rulesCheckboxes(value, mandatory) {
       // Check if the value length is 0 and the field is mandatory
       if (mandatory && (!value || value.length === 0)) {
-        return 'Selectionner au moins un choix'
+        return 'Sélectionner au moins un choix'
       }
       return true
     },
