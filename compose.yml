@@ -2,6 +2,7 @@ services:
   pos-app:
     container_name: ${CONTAINER_NAME:-frontend_smart_eat}
     image: node:18-bullseye-slim
+    user: "${UID:-1000}:${GID:-118}"
     working_dir: /app
     restart: unless-stopped
     ports:
@@ -11,6 +12,8 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       HOST: ${HOST:-0.0.0.0}
       PORT: ${PORT:-3000}
+      HOME: /tmp
+      NPM_CONFIG_CACHE: /tmp/.npm
     volumes:
       - ./:/app
       - pos_app_node_modules:/app/node_modules
