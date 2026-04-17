@@ -18,7 +18,10 @@ services:
       - ./:/app
       - pos_app_node_modules:/app/node_modules
     command: >
-      sh -c "node serve-dist-folder.js"
+      sh -c "npm ci
+      && npm run generate
+      && node serve-dist-folder.js"
+
 
 volumes:
   pos_app_node_modules:

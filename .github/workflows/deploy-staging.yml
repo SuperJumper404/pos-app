@@ -53,9 +53,6 @@ jobs:
 
 
 
-            npm ci
-            npm run generate
-
             docker compose --env-file .env.staging -f "$COMPOSE_FILE" down --remove-orphans || true
             docker compose --env-file .env.staging -f "$COMPOSE_FILE" up -d --force-recreate
 
