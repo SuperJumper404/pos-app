@@ -51,8 +51,7 @@ jobs:
             CONTAINER_NAME=frontend_smart_eat_production
             EOF
 
-            export UID=$(id -u)
-            export GID=$(id -g)
+
 
             npm ci
             npm run generate
