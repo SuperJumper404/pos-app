@@ -2,7 +2,6 @@ services:
   pos-app:
     container_name: ${CONTAINER_NAME:-frontend_smart_eat}
     image: node:18-bullseye-slim
-    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-118}"
     working_dir: /app
     restart: unless-stopped
     ports:
@@ -20,6 +19,7 @@ services:
     command: >
       sh -c "npm ci --include=dev
       && npm run generate
+      && chown -R ${LOCAL_UID:-1000}:${LOCAL_GID:-118} /app/dist
       && node serve-dist-folder.js"
 
 
