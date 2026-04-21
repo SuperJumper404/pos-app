@@ -7,8 +7,8 @@
     },
     "network": {
       "name": "environments network",
-      "frontEndPoint": "192.168.1.139",
-      "backEndPoint": "http://192.168.1.139:5005"
+      "frontEndPoint": "192.168.1.128",
+      "backEndPoint": "http://192.168.1.128:5005"
     },
     "staging": {
       "name": "environments staging",

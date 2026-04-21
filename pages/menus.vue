@@ -39,14 +39,16 @@
                     <v-card
                       hover
                       outlined
-                      class="d-flex flex-column"
+                      class="d-flex flex-column product-clickable"
                       height="300"
+                      @click="openProductPreview(items)"
                     >
                       <!-- Image 5/4 -->
                       <v-img
                         :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
                         aspect-ratio="5/4"
                         class="rounded-t"
+                        @click.stop="openProductPreview(items)"
                       />
 
                       <!-- Title -->
@@ -80,7 +82,7 @@
                           small
                           block
                           class="text-none font-weight-bold"
-                          @click="addToCart(items)"
+                          @click.stop="addToCart(items)"
                         >
                           <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
                           Ajouter
@@ -264,6 +266,52 @@
       </v-col>
     </v-row>
 
+    <v-dialog v-model="previewDialog" max-width="620">
+      <v-card v-if="previewItem" class="product-preview-card">
+        <v-btn
+          class="product-preview-close"
+          color="white"
+          elevation="3"
+          fab
+          small
+          aria-label="Fermer"
+          @click="closeProductPreview"
+        >
+          <v-icon color="grey darken-3">mdi-close</v-icon>
+        </v-btn>
+
+        <v-img
+          :src="`${staticURL}/api/v1/imgproducts/${previewItem.image}`"
+          max-height="420"
+          contain
+          class="grey lighten-4"
+        />
+
+        <v-card-text class="pt-4">
+          <div class="text-h6 font-weight-bold mb-2">
+            {{ previewItem.name }}
+          </div>
+          <div class="text-body-2 text--secondary mb-3">
+            {{ previewItem.description }}
+          </div>
+          <div class="text-h6 font-weight-bold">
+            {{ conversiRp(previewItem.price) }} €
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="justify-center px-4 py-4">
+          <v-btn
+            color="success"
+            class="text-none font-weight-bold"
+            @click="addPreviewItemToCart"
+          >
+            <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
+            Ajouter
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="itemDialog" max-width="350">
       <v-form ref="formItem">
         <v-card>
@@ -371,6 +419,8 @@ export default {
   middleware: 'auth',
   data: () => ({
     itemDialog: false,
+    previewDialog: false,
+    previewItem: null,
     selectedItem: [],
     currentItem: [],
     // config: config,
@@ -440,6 +490,20 @@ export default {
   },
 
   methods: {
+    openProductPreview(item) {
+      this.previewItem = item
+      this.previewDialog = true
+    },
+    closeProductPreview() {
+      this.previewDialog = false
+    },
+    addPreviewItemToCart() {
+      if (!this.previewItem) return
+
+      const item = this.previewItem
+      this.previewDialog = false
+      this.addToCart(item)
+    },
     resetForm() {
       if (this.$refs.formItem) {
         this.$refs.formItem.resetValidation()
@@ -644,5 +708,20 @@ export default {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.product-clickable {
+  cursor: pointer;
+}
+
+.product-preview-card {
+  position: relative;
+}
+
+.product-preview-close {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 2;
 }
 </style>
