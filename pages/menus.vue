@@ -40,14 +40,15 @@
                       hover
                       outlined
                       class="d-flex flex-column product-clickable"
-                      height="300"
+                      height="320"
                       @click="openProductPreview(items)"
                     >
                       <!-- Image 5/4 -->
                       <v-img
-                        :src="`${staticURL}/api/v1/imgproducts/${items.image}`"
-                        aspect-ratio="5/4"
-                        class="rounded-t"
+                        :src="productImageSrc(items.image)"
+                        height="150"
+                        aspect-ratio="1.25"
+                        class="product-card-image rounded-t"
                         @click.stop="openProductPreview(items)"
                       />
 
@@ -62,7 +63,7 @@
                       </v-card-title>
 
                       <!-- Text -->
-                      <v-card-text class="pt-0 mb-0 pb-1">
+                      <v-card-text class="product-card-content pt-0 mb-0 pb-1">
                         <div class="text--secondary line-clamp-2">
                           {{ items.description }}
                         </div>
@@ -177,7 +178,7 @@
                     <v-avatar size="75" rounded tile class="mr-3">
                       <v-img
                         class="rounded-lg"
-                        :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                        :src="productImageSrc(itm.image)"
                       />
                     </v-avatar>
 
@@ -281,7 +282,7 @@
         </v-btn>
 
         <v-img
-          :src="`${staticURL}/api/v1/imgproducts/${previewItem.image}`"
+          :src="productImageSrc(previewItem.image)"
           max-height="420"
           contain
           class="grey lighten-4"
@@ -496,6 +497,10 @@ export default {
     },
     closeProductPreview() {
       this.previewDialog = false
+    },
+    productImageSrc(image) {
+      const fileName = image || 'default.png'
+      return `${this.staticURL}/api/v1/imgproducts/${fileName}`
     },
     addPreviewItemToCart() {
       if (!this.previewItem) return
@@ -712,6 +717,19 @@ export default {
 
 .product-clickable {
   cursor: pointer;
+}
+
+.product-card-image {
+  flex: 0 0 150px;
+}
+
+.product-card-image ::v-deep .v-image__image {
+  background-size: cover;
+  background-position: center;
+}
+
+.product-card-content {
+  min-height: 76px;
 }
 
 .product-preview-card {
