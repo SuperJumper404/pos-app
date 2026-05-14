@@ -69,7 +69,7 @@
                         </div>
 
                         <div class="product-card-price font-weight-bold">
-                          {{ conversiRp(items.price) }} €
+                          {{ formatCurrency(items.price) }}
                         </div>
                       </v-card-text>
 
@@ -123,7 +123,7 @@
                       <span
                         class="mb-2"
                         style="font-weight: bold; font-size: medium"
-                        >{{ conversiRp(items.price) }} €</span
+                        >{{ formatCurrency(items.price) }}</span
                       >
                     </v-card-text>
                     <v-card-actions>
@@ -190,7 +190,7 @@
                         class="font-weight-bold"
                         style="color: rgba(0, 0, 0, 0.8)"
                       >
-                        {{ itm.price }} €
+                        {{ formatCurrency(itm.price) }}
                       </div>
                     </div>
                   </v-col>
@@ -293,7 +293,7 @@
             {{ previewItem.description }}
           </div>
           <div class="text-h6 font-weight-bold">
-            {{ conversiRp(previewItem.price) }} €
+            {{ formatCurrency(previewItem.price) }}
           </div>
         </v-card-text>
 
@@ -339,7 +339,7 @@
                       multiple
                       :label="
                         choice.price > 0
-                          ? `${choice.name} (+${choice.price}€)`
+                          ? `${choice.name} (+${formatCurrency(choice.price)})`
                           : `${choice.name}`
                       "
                       :disabled="
@@ -366,7 +366,7 @@
                     :key="'radio-' + i"
                     :label="
                       choice.price > 0
-                        ? `${choice.name} (+${choice.price}€)`
+                        ? `${choice.name} (+${formatCurrency(choice.price)})`
                         : choice.name
                     "
                     :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
@@ -522,12 +522,16 @@ export default {
 
       const customizationList = [].concat(...this.currentItem)
       const customizationPrice = customizationList.reduce((acc, item) => {
-        if (item && item.price) acc += item.price
+        if (item && item.price) {
+          return this.roundPrice(acc + this.parsePrice(item.price))
+        }
         return acc
       }, 0)
       console.log('CustimzationPrice', customizationPrice)
       console.log('customisation List', customizationList)
-      const price = this.selectedItem.price + customizationPrice
+      const price = this.roundPrice(
+        this.parsePrice(this.selectedItem.price) + customizationPrice
+      )
       const newData = {
         id: this.selectedItem.id,
         name: this.selectedItem.name,
@@ -535,7 +539,7 @@ export default {
         image: this.selectedItem.image,
         stock: this.selectedItem.stock,
         price,
-        subtotal: 1 * price,
+        subtotal: price,
         qty: 1,
         customizationList,
       }
@@ -576,11 +580,10 @@ export default {
       })
     },
     totalPrice() {
-      this.total = 0
-      this.cartItem.forEach((el) => {
-        this.total = this.total + el.subtotal
-        this.$store.dispatch('cart/setTotal', this.total)
-      })
+      this.total = this.cartItem.reduce((sum, el) => {
+        return this.roundPrice(sum + this.parsePrice(el.subtotal))
+      }, 0)
+      this.$store.dispatch('cart/setTotal', this.total)
     },
     indexCart() {
       this.idxCart = 0
@@ -616,9 +619,10 @@ export default {
         if (existingIndex !== -1) {
           // Si l’item est déjà dans le panier, on augmente juste la quantité
           this.cartItem[existingIndex].qty += 1
-          this.cartItem[existingIndex].subtotal =
+          this.cartItem[existingIndex].subtotal = this.roundPrice(
             this.cartItem[existingIndex].qty *
-            this.cartItem[existingIndex].price
+              this.parsePrice(this.cartItem[existingIndex].price)
+          )
         } else {
           // Sinon on l’ajoute
           const newData = {
@@ -627,8 +631,8 @@ export default {
             categoryid: params.categoryid,
             image: params.image,
             stock: params.stock,
-            price: params.price,
-            subtotal: params.price,
+            price: this.roundPrice(params.price),
+            subtotal: this.roundPrice(params.price),
             qty: 1,
           }
           this.cartItem = [...this.cartItem, newData]
@@ -648,7 +652,7 @@ export default {
         this.cartItem.splice(index, 1)
       } else {
         item.qty -= 1
-        item.subtotal = item.qty * item.price
+        item.subtotal = this.roundPrice(item.qty * this.parsePrice(item.price))
       }
 
       this.totalPrice()
@@ -657,8 +661,9 @@ export default {
     plusBtn(params, index) {
       console.log('Index Plus Btn', index, params)
       this.cartItem[index].qty += 1
-      this.cartItem[index].subtotal =
-        this.cartItem[index].qty * this.cartItem[index].price
+      this.cartItem[index].subtotal = this.roundPrice(
+        this.cartItem[index].qty * this.parsePrice(this.cartItem[index].price)
+      )
       // this.cartItem.forEach((e) => {
       //   if (e.id === params.id) {
       //     e.qty += 1

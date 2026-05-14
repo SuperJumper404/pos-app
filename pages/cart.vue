@@ -38,7 +38,7 @@
                       class="font-weight-bold"
                       style="color: rgba(0, 0, 0, 0.8)"
                     >
-                      {{ itm.price }} €
+                      {{ formatCurrency(itm.price) }}
                     </div>
                   </div>
                 </v-col>
@@ -140,7 +140,7 @@
             <v-card-title>
               <h5>Total</h5>
               <v-spacer></v-spacer>
-              <h5>{{ conversiRp(total) }} €</h5>
+              <h5>{{ formatCurrency(total) }}</h5>
             </v-card-title>
             <v-card-text> </v-card-text>
             <v-card-actions>
@@ -181,12 +181,12 @@ export default {
     Loading,
   },
   mixins: [price],
-  middleware: 'auth',
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
       : 'clientside'
   },
+  middleware: 'auth',
   data: () => ({
     ppn: 0,
     total: 0,
@@ -239,7 +239,7 @@ export default {
       const params = {
         customer: this.formuser.customer,
         customerID: this.selectedTable,
-        subtotal: this.total,
+        subtotal: this.roundPrice(this.total),
         payment: this.formuser.payment,
         remark: this.formuser.notes,
         phone: this.formuser.phone,
@@ -253,9 +253,9 @@ export default {
           const detailData = {
             orderid: this.insertId,
             productid: e.id,
-            price: e.price,
+            price: this.roundPrice(e.price),
             qty: e.qty,
-            total: e.qty * e.price,
+            total: this.roundPrice(e.qty * this.parsePrice(e.price)),
             remark: 'Transaction',
             customizationList: e.customizationList,
             operator: 2,

@@ -47,8 +47,9 @@
           <br />
           <v-text-field
             v-model="formeditproduct.price"
-            label="Prix HT"
+            label="Prix TTC"
             type="number"
+            step="0.01"
             class="d-inline-flex"
             append-outer-icon="mdi-currency-eur"
             :rules="[(v) => !!v || 'Price required']"
@@ -168,10 +169,12 @@
 </template>
 <script>
 import Loading from '@/components/loading'
+import price from '@/helpers/price'
 export default {
   components: {
     Loading,
   },
+  mixins: [price],
 
   middleware: 'auth',
   data() {
@@ -274,7 +277,7 @@ export default {
 
         if (match) {
           const name = match[1].trim()
-          const price = parseFloat(match[2].replace(',', '.')) // Convert , to . if needed
+          const price = this.roundPrice(match[2])
 
           // Replace the last string item with an object
           this.formeditproduct.product_customization[index].items.splice(
@@ -301,7 +304,7 @@ export default {
     displayItem(item) {
       // Check if price is present and not zero to display it.
       return item.price && item.price !== 0
-        ? `${item.name} (+${item.price}€)`
+        ? `${item.name} (+${this.formatCurrency(item.price)})`
         : item.name
     },
     addCustomization() {
@@ -332,9 +335,22 @@ export default {
     // },
     async submitEditProduct() {
       this.loadingBtn = true
+      const data = {
+        ...this.formeditproduct,
+        price: this.roundPrice(this.formeditproduct.price),
+        product_customization: this.formeditproduct.product_customization.map(
+          (customization) => ({
+            ...customization,
+            items: (customization.items || []).map((item) => ({
+              ...item,
+              price: this.roundPrice(item.price),
+            })),
+          })
+        ),
+      }
       const res = await this.$store.dispatch('products/updateProduct', {
         id: this.id,
-        data: this.formeditproduct,
+        data,
       })
       if (res) {
         this.stsMsg = true

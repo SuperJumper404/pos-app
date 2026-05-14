@@ -36,8 +36,9 @@
 
           <v-text-field
             v-model="formproduct.price"
-            label="Prix HT"
+            label="Prix TTC"
             type="number"
+            step="0.01"
             append-outer-icon="mdi-currency-eur"
             :rules="[(v) => !!v || 'Le prix du produit est requis']"
             placeholder="Saisir le prix du produit"
@@ -151,9 +152,10 @@
   </v-container>
 </template>
 <script>
+import price from '@/helpers/price'
 export default {
   components: {},
-  mixins: [],
+  mixins: [price],
   middleware: 'auth',
   data: () => ({
     productImg: null,
@@ -201,7 +203,7 @@ export default {
 
         if (match) {
           const name = match[1].trim()
-          const price = parseFloat(match[2].replace(',', '.')) // Convert , to . if needed
+          const price = this.roundPrice(match[2])
 
           // Replace the last string item with an object
           this.formproduct.product_customization[index].items.splice(-1, 1, {
@@ -220,7 +222,7 @@ export default {
     displayItem(item) {
       // Check if price is present and not zero to display it.
       return item.price && item.price !== 0
-        ? `${item.name} (+${item.price}€)`
+        ? `${item.name} (+${this.formatCurrency(item.price)})`
         : item.name
     },
     addCustomization() {
@@ -236,7 +238,7 @@ export default {
       const fd = new FormData()
       fd.append('name', this.formproduct.name)
       fd.append('stock', this.formproduct.stock)
-      fd.append('price', this.formproduct.price)
+      fd.append('price', this.roundPrice(this.formproduct.price))
       fd.append('categoryid', this.formproduct.categoryid)
       fd.append('image', this.formproduct.image)
       fd.append('description', this.formproduct.description)
