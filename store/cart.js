@@ -83,6 +83,9 @@ export const actions = {
         dispatch('set/insertId', response.data.data.insertId)
         commit('ADD_ORDER_SENT', response.data.data.insertId)
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Commande envoyée avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {
@@ -100,6 +103,9 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Détail de commande ajouté.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {

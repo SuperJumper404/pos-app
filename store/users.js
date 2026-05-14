@@ -20,6 +20,7 @@ export const actions = {
       .post('/baseurl/api/v1/register', params)
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', response.data.message, { root: true })
         return true
       })
       .catch((error) => {
@@ -41,6 +42,7 @@ export const actions = {
         dispatch('set/user.token', response.data.data[0].token)
         dispatch('set/user.shopid', response.data.data[0].shopid)
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', response.data.message, { root: true })
         return true
       })
       .catch((error) => {
@@ -72,6 +74,7 @@ export const actions = {
         dispatch('set/message', response.data.message)
         dispatch('set/alertSuccess', true)
         dispatch('set/user.shopid', null)
+        dispatch('notifications/success', response.data.message, { root: true })
         return true
       })
       .catch((error) => {

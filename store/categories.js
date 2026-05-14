@@ -54,6 +54,9 @@ export const actions = {
       .then((response) => {
         console.log('Response postCategory', response)
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Catégorie créée avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {
@@ -71,6 +74,9 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Catégorie mise à jour avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {
@@ -87,6 +93,9 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Catégorie supprimée avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {

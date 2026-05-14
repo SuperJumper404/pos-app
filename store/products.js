@@ -51,6 +51,9 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Produit créé avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {
@@ -67,6 +70,9 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Produit mis à jour avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {
@@ -83,6 +89,7 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch('notifications/success', response.data.message, { root: true })
         return true
       })
       .catch((error) => {

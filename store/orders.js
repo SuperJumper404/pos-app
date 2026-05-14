@@ -92,8 +92,9 @@ export const actions = {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
       })
-      .then(() => {
-        // dispatch('set/message', response.data.message)
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        dispatch('notifications/success', response.data.message, { root: true })
         return true
       })
       .catch((error) => {
@@ -112,7 +113,11 @@ export const actions = {
           },
         }
       )
-      .then(() => {
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Commande supprimée avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {
@@ -132,7 +137,11 @@ export const actions = {
           },
         }
       )
-      .then(() => {
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Commande archivée avec succès.', {
+          root: true,
+        })
         return true
       })
       .catch((error) => {

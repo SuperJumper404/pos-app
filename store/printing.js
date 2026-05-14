@@ -2,6 +2,7 @@ import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 export const state = () => ({
   dataXMLformatToPrint: '',
   ticketType: '',
+  message: '',
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
@@ -15,11 +16,13 @@ export const actions = {
       })
       .then((response) => {
         console.log('Printing Info received', response)
+        dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Impression envoyée.', { root: true })
         return true
       })
       .catch((error) => {
         console.log('Error Sending Printing Job', error)
-        dispatch('set/message', error.response)
+        dispatch('set/message', error.response && error.response.data.message)
         return false
       })
   },

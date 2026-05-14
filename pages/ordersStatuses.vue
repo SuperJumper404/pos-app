@@ -88,7 +88,7 @@
       outlined
       class="social-follow-card mt-5 pa-4 text-center"
     >
-      <div class="font-weight-bold mb-2">Suivre le restaurant</div>
+      <div class="font-weight-bold mb-2">Nous rejoindre</div>
       <div class="d-flex justify-center align-center flex-wrap">
         <v-btn
           v-for="social in socialLinks"

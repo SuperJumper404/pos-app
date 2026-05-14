@@ -97,6 +97,7 @@
       <nuxt />
       <!-- </v-container> -->
     </v-main>
+    <AppNotifications />
   </v-app>
 </template>
 <script>

@@ -114,6 +114,13 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/message', response.data.message)
+        dispatch(
+          'notifications/success',
+          'Paramètres de la boutique enregistrés.',
+          {
+            root: true,
+          }
+        )
         return true
       })
       .catch((error) => {
