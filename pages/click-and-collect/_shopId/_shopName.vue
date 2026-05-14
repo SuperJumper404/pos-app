@@ -12,10 +12,11 @@
       <div class="pr-0 pl-0 pt-0 pb-0">
         <v-col class="pr-0 pl-0 pt-0 pb-0">
           <v-img
-            :src="`${staticURL}/api/v1/imgprofile/${shopInfo.shop_profile_image}`"
-            height="70%"
+            :src="shopProfileImageSrc(shopInfo.shop_profile_image)"
+            height="220"
             position="relative"
-            class="rounded-lg"
+            class="shop-profile-image rounded-lg"
+            @error="shopProfileImageFailed = true"
           >
             <!-- Overlay -->
             <!-- <v-container
@@ -292,6 +293,7 @@ export default {
   data() {
     return {
       shop_identifier: '',
+      shopProfileImageFailed: false,
     }
   },
 
@@ -369,10 +371,20 @@ export default {
     //     this.generateCleanTicketPDF(size)
     //   })
   },
-  methods: {},
+  methods: {
+    shopProfileImageSrc(image) {
+      if (this.shopProfileImageFailed || !image) return '/logo.png'
+      return `${this.staticURL}/api/v1/imgprofile/${image}`
+    },
+  },
 }
 </script>
 <style>
+.shop-profile-image .v-image__image {
+  background-position: center;
+  background-size: cover;
+}
+
 .status-container {
   display: flex;
   align-items: center;

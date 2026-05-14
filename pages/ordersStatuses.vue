@@ -76,16 +76,35 @@
       </v-col>
     </v-row>
     <div v-if="dataOrdersFilteredByOrdersSent.length === 0">
-      <div
-        style="margin-top: 30px"
-        class="d-flex flex-column align-items-center"
-      >
+      <div style="margin-top: 30px" class="d-flex flex-column align-center">
         <v-icon size="90">mdi-room-service-outline</v-icon>
         <div class="font-weight-bold d-flex justify-center">
           Votre assiette est vide !
         </div>
       </div>
     </div>
+    <v-card
+      v-if="socialLinks.length > 0"
+      outlined
+      class="social-follow-card mt-5 pa-4 text-center"
+    >
+      <div class="font-weight-bold mb-2">Suivre le restaurant</div>
+      <div class="d-flex justify-center align-center flex-wrap">
+        <v-btn
+          v-for="social in socialLinks"
+          :key="social.name"
+          :href="social.url"
+          :aria-label="social.label"
+          :color="social.color"
+          class="mx-1"
+          icon
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <v-icon>{{ social.icon }}</v-icon>
+        </v-btn>
+      </div>
+    </v-card>
     <!-- <v-data-table
         :headers="headers"
         :items="dataOrders"
@@ -225,12 +244,49 @@ export default {
       console.log('filteredOrders', filteredOrders)
       return filteredOrders
     },
+    socialLinks() {
+      const socialMedia = this.$store.get('shop/shop_social_media') || {}
+      const links = [
+        {
+          name: 'instagram',
+          label: 'Instagram',
+          icon: 'mdi-instagram',
+          color: 'pink',
+          url: socialMedia.instagram,
+        },
+        {
+          name: 'facebook',
+          label: 'Facebook',
+          icon: 'mdi-facebook',
+          color: 'blue',
+          url: socialMedia.facebook,
+        },
+        {
+          name: 'tiktok',
+          label: 'TikTok',
+          icon: 'mdi-music-note',
+          color: 'black',
+          url: socialMedia.tiktok,
+        },
+        {
+          name: 'snapchat',
+          label: 'Snapchat',
+          icon: 'mdi-snapchat',
+          color: 'amber darken-2',
+          url: socialMedia.snapchat,
+        },
+      ]
+
+      return links.filter((link) => link.url)
+    },
   },
   mounted() {
     this.loadPage = true
     this.pollData()
     this.$store
-      .dispatch('orders/getOrdersByUserId', { userId: this.user.id })
+      .dispatch('orders/getOrdersByUserId', {
+        userId: this.user.id,
+      })
       .finally(() => {
         this.loadPage = false
       })
@@ -268,3 +324,8 @@ export default {
   // },
 }
 </script>
+<style scoped>
+.social-follow-card {
+  border-radius: 8px;
+}
+</style>

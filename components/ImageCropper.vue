@@ -44,11 +44,21 @@
         />
       </div>
     </client-only>
-    <div v-if="previewUrl">
-      <v-img :src="previewUrl" />
+    <div v-if="previewUrl" class="preview">
+      <v-img
+        :src="previewUrl"
+        :aspect-ratio="ratioLocal"
+        class="preview-image"
+        height="280"
+      />
     </div>
-    <div v-if="previewUrlLocal">
-      <v-img :src="previewUrlLocal" />
+    <div v-if="previewUrlLocal" class="preview">
+      <v-img
+        :src="previewUrlLocal"
+        :aspect-ratio="ratioLocal"
+        class="preview-image"
+        height="280"
+      />
     </div>
     <div v-if="src || previewUrlLocal" class="d-flex justify-center">
       <v-btn
@@ -195,11 +205,22 @@ export default {
   overflow: hidden;
 }
 
-.preview img {
+.preview {
   margin-top: 12px;
-  width: 280px;
-  border-radius: 12px;
+  padding: 0 12px;
 }
+
+.preview-image {
+  margin-top: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.preview-image ::v-deep .v-image__image {
+  background-position: center;
+  background-size: cover;
+}
+
 .placeholder {
   height: 100%;
   display: flex;

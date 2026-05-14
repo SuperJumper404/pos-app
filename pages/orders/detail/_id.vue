@@ -22,7 +22,9 @@
           class="mb-3 d-flex justify-space-between align-center pa-2"
         >
           <v-img
-            :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+            :src="productImageSrc(itm.image)"
+            class="order-detail-image"
+            height="96"
             max-width="120px"
           ></v-img>
           <!-- //TODO Faire en sorte que les colonnes soient bien alignées sur mobile -->
@@ -163,8 +165,8 @@
             <v-col class="d-flex align-center min-w-0">
               <v-avatar size="75" rounded tile class="mr-3">
                 <v-img
-                  class="rounded-lg"
-                  :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                  class="order-detail-avatar rounded-lg"
+                  :src="productImageSrc(itm.image)"
                 />
               </v-avatar>
 
@@ -292,5 +294,23 @@ export default {
       this.loadPage = false
     }
   },
+  methods: {
+    productImageSrc(image) {
+      const fileName = image || 'default.png'
+      return `${this.staticURL}/api/v1/imgproducts/${fileName}`
+    },
+  },
 }
 </script>
+<style scoped>
+.order-detail-image,
+.order-detail-avatar {
+  flex: 0 0 auto;
+}
+
+.order-detail-image ::v-deep .v-image__image,
+.order-detail-avatar ::v-deep .v-image__image {
+  background-position: center;
+  background-size: cover;
+}
+</style>

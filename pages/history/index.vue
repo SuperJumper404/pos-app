@@ -72,7 +72,9 @@
               class="mb-3 d-flex justify-space-evenly align-items-center pa-2"
             >
               <v-img
-                :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                :src="productImageSrc(itm.image)"
+                class="history-detail-image"
+                height="96"
                 max-width="120px"
               ></v-img>
               <v-divider vertical></v-divider>
@@ -295,6 +297,10 @@ export default {
   },
 
   methods: {
+    productImageSrc(image) {
+      const fileName = image || 'default.png'
+      return `${this.staticURL}/api/v1/imgproducts/${fileName}`
+    },
     getArchivedOrderDetailsByOrderId(id) {
       const result = this.dataAllDetailsArchivedOrders
         .flat()
@@ -323,3 +329,13 @@ export default {
   },
 }
 </script>
+<style scoped>
+.history-detail-image {
+  flex: 0 0 auto;
+}
+
+.history-detail-image ::v-deep .v-image__image {
+  background-position: center;
+  background-size: cover;
+}
+</style>
