@@ -67,7 +67,7 @@
           </div>
         </template>
         <template #[`item.subtotal`]="{ item }">
-          <div>{{ conversiRp(item.subtotal) }} €</div>
+          <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>

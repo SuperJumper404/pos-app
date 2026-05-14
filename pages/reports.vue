@@ -52,7 +52,7 @@
               <td>{{ item.ordernumber }}</td>
               <td>{{ item.customer }}</td>
               <td>{{ item.operator ? item.operator : '-' }}</td>
-              <td>{{ conversiRp(item.subtotal) }} €</td>
+              <td>{{ formatCurrency(item.subtotal) }}</td>
               <td>{{ item.payment }}</td>
               <td>{{ item.status === 1 ? 'Pending' : 'Approve' }}</td>
             </tr>

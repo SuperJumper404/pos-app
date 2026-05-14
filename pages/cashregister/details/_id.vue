@@ -26,7 +26,7 @@
         hide-default-headers
         :disable-sort="$vuetify.breakpoint.smAndDown"
       >
-        <template v-slot:expanded-item="{ item }">
+        <template #expanded-item="{ item }">
           <td colspan="12">
             <v-card
               v-for="(itm, i) in getOrderDetailsByOrderId(item.id)"
@@ -51,7 +51,7 @@
                   "
                 >
                   {{ itm.name }}<br />
-                  {{ itm.subtotal }} €
+                  {{ formatCurrency(itm.subtotal) }}
                 </h6>
 
                 <div v-if="itm.customizationList">
@@ -113,7 +113,7 @@
           </div>
         </template>
         <template #[`item.subtotal`]="{ item }">
-          <div>{{ conversiRp(item.subtotal) }} €</div>
+          <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
@@ -176,12 +176,12 @@ import moment from 'moment'
 
 export default {
   mixins: [formatdate, price],
-  middleware: 'auth',
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
       : 'clientside'
   },
+  middleware: 'auth',
   data() {
     return {
       loadPage: false,

@@ -51,7 +51,7 @@
                       color: rgba(0, 0, 0, 0.8);
                     "
                   >
-                    {{ itm.total }} €
+                    {{ formatCurrency(itm.total) }}
                   </div>
                 </div>
               </v-col>
@@ -118,13 +118,13 @@
         </v-card>
       </v-card>
       <v-alert
+        v-if="orderNote"
         class="my-4"
         outlined
         text
         type="info"
         transition="scroll-x-transition"
         border="left"
-        v-if="orderNote"
       >
         Notes : {{ orderNote }}
       </v-alert>
@@ -178,7 +178,7 @@
                   {{ itm.name }}
                 </div>
                 <div class="font-weight-bold" style="color: rgba(0, 0, 0, 0.8)">
-                  {{ itm.price }} €
+                  {{ formatCurrency(itm.price) }}
                 </div>
               </div>
             </v-col>
@@ -232,13 +232,13 @@
         </v-card>
       </v-card>
       <v-alert
+        v-if="orderNote"
         class="my-4"
         outlined
         text
         type="info"
         transition="scroll-x-transition"
         border="left"
-        v-if="orderNote"
       >
         Notes : {{ orderNote }}
       </v-alert>
@@ -258,12 +258,12 @@
 import price from '@/helpers/price'
 export default {
   mixins: [price],
-  middleware: 'auth',
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
       : 'clientside'
   },
+  middleware: 'auth',
   data() {
     return {
       id: this.$route.params.id,

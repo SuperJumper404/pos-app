@@ -56,7 +56,7 @@
             offset-y
             min-width="auto"
           >
-            <template v-slot:activator="{ on, attrs }">
+            <template #activator="{ on, attrs }">
               <v-text-field
                 v-model="from"
                 label="Date de début"
@@ -83,7 +83,7 @@
             offset-y
             min-width="auto"
           >
-            <template v-slot:activator="{ on, attrs }">
+            <template #activator="{ on, attrs }">
               <v-text-field
                 v-model="to"
                 label="Date de fin"
@@ -116,7 +116,9 @@
         <v-card outlined>
           <v-card-title>💰 Total Caisse</v-card-title>
           <v-card-text
-            ><strong>{{ metrics.totalRevenue }} €</strong></v-card-text
+            ><strong>{{
+              formatCurrency(metrics.totalRevenue)
+            }}</strong></v-card-text
           >
         </v-card>
       </v-col>
@@ -134,7 +136,9 @@
         <v-card outlined>
           <v-card-title>🧾 Ticket moyen</v-card-title>
           <v-card-text
-            ><strong>{{ metrics.averageOrder }} €</strong></v-card-text
+            ><strong>{{
+              formatCurrency(metrics.averageOrder)
+            }}</strong></v-card-text
           >
         </v-card>
       </v-col>
@@ -164,7 +168,11 @@
         dense
         :disable-sort="$vuetify.breakpoint.smAndDown"
         hide-default-footer
-      />
+      >
+        <template #[`item.amount`]="{ item }">
+          {{ formatCurrency(item.amount) }}
+        </template>
+      </v-data-table>
     </v-card>
 
     <!-- Produits -->
@@ -179,7 +187,11 @@
         :items="metrics.topProducts"
         dense
         hide-default-footer
-      />
+      >
+        <template #[`item.revenue`]="{ item }">
+          {{ formatCurrency(item.revenue) }}
+        </template>
+      </v-data-table>
     </v-card>
 
     <Loading v-if="loadPage && !accessUser" />
@@ -189,11 +201,12 @@
 <script>
 import listdashboard from '@/helpers/listdashboard'
 import Loading from '@/components/loading'
+import price from '@/helpers/price'
 export default {
   components: {
     Loading,
   },
-  mixins: [listdashboard],
+  mixins: [listdashboard, price],
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'

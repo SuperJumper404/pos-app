@@ -63,7 +63,7 @@
         single-expand
         :disable-sort="$vuetify.breakpoint.smAndDown"
       >
-        <template v-slot:expanded-item="{ item }">
+        <template #expanded-item="{ item }">
           <td colspan="12">
             <v-card
               v-for="(itm, i) in getArchivedOrderDetailsByOrderId(item.id)"
@@ -99,7 +99,7 @@
                       color: rgba(0, 0, 0, 0.8);
                     "
                   >
-                    {{ itm.price }} €
+                    {{ formatCurrency(itm.price) }}
                   </h6>
                 </div>
                 <div v-if="itm.customizationList">
@@ -148,7 +148,7 @@
           </div>
         </template>
         <template #[`item.subtotal`]="{ item }">
-          <div>{{ conversiRp(item.subtotal) }} €</div>
+          <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>

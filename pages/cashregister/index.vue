@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <v-row cols v-if="isLoaded == true">
+    <v-row v-if="isLoaded == true" cols>
       <v-card
         v-for="table in tableGlobalData"
         :key="table.tableId"
@@ -59,9 +59,9 @@
             :items="table.customerTotals"
             item-key="customer"
             show-select
-            @item-selected="selectionHandler(table.tableName)"
             :hide-default-footer="true"
             :disable-sort="$vuetify.breakpoint.smAndDown"
+            @item-selected="selectionHandler(table.tableName)"
           >
             <template #[`item.created`]="{ item }">
               <div>
@@ -69,7 +69,7 @@
               </div>
             </template>
             <template #[`item.sum_amount`]="{ item }">
-              <div>{{ conversiRp(item.sum_amount) }} €</div>
+              <div>{{ formatCurrency(item.sum_amount) }}</div>
             </template>
             <!-- <template #[`item.status`]="{ item }">
               <v-chip v-if="item.status === 1" color="grey">
@@ -90,7 +90,9 @@
 
         <v-divider class="mx-4 mb-1"></v-divider>
 
-        <v-card-title>Total: {{ table.totalPerTable }}€</v-card-title>
+        <v-card-title
+          >Total: {{ formatCurrency(table.totalPerTable) }}</v-card-title
+        >
 
         <div class="px-4">
           <!-- <v-chip-group v-model="selection">

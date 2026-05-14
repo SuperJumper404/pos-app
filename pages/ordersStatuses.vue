@@ -30,7 +30,7 @@
             </div>
 
             <div class="mb-1 black--text">
-              Total : <b>{{ conversiRp(item.subtotal) }} €</b>
+              Total : <b>{{ formatCurrency(item.subtotal) }}</b>
             </div>
 
             <div class="mb-1 black--text">
@@ -117,7 +117,7 @@
           </div>
         </template>
         <template #[`item.subtotal`]="{ item }">
-          <div>{{ conversiRp(item.subtotal) }} €</div>
+          <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
@@ -170,12 +170,12 @@ import moment from 'moment'
 
 export default {
   mixins: [formatdate, price],
-  middleware: 'auth',
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
       : 'clientside'
   },
+  middleware: 'auth',
   data() {
     return {
       loadPage: false,

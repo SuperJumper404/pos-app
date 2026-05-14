@@ -46,7 +46,9 @@
               {{ items.name }}
             </p>
             <p class="mr-4" style="flex: 1">{{ items.category }}</p>
-            <p class="mr-4" style="flex: 1">{{ conversiRp(items.price) }} €</p>
+            <p class="mr-4" style="flex: 1">
+              {{ formatCurrency(items.price) }}
+            </p>
             <p class="mr-4" style="flex: 1">Stock: {{ items.stock }}</p>
           </v-card-text>
 
@@ -112,7 +114,7 @@
           <v-card-text>
             <p class="font-weight-bold">{{ itm.name }}</p>
             <p>{{ itm.category }}</p>
-            <p>{{ conversiRp(itm.price) }} €</p>
+            <p>{{ formatCurrency(itm.price) }}</p>
             <p>Stock: {{ itm.stock }}</p>
           </v-card-text>
           <v-card-actions class="d-md-flex">
