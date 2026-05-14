@@ -247,7 +247,10 @@ export default {
         table: order.username,
         client: order.customer,
         created: order.created,
-        total: orderDetails.reduce((sum, item) => sum + item.total, 0),
+        total: orderDetails.reduce(
+          (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
+          0
+        ),
         paymentMethod: order.payment,
         remark: order.remark,
       }
@@ -457,7 +460,7 @@ export default {
       order.forEach((item) => {
         const qty = (item.qty + 'x').padEnd(5)
         const name = (item.name + '').padEnd(20).slice(0, 20)
-        const price = item.total.toFixed(2).padStart(7)
+        const price = this.formatTicketNumber(item.total).padStart(7)
 
         push(alignLeft(), esc(`${qty}${name}${price} `), euroSymbol, esc('\n'))
         if (item.customizationList && Array.isArray(item.customizationList)) {
@@ -477,23 +480,11 @@ export default {
       // ---------------------------------------
       // 🧾 TOTAUX
       // ---------------------------------------
-      // const subtotal = (this.totalAmount - this.totalAmount * 0.2).toFixed(2)
-      // const tva = (this.totalAmount * 0.2).toFixed(2)
-
-      // push(
-      //   alignRight(),
-      //   esc(`Sous-total : ${subtotal} `),
-      //   euroSymbol,
-      //   esc('\n')
-      // )
-      // push(alignRight(), esc(`TVA 20%    : ${tva} `), euroSymbol, esc('\n'))
-
-      // push(alignRight(), boldOn(), doubleOn())
       push(
         alignRight(),
         boldOn(),
         doubleOn(),
-        esc(`TOTAL : ${orderInfo.total.toFixed(2)} `),
+        esc(`TOTAL : ${this.formatTicketNumber(orderInfo.total)} `),
         euroSymbol,
         doubleOff(),
         boldOff(),
@@ -543,6 +534,9 @@ export default {
     },
     currentDate(date) {
       return moment(date).local().format('DD/MM/YYYY à HH:mm')
+    },
+    formatTicketNumber(value) {
+      return this.formatCurrency(value).replace(' €', '')
     },
 
     printReceiptCloud(order, shopInfo, orderInfo) {
@@ -594,7 +588,7 @@ export default {
           .map((item) => {
             const qty = (item.qty + 'x').padEnd(5)
             const name = (item.name + '').padEnd(20).slice(0, 20)
-            const price = item.total.toFixed(2).padStart(7)
+            const price = this.formatTicketNumber(item.total).padStart(7)
 
             let block =
               `<text em="true" align="left" >${qty}${name}${price} €</text>` +
@@ -618,7 +612,7 @@ export default {
         '<text>--------------------------------</text>' +
         '<feed line="1"/>' +
         '<text align="right" width="2" height="2">TOTAL : ' +
-        orderInfo.total.toFixed(2) +
+        this.formatTicketNumber(orderInfo.total) +
         ' €</text>' +
         '<feed line="2"/>' +
         '<text em="false"  width="1" height="1" >Paiement : ' +

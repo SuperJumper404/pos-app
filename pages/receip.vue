@@ -35,8 +35,10 @@
 import moment from 'moment'
 import { jsPDF as JSPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import price from '@/helpers/price'
 
 export default {
+  mixins: [price],
   layout: 'empty',
   data() {
     return {
@@ -71,16 +73,19 @@ export default {
       }
     },
     totalAmount() {
-      return this.detailArchivedOrder.reduce((sum, item) => sum + item.total, 0)
+      return this.detailArchivedOrder.reduce(
+        (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
+        0
+      )
     },
     isTvaActive() {
       return [true, 1, '1', 'true'].includes(this.shopInfo.activate_tva)
     },
     subtotalWithoutTva() {
-      return this.totalAmount - this.tvaAmount
+      return this.roundPrice(this.totalAmount / 1.2)
     },
     tvaAmount() {
-      return this.totalAmount * 0.2
+      return this.roundPrice(this.totalAmount - this.subtotalWithoutTva)
     },
   },
   mounted() {
@@ -99,7 +104,7 @@ export default {
   },
   methods: {
     formatPrice(value) {
-      return value.toFixed(2) + ' €'
+      return this.formatCurrency(value)
     },
 
     generateCleanTicketPDF(size) {
@@ -166,7 +171,7 @@ export default {
         body: items.map((order) => [
           order.qty.toString(),
           order.name,
-          order.total.toFixed(2) + ' €',
+          this.formatPrice(order.total),
         ]),
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' }, // Qté
@@ -183,7 +188,7 @@ export default {
       if (this.isTvaActive) {
         doc.setFontSize(8)
         doc.text(
-          'Sous-total: ' + this.formatPrice(this.subtotalWithoutTva),
+          'Sous-total HT: ' + this.formatPrice(this.subtotalWithoutTva),
           53,
           (y += bigGap),
           {
@@ -191,7 +196,7 @@ export default {
           }
         )
         doc.text(
-          'Dont TVA (20%): ' + this.formatPrice(this.tvaAmount),
+          'TVA (20%): ' + this.formatPrice(this.tvaAmount),
           53,
           (y += bigGap),
           {

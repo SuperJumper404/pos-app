@@ -48,13 +48,14 @@
 </template>
 <script>
 // import formatdate from '@/helpers/formatdate'
-// import price from '@/helpers/price'
+import price from '@/helpers/price'
 // import moment from 'moment'
 import moment from 'moment'
 import { jsPDF as JSPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 export default {
+  mixins: [price],
   data() {
     return {
       orderId: this.$route.params.id,
@@ -89,16 +90,19 @@ export default {
       }
     },
     totalAmount() {
-      return this.detailArchivedOrder.reduce((sum, item) => sum + item.total, 0)
+      return this.detailArchivedOrder.reduce(
+        (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
+        0
+      )
     },
     isTvaActive() {
       return [true, 1, '1', 'true'].includes(this.shopInfo.activate_tva)
     },
     subtotalWithoutTva() {
-      return this.totalAmount - this.tvaAmount
+      return this.roundPrice(this.totalAmount / 1.2)
     },
     tvaAmount() {
-      return this.totalAmount * 0.2
+      return this.roundPrice(this.totalAmount - this.subtotalWithoutTva)
     },
   },
   mounted() {
@@ -191,8 +195,8 @@ export default {
               item.qty +
               'x '.padEnd(5) +
               item.name.padEnd(20).slice(0, 20) +
-              item.total.toFixed(2).padStart(7) +
-              ' €</text><feed line="1"/>'
+              this.formatPrice(item.total).padStart(9) +
+              '</text><feed line="1"/>'
           )
           .join('') +
         '<text>--------------------------------</text>' +
@@ -238,7 +242,7 @@ export default {
       }
 
       return (
-        '<text align="right" >Sous-total : ' +
+        '<text align="right" >Sous-total HT : ' +
         this.formatPrice(this.subtotalWithoutTva) +
         '</text>' +
         '<feed line="1"/>' +
@@ -322,7 +326,7 @@ export default {
       this.detailArchivedOrder.forEach((item) => {
         const qty = (item.qty + 'x').padEnd(5)
         const name = (item.name + '').padEnd(20).slice(0, 20)
-        const price = item.total.toFixed(2).padStart(7)
+        const price = this.formatTicketNumber(item.total).padStart(7)
 
         push(alignLeft(), esc(`${qty}${name}${price} `), euroSymbol, esc('\n'))
       })
@@ -333,23 +337,28 @@ export default {
       // 🧾 TOTAUX
       // ---------------------------------------
       if (this.isTvaActive) {
-        const subtotal = this.subtotalWithoutTva.toFixed(2)
-        const tva = this.tvaAmount.toFixed(2)
+        const subtotal = this.formatTicketNumber(this.subtotalWithoutTva)
+        const tva = this.formatTicketNumber(this.tvaAmount)
 
         push(
           alignRight(),
-          esc(`Sous-total : ${subtotal} `),
+          esc(`Sous-total HT : ${subtotal} `),
           euroSymbol,
           esc('\n')
         )
-        push(alignRight(), esc(`TVA 20%    : ${tva} `), euroSymbol, esc('\n'))
+        push(
+          alignRight(),
+          esc(`TVA (20%)     : ${tva} `),
+          euroSymbol,
+          esc('\n')
+        )
       }
 
       push(alignRight(), boldOn(), doubleOn())
       push(
         esc(
-          `TOTAL${this.isTvaActive ? ' TTC' : '*'} : ${this.totalAmount.toFixed(
-            2
+          `TOTAL${this.isTvaActive ? ' TTC' : '*'} : ${this.formatTicketNumber(
+            this.totalAmount
           )} `
         ),
         euroSymbol,
@@ -380,7 +389,11 @@ export default {
     },
 
     formatPrice(value) {
-      return value.toFixed(2) + ' €'
+      return this.formatCurrency(value)
+    },
+
+    formatTicketNumber(value) {
+      return this.formatPrice(value).replace(' €', '')
     },
 
     generateCleanTicketPDF(size) {
@@ -447,7 +460,7 @@ export default {
         body: items.map((order) => [
           order.qty.toString(),
           order.name,
-          order.total.toFixed(2) + ' €',
+          this.formatPrice(order.total),
         ]),
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' }, // Qté
@@ -464,7 +477,7 @@ export default {
       if (this.isTvaActive) {
         doc.setFontSize(8)
         doc.text(
-          'Sous-total: ' + this.formatPrice(this.subtotalWithoutTva),
+          'Sous-total HT: ' + this.formatPrice(this.subtotalWithoutTva),
           53,
           (y += bigGap),
           {
@@ -472,7 +485,7 @@ export default {
           }
         )
         doc.text(
-          'Dont TVA (20%): ' + this.formatPrice(this.tvaAmount),
+          'TVA (20%): ' + this.formatPrice(this.tvaAmount),
           53,
           (y += bigGap),
           {
