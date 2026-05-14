@@ -22,8 +22,8 @@
                 <v-col class="d-flex align-center">
                   <v-avatar size="75" rounded tile class="mr-3">
                     <v-img
-                      class="rounded-lg"
-                      :src="`${staticURL}/api/v1/imgproducts/${itm.image}`"
+                      class="cart-item-image rounded-lg"
+                      :src="productImageSrc(itm.image)"
                     />
                   </v-avatar>
 
@@ -231,6 +231,10 @@ export default {
     this.total = this.totalCart
   },
   methods: {
+    productImageSrc(image) {
+      const fileName = image || 'default.png'
+      return `${this.staticURL}/api/v1/imgproducts/${fileName}`
+    },
     async paymentBtn() {
       const params = {
         customer: this.formuser.customer,
@@ -282,3 +286,9 @@ export default {
   },
 }
 </script>
+<style scoped>
+.cart-item-image ::v-deep .v-image__image {
+  background-position: center;
+  background-size: cover;
+}
+</style>

@@ -34,11 +34,9 @@
           class="pa-2 d-md-flex d-sm-none d-none justify-space-between ma-3"
         >
           <v-img
-            :src="
-              items.image
-                ? `${staticurl}/api/v1/imgproducts/${items.image}`
-                : `${staticurl}/api/v1/imgproducts/default.png`
-            "
+            :src="productImageSrc(items.image)"
+            class="product-list-image"
+            height="96"
             width="120"
           ></v-img>
           <v-card-text
@@ -106,11 +104,9 @@
           class="pa-2 d-block d-sm-block d-md-none ma-5"
         >
           <v-img
-            :src="
-              itm.image
-                ? `${staticurl}/api/v1/imgproducts/${itm.image}`
-                : `${staticurl}/api/v1/imgproducts/default.png`
-            "
+            :src="productImageSrc(itm.image)"
+            class="product-mobile-image"
+            height="180"
             width="100%"
           ></v-img>
           <v-card-text>
@@ -125,7 +121,7 @@
               <v-btn
                 color="primary"
                 class="text-none"
-                @click="$router.push(`/products/edit/${items.id}`)"
+                @click="$router.push(`/products/edit/${itm.id}`)"
               >
                 Modifier <v-icon small right>mdi-pencil</v-icon>
               </v-btn>
@@ -134,9 +130,7 @@
                 color="red darken-1"
                 dark
                 class="text-none"
-                @click="
-                  $router.push(`/products/delete/${items.id}?modals=true`)
-                "
+                @click="$router.push(`/products/delete/${itm.id}?modals=true`)"
               >
                 Supprimer <v-icon small right>mdi-trash-can</v-icon>
               </v-btn>
@@ -204,9 +198,25 @@ export default {
     })
   },
   methods: {
+    productImageSrc(image) {
+      const fileName = image || 'default.png'
+      return `${this.staticurl}/api/v1/imgproducts/${fileName}`
+    },
     pageProduct() {
       this.$store.dispatch('products/getProducts')
     },
   },
 }
 </script>
+<style scoped>
+.product-list-image,
+.product-mobile-image {
+  flex: 0 0 auto;
+}
+
+.product-list-image ::v-deep .v-image__image,
+.product-mobile-image ::v-deep .v-image__image {
+  background-position: center;
+  background-size: cover;
+}
+</style>

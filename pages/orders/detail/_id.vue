@@ -122,9 +122,9 @@
         type="info"
         transition="scroll-x-transition"
         border="left"
-        v-if="detailOrder[0] !== undefined && detailOrder[0].remark !== null"
+        v-if="orderNote"
       >
-        Notes : {{ detailOrder[0].remark }}
+        Notes : {{ orderNote }}
       </v-alert>
       <v-card color="grey lighten-3" class="mt-5">
         <v-card-actions>
@@ -236,9 +236,9 @@
         type="info"
         transition="scroll-x-transition"
         border="left"
-        v-if="detailOrder[0] !== undefined && detailOrder[0].remark !== null"
+        v-if="orderNote"
       >
-        Notes : {{ detailOrder[0].remark }}
+        Notes : {{ orderNote }}
       </v-alert>
       <v-card color="grey lighten-3" class="mt-5">
         <v-card-actions>
@@ -278,6 +278,10 @@ export default {
     },
     detailOrder() {
       return this.$store.get('orders/detailOrder')
+    },
+    orderNote() {
+      const remark = this.detailOrder[0] && this.detailOrder[0].remark
+      return typeof remark === 'string' ? remark.trim() : ''
     },
   },
   async mounted() {

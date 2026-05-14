@@ -68,16 +68,13 @@
                           {{ items.description }}
                         </div>
 
-                        <div
-                          class="mt-2 font-weight-bold"
-                          style="font-size: medium"
-                        >
+                        <div class="product-card-price font-weight-bold">
                           {{ conversiRp(items.price) }} €
                         </div>
                       </v-card-text>
 
                       <!-- Actions always bottom -->
-                      <v-card-actions class="mt-auto px-4 pb-3">
+                      <v-card-actions class="px-4 pt-1 pb-3">
                         <v-btn
                           color="success"
                           small
@@ -710,6 +707,8 @@ export default {
 
 .line-clamp-2 {
   display: -webkit-box;
+  line-height: 1.35;
+  min-height: 2.7em;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -729,7 +728,15 @@ export default {
 }
 
 .product-card-content {
-  min-height: 76px;
+  min-height: 78px;
+}
+
+.product-card-price {
+  color: rgba(0, 0, 0, 0.9);
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 8px;
 }
 
 .product-preview-card {
