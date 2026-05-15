@@ -183,25 +183,13 @@
 
     <pre type="json">la{{ detailArchivedOrder }}</pre>
     <pre type="json">{{ dataArchivedOrders }}</pre> -->
-
-    <v-snackbars
-      :messages.sync="orderNotifications"
-      :timeout="60000"
-      top
-      right
-      color="blue"
-    ></v-snackbars>
   </v-container>
 </template>
 <script>
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
-import VSnackbars from 'v-snackbars'
 export default {
-  components: {
-    'v-snackbars': VSnackbars,
-  },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {
@@ -213,7 +201,6 @@ export default {
       dataAllDetailsArchivedOrders: [],
       lastUpdate: moment(new Date()),
       searchFilter: '',
-      orderNotifications: [],
       selectedOrders: [],
       headers: [
         { text: 'Date', value: 'created', filterable: true },

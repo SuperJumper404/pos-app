@@ -1,6 +1,7 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 
-const DEFAULT_TIMEOUT = 5000
+const DEFAULT_TIMEOUT = 6000
+const MAX_NOTIFICATIONS = 6
 
 export const state = () => ({
   items: [],
@@ -24,7 +25,10 @@ const buildNotification = (payload, type) => {
 export const actions = {
   push({ state, dispatch }, payload) {
     const notification = buildNotification(payload, payload.type || 'info')
-    dispatch('set/items', [...state.items, notification])
+    dispatch(
+      'set/items',
+      [...state.items, notification].slice(-MAX_NOTIFICATIONS)
+    )
     return notification.id
   },
   success({ dispatch }, payload) {
@@ -37,7 +41,6 @@ export const actions = {
     return dispatch('push', {
       ...(typeof payload === 'string' ? { message: payload } : payload),
       type: 'error',
-      timeout: 7000,
     })
   },
   warning({ dispatch }, payload) {

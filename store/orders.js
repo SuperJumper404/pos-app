@@ -115,9 +115,11 @@ export const actions = {
       )
       .then((response) => {
         dispatch('set/message', response.data.message)
-        dispatch('notifications/success', 'Commande supprimée avec succès.', {
-          root: true,
-        })
+        if (params.notify !== false) {
+          dispatch('notifications/success', 'Commande supprimée avec succès.', {
+            root: true,
+          })
+        }
         return true
       })
       .catch((error) => {

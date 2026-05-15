@@ -139,25 +139,13 @@
     </v-btn> -->
     <!-- <pre type="json">{{ lastUpdate }}</pre> -->
     <!-- <pre type="json">{{ selectedOrders }}</pre> -->
-
-    <v-snackbars
-      :messages.sync="orderNotifications"
-      :timeout="60000"
-      top
-      right
-      color="blue"
-    ></v-snackbars>
   </v-container>
 </template>
 <script>
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
-import VSnackbars from 'v-snackbars'
 export default {
-  components: {
-    'v-snackbars': VSnackbars,
-  },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {
@@ -168,7 +156,6 @@ export default {
       errMsg: false,
       lastUpdate: moment(new Date()),
       searchFilter: '',
-      orderNotifications: [],
       selectedOrders: [],
       headers: [
         { text: 'Date', value: 'created', filterable: true },
@@ -296,9 +283,10 @@ export default {
         this.$store.dispatch('orders/getAllOrder')
         const newOrders = this.numberOfNewOrders()
         if (newOrders) {
-          this.orderNotifications.push(
-            'Il y a ' + newOrders + ' nouvelles commandes ! '
-          )
+          this.$store.dispatch('notifications/info', {
+            message: 'Il y a ' + newOrders + ' nouvelles commandes ! ',
+            timeout: 6000,
+          })
           this.soundNotification()
         }
         this.lastUpdate = this.updateTimeStamp
@@ -317,12 +305,24 @@ export default {
 
       Promise.all(
         this.selectedOrders.map((element) =>
-          this.$store.dispatch('orders/deleteOrder', { id: element.id })
+          this.$store.dispatch('orders/deleteOrder', {
+            id: element.id,
+            notify: false,
+          })
         )
       )
-        .then(() => {
+        .then((results) => {
+          const deletedOrders = results.filter(Boolean).length
           this.selectedOrders = []
           this.deleteLoading = false
+          if (deletedOrders) {
+            this.$store.dispatch('notifications/success', {
+              message:
+                deletedOrders > 1
+                  ? `${deletedOrders} commandes supprimées avec succès.`
+                  : 'Commande supprimée avec succès.',
+            })
+          }
         })
         .finally(() => {
           this.$store.dispatch('orders/getAllOrder')

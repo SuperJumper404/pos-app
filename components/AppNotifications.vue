@@ -5,22 +5,34 @@
       :key="notification.id"
       :value="true"
       :timeout="notification.timeout"
-      :color="notificationColor(notification.type)"
-      :style="{ top: `${16 + index * 64}px` }"
-      top
+      :style="{ bottom: `${16 + index * 68}px` }"
+      bottom
       right
       app
+      transition="slide-y-transition"
+      :class="['app-notification', `app-notification--${notification.type}`]"
       @input="remove(notification.id)"
     >
-      <div class="d-flex align-center">
-        <v-icon class="mr-3" color="white">
+      <div class="app-notification-content">
+        <v-icon class="app-notification-icon" small>
           {{ notificationIcon(notification.type) }}
         </v-icon>
-        <span>{{ notification.message }}</span>
+        <span class="app-notification-message">
+          {{ notification.message }}
+        </span>
         <v-spacer></v-spacer>
-        <v-btn icon small @click="remove(notification.id)">
-          <v-icon color="white">mdi-close</v-icon>
+        <v-btn
+          icon
+          small
+          class="app-notification-close"
+          @click="remove(notification.id)"
+        >
+          <v-icon small>mdi-close</v-icon>
         </v-btn>
+        <div
+          class="app-notification-progress"
+          :style="{ animationDuration: `${notification.timeout}ms` }"
+        ></div>
       </div>
     </v-snackbar>
   </div>
@@ -38,16 +50,6 @@ export default {
     remove(id) {
       this.$store.dispatch('notifications/remove', id)
     },
-    notificationColor(type) {
-      const colors = {
-        success: 'success',
-        error: 'error',
-        warning: 'warning',
-        info: 'primary',
-      }
-
-      return colors[type] || colors.info
-    },
     notificationIcon(type) {
       const icons = {
         success: 'mdi-check-circle',
@@ -61,3 +63,146 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.app-notification ::v-deep .v-snack__wrapper {
+  background: #ffffff !important;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  box-shadow: 0 10px 18px rgba(24, 24, 27, 0.12);
+  color: #27272a;
+  max-width: calc(100vw - 48px);
+  min-height: 0;
+  overflow: hidden;
+  width: 356px;
+}
+
+.app-notification ::v-deep.v-snack {
+  bottom: auto !important;
+  left: auto !important;
+  position: fixed !important;
+  right: 16px !important;
+  top: auto !important;
+  z-index: 3000 !important;
+}
+
+.app-notification ::v-deep .v-snack__content {
+  min-height: 0;
+  padding: 12px !important;
+}
+
+.app-notification-content {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+  padding-bottom: 2px;
+  position: relative;
+  width: 100%;
+}
+
+.app-notification-icon {
+  align-items: center;
+  color: currentColor !important;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 20px !important;
+  height: 20px;
+  line-height: 1;
+  margin-right: 0;
+  width: 20px;
+}
+
+.app-notification-message {
+  color: #27272a;
+  flex: 1 1 auto;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  padding-right: 0;
+}
+
+.app-notification-close {
+  color: #71717a !important;
+  height: 22px;
+  margin-right: -2px;
+  opacity: 0.65;
+  width: 22px;
+}
+
+.app-notification-close ::v-deep .v-icon {
+  color: currentColor !important;
+}
+
+.app-notification-progress {
+  animation-name: notification-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  background: currentColor;
+  bottom: -12px;
+  height: 2px;
+  left: -12px;
+  opacity: 0.28;
+  position: absolute;
+  width: calc(100% + 24px);
+}
+
+.app-notification--success ::v-deep .v-snack__wrapper {
+  border-color: #00e676;
+}
+
+.app-notification--success .app-notification-icon,
+.app-notification--success .app-notification-progress {
+  color: #00e676 !important;
+}
+
+.app-notification--error ::v-deep .v-snack__wrapper {
+  border-color: #ffc107;
+}
+
+.app-notification--error .app-notification-icon,
+.app-notification--error .app-notification-progress {
+  color: #ffc107 !important;
+}
+
+.app-notification--warning ::v-deep .v-snack__wrapper {
+  border-color: #ffc107;
+}
+
+.app-notification--warning .app-notification-icon,
+.app-notification--warning .app-notification-progress {
+  color: #ffc107 !important;
+}
+
+.app-notification--info ::v-deep .v-snack__wrapper {
+  border-color: #1976d2;
+}
+
+.app-notification--info .app-notification-icon,
+.app-notification--info .app-notification-progress {
+  color: #1976d2 !important;
+}
+
+@keyframes notification-progress {
+  from {
+    width: calc(100% + 24px);
+  }
+
+  to {
+    width: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .app-notification ::v-deep.v-snack {
+    left: 12px !important;
+    right: 12px !important;
+  }
+
+  .app-notification ::v-deep .v-snack__wrapper {
+    max-width: none;
+    width: 100%;
+  }
+}
+</style>

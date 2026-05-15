@@ -28,25 +28,25 @@
                 ><h3>{{ category }}</h3></v-expansion-panel-header
               >
               <v-expansion-panel-content>
-                <v-row>
+                <v-row dense>
                   <v-col
                     v-for="items in getProductPerCategorie(category)"
                     :key="items.id"
-                    md="3"
-                    sm="4"
+                    lg="3"
+                    md="4"
+                    sm="6"
                     cols="6"
                   >
                     <v-card
                       hover
                       outlined
-                      class="d-flex flex-column product-clickable"
+                      class="d-flex flex-column product-card product-clickable"
                       height="320"
                       @click="openProductPreview(items)"
                     >
                       <!-- Image 5/4 -->
                       <v-img
                         :src="productImageSrc(items.image)"
-                        height="150"
                         aspect-ratio="1.25"
                         class="product-card-image rounded-t"
                         @click.stop="openProductPreview(items)"
@@ -723,8 +723,12 @@ export default {
   cursor: pointer;
 }
 
+.product-card {
+  height: 306px;
+}
+
 .product-card-image {
-  flex: 0 0 150px;
+  flex: 0 0 auto;
 }
 
 .product-card-image ::v-deep .v-image__image {
@@ -733,7 +737,7 @@ export default {
 }
 
 .product-card-content {
-  min-height: 78px;
+  min-height: 72px;
 }
 
 .product-card-price {
@@ -742,6 +746,46 @@ export default {
   font-weight: 800;
   line-height: 1.2;
   margin-top: 8px;
+}
+
+@media (min-width: 600px) and (max-width: 1263px) {
+  .product-card {
+    height: 292px !important;
+  }
+
+  .product-card ::v-deep .v-card__title {
+    padding-top: 5px !important;
+    padding-bottom: 0 !important;
+  }
+
+  .product-card ::v-deep .v-card__text {
+    padding-top: 0 !important;
+    padding-bottom: 2px !important;
+  }
+
+  .product-card ::v-deep .v-card__actions {
+    padding-bottom: 8px !important;
+    padding-top: 0 !important;
+  }
+
+  .product-card .font-weight-bold[style*='font-size: large'] {
+    font-size: 0.98rem !important;
+  }
+
+  .line-clamp-2 {
+    font-size: 0.82rem;
+    line-height: 1.25;
+    min-height: 2.5em;
+  }
+
+  .product-card-price {
+    font-size: 1rem;
+    margin-top: 5px;
+  }
+
+  .product-card ::v-deep .v-btn {
+    height: 28px !important;
+  }
 }
 
 .product-preview-card {
