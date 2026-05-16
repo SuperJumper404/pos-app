@@ -21,6 +21,19 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-bookmark',
+          title: 'Catégories',
+          routeName: 'categories',
+          to: '/categories',
+          isAdmin: true,
+        },
+        {
+          icon: 'mdi-shape-plus',
+          title: 'Ajouter un nouvelle catégorie',
+          routeName: 'categories-newcategory',
+          isAdmin: false,
+        },
+        {
           icon: 'mdi-shape-plus',
           title: 'Produits',
           routeName: 'products',
@@ -42,19 +55,6 @@ const listdashboard = {
           icon: 'mdi-shape-plus',
           title: 'Ajouter un nouveau produit',
           routeName: 'products-newproduct',
-          isAdmin: false,
-        },
-        {
-          icon: 'mdi-bookmark',
-          title: 'Catégories',
-          routeName: 'categories',
-          to: '/categories',
-          isAdmin: true,
-        },
-        {
-          icon: 'mdi-shape-plus',
-          title: 'Ajouter un nouvelle catégorie',
-          routeName: 'categories-newcategory',
           isAdmin: false,
         },
         {

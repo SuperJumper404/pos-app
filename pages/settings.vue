@@ -398,6 +398,9 @@ export default {
     smart_print_app() {
       return this.$store.get('shop/smart_print_app')
     },
+    activate_tva() {
+      return this.$store.get('shop/activate_tva')
+    },
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
@@ -468,6 +471,7 @@ export default {
         this.formShop.shop_printer_ip = this.shop_printer_ip
         this.formShop.shop_siret = this.shop_siret
         this.formShop.smart_print_app = this.smart_print_app
+        this.formShop.activate_tva = this.activate_tva
 
         console.log('Form Shop', this.formShop)
         this.imageUrl = `${this.staticURL}/api/v1/imgprofile/${this.formShop.shop_profile_image}`

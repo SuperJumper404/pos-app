@@ -76,6 +76,7 @@
                 class="history-detail-image"
                 :aspect-ratio="4 / 3"
                 height="96"
+                width="128"
                 max-width="128px"
               ></v-img>
               <v-divider vertical></v-divider>
@@ -320,6 +321,8 @@ export default {
 <style scoped>
 .history-detail-image {
   flex: 0 0 auto;
+  min-width: 128px;
+  width: 128px;
 }
 
 .history-detail-image ::v-deep .v-image__image {

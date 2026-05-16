@@ -1,7 +1,7 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 
-const DEFAULT_TIMEOUT = 6000
-const MAX_NOTIFICATIONS = 6
+const DEFAULT_TIMEOUT = 3500
+const MAX_NOTIFICATIONS = 2
 
 export const state = () => ({
   items: [],

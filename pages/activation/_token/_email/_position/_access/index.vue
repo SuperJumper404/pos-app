@@ -11,7 +11,7 @@
           <i class="fa fa-thumbs-up" aria-hidden="true"></i>
         </h1> -->
         <h4>OK!</h4>
-        <p>Your activation success!</p>
+        <p>Votre compte a bien été activé !</p>
         <v-btn color="primary" @click="$router.push('/login')">
           Take me to login page
         </v-btn>

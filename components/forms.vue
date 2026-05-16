@@ -239,7 +239,7 @@ export default {
           console.log('Je passe dans cette condition ? ')
 
           this.$store.set('users/alertSuccess', true)
-          this.$store.set('users/message', 'Check email!')
+          this.$store.set('users/message', 'Vérifiez votre email.')
           this.$router.push('/login')
         } else {
           this.loadingBtn = false

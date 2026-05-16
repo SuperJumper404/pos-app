@@ -26,6 +26,7 @@
             class="order-detail-image"
             :aspect-ratio="4 / 3"
             height="96"
+            width="128"
             max-width="128px"
           ></v-img>
           <!-- //TODO Faire en sorte que les colonnes soient bien alignées sur mobile -->
@@ -307,6 +308,11 @@ export default {
 .order-detail-image,
 .order-detail-avatar {
   flex: 0 0 auto;
+}
+
+.order-detail-image {
+  min-width: 128px;
+  width: 128px;
 }
 
 .order-detail-image ::v-deep .v-image__image,

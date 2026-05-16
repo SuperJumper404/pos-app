@@ -285,7 +285,7 @@ export default {
         if (newOrders) {
           this.$store.dispatch('notifications/info', {
             message: 'Il y a ' + newOrders + ' nouvelles commandes ! ',
-            timeout: 6000,
+            timeout: 3500,
           })
           this.soundNotification()
         }
@@ -337,7 +337,7 @@ export default {
       if (res) {
         this.$store.dispatch('orders/getAllOrder')
       } else {
-        this.$store.set('orders/message', 'Failed request!')
+        this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true
       }
     },
@@ -350,7 +350,7 @@ export default {
       if (res) {
         this.$store.dispatch('orders/getAllOrder')
       } else {
-        this.$store.set('orders/message', 'Failed request!')
+        this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true
       }
     },
@@ -363,7 +363,7 @@ export default {
       if (res) {
         this.$store.dispatch('orders/getAllOrder')
       } else {
-        this.$store.set('orders/message', 'Failed request!')
+        this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true
       }
     },

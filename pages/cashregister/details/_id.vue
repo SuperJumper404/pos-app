@@ -279,7 +279,7 @@ export default {
       if (res) {
         this.$store.dispatch('orders/getAllOrder')
       } else {
-        this.$store.set('orders/message', 'Failed request!')
+        this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true
       }
     },
@@ -302,7 +302,7 @@ export default {
             this.loadPage = false
           })
       } else {
-        this.$store.set('orders/message', 'Failed request!')
+        this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true
       }
     },
