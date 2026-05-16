@@ -37,8 +37,9 @@
               <v-img
                 :src="productImageSrc(itm.image)"
                 class="cashregister-detail-image"
+                :aspect-ratio="4 / 3"
                 height="96"
-                max-width="120px"
+                max-width="128px"
               ></v-img>
               <v-divider vertical></v-divider>
               <v-card-text class="d-sm-flex d-none justify-space-between">

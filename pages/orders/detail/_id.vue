@@ -24,8 +24,9 @@
           <v-img
             :src="productImageSrc(itm.image)"
             class="order-detail-image"
+            :aspect-ratio="4 / 3"
             height="96"
-            max-width="120px"
+            max-width="128px"
           ></v-img>
           <!-- //TODO Faire en sorte que les colonnes soient bien alignées sur mobile -->
           <v-card-text class="">

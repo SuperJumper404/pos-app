@@ -40,7 +40,7 @@
           class="cropper"
           :src="src"
           :stencil-props="{ aspectRatio: ratioLocal }"
-          :canvas="{ width: 1600, height: 1280 }"
+          :canvas="{ width: 1600, height: 1200 }"
         />
       </div>
     </client-only>
@@ -49,7 +49,6 @@
         :src="previewUrl"
         :aspect-ratio="ratioLocal"
         class="preview-image"
-        height="280"
       />
     </div>
     <div v-if="previewUrlLocal" class="preview">
@@ -57,7 +56,6 @@
         :src="previewUrlLocal"
         :aspect-ratio="ratioLocal"
         class="preview-image"
-        height="280"
       />
     </div>
     <div v-if="src || previewUrlLocal" class="d-flex justify-center">
@@ -98,7 +96,7 @@ export default {
     },
     ratio: {
       type: Number,
-      default: 5 / 4,
+      default: 4 / 3,
     },
   },
 

@@ -1,14 +1,12 @@
 <template>
-  <div>
+  <div class="app-notifications">
     <v-snackbar
       v-for="(notification, index) in notifications"
       :key="notification.id"
       :value="true"
       :timeout="notification.timeout"
-      :style="{ bottom: `${16 + index * 68}px` }"
-      bottom
-      right
-      app
+      :style="{ marginBottom: `${index * 12}px` }"
+      absolute
       transition="slide-y-transition"
       :class="['app-notification', `app-notification--${notification.type}`]"
       @input="remove(notification.id)"
@@ -65,6 +63,26 @@ export default {
 </script>
 
 <style scoped>
+.app-notifications {
+  align-items: flex-end;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column-reverse;
+  pointer-events: none;
+  position: fixed;
+  right: 16px;
+  z-index: 3000;
+}
+
+.app-notification {
+  pointer-events: auto;
+  position: static !important;
+}
+
+.app-notification ::v-deep .v-snack {
+  position: static !important;
+}
+
 .app-notification ::v-deep .v-snack__wrapper {
   background: #ffffff !important;
   border: 1px solid #e4e4e7;
@@ -75,15 +93,6 @@ export default {
   min-height: 0;
   overflow: hidden;
   width: 356px;
-}
-
-.app-notification ::v-deep.v-snack {
-  bottom: auto !important;
-  left: auto !important;
-  position: fixed !important;
-  right: 16px !important;
-  top: auto !important;
-  z-index: 3000 !important;
 }
 
 .app-notification ::v-deep .v-snack__content {
@@ -195,7 +204,8 @@ export default {
 }
 
 @media (max-width: 960px) {
-  .app-notification ::v-deep.v-snack {
+  .app-notifications {
+    bottom: 12px;
     left: 12px !important;
     right: 12px !important;
   }

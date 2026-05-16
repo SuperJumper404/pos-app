@@ -36,8 +36,9 @@
           <v-img
             :src="productImageSrc(items.image)"
             class="product-list-image"
+            :aspect-ratio="4 / 3"
             height="96"
-            width="120"
+            width="128"
           ></v-img>
           <v-card-text
             class="d-flex justify-content-between align-items-center mt-5"
@@ -108,7 +109,7 @@
           <v-img
             :src="productImageSrc(itm.image)"
             class="product-mobile-image"
-            height="180"
+            :aspect-ratio="4 / 3"
             width="100%"
           ></v-img>
           <v-card-text>

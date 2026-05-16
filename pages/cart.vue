@@ -143,23 +143,25 @@
               <h5>{{ formatCurrency(total) }}</h5>
             </v-card-title>
             <v-card-text> </v-card-text>
-            <v-card-actions>
+            <v-card-actions class="cart-checkout-actions">
               <v-btn
                 :disabled="!isValue"
                 :loading="loadingBtn"
                 type="submit"
                 color="success"
-                width="50%"
-                class="text-none"
+                class="
+                  cart-checkout-btn cart-checkout-btn--submit
+                  text-none
+                  font-weight-bold
+                "
                 >Commander
                 <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
 
               <v-btn
                 color="red lighten-1"
-                width="50%"
                 dark
-                class="text-none"
+                class="cart-checkout-btn cart-checkout-btn--cancel text-none"
                 @click="cancelCart"
                 >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
               >
@@ -290,5 +292,52 @@ export default {
 .cart-item-image ::v-deep .v-image__image {
   background-position: center;
   background-size: cover;
+}
+
+.cart-checkout-actions {
+  display: flex;
+  gap: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.cart-checkout-btn {
+  min-width: 0 !important;
+}
+
+.cart-checkout-btn--submit {
+  flex: 1.35 1 0;
+}
+
+.cart-checkout-btn--cancel {
+  flex: 1 1 0;
+}
+
+.cart-checkout-btn ::v-deep .v-btn__content {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+@media (min-width: 600px) and (max-width: 1263px) {
+  .cart-checkout-actions {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .cart-checkout-btn {
+    font-size: 0.78rem !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .cart-checkout-actions {
+    flex-direction: column;
+  }
+
+  .cart-checkout-btn {
+    width: 100%;
+  }
 }
 </style>

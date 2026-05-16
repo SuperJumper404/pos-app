@@ -4,12 +4,12 @@
       alertText
     }}</v-alert>
     <v-row class="mt-5">
-      <v-col v-if="loadPage" md="8" xs="6" cols="12">
+      <v-col v-if="loadPage" md="8" cols="12">
         <v-card outlined height="425px" class="overflow-y-auto">
           <Loading />
         </v-card>
       </v-col>
-      <v-col v-else md="8" xs="6" cols="12">
+      <v-col v-else md="8" cols="12">
         <v-card
           v-if="dataProduct.length === 0"
           outlined
@@ -28,26 +28,22 @@
                 ><h3>{{ category }}</h3></v-expansion-panel-header
               >
               <v-expansion-panel-content>
-                <v-row dense>
-                  <v-col
+                <div class="product-grid">
+                  <div
                     v-for="items in getProductPerCategorie(category)"
                     :key="items.id"
-                    lg="3"
-                    md="4"
-                    sm="6"
-                    cols="6"
+                    class="product-grid-col"
                   >
                     <v-card
                       hover
                       outlined
                       class="d-flex flex-column product-card product-clickable"
-                      height="320"
                       @click="openProductPreview(items)"
                     >
-                      <!-- Image 5/4 -->
+                      <!-- Image -->
                       <v-img
                         :src="productImageSrc(items.image)"
-                        aspect-ratio="1.25"
+                        :aspect-ratio="4 / 3"
                         class="product-card-image rounded-t"
                         @click.stop="openProductPreview(items)"
                       />
@@ -55,8 +51,11 @@
                       <!-- Title -->
                       <v-card-title class="py-2 pb-0 mb-0">
                         <div
-                          class="text-truncate font-weight-bold"
-                          style="font-size: large"
+                          class="
+                            product-card-title-text
+                            text-truncate
+                            font-weight-bold
+                          "
                         >
                           {{ items.name }}
                         </div>
@@ -74,7 +73,9 @@
                       </v-card-text>
 
                       <!-- Actions always bottom -->
-                      <v-card-actions class="px-4 pt-1 pb-3">
+                      <v-card-actions
+                        class="product-card-actions px-4 pt-1 pb-3"
+                      >
                         <v-btn
                           color="success"
                           small
@@ -87,8 +88,8 @@
                         </v-btn>
                       </v-card-actions>
                     </v-card>
-                  </v-col>
-                </v-row>
+                  </div>
+                </div>
               </v-expansion-panel-content>
             </v-expansion-panel>
           </v-expansion-panels>
@@ -144,7 +145,7 @@
           
         </v-card> -->
       </v-col>
-      <v-col md="4" xs="6">
+      <v-col md="4" cols="12">
         <!-- <v-col md="4" class="d-none d-sm-none d-md-block"> -->
         <v-card v-if="loadPage" outlined height="425px">
           <Loading />
@@ -166,22 +167,38 @@
                 v-for="(itm, itemIndex) in cartItem"
                 :key="itm.id"
                 outlined
-                class="d-flex mb-2 flex-column"
+                class="cart-item-card d-flex mb-2 flex-column"
                 rounded="7"
               >
-                <v-row class="d-flex align-center mr-2 ml-2 mt-2" no-gutters>
+                <v-row
+                  class="
+                    cart-item-row
+                    d-flex
+                    align-center
+                    flex-nowrap
+                    mr-2
+                    ml-2
+                    mt-2
+                  "
+                  no-gutters
+                >
                   <!-- Left block: avatar + texts -->
-                  <v-col class="d-flex align-center">
-                    <v-avatar size="75" rounded tile class="mr-3">
+                  <v-col class="cart-item-info d-flex align-center">
+                    <v-avatar
+                      size="64"
+                      rounded
+                      tile
+                      class="cart-item-avatar mr-2"
+                    >
                       <v-img
                         class="rounded-lg"
                         :src="productImageSrc(itm.image)"
                       />
                     </v-avatar>
 
-                    <div>
+                    <div class="cart-item-text">
                       <div
-                        class="text-truncate font-weight-bold"
+                        class="cart-item-name text-truncate font-weight-bold"
                         style="font-size: large; color: rgba(0, 0, 0, 0.8)"
                       >
                         {{ itm.name }}
@@ -196,8 +213,12 @@
                   </v-col>
 
                   <!-- Right block: actions -->
-                  <v-col class="d-flex align-center justify-end" cols="auto">
+                  <v-col
+                    class="cart-item-actions d-flex align-center justify-end"
+                    cols="auto"
+                  >
                     <v-btn
+                      class="cart-action-btn"
                       outlined
                       color="warning"
                       small
@@ -208,7 +229,7 @@
                     </v-btn>
 
                     <v-btn
-                      class="mx-2"
+                      class="cart-qty-btn mx-1"
                       style="font-size: x-large"
                       color="success"
                       fab
@@ -219,6 +240,7 @@
                     </v-btn>
 
                     <v-btn
+                      class="cart-action-btn"
                       outlined
                       color="success"
                       small
@@ -241,19 +263,24 @@
                 </v-col>
               </v-card>
             </div>
-            <v-card-actions v-if="cartItem.length > 0">
+            <v-card-actions
+              v-if="cartItem.length > 0"
+              class="cart-order-actions"
+            >
               <v-btn
                 color="primary"
-                width="50%"
-                class="text-none mt-3 mb-3"
+                class="
+                  cart-order-btn cart-order-btn--submit
+                  text-none
+                  font-weight-bold
+                "
                 @click="btnOrder"
                 >Commander
                 <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
               <v-btn
                 color="red ligthen-1"
-                width="50%"
-                class="text-none"
+                class="cart-order-btn cart-order-btn--cancel text-none"
                 dark
                 @click="btnCancel"
                 >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
@@ -712,8 +739,9 @@ export default {
 
 .line-clamp-2 {
   display: -webkit-box;
+  height: 2.7em;
   line-height: 1.35;
-  min-height: 2.7em;
+  margin-top: 6px;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -723,8 +751,25 @@ export default {
   cursor: pointer;
 }
 
+.product-grid {
+  --product-card-min-width: 148px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--product-card-min-width), 1fr)
+  );
+}
+
+.product-grid-col {
+  display: flex;
+  min-width: 0;
+}
+
 .product-card {
-  height: 306px;
+  height: 100%;
+  min-height: 284px;
+  width: 100%;
 }
 
 .product-card-image {
@@ -736,8 +781,24 @@ export default {
   background-position: center;
 }
 
+.product-card-title-text {
+  font-size: 1rem;
+  height: 1.2em;
+  line-height: 1.2;
+  min-width: 0;
+}
+
 .product-card-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-height: 72px;
+  padding-top: 2px !important;
+}
+
+.product-card-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
 }
 
 .product-card-price {
@@ -745,22 +806,93 @@ export default {
   font-size: 1.12rem;
   font-weight: 800;
   line-height: 1.2;
-  margin-top: 8px;
+  margin-top: auto;
+  margin-bottom: 0px;
+  min-height: 1.35em;
+  padding-top: 12px;
+}
+
+.cart-item-row {
+  min-width: 0;
+}
+
+.cart-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cart-item-avatar {
+  flex: 0 0 64px;
+}
+
+.cart-item-text {
+  min-width: 0;
+}
+
+.cart-item-name {
+  max-width: 100%;
+}
+
+.cart-item-actions {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.cart-action-btn {
+  height: 30px !important;
+  width: 30px !important;
+}
+
+.cart-qty-btn {
+  height: 34px !important;
+  min-width: 34px !important;
+  width: 34px !important;
+}
+
+.cart-order-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 8px 8px;
+}
+
+.cart-order-btn {
+  min-width: 0 !important;
+}
+
+.cart-order-btn--submit {
+  flex: 1.35 1 0;
+}
+
+.cart-order-btn--cancel {
+  flex: 1 1 0;
+}
+
+.cart-order-btn ::v-deep .v-btn__content {
+  min-width: 0;
+  white-space: nowrap;
 }
 
 @media (min-width: 600px) and (max-width: 1263px) {
+  .product-grid {
+    --product-card-min-width: 150px;
+  }
+
   .product-card {
-    height: 292px !important;
+    min-height: 252px !important;
   }
 
   .product-card ::v-deep .v-card__title {
-    padding-top: 5px !important;
-    padding-bottom: 0 !important;
+    padding-top: 7px !important;
+    padding-bottom: 2px !important;
   }
 
   .product-card ::v-deep .v-card__text {
-    padding-top: 0 !important;
-    padding-bottom: 2px !important;
+    padding-top: 2px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .product-card-content {
+    min-height: 62px;
   }
 
   .product-card ::v-deep .v-card__actions {
@@ -768,23 +900,134 @@ export default {
     padding-top: 0 !important;
   }
 
-  .product-card .font-weight-bold[style*='font-size: large'] {
+  .product-card-title-text {
     font-size: 0.98rem !important;
   }
 
   .line-clamp-2 {
     font-size: 0.82rem;
+    height: 2.5em;
     line-height: 1.25;
-    min-height: 2.5em;
+    margin-top: 4px;
   }
 
   .product-card-price {
     font-size: 1rem;
-    margin-top: 5px;
+    margin-top: auto;
+    padding-top: 8px;
   }
 
   .product-card ::v-deep .v-btn {
     height: 28px !important;
+  }
+
+  .cart-item-avatar {
+    flex-basis: 56px;
+    height: 56px !important;
+    min-width: 56px !important;
+    width: 56px !important;
+  }
+
+  .cart-item-row {
+    margin-left: 4px !important;
+    margin-right: 4px !important;
+  }
+
+  .cart-item-name {
+    font-size: 0.9rem !important;
+  }
+
+  .cart-item-actions {
+    margin-left: 6px;
+  }
+
+  .cart-action-btn {
+    height: 26px !important;
+    width: 26px !important;
+  }
+
+  .cart-qty-btn {
+    font-size: 0.95rem !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    width: 28px !important;
+  }
+
+  .cart-order-actions {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .cart-order-btn {
+    font-size: 0.78rem !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .cart-order-actions {
+    flex-direction: column;
+  }
+
+  .cart-order-btn {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1263px) {
+  .product-card {
+    min-height: 236px !important;
+  }
+
+  .product-card ::v-deep .v-card__title {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    padding-top: 7px !important;
+  }
+
+  .product-card ::v-deep .v-card__text {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .product-card-content {
+    min-height: 56px;
+  }
+
+  .product-card-title-text {
+    font-size: 0.9rem !important;
+    height: 1.15em;
+    line-height: 1.15;
+  }
+
+  .line-clamp-2 {
+    font-size: 0.78rem;
+    height: 2.4em;
+    line-height: 1.2;
+    margin-top: 4px;
+  }
+
+  .product-card-price {
+    font-size: 0.98rem;
+    line-height: 1.12;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
+  .product-card ::v-deep .v-card__actions {
+    padding-bottom: 7px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .product-card ::v-deep .v-btn {
+    font-size: 0.78rem !important;
+    height: 26px !important;
+  }
+
+  .product-card ::v-deep .v-btn .v-icon {
+    font-size: 16px !important;
   }
 }
 
