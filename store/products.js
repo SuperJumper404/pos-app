@@ -68,8 +68,9 @@ export const actions = {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
       })
-      .then((response) => {
+      .then(async (response) => {
         dispatch('set/message', response.data.message)
+        await dispatch('getProducts')
         dispatch('notifications/success', 'Produit mis à jour avec succès.', {
           root: true,
         })

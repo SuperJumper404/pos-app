@@ -462,9 +462,7 @@ export default {
   computed: {
     categories() {
       console.log('dataProduct', this.$store.get('products/dataProduct'))
-      const items = this.$store
-        .get('products/dataProduct')
-        .map((x) => x.category)
+      const items = this.dataProduct.map((x) => x.category)
       return [...new Set(items)]
     },
     staticURL() {
@@ -478,7 +476,7 @@ export default {
     dataProduct() {
       return this.$store
         .get('products/dataProduct')
-        .filter((x) => x.archived === 0)
+        .filter((x) => x.archived === 0 && !this.isProductHidden(x))
     },
     totalPage() {
       return this.$store.get('products/totalPage')
@@ -605,6 +603,9 @@ export default {
       return this.dataProduct.filter(function (x) {
         return x.category === category
       })
+    },
+    isProductHidden(product) {
+      return [true, 1, '1'].includes(product.is_hidden)
     },
     totalPrice() {
       this.total = this.cartItem.reduce((sum, el) => {
