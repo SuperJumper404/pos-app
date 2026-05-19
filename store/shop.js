@@ -15,11 +15,26 @@ export const state = () => ({
   shop_printer_ip: '',
   smart_print_app: '',
   activate_tva: false,
+  kitchen_closed: false,
   clickAndCollectTable: '',
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
+  getCurrentShopInfo({ dispatch }) {
+    const access = parseInt(localStorage.getItem('access'))
+    const shopId = localStorage.getItem('shopid')
+
+    if (access === 0) {
+      return dispatch('getShopInfo')
+    }
+
+    if (shopId) {
+      return dispatch('getShopInfoClickAndCollect', shopId)
+    }
+
+    return dispatch('getShopInfo')
+  },
   getShopInfo({ dispatch }) {
     return this.$axios
       .get('/baseurl/api/v1/shopInfo', {
@@ -36,6 +51,7 @@ export const actions = {
         dispatch('set/activate_tva', response.data.data[0].activate_tva)
         dispatch('set/shop_phone', response.data.data[0].shop_phone)
         dispatch('set/shop_status', response.data.data[0].shop_status)
+        dispatch('set/kitchen_closed', response.data.data[0].kitchen_closed)
         dispatch('set/shop_mail', response.data.data[0].shop_mail)
         dispatch('set/shop_description', response.data.data[0].shop_description)
         console.log('Open Hours', JSON.parse(response.data.data[0].hours))
@@ -77,6 +93,7 @@ export const actions = {
         dispatch('set/shop_siret', response.data.data.shop_siret)
         dispatch('set/shop_phone', response.data.data.shop_phone)
         dispatch('set/shop_status', response.data.data.shop_status)
+        dispatch('set/kitchen_closed', response.data.data.kitchen_closed)
         dispatch('set/shop_mail', response.data.data.shop_mail)
         dispatch('set/shop_description', response.data.data.shop_description)
         console.log('Open Hours', JSON.parse(response.data.data.hours))

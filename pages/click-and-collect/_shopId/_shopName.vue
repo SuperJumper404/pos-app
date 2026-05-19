@@ -84,7 +84,13 @@
                 <v-icon left small>
                   {{ isRestaurantOpen ? 'mdi-door-open' : 'mdi-door-closed' }}
                 </v-icon>
-                {{ isRestaurantOpen ? 'Ouvert' : 'Fermé' }}
+                {{
+                  isKitchenClosed
+                    ? 'Cuisine fermee'
+                    : isRestaurantOpen
+                    ? 'Ouvert'
+                    : 'Fermé'
+                }}
               </v-chip>
             </v-col>
           </v-row>
@@ -136,8 +142,13 @@
                 color="primary"
                 class="mt-2"
                 rounded
-                :href="`/login?username=${clickAndCollectTable.email}&password=${clickAndCollectTable.clearpass}`"
+                :href="
+                  isKitchenClosed
+                    ? undefined
+                    : `/login?username=${clickAndCollectTable.email}&password=${clickAndCollectTable.clearpass}`
+                "
                 target="_blank"
+                @click="goToClickAndCollect"
               >
                 Click & Collet <v-icon> mdi-arrow-top-right </v-icon>
               </v-btn>
@@ -285,6 +296,19 @@
     <pre type="json">
  {{ staticURL }}/api/v1/imgprofile/{{ shopInfo.shop_profile_image }}</pre
     > -->
+    <v-snackbar
+      v-model="kitchenClosedSnackbar"
+      color="warning"
+      timeout="4500"
+      top
+    >
+      {{ kitchenClosedMessage }}
+      <template v-slot:action="{ attrs }">
+        <v-btn text v-bind="attrs" @click="kitchenClosedSnackbar = false">
+          Fermer
+        </v-btn>
+      </template>
+    </v-snackbar>
   </v-container>
 </template>
 <script>
@@ -294,6 +318,9 @@ export default {
     return {
       shop_identifier: '',
       shopProfileImageFailed: false,
+      kitchenClosedSnackbar: false,
+      kitchenClosedMessage:
+        'La cuisine est fermée. Aucune nouvelle commande possible.',
     }
   },
 
@@ -320,9 +347,15 @@ export default {
         shop_profile_image: this.$store.get('shop/shop_profile_image'),
         shop_status: this.$store.get('shop/shop_status'),
         shop_social_media: this.$store.get('shop/shop_social_media'),
+        kitchen_closed: this.$store.get('shop/kitchen_closed'),
       }
     },
+    isKitchenClosed() {
+      return [true, 1, '1', 'true'].includes(this.shopInfo.kitchen_closed)
+    },
     isRestaurantOpen() {
+      if (this.isKitchenClosed) return false
+
       const now = new Date()
 
       // getDay() → 0 = Dimanche ... 6 = Samedi
@@ -372,6 +405,12 @@ export default {
     //   })
   },
   methods: {
+    goToClickAndCollect(event) {
+      if (!this.isKitchenClosed) return
+
+      if (event) event.preventDefault()
+      this.kitchenClosedSnackbar = true
+    },
     shopProfileImageSrc(image) {
       if (this.shopProfileImageFailed || !image) return '/logo.png'
       return `${this.staticURL}/api/v1/imgprofile/${image}`

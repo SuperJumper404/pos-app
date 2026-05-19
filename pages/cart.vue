@@ -101,6 +101,9 @@
             >
           </v-card-actions>
           <v-form v-else v-model="isValue" @submit.prevent="paymentBtn">
+            <v-alert v-if="isKitchenClosed" dense text type="warning">
+              La cuisine est fermée. Aucune nouvelle commande possible.
+            </v-alert>
             <v-text-field
               v-model="formuser.customer"
               type="text"
@@ -173,6 +176,19 @@
     <!-- {{ dataCart }}
     <pre>acces :{{ access }}</pre>
     <pre>current table : {{ selectedTable }}</pre> -->
+    <v-snackbar
+      v-model="kitchenClosedSnackbar"
+      color="warning"
+      timeout="4500"
+      top
+    >
+      {{ kitchenClosedMessage }}
+      <template v-slot:action="{ attrs }">
+        <v-btn text v-bind="attrs" @click="kitchenClosedSnackbar = false">
+          Fermer
+        </v-btn>
+      </template>
+    </v-snackbar>
   </v-container>
 </template>
 <script>
@@ -195,6 +211,9 @@ export default {
     isValue: false,
     loadingBtn: false,
     loadPage: false,
+    kitchenClosedSnackbar: false,
+    kitchenClosedMessage:
+      'La cuisine est fermée. Aucune nouvelle commande possible.',
     selectedTable: parseInt(localStorage.getItem('idUser')),
     access: parseInt(localStorage.getItem('access')),
     formuser: {
@@ -228,9 +247,15 @@ export default {
       // const filtered = result.filter((x) => x.access === 2)
       return result
     },
+    isKitchenClosed() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/kitchen_closed')
+      )
+    },
   },
   mounted() {
     this.total = this.totalCart
+    this.$store.dispatch('shop/getCurrentShopInfo')
   },
   methods: {
     productImageSrc(image) {
@@ -238,6 +263,11 @@ export default {
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
     },
     async paymentBtn() {
+      if (this.isKitchenClosed) {
+        this.kitchenClosedSnackbar = true
+        return
+      }
+
       const params = {
         customer: this.formuser.customer,
         customerID: this.selectedTable,

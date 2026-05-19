@@ -29,6 +29,20 @@
         <v-spacer></v-spacer>
         <v-spacer></v-spacer>
         <v-spacer></v-spacer>
+        <div class="kitchen-toggle mr-3">
+          <v-switch
+            :input-value="isKitchenClosed"
+            :loading="kitchenToggleLoading"
+            :disabled="kitchenToggleLoading"
+            :label="isKitchenClosed ? 'Cuisine fermee' : 'Cuisine ouverte'"
+            color="red"
+            dense
+            hide-details
+            inset
+            class="mt-0"
+            @change="toggleKitchenClosed"
+          ></v-switch>
+        </div>
         <v-spacer></v-spacer>
         <div>
           <v-btn
@@ -152,6 +166,7 @@ export default {
     return {
       loadPage: false,
       deleteLoading: false,
+      kitchenToggleLoading: false,
       polling: null,
       errMsg: false,
       lastUpdate: moment(new Date()),
@@ -196,6 +211,11 @@ export default {
     updateTimeStamp() {
       return this.$store.get('orders/lastCreatedOrder')
     },
+    isKitchenClosed() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/kitchen_closed')
+      )
+    },
     user() {
       return this.$store.get('users/user')
     },
@@ -210,6 +230,7 @@ export default {
         shop_payment_methods: this.$store.get('shop/shop_payment_methods'),
         shop_profile_image: this.$store.get('shop/shop_profile_image'),
         shop_status: this.$store.get('shop/shop_status'),
+        kitchen_closed: this.$store.get('shop/kitchen_closed'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
       }
@@ -217,7 +238,10 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    this.$store.dispatch('orders/getAllOrder').finally(() => {
+    Promise.all([
+      this.$store.dispatch('orders/getAllOrder'),
+      this.$store.dispatch('shop/getShopInfo'),
+    ]).finally(() => {
       this.loadPage = false
     })
     this.pollData()
@@ -226,6 +250,21 @@ export default {
     clearInterval(this.polling)
   },
   methods: {
+    async toggleKitchenClosed(value) {
+      this.kitchenToggleLoading = true
+      const res = await this.$store.dispatch('shop/updateShopInfo', {
+        data: {
+          kitchen_closed: value ? 1 : 0,
+        },
+      })
+      if (!res) {
+        this.$store.dispatch(
+          'notifications/error',
+          "Impossible de modifier l'etat de la cuisine."
+        )
+      }
+      this.kitchenToggleLoading = false
+    },
     async printOrderDetails(order) {
       console.log('Print order details for order', order)
       await this.$store.dispatch('orders/getDetailOrder', order.id)
@@ -651,3 +690,8 @@ export default {
   },
 }
 </script>
+<style scoped>
+.kitchen-toggle {
+  min-width: 170px;
+}
+</style>

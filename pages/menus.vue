@@ -3,6 +3,9 @@
     <v-alert :value="alert" :type="alertType" dismissible>{{
       alertText
     }}</v-alert>
+    <v-alert v-if="isKitchenClosed" dense text type="warning">
+      La cuisine est fermée. Aucune nouvelle commande possible.
+    </v-alert>
     <v-row class="mt-5">
       <v-col v-if="loadPage" md="8" cols="12">
         <v-card outlined height="425px" class="overflow-y-auto">
@@ -80,6 +83,7 @@
                           color="success"
                           small
                           block
+                          :disabled="isKitchenClosed"
                           class="text-none font-weight-bold"
                           @click.stop="addToCart(items)"
                         >
@@ -328,6 +332,7 @@
           <v-btn
             color="success"
             class="text-none font-weight-bold"
+            :disabled="isKitchenClosed"
             @click="addPreviewItemToCart"
           >
             <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
@@ -425,6 +430,19 @@
     <!-- <pre>{{ breakpoint }}</pre> -->
     <!-- <pre>acces :{{ access }}</pre>
     <pre>ici {{ itemDialog }}</pre> -->
+    <v-snackbar
+      v-model="kitchenClosedSnackbar"
+      color="warning"
+      timeout="4500"
+      top
+    >
+      {{ kitchenClosedMessage }}
+      <template v-slot:action="{ attrs }">
+        <v-btn text v-bind="attrs" @click="kitchenClosedSnackbar = false">
+          Fermer
+        </v-btn>
+      </template>
+    </v-snackbar>
   </v-container>
 </template>
 <script>
@@ -454,6 +472,9 @@ export default {
     alertText: null,
     dialog: false,
     loadPage: false,
+    kitchenClosedSnackbar: false,
+    kitchenClosedMessage:
+      'La cuisine est fermée. Aucune nouvelle commande possible.',
     cartItem: [],
     total: 0,
     idxCart: 0,
@@ -484,6 +505,11 @@ export default {
     stateDialog() {
       return this.$store.get('stateDialog')
     },
+    isKitchenClosed() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/kitchen_closed')
+      )
+    },
   },
   watch: {
     itemDialog(newVal) {
@@ -503,6 +529,7 @@ export default {
 
     const calls = [
       this.$store.dispatch('products/getProducts'),
+      this.$store.dispatch('shop/getCurrentShopInfo'),
       this.$store.dispatch('cart/setTotal', 0),
       this.$store.dispatch('cart/setIndex', 0),
     ]
@@ -629,7 +656,15 @@ export default {
         this.alert = null
       }, 5000)
     },
+    showKitchenClosedSnackbar() {
+      this.kitchenClosedSnackbar = true
+    },
     addToCart(params) {
+      if (this.isKitchenClosed) {
+        this.showKitchenClosedSnackbar()
+        return
+      }
+
       if (params.stock < 1) {
         this.showAlert('Produit non disponible', 'error')
         return
@@ -719,6 +754,11 @@ export default {
       this.indexCart()
     },
     btnOrder() {
+      if (this.isKitchenClosed) {
+        this.showKitchenClosedSnackbar()
+        return
+      }
+
       this.$store.dispatch('cart/setTocart', this.cartItem)
       this.$router.push('/cart')
     },
