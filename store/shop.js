@@ -17,6 +17,12 @@ export const state = () => ({
   activate_tva: false,
   kitchen_closed: false,
   clickAndCollectTable: '',
+  qr_payment_mode: 'stripe_before_order',
+  stripe_connected: false,
+  stripe_onboarding_complete: false,
+  stripe_charges_enabled: false,
+  stripe_payouts_enabled: false,
+  stripe_account_id: '',
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
@@ -71,8 +77,28 @@ export const actions = {
           response.data.data[0].shop_profile_image
         )
         dispatch(
+          'set/qr_payment_mode',
+          response.data.data[0].qr_payment_mode || 'stripe_before_order'
+        )
+        dispatch(
           'set/clickAndCollectTable',
           response.data.data[0].clickAndCollectTable
+        )
+        dispatch(
+          'set/stripe_account_id',
+          response.data.data[0].stripe_account_id || ''
+        )
+        dispatch(
+          'set/stripe_onboarding_complete',
+          response.data.data[0].stripe_onboarding_complete || false
+        )
+        dispatch(
+          'set/stripe_charges_enabled',
+          response.data.data[0].stripe_charges_enabled || false
+        )
+        dispatch(
+          'set/stripe_payouts_enabled',
+          response.data.data[0].stripe_payouts_enabled || false
         )
         return true
       })
@@ -107,12 +133,20 @@ export const actions = {
           response.data.data.shop_profile_image
         )
         dispatch(
+          'set/qr_payment_mode',
+          response.data.data.qr_payment_mode || 'stripe_before_order'
+        )
+        dispatch(
           'set/clickAndCollectTable',
           response.data.data.clickAndCollectTable
         )
         dispatch(
           'set/shop_social_media',
           JSON.parse(response.data.data.shop_social_media)
+        )
+        dispatch(
+          'set/stripe_charges_enabled',
+          response.data.data.stripe_charges_enabled || false
         )
         return true
       })
@@ -144,6 +178,44 @@ export const actions = {
       .catch((error) => {
         dispatch('set/message', error.response.data.message)
         return false
+      })
+  },
+  getStripeConnectStatus({ dispatch }) {
+    return this.$axios
+      .get('/baseurl/api/v1/stripe/connect/status', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+      .then((response) => {
+        const data = response.data.data
+        dispatch('set/stripe_connected', data.connected)
+        dispatch('set/stripe_onboarding_complete', data.onboarding_complete)
+        dispatch('set/stripe_charges_enabled', data.charges_enabled)
+        dispatch('set/stripe_payouts_enabled', data.payouts_enabled)
+        dispatch('set/stripe_account_id', data.stripe_account_id || '')
+        return data
+      })
+      .catch((error) => {
+        dispatch('set/message', error.response?.data?.message)
+        return null
+      })
+  },
+  createStripeOnboardingLink({ dispatch }) {
+    return this.$axios
+      .post(
+        '/baseurl/api/v1/stripe/connect/onboarding-link',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then((response) => response.data.data)
+      .catch((error) => {
+        dispatch('set/message', error.response?.data?.message)
+        return null
       })
   },
 }

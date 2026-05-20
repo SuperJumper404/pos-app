@@ -152,6 +152,11 @@
         <template #[`item.subtotal`]="{ item }">
           <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
+        <template #[`item.payment_status`]="{ item }">
+          <v-chip small dark :color="paymentStatusColor(item)">
+            {{ paymentStatusText(item) }}
+          </v-chip>
+        </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
@@ -191,6 +196,10 @@
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
+const {
+  getPaymentStatusText,
+  getPaymentStatusColor,
+} = require('@/helpers/paymentStatus')
 export default {
   mixins: [formatdate, price],
   middleware: 'auth',
@@ -215,6 +224,7 @@ export default {
         { text: 'Client', value: 'customer', filterable: true },
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true },
+        { text: 'Paiement', value: 'payment_status', filterable: true },
         { text: 'Status', value: 'status', filterable: true },
         { text: 'Actions', value: 'actions' },
       ],
@@ -314,6 +324,12 @@ export default {
     },
     orderTime(time) {
       return moment(new Date(time)).format('DD/MM à HH:mm')
+    },
+    paymentStatusText(item) {
+      return getPaymentStatusText(item)
+    },
+    paymentStatusColor(item) {
+      return getPaymentStatusColor(item)
     },
   },
 }

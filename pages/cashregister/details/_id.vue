@@ -39,6 +39,7 @@
                 class="cashregister-detail-image"
                 :aspect-ratio="4 / 3"
                 height="96"
+                width="128"
                 max-width="128px"
               ></v-img>
               <v-divider vertical></v-divider>
@@ -116,6 +117,11 @@
         <template #[`item.subtotal`]="{ item }">
           <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
+        <template #[`item.payment_status`]="{ item }">
+          <v-chip small dark :color="paymentStatusColor(item)">
+            {{ paymentStatusText(item) }}
+          </v-chip>
+        </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
@@ -174,6 +180,10 @@
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import moment from 'moment'
+const {
+  getPaymentStatusText,
+  getPaymentStatusColor,
+} = require('@/helpers/paymentStatus')
 
 export default {
   mixins: [formatdate, price],
@@ -203,6 +213,7 @@ export default {
         { text: 'Client', value: 'customer', filterable: true, width: '100px' },
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true, width: '100px' },
+        { text: 'Paiement', value: 'payment_status', filterable: true },
         { text: 'Status', value: 'status', filterable: true },
         { text: 'Actions', value: 'actions', width: '500px' },
       ],
@@ -270,6 +281,13 @@ export default {
       return displayTime
     },
 
+    paymentStatusText(item) {
+      return getPaymentStatusText(item)
+    },
+    paymentStatusColor(item) {
+      return getPaymentStatusColor(item)
+    },
+
     async btnFinish(id) {
       const data = {
         operator: this.user.id,
@@ -315,6 +333,8 @@ export default {
 <style scoped>
 .cashregister-detail-image {
   flex: 0 0 auto;
+  min-width: 128px;
+  width: 128px;
 }
 
 .cashregister-detail-image ::v-deep .v-image__image {

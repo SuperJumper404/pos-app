@@ -1,0 +1,77 @@
+const PAYMENT_STATUS_DISPLAY = {
+  paid: {
+    text: 'Payé',
+    color: 'success',
+  },
+  requires_payment: {
+    text: 'Paiement en attente',
+    color: 'info',
+  },
+  unpaid: {
+    text: 'Non payé',
+    color: 'grey',
+  },
+  failed: {
+    text: 'Échoué',
+    color: 'error',
+  },
+  refunded: {
+    text: 'Remboursé',
+    color: 'warning',
+  },
+}
+
+const getPaymentMethodText = (order = {}) =>
+  order.used_payment_method || order.payment || 'Payé'
+
+const STRIPE_PAYMENT_COLOR = '#635BFF'
+
+const isStripePayment = (order = {}) => {
+  const paymentText = String(getPaymentMethodText(order)).toLowerCase()
+
+  return (
+    order.payment_provider === 'stripe' ||
+    paymentText.includes('stripe') ||
+    paymentText.includes('apple pay') ||
+    paymentText.includes('google pay') ||
+    paymentText === 'carte'
+  )
+}
+
+const isCounterPayment = (order = {}) =>
+  String(order.payment || '')
+    .toLowerCase()
+    .includes('comptoir')
+
+const getPaymentStatusDisplay = (order = {}) => {
+  if (order.payment_status === 'paid') {
+    return {
+      text: getPaymentMethodText(order),
+      color: isStripePayment(order) ? STRIPE_PAYMENT_COLOR : 'success',
+    }
+  }
+
+  if (order.payment_status === 'unpaid' && isCounterPayment(order)) {
+    return {
+      text: 'À payer au comptoir',
+      color: 'orange',
+    }
+  }
+
+  return (
+    PAYMENT_STATUS_DISPLAY[order.payment_status] || {
+      text: order.payment ? order.payment : 'Non renseigné',
+      color: 'grey',
+    }
+  )
+}
+
+const getPaymentStatusText = (order = {}) => getPaymentStatusDisplay(order).text
+
+const getPaymentStatusColor = (order = {}) => getPaymentStatusDisplay(order).color
+
+module.exports = {
+  getPaymentStatusDisplay,
+  getPaymentStatusText,
+  getPaymentStatusColor,
+}

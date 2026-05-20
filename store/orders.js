@@ -152,4 +152,32 @@ export const actions = {
         return false
       })
   },
+  refundStripeOrder({ dispatch }, params) {
+    return this.$axios
+      .post(
+        `/baseurl/api/v1/stripe/refunds/orders/${params.id}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Commande remboursee.', {
+          root: true,
+        })
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', error.response?.data?.message)
+        dispatch(
+          'notifications/error',
+          error.response?.data?.message || 'Remboursement impossible.',
+          { root: true }
+        )
+        return false
+      })
+  },
 }

@@ -83,6 +83,11 @@
         <template #[`item.subtotal`]="{ item }">
           <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
+        <template #[`item.payment_status`]="{ item }">
+          <v-chip dark :color="paymentStatusColor(item)">
+            {{ paymentStatusText(item) }}
+          </v-chip>
+        </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
@@ -139,8 +144,14 @@
                 small
                 color="red"
                 class="text-none"
-                @click="btnCancel(item.id)"
-                >Annuler <v-icon small right>mdi-close-circle</v-icon>
+                @click="btnCancel(item)"
+                >{{
+                  item.payment_provider === 'stripe' &&
+                  item.payment_status === 'paid'
+                    ? 'Rembourser'
+                    : 'Annuler'
+                }}
+                <v-icon small right>mdi-close-circle</v-icon>
               </v-btn>
             </v-card-actions>
           </v-row>
@@ -159,6 +170,10 @@
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
+const {
+  getPaymentStatusText,
+  getPaymentStatusColor,
+} = require('@/helpers/paymentStatus')
 export default {
   mixins: [formatdate, price],
   middleware: 'auth',
@@ -183,6 +198,7 @@ export default {
         { text: 'Client', value: 'customer', filterable: true },
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true },
+        { text: 'Paiement', value: 'payment_status', filterable: true },
         { text: 'Status', value: 'status', filterable: true },
         { text: 'Actions', value: 'actions' },
       ],
@@ -393,12 +409,31 @@ export default {
         this.errMsg = true
       }
     },
-    async btnCancel(id) {
+    async btnCancel(item) {
+      if (
+        item.payment_provider === 'stripe' &&
+        item.payment_status === 'paid'
+      ) {
+        const refunded = await this.$store.dispatch(
+          'orders/refundStripeOrder',
+          {
+            id: item.id,
+          }
+        )
+        if (refunded) {
+          this.$store.dispatch('orders/getAllOrder')
+        }
+        return
+      }
+
       const data = {
         operator: this.user.id,
         status: 4,
       }
-      const res = await this.$store.dispatch('orders/updateOrder', { id, data })
+      const res = await this.$store.dispatch('orders/updateOrder', {
+        id: item.id,
+        data,
+      })
       if (res) {
         this.$store.dispatch('orders/getAllOrder')
       } else {
@@ -408,6 +443,12 @@ export default {
     },
     orderTime(time) {
       return moment(new Date(time)).format('DD/MM à HH:mm')
+    },
+    paymentStatusText(item) {
+      return getPaymentStatusText(item)
+    },
+    paymentStatusColor(item) {
+      return getPaymentStatusColor(item)
     },
     generateEscPos(order, shopInfo, orderInfo) {
       console.log('Generating ESC/POS for order:', order, 'shopInfo:', shopInfo)

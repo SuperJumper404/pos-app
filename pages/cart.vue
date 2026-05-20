@@ -139,6 +139,14 @@
               prepend-inner-icon="mdi-comment"
               placeholder="Ajouter une note à la commande"
             ></v-textarea>
+            <v-alert v-if="isQrClient" dense text type="info" class="mb-4">
+              {{ clientPaymentMessage }}
+            </v-alert>
+            <div
+              v-show="isStripeCheckout && stripePaymentReady"
+              ref="stripePaymentElement"
+              class="stripe-payment-element mb-4"
+            ></div>
             <!-- struc -->
             <v-card-title>
               <h5>Total</h5>
@@ -157,8 +165,8 @@
                   text-none
                   font-weight-bold
                 "
-                >Commander
-                <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
+                >{{ checkoutButtonLabel }}
+                <v-icon small right>{{ checkoutButtonIcon }}</v-icon></v-btn
               >
 
               <v-btn
@@ -192,8 +200,10 @@
   </v-container>
 </template>
 <script>
+import { loadStripe } from '@stripe/stripe-js'
 import Loading from '@/components/loading'
 import price from '@/helpers/price'
+const { isQrClientAccess } = require('@/helpers/checkoutAccess')
 export default {
   components: {
     Loading,
@@ -211,6 +221,11 @@ export default {
     isValue: false,
     loadingBtn: false,
     loadPage: false,
+    stripe: null,
+    stripeElements: null,
+    stripePaymentReady: false,
+    stripePaymentIntentId: null,
+    stripeOrderId: null,
     kitchenClosedSnackbar: false,
     kitchenClosedMessage:
       'La cuisine est fermée. Aucune nouvelle commande possible.',
@@ -252,10 +267,43 @@ export default {
         this.$store.get('shop/kitchen_closed')
       )
     },
+    qrPaymentMode() {
+      return this.$store.get('shop/qr_payment_mode') || 'stripe_before_order'
+    },
+    isQrClient() {
+      return isQrClientAccess(this.access)
+    },
+    isStripeCheckout() {
+      return this.isQrClient && this.qrPaymentMode === 'stripe_before_order'
+    },
+    isCounterCheckout() {
+      return this.isQrClient && this.qrPaymentMode === 'pay_at_counter'
+    },
+    clientPaymentMessage() {
+      if (this.isCounterCheckout) {
+        return 'La commande sera envoyée au restaurant. Le paiement se fera au comptoir à la fin.'
+      }
+      return 'Le paiement se fait par carte, Apple Pay ou Google Pay avant envoi en cuisine.'
+    },
+    checkoutButtonLabel() {
+      if (this.isStripeCheckout && this.stripePaymentReady) {
+        return 'Confirmer le paiement'
+      }
+      if (this.isStripeCheckout) return 'Payer'
+      if (this.isCounterCheckout) return 'Payer au comptoir'
+      return 'Commander'
+    },
+    checkoutButtonIcon() {
+      if (this.isCounterCheckout) return 'mdi-cash-register'
+      if (this.isStripeCheckout) return 'mdi-credit-card-check'
+      return 'mdi-silverware-fork-knife'
+    },
   },
-  mounted() {
+  async mounted() {
+    this.loadPage = true
     this.total = this.totalCart
-    this.$store.dispatch('shop/getCurrentShopInfo')
+    await this.$store.dispatch('shop/getCurrentShopInfo')
+    this.loadPage = false
   },
   methods: {
     productImageSrc(image) {
@@ -268,11 +316,23 @@ export default {
         return
       }
 
+      if (this.isStripeCheckout) {
+        await this.handleStripePayment()
+        return
+      }
+
+      const paymentMethod = this.isCounterCheckout
+        ? 'Paiement au comptoir'
+        : this.formuser.payment
+      await this.submitOrderWithoutStripe(paymentMethod)
+    },
+    async submitOrderWithoutStripe(paymentMethod) {
+      this.loadingBtn = true
       const params = {
         customer: this.formuser.customer,
         customerID: this.selectedTable,
         subtotal: this.roundPrice(this.total),
-        payment: this.formuser.payment,
+        payment: paymentMethod,
         remark: this.formuser.notes,
         phone: this.formuser.phone,
         status: 1, // 1 pending & 2 approve
@@ -281,7 +341,7 @@ export default {
       console.log('Parametre de la commande ', params)
       const res = await this.$store.dispatch('cart/postOrder', params)
       if (res) {
-        this.dataCart.forEach((e) => {
+        for (const e of this.dataCart) {
           const detailData = {
             orderid: this.insertId,
             productid: e.id,
@@ -292,22 +352,91 @@ export default {
             customizationList: e.customizationList,
             operator: 2,
           }
-          const detail = this.$store.dispatch(
-            'cart/postDetailOrder',
-            detailData
-          )
-          if (detail) {
-            // alert('Order success!')
-            this.$store.set('stateDialog', false)
-            this.$router.push('/menus')
-          } else {
-            this.$store.set('stateDialog', false)
-            this.$router.push('/menus')
-          }
-        })
+          await this.$store.dispatch('cart/postDetailOrder', detailData)
+        }
+        this.$store.set('stateDialog', false)
+        this.$store.dispatch('cart/setTotal', 0)
+        this.$store.dispatch('cart/setIndex', 0)
+        this.$store.dispatch('cart/setTocart', null)
+        this.$router.push(this.isQrClient ? '/ordersStatuses' : '/menus')
       } else {
         // console.log(this.message)
       }
+      this.loadingBtn = false
+    },
+    buildOrderPayload() {
+      return {
+        customer: this.formuser.customer,
+        customerID: this.selectedTable,
+        subtotal: this.roundPrice(this.total),
+        payment: 'Stripe',
+        remark: this.formuser.notes,
+        phone: this.formuser.phone,
+        status: 0,
+        created: new Date(),
+        items: this.dataCart.map((e) => ({
+          productid: e.id,
+          price: this.roundPrice(e.price),
+          qty: e.qty,
+          total: this.roundPrice(e.qty * this.parsePrice(e.price)),
+          customizationList: e.customizationList,
+        })),
+      }
+    },
+    async handleStripePayment() {
+      this.loadingBtn = true
+
+      if (!this.stripePaymentReady) {
+        const payment = await this.$store.dispatch(
+          'cart/createStripeQrTablePayment',
+          this.buildOrderPayload()
+        )
+
+        if (!payment || !payment.clientSecret || !payment.publishableKey) {
+          this.loadingBtn = false
+          return
+        }
+
+        this.stripe = await loadStripe(payment.publishableKey)
+        this.stripeElements = this.stripe.elements({
+          clientSecret: payment.clientSecret,
+        })
+        const paymentElement = this.stripeElements.create('payment')
+        paymentElement.mount(this.$refs.stripePaymentElement)
+        this.stripePaymentReady = true
+        this.stripePaymentIntentId = payment.paymentIntentId
+        this.stripeOrderId = payment.orderId
+        this.loadingBtn = false
+        return
+      }
+
+      const result = await this.stripe.confirmPayment({
+        elements: this.stripeElements,
+        redirect: 'if_required',
+        confirmParams: {
+          return_url: `${window.location.origin}/ordersStatuses`,
+        },
+      })
+
+      this.loadingBtn = false
+
+      if (result.error) {
+        this.$store.dispatch(
+          'notifications/error',
+          result.error.message || 'Le paiement a echoue.'
+        )
+        return
+      }
+
+      this.$store.dispatch(
+        'notifications/success',
+        'Paiement envoye. La commande sera confirmee par Stripe.'
+      )
+      this.$store.set('stateDialog', false)
+      this.$store.dispatch('cart/setTotal', 0)
+      this.$store.dispatch('cart/setIndex', 0)
+      this.$store.dispatch('cart/setTocart', null)
+      this.$router.push('/ordersStatuses')
     },
     cancelCart() {
       this.$store.set('stateDialog', false)
@@ -346,6 +475,13 @@ export default {
 .cart-checkout-btn ::v-deep .v-btn__content {
   min-width: 0;
   white-space: nowrap;
+}
+
+.stripe-payment-element {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
 }
 
 @media (min-width: 600px) and (max-width: 1263px) {

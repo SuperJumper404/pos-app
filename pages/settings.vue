@@ -35,6 +35,53 @@
             <v-icon> mdi-arrow-top-right </v-icon>
           </v-btn>
         </v-row>
+        <v-card outlined class="mt-6 pa-4">
+          <h3>Mode paiement QR table</h3>
+          <v-select
+            v-model="formShop.qr_payment_mode"
+            :items="qrPaymentModes"
+            item-text="text"
+            item-value="value"
+            label="Encaissement client"
+            class="mt-3"
+            outlined
+            dense
+            hide-details
+          ></v-select>
+          <v-alert
+            v-if="
+              formShop.qr_payment_mode === 'stripe_before_order' && !stripeReady
+            "
+            dense
+            text
+            type="warning"
+            class="mt-4 mb-0"
+          >
+            Connectez Stripe avant d'imposer le paiement en ligne.
+          </v-alert>
+        </v-card>
+        <v-card outlined class="mt-6 pa-4">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <h3>Paiements Stripe</h3>
+              <p class="mb-0">
+                {{ stripeStatusLabel }}
+              </p>
+            </div>
+            <v-chip :color="stripeReady ? 'success' : 'warning'" dark small>
+              {{ stripeReady ? 'Actif' : 'A configurer' }}
+            </v-chip>
+          </div>
+          <v-btn
+            class="mt-4 text-none"
+            color="primary"
+            :loading="stripeLoading"
+            @click="connectStripe"
+          >
+            Connecter Stripe
+            <v-icon small right>mdi-credit-card-check</v-icon>
+          </v-btn>
+        </v-card>
       </v-col>
 
       <v-col cols="6">
@@ -317,10 +364,21 @@ export default {
     editableForm: false,
     loadPage: false,
     loadingBtnImg: false,
+    stripeLoading: false,
     isValue: true,
     loadingBtn: false,
     shopId: localStorage.getItem('shopid'),
     AllPaymentsMethods: ['Cheques', 'Especes', 'Tickets Restaurants'],
+    qrPaymentModes: [
+      {
+        text: 'Stripe obligatoire avant commande',
+        value: 'stripe_before_order',
+      },
+      {
+        text: 'Payer au comptoir à la fin',
+        value: 'pay_at_counter',
+      },
+    ],
     shopImg: null,
     imageUrl: null,
     formShop: {
@@ -341,6 +399,7 @@ export default {
       shop_printer_ip: '',
       smart_print_app: '',
       activate_tva: false,
+      qr_payment_mode: 'stripe_before_order',
     },
     valid: true,
     nameRules: [
@@ -401,6 +460,21 @@ export default {
     activate_tva() {
       return this.$store.get('shop/activate_tva')
     },
+    qr_payment_mode() {
+      return this.$store.get('shop/qr_payment_mode') || 'stripe_before_order'
+    },
+    stripeReady() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/stripe_charges_enabled')
+      )
+    },
+    stripeStatusLabel() {
+      if (this.stripeReady) return 'Le restaurant peut recevoir les paiements.'
+      if (this.$store.get('shop/stripe_account_id')) {
+        return 'Compte cree, onboarding Stripe a terminer.'
+      }
+      return 'Connectez Stripe pour accepter Apple Pay, Google Pay et carte.'
+    },
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
@@ -446,7 +520,10 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    const calls = [this.$store.dispatch('shop/getShopInfo')]
+    const calls = [
+      this.$store.dispatch('shop/getShopInfo'),
+      this.$store.dispatch('shop/getStripeConnectStatus'),
+    ]
 
     Promise.all(calls)
       .then(() => {
@@ -472,6 +549,7 @@ export default {
         this.formShop.shop_siret = this.shop_siret
         this.formShop.smart_print_app = this.smart_print_app
         this.formShop.activate_tva = this.activate_tva
+        this.formShop.qr_payment_mode = this.qr_payment_mode
 
         console.log('Form Shop', this.formShop)
         this.imageUrl = `${this.staticURL}/api/v1/imgprofile/${this.formShop.shop_profile_image}`
@@ -482,6 +560,14 @@ export default {
       })
   },
   methods: {
+    async connectStripe() {
+      this.stripeLoading = true
+      const link = await this.$store.dispatch('shop/createStripeOnboardingLink')
+      this.stripeLoading = false
+      if (link && link.url) {
+        window.location.href = link.url
+      }
+    },
     async submitShopEdit() {
       if (this.isValue) {
         this.loadingBtn = true

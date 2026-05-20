@@ -36,8 +36,18 @@
             <div class="mb-1 black--text">
               Paiement : <b>{{ item.payment }}</b>
             </div>
+
+            <div class="mb-1 black--text">
+              Statut paiement :
+              <v-chip x-small dark :color="paymentStatusColor(item)">
+                {{ paymentStatusText(item) }}
+              </v-chip>
+            </div>
           </v-card-subtitle>
           <v-card-text>
+            <v-chip v-if="item.status === 0" color="info" class="mb-2">
+              Paiement en attente
+            </v-chip>
             <v-chip v-if="item.status === 1" color="grey" class="mb-2">
               En attente
             </v-chip>
@@ -62,7 +72,7 @@
               <v-icon small right>mdi-information-outline</v-icon>
             </v-btn>
             <v-btn
-              v-if="item.status !== 4 && item.status !== 3 && item.status !== 2"
+              v-if="canCancelOrder(item)"
               outlined
               small
               color="red"
@@ -119,6 +129,11 @@
         <template #[`item.subtotal`]="{ item }">
           <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
+        <template #[`item.payment_status`]="{ item }">
+          <v-chip small dark :color="paymentStatusColor(item)">
+            {{ paymentStatusText(item) }}
+          </v-chip>
+        </template>
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
@@ -167,6 +182,10 @@
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import moment from 'moment'
+const {
+  getPaymentStatusText,
+  getPaymentStatusColor,
+} = require('@/helpers/paymentStatus')
 
 export default {
   mixins: [formatdate, price],
@@ -195,6 +214,7 @@ export default {
         { text: 'Client', value: 'customer', filterable: true, width: '100px' },
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true, width: '100px' },
+        { text: 'Paiement', value: 'payment_status', filterable: true },
         { text: 'Status', value: 'status', filterable: true },
         { text: 'Actions', value: 'actions', width: '500px' },
       ],
@@ -282,6 +302,7 @@ export default {
   },
   mounted() {
     this.loadPage = true
+    this.$store.dispatch('cart/hydrateOrdersSent')
     this.pollData()
     this.$store
       .dispatch('orders/getOrdersByUserId', {
@@ -304,6 +325,15 @@ export default {
       const displayTime = moment(new Date(time)).format('DD/MM à HH:mm')
       console.log(displayTime)
       return displayTime
+    },
+    canCancelOrder(item) {
+      return ![0, 2, 3, 4].includes(item.status)
+    },
+    paymentStatusText(item) {
+      return getPaymentStatusText(item)
+    },
+    paymentStatusColor(item) {
+      return getPaymentStatusColor(item)
     },
     async btnCancel(id) {
       const data = {

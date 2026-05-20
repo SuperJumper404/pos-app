@@ -15,6 +15,12 @@
         class="mt-5 overflow-y-auto"
         style="height: 400px"
       >
+        <v-card-text v-if="orderPaymentStatus" class="pb-0">
+          Statut paiement :
+          <v-chip small dark :color="paymentStatusColor(orderPaymentStatus)">
+            {{ paymentStatusText(orderPaymentStatus) }}
+          </v-chip>
+        </v-card-text>
         <v-card
           v-for="(itm, i) in detailOrder"
           :key="i"
@@ -154,6 +160,12 @@
         class="mt-5 overflow-y-auto"
         style="height: 400px"
       >
+        <v-card-text v-if="orderPaymentStatus" class="pb-0">
+          Statut paiement :
+          <v-chip small dark :color="paymentStatusColor(orderPaymentStatus)">
+            {{ paymentStatusText(orderPaymentStatus) }}
+          </v-chip>
+        </v-card-text>
         <v-card
           v-for="(itm, i) in detailOrder"
           :key="i"
@@ -258,6 +270,10 @@
 </template>
 <script>
 import price from '@/helpers/price'
+const {
+  getPaymentStatusText,
+  getPaymentStatusColor,
+} = require('@/helpers/paymentStatus')
 export default {
   mixins: [price],
   layout() {
@@ -287,6 +303,9 @@ export default {
       const remark = this.detailOrder[0] && this.detailOrder[0].remark
       return typeof remark === 'string' ? remark.trim() : ''
     },
+    orderPaymentStatus() {
+      return this.detailOrder[0] || null
+    },
   },
   async mounted() {
     this.loadPage = true
@@ -300,6 +319,12 @@ export default {
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
+    },
+    paymentStatusText(item) {
+      return getPaymentStatusText(item)
+    },
+    paymentStatusColor(item) {
+      return getPaymentStatusColor(item)
     },
   },
 }
