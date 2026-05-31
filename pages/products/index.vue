@@ -3,7 +3,7 @@
     <v-card v-if="loadPage" outlined class="mt-5" style="height: 350px">
       <Loading />
     </v-card>
-    <v-card v-else outlined class="product-page-card mt-5">
+    <v-card v-else ref="productsCard" outlined class="product-page-card mt-5">
       <v-app-bar flat color="grey lighten-4" light class="d-flex justify-end">
         <v-btn
           color="primaryPurple lighten-1"
@@ -218,11 +218,26 @@ export default {
       return this.$store.get('products/totalPage')
     },
   },
+  watch: {
+    dataProduct() {
+      this.scheduleFit(true)
+    },
+  },
   mounted() {
     this.loadPage = true
     this.$store.dispatch('products/getProducts').finally(() => {
       this.loadPage = false
+      this.$nextTick(this.applyFit)
     })
+    window.addEventListener('resize', this.scheduleFit)
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(this.scheduleFit)
+    }
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.scheduleFit)
+    if (this.resizeObserver) this.resizeObserver.disconnect()
+    if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
   },
   methods: {
     productImageSrc(image) {
@@ -245,6 +260,55 @@ export default {
       })
       this.visibilityLoadingId = null
     },
+    scheduleFit(force) {
+      if (force === true) this.fitForce = true
+      if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
+      this.fitRaf = requestAnimationFrame(() => {
+        this.fitRaf = null
+        const f = this.fitForce
+        this.fitForce = false
+        this.applyFit(f)
+      })
+    },
+    // Reduit la carte produits (min-width: 1280px) pour qu'elle tienne dans la
+    // largeur de l'ecran, sans scroll horizontal, via la propriete CSS `zoom`.
+    applyFit(force) {
+      const card = this.$refs.productsCard && this.$refs.productsCard.$el
+      if (!card) return
+      const parent = card.parentElement
+      if (!parent) return
+
+      // Largeur reellement disponible pour la carte (contenu du conteneur)
+      const cs = window.getComputedStyle(parent)
+      const available =
+        parent.clientWidth -
+        parseFloat(cs.paddingLeft || 0) -
+        parseFloat(cs.paddingRight || 0)
+
+      // Garde anti-boucle : le zoom modifie la hauteur (donc re-declenche le
+      // ResizeObserver). On ne recalcule que si la largeur a change.
+      if (
+        !force &&
+        this.observing &&
+        Math.abs(available - (this.lastAvailable || 0)) < 1
+      ) {
+        return
+      }
+      this.lastAvailable = available
+
+      // Reset avant de mesurer la largeur naturelle de la carte
+      card.style.zoom = ''
+      const natural = card.scrollWidth
+      if (!natural || !available) return
+
+      const scale = Math.min(1, available / natural)
+      card.style.zoom = scale < 1 ? String(scale) : ''
+
+      if (this.resizeObserver && !this.observing) {
+        this.resizeObserver.observe(parent)
+        this.observing = true
+      }
+    },
   },
 }
 </script>
@@ -257,7 +321,7 @@ export default {
 .product-page-card {
   box-sizing: border-box;
   max-width: none;
-  min-width: 1280px;
+  min-width: 1300px;
   overflow: visible;
   width: 100%;
 }
@@ -288,7 +352,7 @@ export default {
     210px
     280px;
   min-width: 0;
-  padding: 0 8px 0 0 !important;
+  padding: 0 20px 0 0 !important;
   width: auto;
 }
 

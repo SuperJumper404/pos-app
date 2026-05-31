@@ -24,12 +24,9 @@
     >
       <Loading />
     </v-card>
-    <v-card v-else outlined class="mt-5 full-width">
+    <v-card v-else ref="ordersCard" outlined class="mt-5 full-width">
       <v-app-bar flat color="grey lighten-4" light>
-        <v-spacer></v-spacer>
-        <v-spacer></v-spacer>
-        <v-spacer></v-spacer>
-        <div class="kitchen-toggle mr-3">
+        <div class="kitchen-toggle">
           <v-switch
             :input-value="isKitchenClosed"
             :loading="kitchenToggleLoading"
@@ -43,27 +40,28 @@
             @change="toggleKitchenClosed"
           ></v-switch>
         </div>
+
         <v-spacer></v-spacer>
-        <div>
-          <v-btn
-            v-if="selectedOrders.length"
-            color="red"
-            elevation="3"
-            style="color: white; height: 40px; margin: 0px 8px 2px 0px"
-            :loading="deleteLoading"
-            @click="deleteSelectedOrders()"
-            >Supprimer
-            <v-icon small right>mdi-trash-can</v-icon>
-          </v-btn>
-        </div>
+
+        <v-btn
+          v-if="selectedOrders.length"
+          color="red"
+          dark
+          elevation="3"
+          class="mr-3"
+          :loading="deleteLoading"
+          @click="deleteSelectedOrders()"
+          >Supprimer
+          <v-icon small right>mdi-trash-can</v-icon>
+        </v-btn>
 
         <v-text-field
           v-model="searchFilter"
-          class="mt-6"
-          placeholder="Recherche une commande, table ou client"
-          label="Rechercher une commande, table ou client"
+          style="max-width: 320px"
+          placeholder="Rechercher une commande, table ou client"
           outlined
           dense
+          hide-details
           append-icon="mdi-card-search"
         ></v-text-field>
       </v-app-bar>
@@ -78,11 +76,8 @@
         <template #[`item.ordernumber`]="{ item }">
           <div class="order-reference">
             <div class="order-reference__number">#{{ item.ordernumber }}</div>
-            <div class="order-reference__time">
-              {{ orderHour(item.created) }}
-            </div>
             <div class="order-reference__date">
-              {{ orderDate(item.created) }}
+              {{ orderHour(item.created) }} • {{ orderDayMonth(item.created) }}
             </div>
           </div>
         </template>
@@ -257,6 +252,14 @@ export default {
       }
     },
   },
+  watch: {
+    dataOrders() {
+      this.scheduleFit(true)
+    },
+    searchFilter() {
+      this.scheduleFit(true)
+    },
+  },
   mounted() {
     this.loadPage = true
     Promise.all([
@@ -264,11 +267,19 @@ export default {
       this.$store.dispatch('shop/getShopInfo'),
     ]).finally(() => {
       this.loadPage = false
+      this.$nextTick(this.applyFit)
     })
     this.pollData()
+    window.addEventListener('resize', this.scheduleFit)
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(this.scheduleFit)
+    }
   },
   beforeDestroy() {
     clearInterval(this.polling)
+    window.removeEventListener('resize', this.scheduleFit)
+    if (this.resizeObserver) this.resizeObserver.disconnect()
+    if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
   },
   methods: {
     async toggleKitchenClosed(value) {
@@ -451,6 +462,56 @@ export default {
     },
     orderDate(time) {
       return moment(new Date(time)).format('DD/MM/YYYY')
+    },
+    orderDayMonth(time) {
+      return moment(new Date(time)).format('DD/MM')
+    },
+    scheduleFit(force) {
+      if (force === true) this.fitForce = true
+      if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
+      this.fitRaf = requestAnimationFrame(() => {
+        this.fitRaf = null
+        const f = this.fitForce
+        this.fitForce = false
+        this.applyFit(f)
+      })
+    },
+    // Reduit le tableau pour qu'il tienne dans la largeur de l'ecran, sans
+    // scroll horizontal, via la propriete CSS `zoom` (reflow naturel : pas de
+    // compensation de hauteur a faire).
+    applyFit(force) {
+      const card = this.$refs.ordersCard && this.$refs.ordersCard.$el
+      if (!card) return
+      const el = card.querySelector('.v-data-table')
+      if (!el) return
+
+      // Garde anti-boucle : le zoom modifie la hauteur de la carte, ce qui
+      // re-declenche le ResizeObserver. On ne recalcule que si la largeur a
+      // change, sauf si force=true (changement de donnees / recherche).
+      const available = card.clientWidth
+      if (
+        !force &&
+        this.observing &&
+        Math.abs(available - (this.lastAvailable || 0)) < 1
+      ) {
+        return
+      }
+      this.lastAvailable = available
+
+      // Reset avant de mesurer la largeur naturelle du tableau
+      el.style.zoom = ''
+
+      const table = el.querySelector('.v-data-table__wrapper table')
+      const natural = table ? table.scrollWidth : el.scrollWidth
+      if (!natural || !available) return
+
+      const scale = Math.min(1, available / natural)
+      el.style.zoom = scale < 1 ? String(scale) : ''
+
+      if (this.resizeObserver && !this.observing) {
+        this.resizeObserver.observe(card)
+        this.observing = true
+      }
     },
     paymentStatusText(item) {
       return getPaymentStatusText(item)
@@ -740,6 +801,18 @@ export default {
 }
 </script>
 <style scoped>
+/* Bug connu Vuetify (#10164) : les entetes de v-data-table se desalignent
+   selon la largeur quand une cellule d'entete passe sur 2 lignes. On force le
+   non-retour a la ligne et un alignement vertical coherent entete/corps. */
+::v-deep .v-data-table-header th {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+::v-deep .v-data-table td {
+  vertical-align: middle;
+}
+
 .kitchen-toggle {
   min-width: 170px;
 }
@@ -750,19 +823,13 @@ export default {
 }
 
 .order-reference__number {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 700;
   color: rgba(0, 0, 0, 0.87);
 }
 
-.order-reference__time {
-  margin-top: 2px;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.87);
-}
-
 .order-reference__date {
+  margin-top: 2px;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.6);
 }

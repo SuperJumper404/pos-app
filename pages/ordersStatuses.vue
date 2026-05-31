@@ -34,19 +34,15 @@
             </div>
 
             <div class="mb-1 black--text">
-              Paiement : <b>{{ item.payment }}</b>
-            </div>
-
-            <div class="mb-1 black--text">
-              Statut paiement :
-              <v-chip x-small dark :color="paymentStatusColor(item)">
-                {{ paymentStatusText(item) }}
+              Paiement :
+              <v-chip small dark :color="paymentStatusColor(item)">
+                {{ paymentSummary(item) }}
               </v-chip>
             </div>
           </v-card-subtitle>
           <v-card-text>
             <v-chip v-if="item.status === 0" color="info" class="mb-2">
-              Paiement en attente
+              En attente
             </v-chip>
             <v-chip v-if="item.status === 1" color="grey" class="mb-2">
               En attente
@@ -334,6 +330,23 @@ export default {
     },
     paymentStatusColor(item) {
       return getPaymentStatusColor(item)
+    },
+    // Fusionne moyen de paiement + statut en un libelle oriente client :
+    // ce qui compte pour lui, c'est "est-ce paye, et comment ?".
+    paymentSummary(item) {
+      const method = (item.payment || '').toString().trim()
+      switch (item.payment_status) {
+        case 'paid':
+          return method ? `Payé · ${method}` : 'Payé'
+        case 'unpaid':
+          if (/comptoir/i.test(method)) return 'À régler au comptoir'
+          return method ? `À régler · ${method}` : 'À régler'
+        case 'requires_payment':
+          return 'En attente'
+        default:
+          // failed -> Échoué, canceled -> Annulée, refunded -> Remboursé
+          return this.paymentStatusText(item)
+      }
     },
     async btnCancel(id) {
       const data = {

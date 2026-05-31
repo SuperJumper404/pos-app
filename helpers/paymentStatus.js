@@ -16,7 +16,7 @@ const PAYMENT_STATUS_DISPLAY = {
     color: 'error',
   },
   canceled: {
-    text: 'Paiement annulé',
+    text: 'Annulée',
     color: 'warning',
   },
   refunded: {

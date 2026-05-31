@@ -98,7 +98,7 @@ assert.strictEqual(getPaymentStatusText({ payment_status: 'failed' }), 'Échoué
 assert.strictEqual(getPaymentStatusColor({ payment_status: 'failed' }), 'error')
 assert.strictEqual(
   getPaymentStatusText({ payment_status: 'canceled' }),
-  'Paiement annulé'
+  'Annulée'
 )
 assert.strictEqual(
   getPaymentStatusColor({ payment_status: 'canceled' }),
