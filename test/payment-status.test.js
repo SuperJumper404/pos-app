@@ -66,7 +66,7 @@ assert.deepStrictEqual(
   getPaymentStatusDisplay({ payment_status: 'requires_payment' }),
   {
     text: 'En attente',
-    color: 'info',
+    color: 'indigo',
   }
 )
 

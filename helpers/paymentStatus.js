@@ -5,7 +5,7 @@ const PAYMENT_STATUS_DISPLAY = {
   },
   requires_payment: {
     text: 'En attente',
-    color: 'info',
+    color: 'indigo',
   },
   unpaid: {
     text: 'À encaisser',

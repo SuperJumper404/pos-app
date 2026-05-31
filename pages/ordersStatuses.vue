@@ -41,7 +41,7 @@
             </div>
           </v-card-subtitle>
           <v-card-text>
-            <v-chip v-if="item.status === 0" color="info" class="mb-2">
+            <v-chip v-if="item.status === 0" color="grey" class="mb-2">
               En attente
             </v-chip>
             <v-chip v-if="item.status === 1" color="grey" class="mb-2">
