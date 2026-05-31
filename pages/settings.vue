@@ -35,53 +35,6 @@
             <v-icon> mdi-arrow-top-right </v-icon>
           </v-btn>
         </v-row>
-        <v-card outlined class="mt-6 pa-4">
-          <h3>Mode paiement QR table</h3>
-          <v-select
-            v-model="formShop.qr_payment_mode"
-            :items="qrPaymentModes"
-            item-text="text"
-            item-value="value"
-            label="Encaissement client"
-            class="mt-3"
-            outlined
-            dense
-            hide-details
-          ></v-select>
-          <v-alert
-            v-if="
-              formShop.qr_payment_mode === 'stripe_before_order' && !stripeReady
-            "
-            dense
-            text
-            type="warning"
-            class="mt-4 mb-0"
-          >
-            Connectez Stripe avant d'imposer le paiement en ligne.
-          </v-alert>
-        </v-card>
-        <v-card outlined class="mt-6 pa-4">
-          <div class="d-flex align-center justify-space-between">
-            <div>
-              <h3>Paiements Stripe</h3>
-              <p class="mb-0">
-                {{ stripeStatusLabel }}
-              </p>
-            </div>
-            <v-chip :color="stripeReady ? 'success' : 'warning'" dark small>
-              {{ stripeReady ? 'Actif' : 'A configurer' }}
-            </v-chip>
-          </div>
-          <v-btn
-            class="mt-4 text-none"
-            color="primary"
-            :loading="stripeLoading"
-            @click="connectStripe"
-          >
-            Connecter Stripe
-            <v-icon small right>mdi-credit-card-check</v-icon>
-          </v-btn>
-        </v-card>
       </v-col>
 
       <v-col cols="6">
@@ -244,6 +197,56 @@
             ></v-switch>
           </div>
         </v-col>
+
+        <v-col cols="6">
+          <v-card class="pa-4">
+            <div class="mb-5 flex" style="justify-items: center">
+              <h3>Encaissement à table via mobile</h3>
+            </div>
+
+            <h4 class="mb-3">Encaissement avant la commande</h4>
+            <v-switch
+              v-model="paymentBeforeOrder"
+              color="success"
+              class="mt-0"
+              label="Encaissement obligatoire avant la commande"
+            ></v-switch>
+            <v-alert
+              v-if="paymentBeforeOrder && !stripeReady"
+              dense
+              text
+              type="warning"
+              class="mt-2 mb-0"
+            >
+              Connectez Stripe afin de pouvoir utiliser l'encaissement à table
+              et le paiement par carte. Sans Stripe, vos clients devront payer
+              au comptoir.
+            </v-alert>
+
+            <v-divider class="my-5"></v-divider>
+
+            <div class="d-flex align-center justify-space-between">
+              <div>
+                <h4>Paiements Stripe</h4>
+                <p class="mb-0 mt-2">
+                  {{ stripeStatusLabel }}
+                </p>
+              </div>
+              <v-chip :color="stripeReady ? 'success' : 'warning'" dark small>
+                {{ stripeReady ? 'Actif' : 'A configurer' }}
+              </v-chip>
+            </div>
+            <v-btn
+              class="mt-4 text-none"
+              color="primary"
+              :loading="stripeLoading"
+              @click="connectStripe"
+            >
+              Connecter Stripe
+              <v-icon small right>mdi-credit-card-check</v-icon>
+            </v-btn>
+          </v-card>
+        </v-col>
         <v-col cols="6">
           <div class="mb-5 flex" style="justify-items: center">
             <h3>Réseaux Sociaux</h3>
@@ -318,7 +321,7 @@
       </v-row>
 
       <v-btn
-        :disabled="!isValue"
+        :disabled="!isValue || !isDirty"
         :loading="loadingBtn"
         class="ml-4 text-none"
         type="submit"
@@ -366,19 +369,11 @@ export default {
     loadingBtnImg: false,
     stripeLoading: false,
     isValue: true,
+    isDirty: false,
+    formReady: false,
     loadingBtn: false,
     shopId: localStorage.getItem('shopid'),
     AllPaymentsMethods: ['Cheques', 'Especes', 'Tickets Restaurants'],
-    qrPaymentModes: [
-      {
-        text: 'Stripe obligatoire avant commande',
-        value: 'stripe_before_order',
-      },
-      {
-        text: 'Payer au comptoir à la fin',
-        value: 'pay_at_counter',
-      },
-    ],
     shopImg: null,
     imageUrl: null,
     formShop: {
@@ -468,6 +463,16 @@ export default {
         this.$store.get('shop/stripe_charges_enabled')
       )
     },
+    paymentBeforeOrder: {
+      get() {
+        return this.formShop.qr_payment_mode === 'stripe_before_order'
+      },
+      set(val) {
+        this.formShop.qr_payment_mode = val
+          ? 'stripe_before_order'
+          : 'pay_at_counter'
+      },
+    },
     stripeStatusLabel() {
       if (this.stripeReady) return 'Le restaurant peut recevoir les paiements.'
       if (this.$store.get('shop/stripe_account_id')) {
@@ -480,6 +485,13 @@ export default {
     },
   },
   watch: {
+    formShop: {
+      deep: true,
+      handler() {
+        // Ignore les mutations du pré-remplissage initial (mounted)
+        if (this.formReady) this.isDirty = true
+      },
+    },
     shopImg: {
       immediate: false,
       async handler(newBlob) {
@@ -554,6 +566,11 @@ export default {
         console.log('Form Shop', this.formShop)
         this.imageUrl = `${this.staticURL}/api/v1/imgprofile/${this.formShop.shop_profile_image}`
         console.log(this.imageUrl)
+
+        // Active le suivi des modifications une fois le pré-remplissage terminé
+        this.$nextTick(() => {
+          this.formReady = true
+        })
       })
       .finally(() => {
         this.loadPage = false
@@ -578,10 +595,17 @@ export default {
         if (res) {
           this.stsMsg = true
           this.loadingBtn = false
+          this.isDirty = false
+          this.$store.dispatch('notifications/success', {
+            message: 'Réglages enregistrés avec succès.',
+          })
           this.$router.push('/settings')
         } else {
           this.stsMsg = true
           this.loadingBtn = false
+          this.$store.dispatch('notifications/error', {
+            message: "Échec de l'enregistrement des réglages.",
+          })
         }
         // logique de soumission ici, par exemple :
         // appel API pour soumettre les données du formulaire

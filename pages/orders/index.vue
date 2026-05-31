@@ -75,9 +75,15 @@
         :hide-default-header="$vuetify.breakpoint.smAndDown"
         show-select
       >
-        <template #[`item.created`]="{ item }">
-          <div>
-            {{ orderTime(item.created) }}
+        <template #[`item.ordernumber`]="{ item }">
+          <div class="order-reference">
+            <div class="order-reference__number">#{{ item.ordernumber }}</div>
+            <div class="order-reference__time">
+              {{ orderHour(item.created) }}
+            </div>
+            <div class="order-reference__date">
+              {{ orderDate(item.created) }}
+            </div>
           </div>
         </template>
         <template #[`item.subtotal`]="{ item }">
@@ -93,8 +99,8 @@
           <v-chip v-if="item.status === 2" color="success">
             En preparation
           </v-chip>
-          <v-chip v-if="item.status === 3" color="primary"> Terminer </v-chip>
-          <v-chip v-if="item.status === 4" color="warning"> Annuler </v-chip>
+          <v-chip v-if="item.status === 3" color="primary"> Terminée </v-chip>
+          <v-chip v-if="item.status === 4" color="warning"> Annulée </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
           <v-row class="d-flex flex-nowrap" dense>
@@ -188,9 +194,8 @@ export default {
       searchFilter: '',
       selectedOrders: [],
       headers: [
-        { text: 'Date', value: 'created', filterable: true },
         {
-          text: 'Numero de commande',
+          text: 'Commande',
           value: 'ordernumber',
           filterable: true,
         },
@@ -441,8 +446,11 @@ export default {
         this.errMsg = true
       }
     },
-    orderTime(time) {
-      return moment(new Date(time)).format('DD/MM à HH:mm')
+    orderHour(time) {
+      return moment(new Date(time)).format('HH:mm')
+    },
+    orderDate(time) {
+      return moment(new Date(time)).format('DD/MM/YYYY')
     },
     paymentStatusText(item) {
       return getPaymentStatusText(item)
@@ -734,5 +742,28 @@ export default {
 <style scoped>
 .kitchen-toggle {
   min-width: 170px;
+}
+
+.order-reference {
+  min-width: 96px;
+  line-height: 1.25;
+}
+
+.order-reference__number {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.order-reference__time {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.order-reference__date {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
 }
 </style>

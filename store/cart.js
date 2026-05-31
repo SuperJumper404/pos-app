@@ -138,4 +138,35 @@ export const actions = {
         return null
       })
   },
+  markStripeOrderPayAtCounter({ dispatch, commit }, orderId) {
+    return this.$axios
+      .post(
+        `/baseurl/api/v1/stripe/payment-intents/qr-table/${orderId}/pay-at-counter`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then((response) => {
+        commit('ADD_ORDER_SENT', orderId)
+        dispatch('set/message', response.data.message)
+        dispatch(
+          'notifications/success',
+          'Commande envoyée. Paiement au comptoir à la fin.',
+          { root: true }
+        )
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', error.response?.data?.message)
+        dispatch(
+          'notifications/error',
+          error.response?.data?.message || 'Impossible d’envoyer la commande.',
+          { root: true }
+        )
+        return false
+      })
+  },
 }

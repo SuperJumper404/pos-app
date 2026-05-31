@@ -100,7 +100,7 @@
               <v-icon small right>mdi-arrow-left</v-icon></v-btn
             >
           </v-card-actions>
-          <v-form v-else v-model="isValue" @submit.prevent="paymentBtn">
+          <v-form v-else v-model="isValue" @submit.prevent="paymentBtn()">
             <v-alert v-if="isKitchenClosed" dense text type="warning">
               La cuisine est fermée. Aucune nouvelle commande possible.
             </v-alert>
@@ -144,9 +144,41 @@
             </v-alert>
             <div
               v-show="isStripeCheckout && stripePaymentReady"
-              ref="stripePaymentElement"
-              class="stripe-payment-element mb-4"
-            ></div>
+              class="stripe-checkout-panel mb-4"
+            >
+              <div ref="stripePaymentElement"></div>
+              <v-btn
+                :disabled="!isValue || loadingBtn"
+                :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
+                block
+                color="success"
+                class="mt-4 text-none font-weight-bold"
+                @click="paymentBtn"
+              >
+                Confirmer le paiement
+                <v-icon small right>mdi-credit-card-check</v-icon>
+              </v-btn>
+              <div
+                v-if="showOrderWithoutPaymentButton"
+                class="cart-payment-separator"
+              >
+                <span></span>
+                <strong>OU</strong>
+                <span></span>
+              </div>
+              <v-btn
+                v-if="showOrderWithoutPaymentButton"
+                :disabled="!isValue || loadingBtn"
+                :loading="loadingBtn && selectedCheckoutFlow === 'counter'"
+                block
+                color="primary"
+                class="mt-2 text-none font-weight-bold"
+                @click="orderWithoutPayment"
+              >
+                Payer au comptoir
+                <v-icon small right>mdi-cash-register</v-icon>
+              </v-btn>
+            </div>
             <!-- struc -->
             <v-card-title>
               <h5>Total</h5>
@@ -154,10 +186,16 @@
               <h5>{{ formatCurrency(total) }}</h5>
             </v-card-title>
             <v-card-text> </v-card-text>
-            <v-card-actions class="cart-checkout-actions">
+            <v-card-actions
+              class="cart-checkout-actions"
+              :class="{
+                'cart-checkout-actions--single': !showFooterCheckoutButton,
+              }"
+            >
               <v-btn
-                :disabled="!isValue"
-                :loading="loadingBtn"
+                v-if="showFooterCheckoutButton"
+                :disabled="!isValue || loadingBtn"
+                :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
                 type="submit"
                 color="success"
                 class="
@@ -203,7 +241,10 @@
 import { loadStripe } from '@stripe/stripe-js'
 import Loading from '@/components/loading'
 import price from '@/helpers/price'
-const { isQrClientAccess } = require('@/helpers/checkoutAccess')
+const {
+  isCounterPaymentAllowed,
+  isQrClientAccess,
+} = require('@/helpers/checkoutAccess')
 export default {
   components: {
     Loading,
@@ -226,6 +267,7 @@ export default {
     stripePaymentReady: false,
     stripePaymentIntentId: null,
     stripeOrderId: null,
+    selectedCheckoutFlow: null,
     kitchenClosedSnackbar: false,
     kitchenClosedMessage:
       'La cuisine est fermée. Aucune nouvelle commande possible.',
@@ -273,15 +315,21 @@ export default {
     isQrClient() {
       return isQrClientAccess(this.access)
     },
-    isStripeCheckout() {
-      return this.isQrClient && this.qrPaymentMode === 'stripe_before_order'
+    isFlexibleQrCheckout() {
+      return this.isQrClient && isCounterPaymentAllowed(this.qrPaymentMode)
     },
-    isCounterCheckout() {
-      return this.isQrClient && this.qrPaymentMode === 'pay_at_counter'
+    isStripeCheckout() {
+      return this.isQrClient && this.selectedCheckoutFlow !== 'counter'
+    },
+    showOrderWithoutPaymentButton() {
+      return this.isFlexibleQrCheckout && this.stripePaymentReady
+    },
+    showFooterCheckoutButton() {
+      return !(this.isStripeCheckout && this.stripePaymentReady)
     },
     clientPaymentMessage() {
-      if (this.isCounterCheckout) {
-        return 'La commande sera envoyée au restaurant. Le paiement se fera au comptoir à la fin.'
+      if (this.isFlexibleQrCheckout) {
+        return 'Vous pouvez payer maintenant en ligne ou payer au comptoir à la fin.'
       }
       return 'Le paiement se fait par carte, Apple Pay ou Google Pay avant envoi en cuisine.'
     },
@@ -290,11 +338,9 @@ export default {
         return 'Confirmer le paiement'
       }
       if (this.isStripeCheckout) return 'Payer'
-      if (this.isCounterCheckout) return 'Payer au comptoir'
       return 'Commander'
     },
     checkoutButtonIcon() {
-      if (this.isCounterCheckout) return 'mdi-cash-register'
       if (this.isStripeCheckout) return 'mdi-credit-card-check'
       return 'mdi-silverware-fork-knife'
     },
@@ -316,15 +362,41 @@ export default {
         return
       }
 
-      if (this.isStripeCheckout) {
+      const flow = this.isQrClient ? 'stripe' : 'order'
+
+      this.selectedCheckoutFlow = flow
+
+      if (flow === 'stripe') {
         await this.handleStripePayment()
         return
       }
 
-      const paymentMethod = this.isCounterCheckout
-        ? 'Paiement au comptoir'
-        : this.formuser.payment
-      await this.submitOrderWithoutStripe(paymentMethod)
+      await this.submitOrderWithoutStripe(this.formuser.payment)
+    },
+    async orderWithoutPayment() {
+      if (!this.stripeOrderId) {
+        await this.submitOrderWithoutStripe('Paiement au comptoir')
+        return
+      }
+
+      this.selectedCheckoutFlow = 'counter'
+      this.loadingBtn = true
+      const res = await this.$store.dispatch(
+        'cart/markStripeOrderPayAtCounter',
+        this.stripeOrderId
+      )
+      this.loadingBtn = false
+
+      if (!res) {
+        this.selectedCheckoutFlow = 'stripe'
+        return
+      }
+
+      this.$store.set('stateDialog', false)
+      this.$store.dispatch('cart/setTotal', 0)
+      this.$store.dispatch('cart/setIndex', 0)
+      this.$store.dispatch('cart/setTocart', null)
+      this.$router.push('/ordersStatuses')
     },
     async submitOrderWithoutStripe(paymentMethod) {
       this.loadingBtn = true
@@ -372,7 +444,7 @@ export default {
         payment: 'Stripe',
         remark: this.formuser.notes,
         phone: this.formuser.phone,
-        status: 0,
+        status: 1,
         created: new Date(),
         items: this.dataCart.map((e) => ({
           productid: e.id,
@@ -472,16 +544,35 @@ export default {
   flex: 1 1 0;
 }
 
+.cart-checkout-actions--single .cart-checkout-btn--cancel {
+  flex: 1 1 100%;
+}
+
 .cart-checkout-btn ::v-deep .v-btn__content {
   min-width: 0;
   white-space: nowrap;
 }
 
-.stripe-payment-element {
+.stripe-checkout-panel {
   padding: 12px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   background: #fff;
+}
+
+.cart-payment-separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 2px;
+  color: #777;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cart-payment-separator span {
+  flex: 1 1 0;
+  border-top: 1px solid #dedede;
 }
 
 @media (min-width: 600px) and (max-width: 1263px) {

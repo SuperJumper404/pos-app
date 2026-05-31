@@ -4,16 +4,20 @@ const PAYMENT_STATUS_DISPLAY = {
     color: 'success',
   },
   requires_payment: {
-    text: 'Paiement en attente',
+    text: 'En attente',
     color: 'info',
   },
   unpaid: {
-    text: 'Non payé',
-    color: 'grey',
+    text: 'À encaisser',
+    color: 'orange',
   },
   failed: {
     text: 'Échoué',
     color: 'error',
+  },
+  canceled: {
+    text: 'Paiement annulé',
+    color: 'warning',
   },
   refunded: {
     text: 'Remboursé',
@@ -53,7 +57,7 @@ const getPaymentStatusDisplay = (order = {}) => {
 
   if (order.payment_status === 'unpaid' && isCounterPayment(order)) {
     return {
-      text: 'À payer au comptoir',
+      text: 'À encaisser',
       color: 'orange',
     }
   }
@@ -68,7 +72,8 @@ const getPaymentStatusDisplay = (order = {}) => {
 
 const getPaymentStatusText = (order = {}) => getPaymentStatusDisplay(order).text
 
-const getPaymentStatusColor = (order = {}) => getPaymentStatusDisplay(order).color
+const getPaymentStatusColor = (order = {}) =>
+  getPaymentStatusDisplay(order).color
 
 module.exports = {
   getPaymentStatusDisplay,
