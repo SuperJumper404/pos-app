@@ -139,9 +139,6 @@
               prepend-inner-icon="mdi-comment"
               placeholder="Ajouter une note à la commande"
             ></v-textarea>
-            <v-alert v-if="isQrClient" dense text type="info" class="mb-4">
-              {{ clientPaymentMessage }}
-            </v-alert>
             <div
               v-show="isStripeCheckout && stripePaymentReady"
               class="stripe-checkout-panel mb-4"
@@ -245,6 +242,10 @@ const {
   isCounterPaymentAllowed,
   isQrClientAccess,
 } = require('@/helpers/checkoutAccess')
+const {
+  buildStripeCheckoutSignature,
+  shouldAutoPrepareStripeCheckout,
+} = require('@/helpers/stripeCheckout')
 export default {
   components: {
     Loading,
@@ -264,9 +265,12 @@ export default {
     loadPage: false,
     stripe: null,
     stripeElements: null,
+    stripePreparing: false,
     stripePaymentReady: false,
     stripePaymentIntentId: null,
     stripeOrderId: null,
+    stripeCheckoutSignature: null,
+    stripeAutoPrepareTimeout: null,
     selectedCheckoutFlow: null,
     kitchenClosedSnackbar: false,
     kitchenClosedMessage:
@@ -327,12 +331,6 @@ export default {
     showFooterCheckoutButton() {
       return !(this.isStripeCheckout && this.stripePaymentReady)
     },
-    clientPaymentMessage() {
-      if (this.isFlexibleQrCheckout) {
-        return 'Vous pouvez payer maintenant en ligne ou payer au comptoir à la fin.'
-      }
-      return 'Le paiement se fait par carte, Apple Pay ou Google Pay avant envoi en cuisine.'
-    },
     checkoutButtonLabel() {
       if (this.isStripeCheckout && this.stripePaymentReady) {
         return 'Confirmer le paiement'
@@ -344,17 +342,110 @@ export default {
       if (this.isStripeCheckout) return 'mdi-credit-card-check'
       return 'mdi-silverware-fork-knife'
     },
+    currentStripeCheckoutSignature() {
+      return buildStripeCheckoutSignature({
+        customer: this.formuser.customer,
+        phone: this.formuser.phone,
+        selectedTable: this.selectedTable,
+        total: this.roundPrice(this.total),
+        dataCart: this.dataCart,
+      })
+    },
+  },
+  watch: {
+    isValue() {
+      this.handleStripeCheckoutChange()
+    },
+    dataCart: {
+      deep: true,
+      handler() {
+        this.handleStripeCheckoutChange()
+      },
+    },
+    totalCart(value) {
+      this.total = value
+      this.handleStripeCheckoutChange()
+    },
+    selectedTable() {
+      this.handleStripeCheckoutChange()
+    },
+    'formuser.customer'() {
+      this.handleStripeCheckoutChange()
+    },
+    'formuser.phone'() {
+      this.handleStripeCheckoutChange()
+    },
+    qrPaymentMode() {
+      this.handleStripeCheckoutChange()
+    },
+    isKitchenClosed() {
+      this.handleStripeCheckoutChange()
+    },
   },
   async mounted() {
     this.loadPage = true
     this.total = this.totalCart
     await this.$store.dispatch('shop/getCurrentShopInfo')
     this.loadPage = false
+    this.scheduleStripeAutoPrepare()
+  },
+  beforeDestroy() {
+    this.clearStripeAutoPrepareTimeout()
   },
   methods: {
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
+    },
+    clearStripeAutoPrepareTimeout() {
+      if (!this.stripeAutoPrepareTimeout) return
+
+      clearTimeout(this.stripeAutoPrepareTimeout)
+      this.stripeAutoPrepareTimeout = null
+    },
+    shouldPrepareStripeCheckout() {
+      return shouldAutoPrepareStripeCheckout({
+        isQrClient: this.isQrClient,
+        isStripeCheckout: this.isStripeCheckout,
+        isValue: this.isValue,
+        dataCart: this.dataCart,
+        isKitchenClosed: this.isKitchenClosed,
+        stripePaymentReady: this.stripePaymentReady,
+        stripePreparing: this.stripePreparing,
+      })
+    },
+    scheduleStripeAutoPrepare() {
+      this.clearStripeAutoPrepareTimeout()
+
+      if (!this.shouldPrepareStripeCheckout()) return
+
+      this.selectedCheckoutFlow = 'stripe'
+      this.stripeAutoPrepareTimeout = setTimeout(() => {
+        this.prepareStripePaymentElement()
+      }, 600)
+    },
+    resetStripePaymentElement() {
+      this.clearStripeAutoPrepareTimeout()
+      this.stripe = null
+      this.stripeElements = null
+      this.stripePreparing = false
+      this.stripePaymentReady = false
+      this.stripePaymentIntentId = null
+      this.stripeOrderId = null
+      this.stripeCheckoutSignature = null
+    },
+    handleStripeCheckoutChange() {
+      if (!this.isQrClient) return
+
+      if (
+        this.stripePaymentReady &&
+        this.stripeCheckoutSignature &&
+        this.currentStripeCheckoutSignature !== this.stripeCheckoutSignature
+      ) {
+        this.resetStripePaymentElement()
+      }
+
+      this.scheduleStripeAutoPrepare()
     },
     async paymentBtn() {
       if (this.isKitchenClosed) {
@@ -367,7 +458,12 @@ export default {
       this.selectedCheckoutFlow = flow
 
       if (flow === 'stripe') {
-        await this.handleStripePayment()
+        if (!this.stripePaymentReady) {
+          await this.prepareStripePaymentElement()
+          return
+        }
+
+        await this.confirmStripePayment()
         return
       }
 
@@ -455,17 +551,28 @@ export default {
         })),
       }
     },
-    async handleStripePayment() {
-      this.loadingBtn = true
+    async prepareStripePaymentElement() {
+      if (!this.shouldPrepareStripeCheckout()) return
 
-      if (!this.stripePaymentReady) {
+      this.clearStripeAutoPrepareTimeout()
+      this.stripePreparing = true
+      await this.$nextTick()
+
+      const checkoutSignature = this.currentStripeCheckoutSignature
+
+      try {
         const payment = await this.$store.dispatch(
           'cart/createStripeQrTablePayment',
           this.buildOrderPayload()
         )
 
         if (!payment || !payment.clientSecret || !payment.publishableKey) {
-          this.loadingBtn = false
+          return
+        }
+
+        if (this.currentStripeCheckoutSignature !== checkoutSignature) {
+          this.stripePreparing = false
+          this.scheduleStripeAutoPrepare()
           return
         }
 
@@ -478,9 +585,13 @@ export default {
         this.stripePaymentReady = true
         this.stripePaymentIntentId = payment.paymentIntentId
         this.stripeOrderId = payment.orderId
-        this.loadingBtn = false
-        return
+        this.stripeCheckoutSignature = checkoutSignature
+      } finally {
+        this.stripePreparing = false
       }
+    },
+    async confirmStripePayment() {
+      this.loadingBtn = true
 
       const result = await this.stripe.confirmPayment({
         elements: this.stripeElements,
