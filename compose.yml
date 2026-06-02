@@ -7,17 +7,18 @@ services:
     ports:
       - "${APP_PORT:-3000}:${PORT:-3000}"
     environment:
-      ENV: ${ENV:-production}
-      NODE_ENV: ${NODE_ENV:-production}
+      ENV: ${ENV:?ENV must be set to local, staging, or production}
+      NODE_ENV: ${NODE_ENV:?NODE_ENV must be set}
       HOST: ${HOST:-0.0.0.0}
-      PORT: ${PORT:-3000}
+      PORT: ${PORT:?PORT must be set}
       HOME: /tmp
       NPM_CONFIG_CACHE: /tmp/.npm
     volumes:
       - ./:/app
       - pos_app_node_modules:/app/node_modules
     command: >
-      sh -c "npm ci --include=dev
+      sh -c "echo Building SmartEat frontend with ENV=${ENV} NODE_ENV=${NODE_ENV} PORT=${PORT}
+      && npm ci --include=dev
       && npm run generate
       && chown -R ${LOCAL_UID:-1000}:${LOCAL_GID:-118} /app/dist
       && node serve-dist-folder.js"
