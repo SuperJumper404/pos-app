@@ -71,6 +71,12 @@
             <template #[`item.sum_amount`]="{ item }">
               <div>{{ formatCurrency(item.sum_amount) }}</div>
             </template>
+            <template #[`item.paid_amount`]="{ item }">
+              <v-chip v-if="item.paid_amount > 0" small dark color="#635BFF">
+                {{ formatCurrency(item.paid_amount) }} deja paye
+              </v-chip>
+              <span v-else>-</span>
+            </template>
             <!-- <template #[`item.status`]="{ item }">
               <v-chip v-if="item.status === 1" color="grey">
                 En attente
@@ -90,10 +96,12 @@
 
         <v-divider class="mx-4 mb-1"></v-divider>
 
-        <v-card-title
-          >Total: {{ formatCurrency(table.totalPerTable) }}</v-card-title
-        >
-
+        <v-card-title>
+          A encaisser: {{ formatCurrency(table.totalPerTable) }}
+        </v-card-title>
+        <v-card-subtitle v-if="table.alreadyPaidTotal > 0">
+          Deja paye: {{ formatCurrency(table.alreadyPaidTotal) }}
+        </v-card-subtitle>
         <div class="px-4">
           <!-- <v-chip-group v-model="selection">
             <v-chip>5:30PM</v-chip>
@@ -121,8 +129,14 @@
                 : null
             "
           >
-            Encaisser
-            <v-icon small right>mdi-cash-check</v-icon>
+            {{ selectedRowsHaveAmountDue() ? 'Encaisser' : 'Cloturer' }}
+            <v-icon small right>
+              {{
+                selectedRowsHaveAmountDue()
+                  ? 'mdi-cash-check'
+                  : 'mdi-check-circle'
+              }}
+            </v-icon>
           </v-btn>
           <v-btn
             outlined
@@ -155,6 +169,10 @@
 // import Loading from '@/components/loading'
 import moment from 'moment'
 import price from '@/helpers/price'
+const {
+  buildCashRegisterCustomerRows,
+  getCashRegisterPaymentSummary,
+} = require('@/helpers/cashRegister')
 // import * as config from '@/nuxt.config'
 export default {
   //   components: {
@@ -181,8 +199,13 @@ export default {
         { text: 'Client', value: 'customer', filterable: true },
         // { text: 'Operateur', value: 'operator' },
         {
-          text: 'Total',
+          text: 'A encaisser',
           value: 'sum_amount',
+          filterable: true,
+        },
+        {
+          text: 'Deja paye',
+          value: 'paid_amount',
           filterable: true,
         },
         // { text: 'Status', value: 'status', filterable: true },
@@ -217,62 +240,37 @@ export default {
     this.$root.$on('modalClosed', () => {
       this.loadTableData()
     })
-    this.$store.dispatch('orders/getAllOrder')
-
-    this.dataTables.forEach((table, index) => {
-      console.log('Index ', index, 'Id', table.id)
-      const finishedOrders = this.getAllOrders.filter(
-        (x) => x.customerID === table.id && x.status === 3
-      )
-      const customerTotals = {}
-      finishedOrders.forEach((order) => {
-        const customer = order.customer
-        const subtotal = order.subtotal
-        const orderid = order.id
-
-        // Ajouter le montant de la commande au total pour ce client
-        if (customer in customerTotals) {
-          customerTotals[customer].subtotal += subtotal
-          customerTotals[customer].orderIds.push(orderid)
-        } else {
-          customerTotals[customer] = { subtotal, orderIds: [orderid] }
-        }
-      })
-
-      console.log('Customer Totals', customerTotals)
-      const customerTotalArray = Object.entries(customerTotals).map(
-        ([customer, value]) => {
-          console.log('Inside loop', customer)
-          return { customer, sum_amount: value.subtotal, ids: value.orderIds }
-        }
-      )
-      this.tableGlobalData.push({
-        tableName: table.username,
-        tableId: table.id,
-        canceled: this.getAllOrders.filter(
-          (x) => x.customerID === table.id && x.status === 4
-        ).length,
-        finished: finishedOrders,
-        waiting: this.getAllOrders.filter(
-          (x) => x.customerID === table.id && x.status === 1
-        ).length,
-        preparing: this.getAllOrders.filter(
-          (x) => x.customerID === table.id && x.status === 2
-        ).length,
-        customerTotals: customerTotalArray,
-        totalPerTable: customerTotalArray.reduce(
-          (accumulator, currentValue) => accumulator + currentValue?.sum_amount,
-          0
-        ),
-      })
+    this.$store.dispatch('orders/getAllOrder').then(() => {
+      this.loadTableData()
     })
-    // this.tableGlobalData = this.tableGlobalData.filter(
-    //   (obj) => Object.keys(obj).length !== 0
-    // )
-    console.log('Global Data Table', this.tableGlobalData)
-    this.isLoaded = true
   },
   methods: {
+    buildTableGlobalData() {
+      return this.dataTables.map((table) => {
+        const tableOrders = this.getAllOrders.filter(
+          (x) => x.customerID === table.id
+        )
+        const finishedOrders = tableOrders.filter((x) => x.status === 3)
+        const customerTotalArray = buildCashRegisterCustomerRows(finishedOrders)
+        const paymentSummary = getCashRegisterPaymentSummary(finishedOrders)
+
+        return {
+          tableName: table.username,
+          tableId: table.id,
+          canceled: tableOrders.filter((x) => x.status === 4).length,
+          finished: finishedOrders,
+          waiting: tableOrders.filter((x) => x.status === 1).length,
+          preparing: tableOrders.filter((x) => x.status === 2).length,
+          customerTotals: customerTotalArray,
+          totalPerTable: paymentSummary.dueAmount,
+          alreadyPaidTotal: paymentSummary.paidAmount,
+        }
+      })
+    },
+    selectedRowsHaveAmountDue() {
+      if (!this.selectedOrders.length) return true
+      return this.selectedOrders.some((order) => order.hasAmountDue)
+    },
     selectionHandler(tableName) {
       if (this.currentSelectedTable !== tableName) {
         this.selectedOrders = []
@@ -292,54 +290,8 @@ export default {
     },
     loadTableData() {
       console.log('Refresh Load DAta')
-      this.dataTables.forEach((table, index) => {
-        console.log('Index ', index, 'Id', table.id)
-        const finishedOrders = this.getAllOrders.filter(
-          (x) => x.customerID === table.id && x.status === 3
-        )
-        const customerTotals = {}
-        finishedOrders.forEach((order) => {
-          const customer = order.customer
-          const subtotal = order.subtotal
-          const orderid = order.id
-
-          // Ajouter le montant de la commande au total pour ce client
-          if (customer in customerTotals) {
-            customerTotals[customer].subtotal = subtotal
-            customerTotals[customer].orderIds.push(orderid)
-          } else {
-            customerTotals[customer] = { subtotal, orderIds: [orderid] }
-          }
-        })
-
-        console.log('Customer Totals', customerTotals)
-        const customerTotalArray = Object.entries(customerTotals).map(
-          ([customer, value]) => {
-            console.log('Inside loop', customer)
-            return { customer, sum_amount: value.subtotal, ids: value.orderIds }
-          }
-        )
-        this.tableGlobalData.push({
-          tableName: table.username,
-          tableId: table.id,
-          canceled: this.getAllOrders.filter(
-            (x) => x.customerID === table.id && x.status === 4
-          ).length,
-          finished: finishedOrders,
-          waiting: this.getAllOrders.filter(
-            (x) => x.customerID === table.id && x.status === 1
-          ).length,
-          preparing: this.getAllOrders.filter(
-            (x) => x.customerID === table.id && x.status === 2
-          ).length,
-          customerTotals: customerTotalArray,
-          totalPerTable: customerTotalArray.reduce(
-            (accumulator, currentValue) =>
-              accumulator + currentValue?.sum_amount,
-            0
-          ),
-        })
-      })
+      this.tableGlobalData = this.buildTableGlobalData()
+      this.isLoaded = true
     },
   },
 }

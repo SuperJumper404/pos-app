@@ -52,14 +52,8 @@
                       />
 
                       <!-- Title -->
-                      <v-card-title class="py-2 pb-0 mb-0">
-                        <div
-                          class="
-                            product-card-title-text
-                            text-truncate
-                            font-weight-bold
-                          "
-                        >
+                      <v-card-title class="product-card-title py-2 pb-0 mb-0">
+                        <div class="product-card-title-text font-weight-bold">
                           {{ items.name }}
                         </div>
                       </v-card-title>
@@ -793,9 +787,9 @@ export default {
 }
 
 .product-grid {
-  --product-card-min-width: 148px;
+  --product-card-min-width: 200px;
   display: grid;
-  gap: 8px;
+  gap: 12px;
   grid-template-columns: repeat(
     auto-fill,
     minmax(var(--product-card-min-width), 1fr)
@@ -809,7 +803,7 @@ export default {
 
 .product-card {
   height: 100%;
-  min-height: 284px;
+  min-height: 320px;
   width: 100%;
 }
 
@@ -822,11 +816,24 @@ export default {
   background-position: center;
 }
 
+/* Réserve 2 lignes sur le conteneur ; v-card-title centre déjà son contenu
+   verticalement (align-items: center), donc un titre court est centré dans
+   l'espace au lieu de laisser un trou avant la description. */
+.product-card-title {
+  align-items: center;
+  min-height: 56px;
+}
+
 .product-card-title-text {
-  font-size: 1rem;
-  height: 1.2em;
-  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 1.05rem;
+  line-height: 1.25;
   min-width: 0;
+  width: 100%;
+  word-break: break-word;
 }
 
 .product-card-content {
@@ -915,11 +922,11 @@ export default {
 
 @media (min-width: 600px) and (max-width: 1263px) {
   .product-grid {
-    --product-card-min-width: 150px;
+    --product-card-min-width: 185px;
   }
 
   .product-card {
-    min-height: 252px !important;
+    min-height: 296px !important;
   }
 
   .product-card ::v-deep .v-card__title {
@@ -939,6 +946,10 @@ export default {
   .product-card ::v-deep .v-card__actions {
     padding-bottom: 8px !important;
     padding-top: 0 !important;
+  }
+
+  .product-card-title {
+    min-height: 50px;
   }
 
   .product-card-title-text {
@@ -1006,6 +1017,42 @@ export default {
   }
 }
 
+@media (max-width: 599px) {
+  .product-grid {
+    --product-card-min-width: 145px;
+    gap: 8px;
+  }
+
+  .product-card {
+    min-height: 270px !important;
+  }
+
+  .product-card-content {
+    min-height: 56px;
+  }
+
+  .product-card-title {
+    min-height: 46px;
+  }
+
+  .product-card-title-text {
+    font-size: 0.92rem !important;
+    line-height: 1.2;
+  }
+
+  .line-clamp-2 {
+    font-size: 0.8rem;
+    height: 2.4em;
+    line-height: 1.2;
+    margin-top: 4px;
+  }
+
+  .product-card-price {
+    font-size: 0.95rem;
+    padding-top: 8px;
+  }
+}
+
 @media (max-width: 420px) {
   .cart-order-actions {
     flex-direction: column;
@@ -1018,7 +1065,7 @@ export default {
 
 @media (min-width: 768px) and (max-width: 1263px) {
   .product-card {
-    min-height: 236px !important;
+    min-height: 284px !important;
   }
 
   .product-card ::v-deep .v-card__title {
@@ -1036,10 +1083,13 @@ export default {
     min-height: 56px;
   }
 
+  .product-card-title {
+    min-height: 48px;
+  }
+
   .product-card-title-text {
-    font-size: 0.9rem !important;
-    height: 1.15em;
-    line-height: 1.15;
+    font-size: 0.95rem !important;
+    line-height: 1.2;
   }
 
   .line-clamp-2 {

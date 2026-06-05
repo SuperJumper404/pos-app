@@ -234,7 +234,7 @@ export default {
 
   computed: {
     dataOrders() {
-      return this.$store.get('orders/dataOrdersByUserId')
+      return this.$store.get('orders/dataOrdersByUserId') || []
     },
     AllOrdersDetails() {
       return this.$store.get('orders/AllDetailOrders')
@@ -282,10 +282,25 @@ export default {
     },
 
     paymentStatusText(item) {
+      if (item.payment_status === 'requires_payment') return 'A encaisser'
       return getPaymentStatusText(item)
     },
     paymentStatusColor(item) {
+      if (item.payment_status === 'requires_payment') return 'orange'
       return getPaymentStatusColor(item)
+    },
+
+    reloadTableOrders() {
+      this.loadPage = true
+      return this.$store
+        .dispatch('orders/getOrdersByUserId', { userId: this.user.id })
+        .then(() => {
+          const ordersIds = this.dataOrders.map((x) => x.id)
+          return this.$store.dispatch('orders/getAllDetailOrders', ordersIds)
+        })
+        .finally(() => {
+          this.loadPage = false
+        })
     },
 
     async btnFinish(id) {
@@ -295,7 +310,7 @@ export default {
       }
       const res = await this.$store.dispatch('orders/updateOrder', { id, data })
       if (res) {
-        this.$store.dispatch('orders/getAllOrder')
+        this.reloadTableOrders()
       } else {
         this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true
@@ -308,17 +323,7 @@ export default {
       }
       const res = await this.$store.dispatch('orders/updateOrder', { id, data })
       if (res) {
-        this.loadPage = true
-        this.$store
-          .dispatch('orders/getOrdersByUserId', { userId: this.user.id })
-          .then(() => {
-            const ordersIds = this.dataOrders.map((x) => x.id)
-            this.$store.dispatch('orders/getAllDetailOrders', ordersIds)
-            console.log('All ids to ask for details', ordersIds)
-          })
-          .finally(() => {
-            this.loadPage = false
-          })
+        this.reloadTableOrders()
       } else {
         this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true

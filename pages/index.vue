@@ -114,7 +114,7 @@
     <v-row class="mt-6" dense>
       <v-col cols="12" sm="6" md="3">
         <v-card outlined>
-          <v-card-title>💰 Total Caisse</v-card-title>
+          <v-card-title>💰 Total caisse</v-card-title>
           <v-card-text
             ><strong>{{
               formatCurrency(metrics.totalRevenue)
@@ -177,7 +177,7 @@
 
     <!-- Produits -->
     <v-card class="mt-6" outlined>
-      <v-card-title>🔥 Top Produits</v-card-title>
+      <v-card-title>🔥 Top produits</v-card-title>
       <v-data-table
         :headers="[
           { text: 'Produit', value: 'name' },
