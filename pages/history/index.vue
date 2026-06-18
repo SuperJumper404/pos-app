@@ -216,7 +216,7 @@ export default {
       headers: [
         { text: 'Date', value: 'created', filterable: true },
         {
-          text: 'Numero de commande',
+          text: 'Numéro de commande',
           value: 'ordernumber',
           filterable: true,
         },
