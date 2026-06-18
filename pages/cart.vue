@@ -17,19 +17,27 @@
               class="d-flex mb-2 flex-column"
               rounded="7"
             >
-              <v-row class="d-flex align-center mr-2 ml-2 mt-2" no-gutters>
+              <v-row
+                class="cart-summary-row d-flex align-center mr-2 ml-2 mt-2"
+                no-gutters
+              >
                 <!-- Left block: avatar + texts -->
-                <v-col class="d-flex align-center">
-                  <v-avatar size="75" rounded tile class="mr-3">
+                <v-col class="cart-summary-main d-flex align-center">
+                  <v-avatar
+                    size="75"
+                    rounded
+                    tile
+                    class="cart-summary-avatar mr-3"
+                  >
                     <v-img
                       class="cart-item-image rounded-lg"
                       :src="productImageSrc(itm.image)"
                     />
                   </v-avatar>
 
-                  <div class="min-w-0">
+                  <div class="cart-summary-text">
                     <div
-                      class="text-truncate font-weight-bold"
+                      class="cart-summary-name text-truncate font-weight-bold"
                       style="font-size: large; color: rgba(0, 0, 0, 0.8)"
                     >
                       {{ itm.name }}
@@ -44,9 +52,12 @@
                 </v-col>
 
                 <!-- Right block: qty -->
-                <v-col class="d-flex align-center justify-end" cols="auto">
+                <v-col
+                  class="cart-summary-qty-col d-flex align-center justify-end"
+                  cols="auto"
+                >
                   <v-btn
-                    class="mx-2"
+                    class="cart-summary-qty mx-2"
                     style="font-size: x-large"
                     color="success"
                     fab
@@ -59,7 +70,7 @@
               </v-row>
 
               <!-- Chips below -->
-              <v-col class="pt-2">
+              <v-col class="cart-summary-customizations pt-2">
                 <v-chip
                   v-for="(choice, index) in itm.customizationList"
                   :key="index"
@@ -636,6 +647,34 @@ export default {
   background-size: cover;
 }
 
+.cart-summary-row {
+  min-width: 0;
+}
+
+.cart-summary-main,
+.cart-summary-text {
+  min-width: 0;
+}
+
+.cart-summary-avatar,
+.cart-summary-qty-col {
+  flex: 0 0 auto;
+}
+
+.cart-summary-text {
+  flex: 1 1 auto;
+}
+
+.cart-summary-name {
+  max-width: 100%;
+}
+
+.cart-summary-customizations {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .cart-checkout-actions {
   display: flex;
   gap: 8px;
@@ -700,6 +739,27 @@ export default {
 }
 
 @media (max-width: 420px) {
+  .cart-summary-row {
+    margin-left: 4px !important;
+    margin-right: 4px !important;
+  }
+
+  .cart-summary-avatar {
+    height: 60px !important;
+    min-width: 60px !important;
+    width: 60px !important;
+  }
+
+  .cart-summary-name {
+    font-size: 0.95rem !important;
+  }
+
+  .cart-summary-qty {
+    height: 34px !important;
+    min-width: 34px !important;
+    width: 34px !important;
+  }
+
   .cart-checkout-actions {
     flex-direction: column;
   }

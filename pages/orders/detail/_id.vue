@@ -25,14 +25,16 @@
           class="order-detail-item mb-3 pa-2"
         >
           <div class="order-detail-content">
-            <v-img
-              :src="productImageSrc(itm.image)"
-              class="order-detail-image"
-              :aspect-ratio="4 / 3"
-              height="96"
-              width="128"
-              max-width="128px"
-            ></v-img>
+            <div class="order-detail-image-wrap">
+              <v-img
+                :src="productImageSrc(itm.image)"
+                class="order-detail-image"
+                :aspect-ratio="4 / 3"
+                height="96"
+                width="128"
+                max-width="128px"
+              ></v-img>
+            </div>
 
             <div class="order-detail-body">
               <div class="order-detail-main">
@@ -52,7 +54,7 @@
                   <v-chip
                     v-for="(customization, j) in itm.customizationList"
                     :key="j"
-                    class="ma-1 order-detail-customization-chip"
+                    class="ma-1"
                   >
                     {{ customization.name }}
                   </v-chip>
@@ -196,10 +198,14 @@ export default {
   width: 100%;
 }
 
-.order-detail-image {
-  border-radius: 4px;
+.order-detail-image-wrap {
   flex: 0 0 128px;
   min-width: 128px;
+}
+
+.order-detail-image {
+  border-radius: 4px;
+  display: block;
   width: 128px;
 }
 
@@ -223,6 +229,12 @@ export default {
   min-width: 0;
 }
 
+.order-detail-product,
+.order-detail-customizations,
+.order-detail-meta {
+  min-width: 0;
+}
+
 .order-detail-product-name,
 .order-detail-product-price,
 .order-detail-meta-value {
@@ -231,14 +243,22 @@ export default {
 }
 
 .order-detail-product-name {
+  display: -webkit-box;
   font-size: 18px;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .order-detail-product-price {
   font-size: 17px;
   margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .order-detail-customizations {
@@ -246,11 +266,6 @@ export default {
   flex-wrap: wrap;
   justify-content: center;
   min-width: 0;
-}
-
-.order-detail-customization-chip {
-  font-size: 15px;
-  min-height: 32px;
 }
 
 .order-detail-meta {
@@ -301,10 +316,14 @@ export default {
     gap: 12px;
   }
 
-  .order-detail-image {
+  .order-detail-image-wrap {
     flex-basis: 84px;
-    height: 84px !important;
     min-width: 84px;
+  }
+
+  .order-detail-image {
+    height: 84px !important;
+    max-width: 84px !important;
     width: 84px;
   }
 
@@ -327,17 +346,57 @@ export default {
     padding: 8px;
   }
 
+  .order-detail-item {
+    padding: 10px !important;
+    position: relative;
+  }
+
   .order-detail-content {
+    align-items: start;
     display: grid;
-    grid-template-columns: 76px minmax(0, 1fr) auto;
-    gap: 10px;
+    gap: 6px 12px;
+    grid-template-areas:
+      'image product qty'
+      'order order client'
+      'custom custom custom';
+    grid-template-columns: 92px minmax(0, 1fr) 38px;
+  }
+
+  .order-detail-image-wrap {
+    align-self: start;
+    flex: none;
+    grid-area: image;
+    min-width: 0;
   }
 
   .order-detail-image {
-    flex: none;
-    height: 76px !important;
-    min-width: 76px;
-    width: 76px;
+    height: 92px !important;
+    max-width: 92px !important;
+    width: 92px;
+  }
+
+  .order-detail-body {
+    display: contents;
+    min-width: 0;
+  }
+
+  .order-detail-qty {
+    grid-area: qty;
+    height: 34px !important;
+    min-width: 34px !important;
+    width: 34px !important;
+  }
+
+  .order-detail-qty ::v-deep .v-btn__content {
+    font-size: 18px;
+  }
+
+  .order-detail-main {
+    display: contents;
+  }
+
+  .order-detail-product {
+    grid-area: product;
   }
 
   .order-detail-product-name {
@@ -350,12 +409,38 @@ export default {
   }
 
   .order-detail-meta {
-    grid-template-columns: 1fr;
-    gap: 6px;
+    display: contents;
   }
 
-  .order-detail-meta-block {
+  .order-detail-meta-block:first-child {
+    grid-area: order;
     text-align: left;
+  }
+
+  .order-detail-meta-block:last-child {
+    align-self: end;
+    grid-area: client;
+    text-align: right;
+  }
+
+  .order-detail-customizations {
+    grid-area: custom;
+  }
+
+  .order-detail-meta-label {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 380px) {
+  .order-detail-content {
+    grid-template-columns: 78px minmax(0, 1fr) 34px;
+  }
+
+  .order-detail-image {
+    height: 78px !important;
+    max-width: 78px !important;
+    width: 78px;
   }
 }
 </style>
