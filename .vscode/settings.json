@@ -3,5 +3,7 @@
     "BracketHighlighter.enableExtension": true,
     "editor.quickSuggestions": {
     "strings": true
-    }
+    },
+    "prettier.endOfLine": "auto",
+    "files.eol": "\r\n"
 }
