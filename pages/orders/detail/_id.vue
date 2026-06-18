@@ -63,7 +63,7 @@
                 <div class="order-detail-meta">
                   <div class="order-detail-meta-block">
                     <span class="order-detail-meta-label">
-                      Numero de commande
+                      Numéro de commande
                     </span>
                     <strong class="order-detail-meta-value">
                       #{{ itm.ordernumber }}
