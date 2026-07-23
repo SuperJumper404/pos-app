@@ -170,6 +170,8 @@ Cette table trace le cycle de réservation du stock pour toutes les commandes. U
 
 Contrainte : unicité `(order_id, product_id)`. Les besoins identiques sont agrégés avant création de la réservation.
 
+La table `orders` reçoit aussi `client_order_token` et `client_order_payload_hash`, tous deux nullables pour préserver les commandes existantes. L’index unique `(shopid, client_order_token)` garantit l’idempotence par boutique ; le hash SHA-256 du payload canonique permet de refuser la réutilisation d’un token avec un panier différent.
+
 ## Règles de disponibilité et de prix
 
 Le backend renvoie chaque choix avec son supplément effectif et son état de disponibilité.
