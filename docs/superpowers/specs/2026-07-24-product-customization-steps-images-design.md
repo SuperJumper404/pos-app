@@ -10,7 +10,7 @@ Le catalogue doit permettre de composer un produit au moyen d’un assistant sé
 
 Une étape contient des choix de deux types :
 
-- un choix simple, comme « Sans oignons » ou « Bacon », avec son nom, son image et son supplément ;
+- un choix simple, comme « Sans oignons » ou « Bacon », avec son nom, une image facultative et un supplément défini sur le produit parent ;
 - un produit lié du catalogue, comme « Coca-Cola » ou « Frites », qui réutilise le nom, l’image et le stock du produit référencé.
 
 Les étapes sont partagées dans une bibliothèque propre à chaque boutique. Lorsqu’une étape est attachée à un produit, le produit parent conserve ses propres contraintes minimum/maximum, son ordre d’affichage, la liste des choix proposés et les suppléments applicables.
@@ -44,7 +44,7 @@ Ces structures ne permettent pas de partager proprement une étape entre plusieu
 6. Décrémenter le stock du produit parent et celui des produits liés sélectionnés.
 7. Utiliser le même assistant guidé pour la caisse, le QR/table, le click-and-collect et la future borne.
 8. Conserver des commandes et archives lisibles même si les étapes ou choix changent ensuite.
-9. Migrer les personnalisations existantes sans perte.
+9. Migrer sans suppression les données de personnalisation encore présentes ; les sélections déjà absentes des anciennes archives ne sont pas reconstructibles.
 10. Éviter les commandes partielles, les prix imposés par le client et les doubles soumissions.
 
 ## Hors périmètre
@@ -103,7 +103,7 @@ Choix réutilisables appartenant à une étape.
 - `created`
 - `updated`, nullable
 
-Un produit lié doit appartenir à la même boutique que l’étape. Une référence du produit vers lui-même est refusée lors de l’attachement au produit parent. Le nom et l’image d’un produit lié sont résolus depuis `products` au moment de la lecture ; ils sont photographiés dans la commande lors de l’achat.
+Un produit lié doit appartenir à la même boutique que l’étape. Une référence du produit vers lui-même est refusée lors de l’attachement au produit parent. Le nom et l’image d’un produit lié sont résolus depuis `products` au moment de la lecture. Le nom affiché et les données tarifaires sont photographiés dans la commande lors de l’achat ; l’image reste une donnée de présentation du catalogue et n’est pas requise sur les tickets historiques.
 
 ### `product_customization_steps`
 
@@ -132,7 +132,7 @@ Configuration d’un choix dans le contexte précis d’un produit–étape.
 - `position`
 - `active`
 
-Contrainte : unicité `(product_customization_step_id, step_choice_id)`. Cette table permet de proposer seulement une partie des choix de l’étape et de modifier l’ordre ou le supplément sans dupliquer l’étape partagée.
+Contrainte : unicité `(product_customization_step_id, step_choice_id)`. Le backend vérifie également que `step_choice_id` appartient bien à l’étape référencée par `product_customization_step_id`. Cette table permet de proposer seulement une partie des choix de l’étape et de modifier l’ordre ou le supplément sans dupliquer l’étape partagée.
 
 ### Instantanés de commande
 
@@ -157,7 +157,7 @@ Les textes et le supplément sont copiés au moment de la commande. Une modifica
 
 ### `order_stock_reservations`
 
-Les paiements Stripe nécessitent une réservation afin d’éviter qu’un produit soit vendu pendant que le paiement est en attente.
+Cette table trace le cycle de réservation du stock pour toutes les commandes. Une commande non-Stripe passe immédiatement à `committed`. Un paiement Stripe reste à `reserved` afin d’éviter qu’un produit soit vendu pendant que le paiement est en attente.
 
 - `id`
 - `order_id`
@@ -197,7 +197,7 @@ Toutes les routes vérifient l’authentification, le rôle administrateur pour 
 - `PATCH /api/v1/customization-choices/:id`
 - `DELETE /api/v1/customization-choices/:id`, qui désactive le choix
 
-La création et la modification d’un choix simple acceptent `multipart/form-data`. Les formats JPEG, PNG et WebP sont acceptés avec une taille maximale documentée et contrôlée. Le serveur génère le nom final. En cas d’échec SQL, le nouveau fichier est supprimé ; lors d’un remplacement réussi, l’ancien fichier est supprimé après le commit. Les images des choix désactivés sont conservées pour permettre une réactivation.
+La création et la modification d’un choix simple acceptent `multipart/form-data`. Les formats JPEG, PNG et WebP sont acceptés jusqu’à 5 Mo. Le serveur génère le nom final. En cas d’échec SQL, le nouveau fichier est supprimé ; lors d’un remplacement réussi, l’ancien fichier est supprimé après le commit. Les images des choix désactivés sont conservées pour permettre une réactivation.
 
 ### Configuration d’un produit
 
@@ -205,7 +205,7 @@ La création et la modification d’un choix simple acceptent `multipart/form-da
 
 Le payload contient les étapes attachées, leur ordre, minimum, maximum, activation et leurs choix contextuels. Le backend remplace la configuration du produit dans une transaction après validation complète.
 
-La création d’un produit peut continuer à envoyer son image principale en multipart et inclure la configuration V2 sérialisée. La création du produit et de ses associations est atomique.
+`POST /api/v1/product` continue à recevoir l’image principale en multipart et reçoit la configuration V2 sérialisée dans le même formulaire. La création du produit et de ses associations est atomique.
 
 ### Lecture du catalogue
 
@@ -222,6 +222,10 @@ Les réponses produit ajoutent `customization_steps`, ordonné et déjà résolu
 La récupération de la liste doit agréger les données en lots et ne doit pas conserver le modèle actuel qui lance une requête de détail par produit.
 
 ### Commande transactionnelle
+
+- `POST /api/v1/orders/checkout` remplace le couple d’appels `orders` puis `detailorder` pour les nouveaux flux non-Stripe.
+- `POST /api/v1/stripe/payment-intents/qr-table` reste le point d’entrée Stripe, mais délègue la validation, la création de commande et le stock au même service métier.
+- Les anciennes routes de détail restent uniquement dans l’adaptateur de compatibilité pendant la transition.
 
 Le frontend envoie un seul payload contenant les données client et :
 
@@ -244,17 +248,17 @@ Le client n’est jamais la source de vérité pour les prix. `expected_total` s
 Le service métier commun :
 
 1. vérifie la boutique, les produits, les associations et les choix ;
-2. refuse les doublons et les choix qui n’appartiennent pas à l’étape du produit ;
+2. refuse les doublons et les choix qui n’appartiennent pas à l’étape du produit ; un même choix contextuel ne peut être sélectionné qu’une fois dans une configuration ;
 3. valide les minimums et maximums ;
 4. recalcule le prix unitaire et le total ;
-5. compare le total serveur à `expected_total` ;
+5. compare le total serveur à `expected_total` et renvoie le nouveau devis sans écrire en base en cas d’écart ;
 6. agrège le besoin de stock du produit parent et de tous les produits liés, multiplié par la quantité de la ligne ;
 7. verrouille les lignes produit dans un ordre stable afin de limiter les interblocages ;
 8. vérifie les stocks ;
 9. crée la commande, les détails, les instantanés et les réservations dans une seule transaction ;
 10. décrémente le stock disponible.
 
-`client_order_token` est unique par boutique et rend la création idempotente. Un double clic renvoie la commande déjà créée au lieu d’en créer une seconde.
+`client_order_token` est unique par boutique et rend la création idempotente. Un double clic avec le même payload renvoie la commande déjà créée avec `idempotent_replay: true`. La réutilisation du même token avec un payload différent renvoie `409 IDEMPOTENCY_KEY_REUSED`.
 
 Le flux non-Stripe valide immédiatement les réservations et crée les mouvements de stock. Le flux Stripe conserve les réservations au statut `reserved` jusqu’au résultat du paiement :
 
@@ -263,7 +267,7 @@ Le flux non-Stripe valide immédiatement les réservations et crée les mouvemen
 - échec, annulation ou expiration : réincrément du stock et passage à `released` ;
 - erreur de création du PaymentIntent : annulation de la commande provisoire et libération immédiate.
 
-La libération des réservations expirées est idempotente et peut être déclenchée périodiquement ainsi qu’avant une nouvelle réservation. Les webhooks Stripe et le paiement au comptoir appellent le même service de finalisation, au lieu de dupliquer les règles de stock.
+La durée de réservation Stripe est configurée par `STRIPE_STOCK_RESERVATION_MINUTES`, avec une valeur par défaut de 15 minutes. La libération des réservations expirées est idempotente et est déclenchée périodiquement ainsi qu’avant une nouvelle réservation. Elle verrouille la réservation et ne libère que le statut `reserved`, ce qui permet plusieurs instances backend sans double réincrément. Les webhooks Stripe et le paiement au comptoir appellent le même service de finalisation, au lieu de dupliquer les règles de stock.
 
 ## Erreurs
 
@@ -278,7 +282,7 @@ Codes prévus :
 - `PRODUCT_UNAVAILABLE`
 - `LINKED_PRODUCT_OUT_OF_STOCK`
 - `ORDER_REPRICE_REQUIRED`
-- `ORDER_ALREADY_CREATED`
+- `IDEMPOTENCY_KEY_REUSED`
 
 Une indisponibilité ou un conflit de stock renvoie `409`. Un payload invalide renvoie `400`. Une association métier impossible renvoie `422`. Pour `ORDER_REPRICE_REQUIRED`, la réponse fournit le nouveau devis serveur afin que l’utilisateur confirme le changement.
 
@@ -288,7 +292,7 @@ Le frontend conserve les sélections valides et rouvre l’assistant directement
 
 ### Administration des étapes
 
-Une page protégée, par exemple `pages/customizations/index.vue`, gère la bibliothèque de la boutique.
+La page protégée `pages/customizations/index.vue` gère la bibliothèque de la boutique.
 
 Elle permet :
 
@@ -317,7 +321,7 @@ Le formulaire refuse une configuration dans laquelle le minimum dépasse le maxi
 
 ### Assistant de commande
 
-Un composant réutilisable, par exemple `ProductCustomizationWizard.vue`, reçoit le produit résolu et éventuellement une sélection existante.
+Le composant réutilisable `ProductCustomizationWizard.vue` reçoit le produit résolu et, en mode édition, la sélection existante.
 
 Comportement :
 
@@ -341,7 +345,7 @@ Une ligne de panier contient le produit, les identifiants contextuels sélection
 
 La signature est construite à partir de l’identifiant produit et de la liste triée des identifiants `product_customization_step_choices`. Deux configurations identiques fusionnent et incrémentent la quantité. Deux configurations différentes restent séparées.
 
-« Modifier » rouvre l’assistant avec la sélection de la ligne. Toute modification recalcule sa signature et peut provoquer une fusion avec une ligne déjà identique.
+« Modifier » rouvre l’assistant avec la sélection de la ligne. Toute modification recalcule sa signature et peut provoquer une fusion avec une ligne déjà identique ; dans ce cas, les quantités des deux lignes sont additionnées.
 
 ## Migration de l’existant
 
@@ -353,15 +357,15 @@ Pour chaque ligne de `product_customization` :
 2. créer une étape V2 propre à ce produit, même si une autre étape porte le même nom ;
 3. créer l’association produit–étape ;
 4. convertir `mandatory = 1` en `minimum_choices = 1`, sinon `0` ;
-5. convertir `limit_choice` en `maximum_choices` ;
+5. convertir `limit_choice` en `maximum_choices` lorsqu’il vaut au moins 1 ; sinon utiliser le nombre de choix existants, avec un minimum technique de 1 ;
 6. créer chaque ancien `product_choice` comme choix simple ;
 7. copier son prix dans `extra_price` sur l’association contextuelle ;
 8. attribuer les positions selon l’ordre stable des identifiants ;
 9. laisser l’image vide afin d’utiliser le placeholder.
 
-Les lignes invalides, par exemple une limite absente ou inférieure au minimum, sont normalisées vers la plus petite valeur valide et inscrites dans le rapport de migration. Les comptages avant/après et les totaux de choix doivent correspondre.
+Pour une ancienne étape obligatoire sans choix, la migration conserve `minimum_choices = 1` et `maximum_choices = 1` : le produit devient explicitement indisponible jusqu’à correction par l’administrateur. Toute autre valeur invalide est normalisée selon la règle précédente et inscrite dans le rapport de migration. Les comptages avant/après et les totaux de choix doivent correspondre.
 
-Les commandes encore actives peuvent être rétroalimentées vers les instantanés à partir de `orders_customization`. Les archives historiques existantes ne contiennent actuellement pas les sélections archivées de manière fiable ; les informations déjà absentes ne peuvent pas être reconstruites. Elles restent consultables dans leur état actuel. Toutes les nouvelles archives conserveront les instantanés complets.
+Les commandes encore actives sont rétroalimentées vers les instantanés à partir de `orders_customization`. Une référence devenue introuvable est conservée dans le rapport de migration et la commande reste lisible avec les données encore disponibles. Les archives historiques existantes ne contiennent actuellement pas les sélections archivées de manière fiable ; les informations déjà absentes ne peuvent pas être reconstruites. Elles restent consultables dans leur état actuel. Toutes les nouvelles archives conserveront les instantanés complets.
 
 Les anciennes tables restent présentes et en lecture seule pendant la première phase. Le backend expose temporairement une projection `product_customization` pour l’ancien frontend et traduit les écritures legacy en étapes dédiées au produit pendant la courte fenêtre de compatibilité. Ce traducteur n’est pas un second modèle permanent et sera retiré après validation du frontend V2.
 
