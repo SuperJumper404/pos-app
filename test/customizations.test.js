@@ -1407,8 +1407,14 @@ for (const cartContract of [
 
 const menusOptions = loadComponentOptions(
   menusPageSource,
-  ['Loading', 'ProductCustomizationWizard', 'price', 'mergeConfiguredCartLine'],
-  [{}, {}, {}, mergeConfiguredCartLine]
+  [
+    'Loading',
+    'ProductCustomizationWizard',
+    'price',
+    'mergeConfiguredCartLine',
+    'replaceConfiguredCartLine',
+  ],
+  [{}, {}, {}, mergeConfiguredCartLine, replaceConfiguredCartLine]
 )
 
 const menuProduct = {
@@ -1425,6 +1431,7 @@ const menusVm = {
   dataProduct: [menuProduct],
   selectedItem: null,
   selectedChoiceIds: [],
+  editingCartIndex: null,
   customizationDialog: false,
   roundPrice: (value) => Math.round(Number(value) * 100) / 100,
   parsePrice: Number,
@@ -1462,6 +1469,64 @@ menusOptions.methods.confirmCustomization.call(menusVm, {
 assert.deepStrictEqual(menusVm.cartItem[0].selectedChoiceIds, [10])
 assert.strictEqual(menusVm.cartItem[0].configurationSignature, '5:10')
 assert.strictEqual(menusVm.cartItem[0].subtotal, 9)
+
+menusOptions.methods.addToCart.call(menusVm, menuProduct)
+menusOptions.methods.confirmCustomization.call(menusVm, {
+  selectedChoiceIds: [30],
+  unitPrice: 10,
+  selections: [
+    {
+      product_step_choice_id: 30,
+      product_step_id: 100,
+      choice_name: 'Frites',
+      extra_price: 2,
+    },
+  ],
+})
+menusVm.cartItem[1].qty = 2
+menusVm.cartItem[1].subtotal = 20
+
+menusOptions.methods.editCartLine.call(menusVm, 1)
+assert.strictEqual(menusVm.editingCartIndex, 1)
+assert.deepStrictEqual(menusVm.selectedChoiceIds, [30])
+assert.strictEqual(menusVm.customizationDialog, true)
+
+menusOptions.methods.confirmCustomization.call(menusVm, {
+  selectedChoiceIds: [10],
+  unitPrice: 9,
+  selections: [
+    {
+      product_step_choice_id: 10,
+      product_step_id: 100,
+      choice_name: 'Cola',
+      extra_price: 1,
+    },
+  ],
+})
+assert.deepStrictEqual(
+  menusVm.cartItem.map(({ configurationSignature, qty, subtotal }) => ({
+    configurationSignature,
+    qty,
+    subtotal,
+  })),
+  [{ configurationSignature: '5:10', qty: 3, subtotal: 27 }],
+  'editing from menus must preserve the whole source quantity and merge matching configurations'
+)
+assert.strictEqual(menusVm.editingCartIndex, null)
+
+const cartBeforeInvalidEdit = JSON.parse(JSON.stringify(menusVm.cartItem))
+menusVm.editingCartIndex = 99
+menusVm.selectedItem = menuProduct
+menusOptions.methods.confirmCustomization.call(menusVm, {
+  selectedChoiceIds: [10],
+  unitPrice: 9,
+  selections: [],
+})
+assert.deepStrictEqual(
+  menusVm.cartItem,
+  cartBeforeInvalidEdit,
+  'an edit whose source line disappeared must not add or mutate a cart line'
+)
 
 menusOptions.methods.addToCart.call(menusVm, {
   id: 6,

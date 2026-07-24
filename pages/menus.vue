@@ -202,7 +202,22 @@
                   no-gutters
                 >
                   <!-- Left block: avatar + texts -->
-                  <v-col class="cart-item-info d-flex align-center">
+                  <v-col
+                    class="cart-item-info d-flex align-center"
+                    :class="{
+                      'cart-item-info--editable': (
+                        itm.customization_steps || []
+                      ).length,
+                    }"
+                    :role="
+                      (itm.customization_steps || []).length ? 'button' : null
+                    "
+                    :tabindex="
+                      (itm.customization_steps || []).length ? 0 : null
+                    "
+                    @click="editCartLine(itemIndex)"
+                    @keydown.enter.prevent="editCartLine(itemIndex)"
+                  >
                     <v-avatar
                       size="64"
                       rounded
@@ -392,7 +407,10 @@
 import Loading from '@/components/loading'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import price from '@/helpers/price'
-import { mergeConfiguredCartLine } from '@/helpers/customizations'
+import {
+  mergeConfiguredCartLine,
+  replaceConfiguredCartLine,
+} from '@/helpers/customizations'
 // import * as config from '@/nuxt.config'
 export default {
   components: {
@@ -412,6 +430,7 @@ export default {
     previewItem: null,
     selectedItem: null,
     selectedChoiceIds: [],
+    editingCartIndex: null,
     // config: config,
     alert: null,
     alertType: null,
@@ -546,10 +565,27 @@ export default {
       this.customizationDialog = false
       this.selectedItem = null
       this.selectedChoiceIds = []
+      this.editingCartIndex = null
+    },
+    editCartLine(lineIndex) {
+      const line = this.cartItem[lineIndex]
+      if (!line || !(line.customization_steps || []).length) return
+
+      this.editingCartIndex = lineIndex
+      this.selectedItem = { ...line }
+      this.selectedChoiceIds = [...(line.selectedChoiceIds || [])]
+      this.customizationDialog = true
     },
     confirmCustomization(customization) {
       if (!this.selectedItem) return
 
+      const isEditing = Number.isInteger(this.editingCartIndex)
+      const sourceLine = isEditing ? this.cartItem[this.editingCartIndex] : null
+      if (isEditing && !sourceLine) {
+        this.closeCustomizationWizard()
+        return
+      }
+      const qty = sourceLine ? Number(sourceLine.qty || 1) : 1
       const price = this.roundPrice(customization.unitPrice)
       const selections = (customization.selections || []).map((selection) => ({
         ...selection,
@@ -564,10 +600,12 @@ export default {
           price: selection.extra_price,
         })),
         price,
-        qty: 1,
-        subtotal: price,
+        qty,
+        subtotal: this.roundPrice(price * qty),
       }
-      this.cartItem = mergeConfiguredCartLine(this.cartItem, line)
+      this.cartItem = sourceLine
+        ? replaceConfiguredCartLine(this.cartItem, this.editingCartIndex, line)
+        : mergeConfiguredCartLine(this.cartItem, line)
       this.closeCustomizationWizard()
       this.totalPrice()
       this.indexCart()
@@ -836,6 +874,16 @@ export default {
 .cart-item-info {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.cart-item-info--editable {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.cart-item-info--editable:focus-visible {
+  outline: 2px solid var(--v-primary-base);
+  outline-offset: 2px;
 }
 
 .cart-item-avatar {
