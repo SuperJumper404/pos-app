@@ -16,6 +16,10 @@ const {
   nextVisibleStepIndex,
   findStepIndexById,
 } = require('../helpers/customizations')
+const {
+  parsePersistedState,
+  serializePersistedState,
+} = require('../helpers/persistedState')
 
 const step = {
   product_step_id: 10,
@@ -1040,7 +1044,31 @@ const axiosPluginSource = fs.readFileSync(
 )
 const loadAxiosPlugin = () =>
   // eslint-disable-next-line no-new-func
-  new Function(axiosPluginSource.replace('export default', 'return'))()
+  new Function(
+    'require',
+    axiosPluginSource.replace('export default', 'return')
+  )(require)
+
+const loadStoreModule = (storeFile, config = null) => {
+  const source = fs.readFileSync(path.join(__dirname, storeFile), 'utf8')
+  const executable = source
+    .replace(/^import .*$/gm, '')
+    .replace(/export const /g, 'const ')
+    .concat('\nreturn { state, mutations, actions }')
+  const configStub = config || {
+    environments: {
+      [process.env.ENV]: { backEndPoint: 'http://localhost:5005' },
+    },
+  }
+
+  // eslint-disable-next-line no-new-func
+  return new Function('EasyAccess', 'defaultMutations', 'require', executable)(
+    () => ({}),
+    () => ({}),
+    (request) =>
+      request.includes('config.json') ? configStub : require(request)
+  )
+}
 
 assert.ok(
   menusPageSource.includes('<ProductCustomizationWizard') &&
@@ -1793,10 +1821,290 @@ const runReviewRegressionTests = async () => {
     assert.strictEqual(cartModule.actions.abandonCheckout(context).ok, false)
   }
 
+  const rootStoreModule = loadStoreModule('../store/index.js')
+  const userStoreModule = loadStoreModule('../store/users.js')
+  const rootActions = rootStoreModule.actions
+  const userActions = userStoreModule.actions
+  const rootAuthDispatches = []
+  await rootActions.clearAuthentication({
+    dispatch(type, payload) {
+      rootAuthDispatches.push([type, payload])
+    },
+  })
+  assert.deepStrictEqual(rootAuthDispatches, [['set/authenticated', false]])
+  const userAuthDispatches = []
+  await userActions.clearAuthenticatedUser({
+    dispatch(type, payload) {
+      userAuthDispatches.push([type, payload])
+    },
+  })
+  assert.deepStrictEqual(userAuthDispatches, [
+    ['set/user.id', null],
+    ['set/user.access', null],
+    ['set/user.token', null],
+    ['set/user.shopid', null],
+  ])
+
+  const originalRecovery = {
+    clientOrderToken: 'auth-checkout-token',
+    clientOrderSignature: 'auth-checkout-signature',
+    clientOrderPayload: {
+      customer: 'Alice',
+      items: [{ product_id: 7, quantity: 2 }],
+    },
+    clientOrderOrderId: 55,
+    clientOrderStatus: 'stripe_prepared',
+  }
+  const createAuthState = (bearer) => ({
+    authenticated: true,
+    users: {
+      user: { id: 12, access: 1, token: bearer, shopid: 4 },
+    },
+    cart: {
+      ...JSON.parse(JSON.stringify(originalRecovery)),
+      clientOrderAuthRedirect: false,
+    },
+  })
+  const createLocalStorage = (state, events) => {
+    const values = new Map([
+      ['idUser', String(state.users.user.id)],
+      ['access', String(state.users.user.access)],
+      ['token', state.users.user.token],
+      ['shopid', String(state.users.user.shopid)],
+      ['vuex', serializePersistedState(state)],
+    ])
+    return {
+      getItem(key) {
+        return values.has(key) ? values.get(key) : null
+      },
+      setItem(key, value) {
+        events.push(['set', key])
+        values.set(key, String(value))
+      },
+      removeItem(key) {
+        events.push(['remove', key])
+        values.delete(key)
+      },
+    }
+  }
+  const applyAuthDispatch = (state, events) => async (type, payload) => {
+    events.push([type, payload])
+    if (type === 'cart/markCheckoutAuthRedirect') {
+      state.cart.clientOrderAuthRedirect = payload
+    } else if (type === 'clearAuthentication') {
+      await rootActions.clearAuthentication({
+        dispatch(innerType, innerPayload) {
+          events.push([innerType, innerPayload])
+          if (innerType === 'set/authenticated') {
+            state.authenticated = innerPayload
+          }
+        },
+      })
+    } else if (type === 'users/clearAuthenticatedUser') {
+      await userActions.clearAuthenticatedUser({
+        dispatch(innerType, innerPayload) {
+          events.push([innerType, innerPayload])
+          const field = innerType.replace('set/user.', '')
+          state.users.user[field] = innerPayload
+        },
+      })
+    }
+  }
+  const runAuthError = async ({ state, storage, events, dispatch }) => {
+    let handler = null
+    const savedLocalStorage = global.localStorage
+    global.localStorage = storage
+    try {
+      loadAxiosPlugin()({
+        $axios: {
+          onError(callback) {
+            handler = callback
+          },
+        },
+        store: {
+          state,
+          dispatch,
+          commit(type, payload) {
+            events.push([type, payload])
+            if (type === 'cart/MARK_CHECKOUT_AUTH_REDIRECT') {
+              cartModule.mutations.MARK_CHECKOUT_AUTH_REDIRECT(
+                state.cart,
+                payload
+              )
+            } else if (type === 'CLEAR_AUTHENTICATION_STATE') {
+              rootStoreModule.mutations.CLEAR_AUTHENTICATION_STATE(state)
+            } else if (type === 'users/CLEAR_AUTHENTICATED_USER') {
+              userStoreModule.mutations.CLEAR_AUTHENTICATED_USER(state.users)
+            }
+          },
+        },
+        redirect(pathValue) {
+          events.push(['redirect', pathValue])
+        },
+        router: {},
+      })
+      await handler({
+        response: { status: 401, data: { message: 'Session expired.' } },
+        config: { skipGlobalErrorNotification: true },
+      })
+    } finally {
+      global.localStorage = savedLocalStorage
+    }
+  }
+
+  const secureAuthEvents = []
+  const authState = createAuthState('secret-bearer-success')
+  const authStorage = createLocalStorage(authState, secureAuthEvents)
+  await runAuthError({
+    state: authState,
+    storage: authStorage,
+    events: secureAuthEvents,
+    dispatch: applyAuthDispatch(authState, secureAuthEvents),
+  })
+  const persistedAuthState = parsePersistedState(authStorage.getItem('vuex'))
+  const authCleanupIndex = secureAuthEvents.findIndex(
+    ([type]) => type === 'cart/markCheckoutAuthRedirect'
+  )
+  const loginRedirectIndex = secureAuthEvents.findIndex(
+    ([type, payload]) => type === 'redirect' && payload === '/login'
+  )
+  assert.ok(authCleanupIndex >= 0)
+  assert.ok(authCleanupIndex < loginRedirectIndex)
+  assert.ok(
+    secureAuthEvents.findIndex(
+      ([type]) => type === 'users/clearAuthenticatedUser'
+    ) <
+      secureAuthEvents.findIndex(
+        ([type, key]) => type === 'remove' && key === 'token'
+      )
+  )
+  assert.ok(
+    secureAuthEvents.findIndex(
+      ([type, key]) => type === 'set' && key === 'vuex'
+    ) < loginRedirectIndex
+  )
+  assert.strictEqual(authState.authenticated, false)
+  assert.deepStrictEqual(authState.users.user, {
+    id: null,
+    access: null,
+    token: null,
+    shopid: null,
+  })
+  assert.strictEqual(persistedAuthState.authenticated, false)
+  assert.deepStrictEqual(persistedAuthState.users.user, authState.users.user)
+  for (const key of ['idUser', 'access', 'token', 'shopid']) {
+    assert.strictEqual(authStorage.getItem(key), null)
+  }
+  assert.ok(!authStorage.getItem('vuex').includes('secret-bearer-success'))
+  assert.deepStrictEqual(persistedAuthState.cart, authState.cart)
+  assert.deepStrictEqual(
+    Object.fromEntries(
+      Object.keys(originalRecovery).map((key) => [key, authState.cart[key]])
+    ),
+    originalRecovery
+  )
+
+  const failedAuthEvents = []
+  const failedAuthState = createAuthState('secret-bearer-fallback')
+  const failedAuthStorage = createLocalStorage(
+    failedAuthState,
+    failedAuthEvents
+  )
+  await runAuthError({
+    state: failedAuthState,
+    storage: failedAuthStorage,
+    events: failedAuthEvents,
+    dispatch(type, payload) {
+      failedAuthEvents.push([type, payload])
+      return Promise.reject(new Error(`failed dispatch: ${type}`))
+    },
+  })
+  const fallbackPersistedState = parsePersistedState(
+    failedAuthStorage.getItem('vuex')
+  )
+  assert.strictEqual(failedAuthState.authenticated, false)
+  assert.deepStrictEqual(failedAuthState.users.user, {
+    id: null,
+    access: null,
+    token: null,
+    shopid: null,
+  })
+  assert.strictEqual(failedAuthState.cart.clientOrderAuthRedirect, true)
+  assert.deepStrictEqual(
+    Object.fromEntries(
+      Object.keys(originalRecovery).map((key) => [
+        key,
+        failedAuthState.cart[key],
+      ])
+    ),
+    originalRecovery
+  )
+  assert.ok(
+    !failedAuthStorage.getItem('vuex').includes('secret-bearer-fallback')
+  )
+  for (const key of ['idUser', 'access', 'token', 'shopid']) {
+    assert.strictEqual(failedAuthStorage.getItem(key), null)
+  }
+  assert.strictEqual(fallbackPersistedState.authenticated, false)
+  assert.strictEqual(fallbackPersistedState.users.user.token, null)
+  assert.deepStrictEqual(fallbackPersistedState.cart, failedAuthState.cart)
+  assert.ok(
+    failedAuthEvents.some(
+      ([type]) => type === 'users/CLEAR_AUTHENTICATED_USER'
+    ),
+    'a rejected auth action must use the explicit mutation fallback'
+  )
+  assert.deepStrictEqual(failedAuthEvents.at(-1), ['redirect', '/login'])
+
+  const loginEvents = []
+  const loginStorage = createLocalStorage(
+    createAuthState('expired-bearer'),
+    loginEvents
+  )
+  const savedLocalStorage = global.localStorage
+  global.localStorage = loginStorage
+  try {
+    const loginResult = await userActions.postLogin.call(
+      {
+        $axios: {
+          post: () =>
+            Promise.resolve({
+              data: {
+                data: [{ id: 21, access: 2, token: 'fresh-bearer', shopid: 8 }],
+                message: 'Connected',
+              },
+            }),
+        },
+      },
+      {
+        dispatch(type, payload, options) {
+          loginEvents.push([type, payload, options])
+        },
+      },
+      { email: 'alice@example.test', password: 'secret' }
+    )
+    assert.strictEqual(loginResult, true)
+  } finally {
+    global.localStorage = savedLocalStorage
+  }
+  assert.ok(
+    loginEvents.some(
+      ([type, payload, options]) =>
+        type === 'setAuthentication' &&
+        payload === true &&
+        options &&
+        options.root === true
+    )
+  )
+
   const authRedirectEvents = []
   let authErrorHandler = null
   const previousLocalStorage = global.localStorage
   global.localStorage = {
+    getItem() {
+      return null
+    },
+    setItem() {},
     removeItem(key) {
       authRedirectEvents.push(['remove', key])
     },
@@ -1809,6 +2117,11 @@ const runReviewRegressionTests = async () => {
         },
       },
       store: {
+        state: {
+          authenticated: true,
+          users: { user: {} },
+          cart: { clientOrderAuthRedirect: false },
+        },
         dispatch(type, payload) {
           authRedirectEvents.push([type, payload])
         },
@@ -1818,25 +2131,25 @@ const runReviewRegressionTests = async () => {
       },
       router: {},
     })
-    authErrorHandler({
+    await authErrorHandler({
       response: { status: 401, data: { message: 'Session expirée.' } },
       config: { skipGlobalErrorNotification: true },
     })
   } finally {
     global.localStorage = previousLocalStorage
   }
-  const authCleanupIndex = authRedirectEvents.findIndex(
+  const legacyAuthCleanupIndex = authRedirectEvents.findIndex(
     ([type]) => type === 'cart/markCheckoutAuthRedirect'
   )
-  const loginRedirectIndex = authRedirectEvents.findIndex(
+  const legacyLoginRedirectIndex = authRedirectEvents.findIndex(
     ([type, payload]) => type === 'redirect' && payload === '/login'
   )
   assert.ok(
-    authCleanupIndex >= 0,
+    legacyAuthCleanupIndex >= 0,
     '401 redirect must mark the in-memory attempt for auth navigation'
   )
   assert.ok(
-    authCleanupIndex < loginRedirectIndex,
+    legacyAuthCleanupIndex < legacyLoginRedirectIndex,
     'the auth redirect marker must be set before login navigation starts'
   )
   assert.ok(

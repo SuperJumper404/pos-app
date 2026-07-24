@@ -1,9 +1,126 @@
-export default function ({ $axios, redirect, store, router }) {
+const {
+  parsePersistedState,
+  serializePersistedState,
+} = require('../helpers/persistedState')
+
+const clearAuthState = (state) => {
+  if (!state || typeof state !== 'object') return
+
+  state.authenticated = false
+  const user = state.users && state.users.user
+  if (!user || typeof user !== 'object') return
+
+  user.id = null
+  user.access = null
+  user.token = null
+  user.shopid = null
+}
+
+const isAuthStateCleared = (state) => {
+  if (!state || state.authenticated !== false) return false
+
+  const user = state.users && state.users.user
+  return (
+    !user ||
+    (user.id === null &&
+      user.access === null &&
+      user.token === null &&
+      user.shopid === null)
+  )
+}
+
+const sanitizedAuthSnapshot = (state) => {
+  if (!state || typeof state !== 'object') return state
+
+  const users = state.users
+  const user = users && users.user
+  return {
+    ...state,
+    authenticated: false,
+    ...(users && {
+      users: {
+        ...users,
+        ...(user && {
+          user: {
+            ...user,
+            id: null,
+            access: null,
+            token: null,
+            shopid: null,
+          },
+        }),
+      },
+    }),
+  }
+}
+
+export default function ({ $axios, redirect, store }) {
   const clearAuth = () => {
     localStorage.removeItem('idUser')
     localStorage.removeItem('access')
     localStorage.removeItem('token')
     localStorage.removeItem('shopid')
+  }
+
+  const markAuthRedirect = async () => {
+    try {
+      await store.dispatch('cart/markCheckoutAuthRedirect', true)
+    } catch (error) {
+      try {
+        store.commit('cart/MARK_CHECKOUT_AUTH_REDIRECT', true)
+      } catch (commitError) {
+        try {
+          if (store.state && store.state.cart) {
+            store.state.cart.clientOrderAuthRedirect = true
+          }
+        } catch (stateError) {
+          // Persisted auth is still scrubbed below before redirecting.
+        }
+      }
+    }
+  }
+
+  const clearStoreAuth = async () => {
+    try {
+      await store.dispatch('clearAuthentication')
+    } catch (error) {
+      // The direct state fallback below still removes the expired session.
+    }
+
+    try {
+      await store.dispatch('users/clearAuthenticatedUser')
+    } catch (error) {
+      // The direct state fallback below still removes the expired session.
+    }
+
+    if (!isAuthStateCleared(store.state)) {
+      try {
+        store.commit('CLEAR_AUTHENTICATION_STATE')
+        store.commit('users/CLEAR_AUTHENTICATED_USER')
+      } catch (error) {
+        try {
+          clearAuthState(store.state)
+        } catch (stateError) {
+          // Persisted auth is still scrubbed below before redirecting.
+        }
+      }
+    }
+  }
+
+  const persistClearedAuth = () => {
+    const persistedState = parsePersistedState(localStorage.getItem('vuex'))
+    const stateToPersist = sanitizedAuthSnapshot(store.state || persistedState)
+
+    if (!stateToPersist) {
+      localStorage.removeItem('vuex')
+      return
+    }
+
+    try {
+      localStorage.setItem('vuex', serializePersistedState(stateToPersist))
+    } catch (error) {
+      localStorage.removeItem('vuex')
+    }
   }
 
   const errorMessageByStatus = (status) => {
@@ -19,7 +136,7 @@ export default function ({ $axios, redirect, store, router }) {
     return messages[status] || 'Une erreur est survenue.'
   }
 
-  $axios.onError((error) => {
+  $axios.onError(async (error) => {
     const status = error.response && error.response.status
     const backendMessage =
       error.response && error.response.data && error.response.data.message
@@ -30,15 +147,10 @@ export default function ({ $axios, redirect, store, router }) {
     }
 
     if (status === 401) {
-      console.log('Store Instance', store)
-      store.dispatch('cart/markCheckoutAuthRedirect', true)
+      await markAuthRedirect()
+      await clearStoreAuth()
+      persistClearedAuth()
       clearAuth()
-      //   await store.dispatch('set/user.id', null)
-      //   await store.dispatch('set/user.access', null)
-      //   await store.dispatch('set/user.token', null)
-      //   await store.dispatch('set/alertSuccess', true)
-      //   await store.dispatch('set/user.shopid', null)
-      //   await router.push('/login')
       redirect('/login')
     }
   })

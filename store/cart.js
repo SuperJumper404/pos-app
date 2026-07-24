@@ -137,6 +137,9 @@ export const state = () => ({
 removeOldOrders()
 export const mutations = {
   ...defaultMutations(state()),
+  MARK_CHECKOUT_AUTH_REDIRECT(currentState, active) {
+    currentState.clientOrderAuthRedirect = active === true
+  },
   HYDRATE_ORDERS_SENT(state) {
     state.allOrdersSent = getOrderIds(removeOldOrders())
   },
