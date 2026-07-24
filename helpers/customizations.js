@@ -35,6 +35,37 @@ const validateStep = (step, selectedIds) => {
   return { valid: true, reason: null }
 }
 
+const isEnabled = (value) => ![false, 0, '0', 'false'].includes(value)
+
+const hasAvailableChoice = (step) =>
+  (step && Array.isArray(step.choices) ? step.choices : []).some(
+    (choice) =>
+      isEnabled(choice.active) &&
+      (choice.choice_type !== 'linked_product' || choice.available !== false)
+  )
+
+const isVisibleWizardStep = (step) => {
+  if (!step || !isEnabled(step.active)) return false
+  return Number(step.minimum_choices) > 0 || hasAvailableChoice(step)
+}
+
+const nextVisibleStepIndex = (steps, currentIndex) => {
+  const normalizedSteps = Array.isArray(steps) ? steps : []
+  for (
+    let index = Number(currentIndex) + 1;
+    index < normalizedSteps.length;
+    index += 1
+  ) {
+    if (isVisibleWizardStep(normalizedSteps[index])) return index
+  }
+  return normalizedSteps.length
+}
+
+const findStepIndexById = (steps, productStepId) =>
+  (Array.isArray(steps) ? steps : []).findIndex(
+    (step) => step && String(step.product_step_id) === String(productStepId)
+  )
+
 const calculatePreviewUnitPrice = (product, selectedIds) => {
   const selectedChoiceIds = new Set(normalizeNumericIds(selectedIds))
   const contextualChoices = new Map()
@@ -216,4 +247,6 @@ module.exports = {
   buildCheckoutItems,
   createComponentInputId,
   serializeProductCustomizationConfig,
+  nextVisibleStepIndex,
+  findStepIndexById,
 }

@@ -9,6 +9,8 @@ const {
   buildCheckoutItems,
   createComponentInputId,
   serializeProductCustomizationConfig,
+  nextVisibleStepIndex,
+  findStepIndexById,
 } = require('../helpers/customizations')
 
 const step = {
@@ -33,6 +35,252 @@ assert.deepStrictEqual(validateStep(step, [30, 30]), {
   valid: true,
   reason: null,
 })
+
+const wizardSteps = [
+  {
+    product_step_id: 10,
+    minimum_choices: 0,
+    choices: [
+      {
+        product_step_choice_id: 101,
+        choice_type: 'linked_product',
+        active: true,
+        available: false,
+      },
+    ],
+  },
+  {
+    product_step_id: '20',
+    minimum_choices: 1,
+    choices: [
+      {
+        product_step_choice_id: 201,
+        choice_type: 'linked_product',
+        active: true,
+        available: false,
+      },
+    ],
+  },
+  {
+    product_step_id: 30,
+    minimum_choices: 0,
+    choices: [{ product_step_choice_id: 301, active: true, available: true }],
+  },
+]
+
+assert.strictEqual(
+  nextVisibleStepIndex(wizardSteps, -1),
+  1,
+  'optional steps without an available choice must be skipped'
+)
+assert.strictEqual(
+  nextVisibleStepIndex(wizardSteps, 1),
+  2,
+  'the next selectable step must remain visible'
+)
+assert.strictEqual(
+  nextVisibleStepIndex(
+    [
+      {
+        product_step_id: 40,
+        minimum_choices: 0,
+        choices: [
+          {
+            product_step_choice_id: 401,
+            choice_type: 'simple',
+            active: true,
+            available: false,
+          },
+        ],
+      },
+    ],
+    -1
+  ),
+  0,
+  'active simple choices remain selectable even without a stock availability flag'
+)
+assert.strictEqual(
+  nextVisibleStepIndex(wizardSteps, 2),
+  wizardSteps.length,
+  'the summary index must follow the last visible step'
+)
+assert.strictEqual(
+  findStepIndexById(wizardSteps, 20),
+  1,
+  'required unavailable steps must remain addressable as blocking steps'
+)
+assert.strictEqual(findStepIndexById(wizardSteps, 'missing'), -1)
+
+const choiceCardPath = path.join(
+  __dirname,
+  '../components/products/CustomizationChoiceCard.vue'
+)
+const wizardPath = path.join(
+  __dirname,
+  '../components/products/ProductCustomizationWizard.vue'
+)
+const cartSummaryPath = path.join(
+  __dirname,
+  '../components/products/CartCustomizationSummary.vue'
+)
+const choiceCardSource = fs.readFileSync(choiceCardPath, 'utf8')
+const wizardSource = fs.readFileSync(wizardPath, 'utf8')
+const cartSummarySource = fs.readFileSync(cartSummaryPath, 'utf8')
+
+assert.ok(
+  choiceCardSource.includes("this.$emit('toggle', this.choiceId)"),
+  'choice cards must emit an id without mutating the choice prop'
+)
+assert.ok(
+  choiceCardSource.includes('Indisponible') &&
+    choiceCardSource.includes('Inclus'),
+  'choice cards must expose availability and included-price labels'
+)
+assert.ok(
+  choiceCardSource.includes("choice.choice_type === 'linked_product'"),
+  'linked choices must resolve their product image separately'
+)
+assert.ok(
+  !/this\.choice\.[A-Za-z_]+\s*=(?!=)/.test(choiceCardSource),
+  'choice cards must never mutate their choice prop'
+)
+
+for (const contractToken of [
+  '<v-progress-linear',
+  'Étape {{ currentStepNumber }} / {{ visibleStepCount }}',
+  'Prix actuel',
+  'initialStepId',
+  "this.$emit('input', [...normalizedSelection])",
+  "this.$emit('confirm', this.confirmationPayload)",
+  "this.$emit('cancel')",
+]) {
+  assert.ok(
+    wizardSource.includes(contractToken),
+    `wizard contract missing: ${contractToken}`
+  )
+}
+assert.ok(
+  cartSummarySource.includes('groupedSelections') &&
+    cartSummarySource.includes('Total'),
+  'the cart summary must group selections and display the total'
+)
+
+const loadComponentOptions = (source, dependencyNames, dependencies) => {
+  const scriptMatch = source.match(/<script>([\s\S]*?)<\/script>/)
+  assert.ok(scriptMatch, 'component script must exist')
+  const executable = scriptMatch[1]
+    .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
+    .replace('export default', 'return')
+
+  // eslint-disable-next-line no-new-func
+  return new Function(...dependencyNames, executable)(...dependencies)
+}
+
+const wizardOptions = loadComponentOptions(
+  wizardSource,
+  [
+    'CustomizationChoiceCard',
+    'CartCustomizationSummary',
+    'calculatePreviewUnitPrice',
+    'findStepIndexById',
+    'nextVisibleStepIndex',
+    'validateStep',
+  ],
+  [
+    {},
+    {},
+    calculatePreviewUnitPrice,
+    findStepIndexById,
+    nextVisibleStepIndex,
+    validateStep,
+  ]
+)
+
+const requestedStepVm = {
+  steps: wizardSteps,
+  initialStepId: 20,
+  currentStepIndex: null,
+}
+wizardOptions.methods.resetWizardPosition.call(requestedStepVm)
+assert.strictEqual(
+  requestedStepVm.currentStepIndex,
+  1,
+  'initialStepId must open the requested edit or recovery step'
+)
+
+const singleSelectionVm = {
+  currentStepChoices: [
+    { product_step_choice_id: 101 },
+    { product_step_choice_id: 102 },
+  ],
+  maximumChoices: 1,
+  selectedChoiceIds: [99, 101],
+  choiceSelectable: () => true,
+  setSelection(selection) {
+    this.selectedChoiceIds = selection
+  },
+}
+wizardOptions.methods.toggleChoice.call(singleSelectionVm, 102)
+assert.deepStrictEqual(
+  singleSelectionVm.selectedChoiceIds,
+  [99, 102],
+  'maximum one must replace only the current step selection'
+)
+
+const multipleSelectionVm = {
+  currentStepChoices: [
+    { product_step_choice_id: 201 },
+    { product_step_choice_id: 202 },
+    { product_step_choice_id: 203 },
+  ],
+  maximumChoices: 2,
+  selectedChoiceIds: [201, 202],
+  choiceSelectable: () => true,
+  setSelection(selection) {
+    this.selectedChoiceIds = selection
+  },
+}
+wizardOptions.methods.toggleChoice.call(multipleSelectionVm, 203)
+assert.deepStrictEqual(
+  multipleSelectionVm.selectedChoiceIds,
+  [201, 202],
+  'multiple selection must stop at the configured maximum'
+)
+wizardOptions.methods.toggleChoice.call(multipleSelectionVm, 201)
+assert.deepStrictEqual(
+  multipleSelectionVm.selectedChoiceIds,
+  [202],
+  'multiple selection must allow deselection'
+)
+
+const summaryOptions = loadComponentOptions(
+  cartSummarySource,
+  ['formatPrice'],
+  [(value) => Number(value).toFixed(2)]
+)
+assert.deepStrictEqual(
+  summaryOptions.computed.groupedSelections.call({
+    selections: [
+      { step_name: 'Boisson', choice_name: 'Cola', extra_price: '0.50' },
+      { step_name: 'Sauce', choice_name: 'Curry', extra_price: 0 },
+      { step_name: 'Boisson', choice_name: 'Eau', extra_price: 0 },
+    ],
+  }),
+  [
+    {
+      stepName: 'Boisson',
+      choices: [
+        { step_name: 'Boisson', choice_name: 'Cola', extra_price: '0.50' },
+        { step_name: 'Boisson', choice_name: 'Eau', extra_price: 0 },
+      ],
+    },
+    {
+      stepName: 'Sauce',
+      choices: [{ step_name: 'Sauce', choice_name: 'Curry', extra_price: 0 }],
+    },
+  ],
+  'summary groups must preserve step and choice order'
+)
 
 const product = {
   id: 5,
