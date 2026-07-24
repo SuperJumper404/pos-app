@@ -36,7 +36,7 @@
                 v-if="item.routeName === 'orders' && pendingOrderCount > 0"
                 color="primary"
                 size="26"
-                class="ml-2 flex-shrink-0"
+                class="ml-3 flex-shrink-0"
               >
                 <span class="white--text text-caption font-weight-bold">
                   {{ pendingOrderBadge }}
