@@ -4,7 +4,6 @@ export default function ({ $axios, redirect, store, router }) {
     localStorage.removeItem('access')
     localStorage.removeItem('token')
     localStorage.removeItem('shopid')
-    localStorage.removeItem('vuex')
   }
 
   const errorMessageByStatus = (status) => {
@@ -32,7 +31,7 @@ export default function ({ $axios, redirect, store, router }) {
 
     if (status === 401) {
       console.log('Store Instance', store)
-      store.dispatch('cart/clearCheckoutForAuth')
+      store.dispatch('cart/markCheckoutAuthRedirect', true)
       clearAuth()
       //   await store.dispatch('set/user.id', null)
       //   await store.dispatch('set/user.access', null)

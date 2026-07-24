@@ -1545,6 +1545,79 @@ const runReviewRegressionTests = async () => {
   )
   assert.deepStrictEqual(checkoutCommits, [['ADD_ORDER_SENT', 44]])
 
+  const authRetryState = cartModule.state()
+  let authRetryRequestCount = 0
+  const authRetryContext = {
+    state: authRetryState,
+    dispatch(type, payload) {
+      applyCartStateDispatch(authRetryState, type, payload)
+    },
+    commit() {},
+  }
+  const authRetryApi = {
+    $axios: {
+      post() {
+        authRetryRequestCount += 1
+        if (authRetryRequestCount === 1) {
+          return Promise.reject(new Error('network'))
+        }
+        const error = new Error('Session expirée.')
+        error.response = {
+          status: 401,
+          data: { message: 'Session expirée.', data: {} },
+        }
+        return Promise.reject(error)
+      },
+    },
+  }
+  await cartModule.actions.checkoutOrder.call(
+    authRetryApi,
+    authRetryContext,
+    checkoutInput
+  )
+  const uncertainRetryToken = authRetryState.clientOrderToken
+  const uncertainRetryPayload = authRetryState.clientOrderPayload
+  await cartModule.actions.checkoutOrder.call(
+    authRetryApi,
+    authRetryContext,
+    checkoutInput
+  )
+  assert.strictEqual(
+    authRetryState.clientOrderStatus,
+    'uncertain',
+    'an exact uncertain retry rejected by auth must remain unsafe'
+  )
+  assert.strictEqual(authRetryState.clientOrderToken, uncertainRetryToken)
+  assert.deepStrictEqual(
+    authRetryState.clientOrderPayload,
+    uncertainRetryPayload
+  )
+
+  const pendingAuthState = cartModule.state()
+  pendingAuthState.clientOrderToken = 'pending-token'
+  pendingAuthState.clientOrderSignature =
+    buildCheckoutPayloadSignature(checkoutInput)
+  pendingAuthState.clientOrderPayload = { customer: 'Alice' }
+  pendingAuthState.clientOrderStatus = 'pending'
+  const pendingAuthError = new Error('Accès refusé.')
+  pendingAuthError.response = {
+    status: 403,
+    data: { message: 'Accès refusé.', data: {} },
+  }
+  await cartModule.actions.checkoutOrder.call(
+    { $axios: { post: () => Promise.reject(pendingAuthError) } },
+    {
+      state: pendingAuthState,
+      dispatch(type, payload) {
+        applyCartStateDispatch(pendingAuthState, type, payload)
+      },
+      commit() {},
+    },
+    checkoutInput
+  )
+  assert.strictEqual(pendingAuthState.clientOrderStatus, 'uncertain')
+  assert.strictEqual(pendingAuthState.clientOrderToken, 'pending-token')
+
   const repriceState = cartModule.state()
   const repriceTokens = []
   let repriceRequestCount = 0
@@ -1753,18 +1826,24 @@ const runReviewRegressionTests = async () => {
     global.localStorage = previousLocalStorage
   }
   const authCleanupIndex = authRedirectEvents.findIndex(
-    ([type]) => type === 'cart/clearCheckoutForAuth'
+    ([type]) => type === 'cart/markCheckoutAuthRedirect'
   )
   const loginRedirectIndex = authRedirectEvents.findIndex(
     ([type, payload]) => type === 'redirect' && payload === '/login'
   )
   assert.ok(
     authCleanupIndex >= 0,
-    '401 redirect must clear the in-memory attempt'
+    '401 redirect must mark the in-memory attempt for auth navigation'
   )
   assert.ok(
     authCleanupIndex < loginRedirectIndex,
-    'checkout cleanup must happen before the login redirect starts'
+    'the auth redirect marker must be set before login navigation starts'
+  )
+  assert.ok(
+    !authRedirectEvents.some(
+      ([type, payload]) => type === 'remove' && payload === 'vuex'
+    ),
+    '401 must preserve the persisted Vuex checkout recovery snapshot'
   )
 
   const authExitState = cartModule.state()
@@ -1779,12 +1858,24 @@ const runReviewRegressionTests = async () => {
       applyCartStateDispatch(authExitState, type, payload)
     },
   }
-  const authExitResult =
-    cartModule.actions.clearCheckoutForAuth(authExitContext)
+  const authExitResult = cartModule.actions.markCheckoutAuthRedirect(
+    authExitContext,
+    true
+  )
   assert.strictEqual(authExitResult.ok, true)
-  assert.strictEqual(authExitState.clientOrderToken, null)
-  assert.strictEqual(authExitState.clientOrderOrderId, null)
+  assert.strictEqual(authExitState.clientOrderToken, 'auth-token')
+  assert.strictEqual(authExitState.clientOrderSignature, 'auth-signature')
+  assert.deepStrictEqual(authExitState.clientOrderPayload, {
+    customer: 'Alice',
+  })
+  assert.strictEqual(authExitState.clientOrderOrderId, 55)
+  assert.strictEqual(authExitState.clientOrderStatus, 'stripe_prepared')
   assert.strictEqual(authExitState.clientOrderAuthRedirect, true)
+  cartModule.actions.markCheckoutAuthRedirect(authExitContext, false)
+  assert.strictEqual(authExitState.clientOrderAuthRedirect, false)
+  assert.strictEqual(authExitState.clientOrderToken, 'auth-token')
+  assert.strictEqual(authExitState.clientOrderOrderId, 55)
+  assert.strictEqual(authExitState.clientOrderStatus, 'stripe_prepared')
 
   let authRouteDecision = 'not-called'
   let authLocalResetCount = 0
@@ -1997,6 +2088,13 @@ const runReviewRegressionTests = async () => {
         type === 'cart/setTocart' && payload[0].selectedChoiceIds[0] === 30
     ),
     'refresh recovery must restore the configured display cart, not only public item ids'
+  )
+  assert.ok(
+    restoredCartDispatches.some(
+      ([type, payload]) =>
+        type === 'cart/markCheckoutAuthRedirect' && payload === false
+    ),
+    'successful cart remount must clear only the auth redirect marker'
   )
 
   const persistedCancellationOrderIds = []

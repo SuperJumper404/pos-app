@@ -168,6 +168,12 @@ export const actions = {
   async checkoutOrder({ state, dispatch, commit }, params = {}) {
     const stripe = params.stripe === true
     const signature = buildCheckoutPayloadSignature(params)
+    const previousAttemptStatus = state.clientOrderStatus || 'idle'
+    const previousOrderId = state.clientOrderOrderId
+    const isFirstAttempt =
+      previousAttemptStatus === 'idle' &&
+      !state.clientOrderToken &&
+      !previousOrderId
     let clientOrderToken = state.clientOrderToken
 
     if (clientOrderToken && state.clientOrderSignature !== signature) {
@@ -231,12 +237,19 @@ export const actions = {
       const isAuthenticationRejection = [401, 403].includes(
         Number(checkoutError.status)
       )
-      const status = state.clientOrderOrderId
+      const unsafeAuthenticationStatus =
+        previousOrderId || previousAttemptStatus === 'stripe_prepared'
+          ? 'stripe_prepared'
+          : 'uncertain'
+      const status = isAuthenticationRejection
+        ? isFirstAttempt
+          ? 'prewrite_rejected'
+          : unsafeAuthenticationStatus
+        : state.clientOrderOrderId
         ? 'stripe_prepared'
         : checkoutError.code === 'ORDER_REPRICE_REQUIRED'
         ? 'reprice_required'
-        : isAuthenticationRejection ||
-          isSafePrewriteErrorCode(checkoutError.code)
+        : isSafePrewriteErrorCode(checkoutError.code)
         ? 'prewrite_rejected'
         : 'uncertain'
       dispatch('set/clientOrderStatus', status)
@@ -258,9 +271,8 @@ export const actions = {
     clearCheckoutAttempt(dispatch)
     return { ok: true, data: null, error: null }
   },
-  clearCheckoutForAuth({ dispatch }) {
-    clearCheckoutAttempt(dispatch)
-    dispatch('set/clientOrderAuthRedirect', true)
+  markCheckoutAuthRedirect({ dispatch }, active = true) {
+    dispatch('set/clientOrderAuthRedirect', active === true)
     return { ok: true, data: null, error: null }
   },
   completeCheckout({ dispatch }) {

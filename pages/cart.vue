@@ -657,6 +657,7 @@ export default {
       })
     },
     async restoreCheckoutFromStore() {
+      this.$store.dispatch('cart/markCheckoutAuthRedirect', false)
       const token = this.$store.get('cart/clientOrderToken')
       const payload = this.$store.get('cart/clientOrderPayload')
       if (!token || !payload) return false
