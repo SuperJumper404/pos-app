@@ -1233,6 +1233,42 @@ assert.match(
   /if \(!saved\) return[\s\S]{0,180}this\.pendingStepPayload = null/,
   'failed step deactivation must preserve its pending operation'
 )
+const stepDeactivationMethod = customizationAdminPageSource.match(
+  /async confirmStepDeactivation\(\)[\s\S]*?\n {4}reactivateStep\(\)/
+)[0]
+assert.ok(
+  stepDeactivationMethod.includes("'customizations/updateStep'") &&
+    !stepDeactivationMethod.includes("'customizations/deleteStep'"),
+  'deactivation must use PATCH and never invoke permanent deletion'
+)
+assert.ok(
+  customizationAdminPageSource.includes('Supprimer définitivement'),
+  'step administration must expose permanent deletion'
+)
+assert.ok(
+  customizationAdminPageSource.includes('stepDeleteDialog: false') &&
+    customizationAdminPageSource.includes('stepToDeleteId: null'),
+  'permanent deletion must use state separate from deactivation'
+)
+assert.ok(
+  customizationAdminPageSource.includes('@click="requestStepDeletion()"'),
+  'permanent deletion must require an explicit confirmation request'
+)
+assert.ok(
+  customizationAdminPageSource.includes('stepToDeleteProducts'),
+  'the deletion dialog must list products attached to its explicit target'
+)
+assert.ok(
+  customizationAdminPageSource.includes(
+    'if (!this.stepToDeleteId || this.savingStep) return'
+  ),
+  'step deletion must guard a missing target and duplicate retries'
+)
+assert.match(
+  customizationAdminPageSource,
+  /if \(!deleted\) return[\s\S]{0,180}this\.stepToDeleteId = null/,
+  'failed permanent deletion must preserve its target'
+)
 assert.ok(
   customizationAdminPageSource.includes(
     'if (!this.choiceToDeactivate || this.savingChoice) return'

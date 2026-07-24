@@ -84,6 +84,15 @@
                 <v-icon left>mdi-eye-outline</v-icon>
                 Réactiver
               </v-btn>
+              <v-btn
+                outlined
+                color="error"
+                class="text-none mr-2"
+                @click="requestStepDeletion()"
+              >
+                <v-icon left>mdi-delete-forever-outline</v-icon>
+                Supprimer définitivement
+              </v-btn>
               <v-btn color="success" class="text-none" @click="openNewChoice">
                 <v-icon left>mdi-plus</v-icon>
                 Ajouter un choix
@@ -292,6 +301,55 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="stepDeleteDialog" max-width="560" persistent>
+      <v-card>
+        <v-card-title>Supprimer définitivement cette étape ?</v-card-title>
+        <v-card-text>
+          <p v-if="stepToDelete">
+            L’étape « {{ stepToDelete.name }} », ses choix et leurs images
+            seront supprimés définitivement.
+          </p>
+          <template v-if="stepToDeleteProducts.length">
+            <p class="font-weight-bold mb-2">
+              Elle sera aussi retirée de
+              {{ stepToDeleteProducts.length }} produit(s) :
+            </p>
+            <v-chip
+              v-for="product in stepToDeleteProducts"
+              :key="product.id"
+              small
+              class="mr-2 mb-2"
+            >
+              {{ product.name }}
+            </v-chip>
+          </template>
+          <v-alert text dense type="warning" class="mt-3 mb-0">
+            Cette action est irréversible. Les commandes historiques resteront
+            inchangées.
+          </v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            text
+            class="text-none"
+            :disabled="savingStep"
+            @click="cancelStepDeletion"
+          >
+            Annuler
+          </v-btn>
+          <v-btn
+            color="error"
+            class="text-none"
+            :loading="savingStep"
+            @click="confirmStepDeletion"
+          >
+            Supprimer définitivement
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="choiceDeactivateDialog" max-width="480" persistent>
       <v-card>
         <v-card-title>Désactiver ce choix ?</v-card-title>
@@ -337,11 +395,13 @@ export default {
       newStepDialog: false,
       choiceDialog: false,
       stepDeactivateDialog: false,
+      stepDeleteDialog: false,
       choiceDeactivateDialog: false,
       editingChoice: null,
       choiceToDeactivate: null,
       pendingStepPayload: null,
       stepToDeactivateId: null,
+      stepToDeleteId: null,
       stepEditorKey: 0,
       newStepEditorKey: 0,
       choiceEditorKey: 0,
@@ -375,12 +435,16 @@ export default {
     },
     selectedStepProducts() {
       if (!this.selectedStep) return []
-      return this.dataProducts.filter((product) =>
-        (product.customization_steps || []).some(
-          (step) =>
-            String(step.step_id || step.id) === String(this.selectedStep.id)
-        )
+      return this.productsUsingStep(this.selectedStep)
+    },
+    stepToDelete() {
+      return this.dataSteps.find(
+        (step) => String(step.id) === String(this.stepToDeleteId)
       )
+    },
+    stepToDeleteProducts() {
+      if (!this.stepToDelete) return []
+      return this.productsUsingStep(this.stepToDelete)
     },
     staticurl() {
       return String(this.$store.get('staticURL') || '').replace(/\/+$/, '')
@@ -414,6 +478,14 @@ export default {
     this.loadingPage = false
   },
   methods: {
+    productsUsingStep(step) {
+      return this.dataProducts.filter((product) =>
+        (product.customization_steps || []).some(
+          (productStep) =>
+            String(productStep.step_id || productStep.id) === String(step.id)
+        )
+      )
+    },
     selectStep(stepId) {
       this.$store.set('customizations/selectedStepId', stepId)
     },
@@ -454,7 +526,11 @@ export default {
     },
     requestStepDeactivation() {
       if (!this.selectedStep) return
-      this.pendingStepPayload = null
+      this.pendingStepPayload = {
+        name: this.selectedStep.name,
+        description: this.selectedStep.description,
+        active: false,
+      }
       this.stepToDeactivateId = this.selectedStep.id
       this.stepDeactivateDialog = true
     },
@@ -468,16 +544,14 @@ export default {
       if (!this.stepToDeactivateId || this.savingStep) return
       const stepId = this.stepToDeactivateId
       const pendingPayload = this.pendingStepPayload
+      if (!pendingPayload) return
       this.savingStep = true
       let saved = false
       try {
-        saved =
-          pendingPayload !== null
-            ? await this.$store.dispatch('customizations/updateStep', {
-                id: stepId,
-                data: pendingPayload,
-              })
-            : await this.$store.dispatch('customizations/deleteStep', stepId)
+        saved = await this.$store.dispatch('customizations/updateStep', {
+          id: stepId,
+          data: pendingPayload,
+        })
       } finally {
         this.savingStep = false
       }
@@ -493,6 +567,33 @@ export default {
         description: this.selectedStep.description,
         active: true,
       })
+    },
+    requestStepDeletion() {
+      if (!this.selectedStep) return
+      this.stepToDeleteId = this.selectedStep.id
+      this.stepDeleteDialog = true
+    },
+    cancelStepDeletion() {
+      if (this.savingStep) return
+      this.stepDeleteDialog = false
+      this.stepToDeleteId = null
+    },
+    async confirmStepDeletion() {
+      if (!this.stepToDeleteId || this.savingStep) return
+      const stepId = this.stepToDeleteId
+      this.savingStep = true
+      let deleted = false
+      try {
+        deleted = await this.$store.dispatch(
+          'customizations/deleteStep',
+          stepId
+        )
+      } finally {
+        this.savingStep = false
+      }
+      if (!deleted) return
+      this.stepDeleteDialog = false
+      this.stepToDeleteId = null
     },
     openNewChoice() {
       this.editingChoice = null
