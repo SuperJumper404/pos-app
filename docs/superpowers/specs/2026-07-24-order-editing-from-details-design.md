@@ -233,14 +233,18 @@ L'écriture SQL suit cet ordre :
 8. vérifier que les deltas positifs sont disponibles ;
 9. appliquer les deltas de stock, y compris les produits liés choisis comme suppléments ;
 10. remplacer les détails et les instantanés ;
-11. mettre à jour le sous-total et le hash canonique de contenu ;
+11. mettre à jour le sous-total ;
 12. mettre à jour les quantités des réservations ;
 13. écrire les mouvements d'ajustement requis ;
 14. valider la transaction et renvoyer la nouvelle révision.
 
 Un delta positif consomme du stock ; un delta négatif le restitue. Une erreur à n'importe quelle étape annule l'ensemble de la transaction.
 
+`client_order_payload_hash` reste le claim d'idempotence du checkout qui a créé la commande et n'est jamais réécrit par l'édition. `content_revision` est recalculée à la lecture depuis les lignes et instantanés réellement enregistrés ; elle n'ajoute donc pas de colonne et ne modifie pas le comportement de rejeu du checkout initial.
+
 Pour une commande non-Stripe, les réservations déjà `committed` restent `committed` et les mouvements décrivent les différences. Pour Stripe, les réservations restent `reserved`, leur quantité et leur expiration sont actualisées, sans second décrément lors du paiement final.
+
+La quantité d'une réservation représente toujours le besoin courant de la commande. Une exigence supprimée passe à zéro ; une nouvelle exigence crée la ligne manquante. Une commande héritée sans réservations est rétroalimentée depuis ses anciens détails sans décrémenter une deuxième fois le stock déjà consommé. Une réservation Stripe précédemment `released` peut être réactivée par cette nouvelle tentative d'édition uniquement après verrouillage et nouvelle vérification du stock ; son expiration est alors renouvelée. Ces transitions particulières sont couvertes par les mêmes verrous et par des tests dédiés.
 
 ## Coordination avec préparation et encaissement
 
@@ -262,13 +266,17 @@ Une commande `requires_payment` peut déjà posséder un PaymentIntent dont le m
 3. si Stripe indique un succès, enregistrer l'encaissement et refuser la modification ;
 4. sinon annuler l'ancien PaymentIntent ;
 5. si l'annulation est incertaine, refuser avant toute modification SQL ;
-6. une fois l'annulation confirmée, exécuter la transaction de contenu ;
-7. générer et attacher un nouveau PaymentIntent idempotent pour le nouveau montant ;
-8. renvoyer le nouveau client secret et les informations QR publiques.
+6. une fois l'annulation confirmée, marquer l'ancien paiement comme annulé ;
+7. exécuter la transaction de contenu en faisant passer temporairement la commande à `payment_status = unpaid` et en supprimant la référence vers l'ancien PaymentIntent ;
+8. générer et attacher un nouveau PaymentIntent idempotent pour le nouveau montant ;
+9. remettre la commande à `payment_status = requires_payment` seulement après l'attachement réussi ;
+10. renvoyer le nouveau client secret et les informations QR publiques.
 
 La clé d'idempotence du nouveau PaymentIntent inclut la boutique, la commande et la nouvelle révision. L'ancien QR devient invalide.
 
-Si l'étape 7 échoue après la validation SQL, la commande reste modifiée mais non encaissée, avec ses réservations temporaires. Une action idempotente **Régénérer le paiement** reprend uniquement cette étape. L'interface distingue clairement « commande modifiée » de « paiement à régénérer ».
+Si l'étape 8 échoue après la validation SQL, la commande reste modifiée avec `payment_status = unpaid`, sans référence vers un PaymentIntent actif et avec ses réservations temporaires. L'interface distingue clairement « commande modifiée » de « paiement à régénérer ».
+
+`POST /api/v1/stripe/payment-intents/orders/:id/regenerate` fournit l'action idempotente **Régénérer le paiement**. Elle est authentifiée et limitée à la boutique, exige une commande toujours en attente, non payée et configurée pour Stripe, puis revérifie ou renouvelle les réservations avant de créer le PaymentIntent. Si les réservations ont expiré et que le stock n'est plus disponible, elle échoue sans créer de paiement et renvoie `INSUFFICIENT_STOCK`.
 
 ## Erreurs stables
 
@@ -309,6 +317,7 @@ Les réponses indiquent le produit ou l'étape concernée lorsque cela aide le f
 - course modification/préparation ;
 - course modification/encaissement ;
 - annulation et régénération Stripe ;
+- renouvellement d'une réservation Stripe expirée et rupture lors du renouvellement ;
 - succès Stripe observé avant modification ;
 - échec récupérable de régénération ;
 - isolation stricte entre boutiques.
