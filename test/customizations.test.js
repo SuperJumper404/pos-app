@@ -1,4 +1,6 @@
 const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
 const {
   validateStep,
   calculatePreviewUnitPrice,
@@ -104,6 +106,88 @@ assert.strictEqual(
 assert.notStrictEqual(
   createComponentInputId('image-cropper', 12),
   createComponentInputId('image-cropper', 13)
+)
+
+const stepEditorSource = fs.readFileSync(
+  path.join(__dirname, '../components/customizations/StepEditor.vue'),
+  'utf8'
+)
+const choiceEditorSource = fs.readFileSync(
+  path.join(__dirname, '../components/customizations/ChoiceEditor.vue'),
+  'utf8'
+)
+const customizationAdminPageSource = fs.readFileSync(
+  path.join(__dirname, '../pages/customizations/index.vue'),
+  'utf8'
+)
+
+assert.ok(
+  stepEditorSource.includes('maxlength="255"'),
+  'step names must enforce the 255-character schema limit'
+)
+assert.ok(
+  stepEditorSource.includes('maxlength="512"'),
+  'step descriptions must enforce the 512-character schema limit'
+)
+assert.ok(
+  stepEditorSource.includes('La longueur maximale est de 255 caractères.'),
+  'step names must have a max-length validation rule'
+)
+assert.ok(
+  stepEditorSource.includes('La longueur maximale est de 512 caractères.'),
+  'step descriptions must have a max-length validation rule'
+)
+assert.ok(
+  choiceEditorSource.includes('maxlength="255"'),
+  'simple choice names must enforce the 255-character schema limit'
+)
+assert.ok(
+  choiceEditorSource.includes('La longueur maximale est de 255 caractères.'),
+  'simple choice names must have a max-length validation rule'
+)
+assert.ok(
+  !choiceEditorSource.includes('label="Choix actif"'),
+  'choice activation must not bypass the page confirmation flow'
+)
+assert.ok(
+  !choiceEditorSource.includes('v-model="form.active"'),
+  'ChoiceEditor must not directly edit activation state'
+)
+assert.ok(
+  choiceEditorSource.includes(
+    "data.append('active', String(this.persistedActive))"
+  ),
+  'choice edits must preserve their existing activation state'
+)
+assert.ok(
+  customizationAdminPageSource.includes('stepToDeactivateId: null'),
+  'step deactivation must preserve its explicit target'
+)
+assert.ok(
+  customizationAdminPageSource.includes(
+    'if (!this.stepToDeactivateId || this.savingStep) return'
+  ),
+  'step deactivation must guard a missing target and duplicate retries'
+)
+assert.match(
+  customizationAdminPageSource,
+  /if \(!saved\) return[\s\S]{0,180}this\.pendingStepPayload = null/,
+  'failed step deactivation must preserve its pending operation'
+)
+assert.ok(
+  customizationAdminPageSource.includes(
+    'if (!this.choiceToDeactivate || this.savingChoice) return'
+  ),
+  'choice deactivation must guard a missing target and duplicate retries'
+)
+assert.match(
+  customizationAdminPageSource,
+  /if \(!saved\) return[\s\S]{0,180}this\.choiceToDeactivate = null/,
+  'failed choice deactivation must preserve its target'
+)
+assert.ok(
+  customizationAdminPageSource.includes('@click="cancelChoiceDeactivation"'),
+  'canceling choice deactivation must explicitly clear its pending target'
 )
 
 // eslint-disable-next-line no-console

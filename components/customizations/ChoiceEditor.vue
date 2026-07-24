@@ -30,8 +30,12 @@
         label="Nom du choix"
         :rules="[
           (value) => !!String(value || '').trim() || 'Le nom est requis',
+          (value) =>
+            String(value || '').trim().length <= 255 ||
+            'La longueur maximale est de 255 caractères.',
         ]"
         counter="255"
+        maxlength="255"
         required
       ></v-text-field>
       <p class="text-subtitle-2 mb-2">Image carrée (facultative)</p>
@@ -70,14 +74,6 @@
         </div>
       </v-card>
     </template>
-
-    <v-switch
-      v-if="isEditing"
-      v-model="form.active"
-      label="Choix actif"
-      color="success"
-      inset
-    ></v-switch>
 
     <div class="d-flex justify-end mt-4">
       <v-btn text class="text-none mr-2" @click="$emit('cancel')">
@@ -126,13 +122,15 @@ export default {
         choice_type: 'simple',
         name: '',
         linked_product_id: null,
-        active: true,
       },
     }
   },
   computed: {
     isEditing() {
       return !!(this.value && this.value.id)
+    },
+    persistedActive() {
+      return this.value ? this.value.active !== false : true
     },
     staticurl() {
       return String(this.$store.get('staticURL') || '').replace(/\/+$/, '')
@@ -168,7 +166,6 @@ export default {
           choice_type: (value && value.choice_type) || 'simple',
           name: (value && value.name) || '',
           linked_product_id: (value && value.linked_product_id) || null,
-          active: value ? value.active !== false : true,
         }
       },
     },
@@ -187,7 +184,7 @@ export default {
       if (!this.$refs.form.validate()) return
       const data = new FormData()
       data.append('choice_type', this.form.choice_type)
-      data.append('active', String(this.form.active))
+      data.append('active', String(this.persistedActive))
       data.append(
         'default_position',
         String(

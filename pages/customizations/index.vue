@@ -301,7 +301,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text class="text-none" @click="choiceDeactivateDialog = false">
+          <v-btn text class="text-none" @click="cancelChoiceDeactivation">
             Annuler
           </v-btn>
           <v-btn
@@ -341,6 +341,7 @@ export default {
       editingChoice: null,
       choiceToDeactivate: null,
       pendingStepPayload: null,
+      stepToDeactivateId: null,
       stepEditorKey: 0,
       newStepEditorKey: 0,
       choiceEditorKey: 0,
@@ -434,8 +435,10 @@ export default {
       if (created) this.selectStep(created.id)
     },
     async saveSelectedStep(payload) {
+      if (!this.selectedStep) return
       if (this.selectedStep.active && payload.active === false) {
         this.pendingStepPayload = payload
+        this.stepToDeactivateId = this.selectedStep.id
         this.stepDeactivateDialog = true
         return
       }
@@ -450,28 +453,38 @@ export default {
       this.savingStep = false
     },
     requestStepDeactivation() {
+      if (!this.selectedStep) return
       this.pendingStepPayload = null
+      this.stepToDeactivateId = this.selectedStep.id
       this.stepDeactivateDialog = true
     },
     cancelStepDeactivation() {
       this.stepDeactivateDialog = false
       this.pendingStepPayload = null
+      this.stepToDeactivateId = null
       this.stepEditorKey += 1
     },
     async confirmStepDeactivation() {
+      if (!this.stepToDeactivateId || this.savingStep) return
+      const stepId = this.stepToDeactivateId
+      const pendingPayload = this.pendingStepPayload
       this.savingStep = true
-      const saved = this.pendingStepPayload
-        ? await this.$store.dispatch('customizations/updateStep', {
-            id: this.selectedStep.id,
-            data: this.pendingStepPayload,
-          })
-        : await this.$store.dispatch(
-            'customizations/deleteStep',
-            this.selectedStep.id
-          )
-      this.savingStep = false
-      if (saved) this.stepDeactivateDialog = false
+      let saved = false
+      try {
+        saved =
+          pendingPayload !== null
+            ? await this.$store.dispatch('customizations/updateStep', {
+                id: stepId,
+                data: pendingPayload,
+              })
+            : await this.$store.dispatch('customizations/deleteStep', stepId)
+      } finally {
+        this.savingStep = false
+      }
+      if (!saved) return
+      this.stepDeactivateDialog = false
       this.pendingStepPayload = null
+      this.stepToDeactivateId = null
       this.stepEditorKey += 1
     },
     reactivateStep() {
@@ -510,17 +523,29 @@ export default {
       if (saved) this.closeChoiceDialog()
     },
     requestChoiceDeactivation(choice) {
+      if (!choice) return
       this.choiceToDeactivate = choice
       this.choiceDeactivateDialog = true
     },
+    cancelChoiceDeactivation() {
+      this.choiceDeactivateDialog = false
+      this.choiceToDeactivate = null
+    },
     async confirmChoiceDeactivation() {
+      if (!this.choiceToDeactivate || this.savingChoice) return
+      const choiceId = this.choiceToDeactivate.id
       this.savingChoice = true
-      const saved = await this.$store.dispatch(
-        'customizations/deleteChoice',
-        this.choiceToDeactivate.id
-      )
-      this.savingChoice = false
-      if (saved) this.choiceDeactivateDialog = false
+      let saved = false
+      try {
+        saved = await this.$store.dispatch(
+          'customizations/deleteChoice',
+          choiceId
+        )
+      } finally {
+        this.savingChoice = false
+      }
+      if (!saved) return
+      this.choiceDeactivateDialog = false
       this.choiceToDeactivate = null
     },
     reactivateChoice(choice) {

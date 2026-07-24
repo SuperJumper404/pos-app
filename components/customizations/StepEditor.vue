@@ -3,15 +3,27 @@
     <v-text-field
       v-model="form.name"
       label="Nom de l'étape"
-      :rules="[(value) => !!String(value || '').trim() || 'Le nom est requis']"
+      :rules="[
+        (value) => !!String(value || '').trim() || 'Le nom est requis',
+        (value) =>
+          String(value || '').trim().length <= 255 ||
+          'La longueur maximale est de 255 caractères.',
+      ]"
       counter="255"
+      maxlength="255"
       required
     ></v-text-field>
     <v-textarea
       v-model="form.description"
       label="Description"
+      :rules="[
+        (value) =>
+          String(value || '').length <= 512 ||
+          'La longueur maximale est de 512 caractères.',
+      ]"
       rows="2"
       counter="512"
+      maxlength="512"
       auto-grow
     ></v-textarea>
     <v-switch
