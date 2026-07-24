@@ -30,7 +30,16 @@
             <v-icon>{{ item.icon }}</v-icon>
           </v-list-item-action>
           <v-list-item-content>
-            <v-list-item-title v-text="item.title" />
+            <v-list-item-title class="d-flex align-center">
+              <span>{{ item.title }}</span>
+              <v-badge
+                v-if="item.routeName === 'orders' && pendingOrderCount > 0"
+                inline
+                color="red"
+                :content="pendingOrderBadge"
+                class="ml-2"
+              ></v-badge>
+            </v-list-item-title>
           </v-list-item-content>
         </v-list-item>
       </v-list>
@@ -102,6 +111,10 @@
 </template>
 <script>
 import listdashboard from '@/helpers/listdashboard'
+const {
+  countPendingOrders,
+  formatPendingOrderBadge,
+} = require('@/helpers/orderNotifications')
 export default {
   mixins: [listdashboard],
   data() {
@@ -114,6 +127,9 @@ export default {
       right: true,
       rightDrawer: false,
       title: 'Vuetify.js',
+      ordersPolling: null,
+      ordersPollingInFlight: false,
+      ordersPollingReady: false,
     }
   },
   computed: {
@@ -123,11 +139,21 @@ export default {
     idUser() {
       return this.$store.get('users/user')
     },
+    userAccess() {
+      const access = this.idUser && this.idUser.access
+      return access === undefined || access === null ? null : Number(access)
+    },
     indexCart() {
       return this.$store.get('cart/indexCart')
     },
     totalCart() {
       return this.$store.get('cart/totalCart')
+    },
+    pendingOrderCount() {
+      return countPendingOrders(this.$store.get('orders/dataOrders'))
+    },
+    pendingOrderBadge() {
+      return formatPendingOrderBadge(this.pendingOrderCount)
     },
     currentPage() {
       const title = this.list.find(
@@ -140,13 +166,55 @@ export default {
       return title
     },
   },
+  watch: {
+    userAccess() {
+      this.syncOrdersPolling()
+    },
+  },
   mounted() {
     console.log('Mixins List Dashbord', this.list)
     console.log('route', this.$route)
     console.log('router', this.$router)
     console.log('currentPage', this.shopInfo)
+    this.ordersPollingReady = true
+    this.syncOrdersPolling()
+  },
+  beforeDestroy() {
+    this.stopOrdersPolling()
   },
   methods: {
+    async refreshPendingOrders() {
+      const isAdmin = Number(this.idUser && this.idUser.access) === 0
+      if (!isAdmin || this.$route.path === '/orders') return false
+      if (this.ordersPollingInFlight) return false
+
+      this.ordersPollingInFlight = true
+      try {
+        await this.$store.dispatch('orders/getAllOrder')
+        return true
+      } catch {
+        return false
+      } finally {
+        this.ordersPollingInFlight = false
+      }
+    },
+    startOrdersPolling() {
+      if (this.ordersPolling) return
+      if (this.userAccess !== 0) return
+
+      this.refreshPendingOrders()
+      this.ordersPolling = setInterval(this.refreshPendingOrders, 15000)
+    },
+    syncOrdersPolling() {
+      if (!this.ordersPollingReady) return
+
+      if (this.userAccess === 0) this.startOrdersPolling()
+      else this.stopOrdersPolling()
+    },
+    stopOrdersPolling() {
+      if (this.ordersPolling) clearInterval(this.ordersPolling)
+      this.ordersPolling = null
+    },
     previousPage() {
       if (this.$route.path === '/') return
 

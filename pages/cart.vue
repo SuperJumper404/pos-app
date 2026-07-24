@@ -56,6 +56,17 @@
                     >
                       {{ formatCurrency(itm.price) }}
                     </div>
+                    <v-btn
+                      v-if="(itm.customization_steps || []).length > 0"
+                      text
+                      x-small
+                      color="primary"
+                      class="cart-summary-edit-btn text-none px-0 mt-1"
+                      @click="editCartLine(itemIndex)"
+                    >
+                      <v-icon x-small left>mdi-pencil</v-icon>
+                      Modifier toutes les options
+                    </v-btn>
                   </div>
                 </v-col>
 
@@ -102,17 +113,6 @@
                   :unit-price="itm.price"
                   @edit="editCartLine(itemIndex, $event)"
                 />
-                <v-btn
-                  v-if="(itm.customization_steps || []).length > 0"
-                  text
-                  small
-                  color="primary"
-                  class="text-none px-0"
-                  @click="editCartLine(itemIndex)"
-                >
-                  <v-icon small left>mdi-pencil</v-icon>
-                  Modifier
-                </v-btn>
               </v-col>
             </v-card>
           </div>

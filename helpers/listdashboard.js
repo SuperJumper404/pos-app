@@ -45,7 +45,7 @@ const listdashboard = {
           title: 'Étapes produits',
           routeName: 'customizations',
           to: '/customizations',
-          isAdmin: true,
+          isAdmin: false,
         },
         {
           icon: 'mdi-shape-plus',

@@ -4,13 +4,33 @@
       <Loading />
     </v-card>
     <v-card v-else ref="productsCard" outlined class="product-page-card mt-5">
-      <v-app-bar flat color="grey lighten-4" light class="d-flex justify-end">
-        <v-btn
-          color="primaryPurple lighten-1"
-          class="primaryWhite--text text--lighten-1 mr-3 text-none"
-          @click="$router.push('/products/newproduct')"
-          ><v-icon>mdi-plus</v-icon> Ajouter un produit</v-btn
-        >
+      <v-app-bar
+        flat
+        color="grey lighten-4"
+        light
+        height="auto"
+        class="products-toolbar py-2"
+      >
+        <v-spacer></v-spacer>
+        <div class="products-toolbar-actions">
+          <v-btn
+            outlined
+            color="primaryPurple lighten-1"
+            class="text-none"
+            @click="openCustomizationSteps"
+          >
+            <v-icon left>mdi-format-list-numbered</v-icon>
+            Gérer les étapes
+          </v-btn>
+          <v-btn
+            color="primaryPurple lighten-1"
+            class="primaryWhite--text text--lighten-1 text-none"
+            @click="$router.push('/products/newproduct')"
+          >
+            <v-icon left>mdi-plus</v-icon>
+            Ajouter un produit
+          </v-btn>
+        </div>
       </v-app-bar>
       <v-card-title
         v-if="dataProduct.length == 0"
@@ -240,6 +260,9 @@ export default {
     if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
   },
   methods: {
+    openCustomizationSteps() {
+      this.$router.push('/customizations')
+    },
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticurl}/api/v1/imgproducts/${fileName}`
@@ -328,6 +351,13 @@ export default {
 
 .product-page-card ::v-deep .v-card__text {
   min-width: 0;
+}
+
+.products-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
 .product-list-card {

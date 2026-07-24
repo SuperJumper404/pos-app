@@ -1404,6 +1404,21 @@ for (const cartContract of [
     `cart ordering contract missing: ${cartContract}`
   )
 }
+const cartHeaderBlock = cartPageSource.match(
+  /<div class="cart-summary-text">[\s\S]*?<\/div>\s*<\/v-col>/
+)[0]
+assert.ok(
+  cartHeaderBlock.includes('Modifier toutes les options') &&
+    cartHeaderBlock.includes('@click="editCartLine(itemIndex)"'),
+  'the global pencil action must live below product name and price'
+)
+const cartCustomizationBlock = cartPageSource.match(
+  /<v-col class="cart-summary-customizations pt-2">[\s\S]*?<\/v-col>/
+)[0]
+assert.ok(
+  !cartCustomizationBlock.includes('mdi-pencil'),
+  'the global pencil action must not remain beside per-step edit actions'
+)
 
 const menusOptions = loadComponentOptions(
   menusPageSource,
