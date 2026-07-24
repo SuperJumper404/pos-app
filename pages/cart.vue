@@ -1,5 +1,10 @@
 <template>
   <v-container>
+    <OrderEditBanner
+      v-if="isOrderEditActive"
+      :order-number="orderEditNumber"
+      @cancel="cancelCart"
+    />
     <v-alert
       v-if="checkoutErrorMessage"
       type="error"
@@ -25,6 +30,16 @@
               class="d-flex mb-2 flex-column"
               rounded="7"
             >
+              <v-alert
+                v-if="itm.requiresReconfiguration"
+                type="warning"
+                dense
+                tile
+                class="mb-0"
+              >
+                Les suppléments de ce produit ont changé. Configurez-les avant
+                d’enregistrer.
+              </v-alert>
               <v-row
                 class="cart-summary-row d-flex align-center mr-2 ml-2 mt-2"
                 no-gutters
@@ -119,7 +134,11 @@
         </v-card>
       </v-col>
       <v-col md="4" sm="12" cols="12">
-        <v-card v-if="access === 0" outlined class="pa-2 mb-3">
+        <v-card
+          v-if="access === 0 && !isOrderEditActive"
+          outlined
+          class="pa-2 mb-3"
+        >
           <v-select
             v-model="selectedTable"
             :items="dataTables"
@@ -146,59 +165,72 @@
               <v-icon small right>mdi-arrow-left</v-icon></v-btn
             >
           </v-card-actions>
-          <v-form v-else v-model="isValue" @submit.prevent="paymentBtn()">
-            <v-alert v-if="isKitchenClosed" dense text type="warning">
+          <v-form
+            v-else
+            v-model="isValue"
+            @submit.prevent="submitPrimaryAction"
+          >
+            <v-alert
+              v-if="isKitchenClosed && !isOrderEditActive"
+              dense
+              text
+              type="warning"
+            >
               La cuisine est fermée. Aucune nouvelle commande possible.
             </v-alert>
-            <v-text-field
-              v-model="formuser.customer"
-              type="text"
-              label="Nom du client"
-              :rules="[(v) => !!v || 'Veuillez saisir le nom']"
-              placeholder="Saisir le nom du client"
-              required
-            ></v-text-field>
-            <v-text-field
-              v-model="formuser.phone"
-              type="tel"
-              prepend-inner-icon="mdi-phone"
-              label="Numéro de téléphone"
-              :rules="[
-                (v) =>
-                  /^[0-9]+$/.test(v) || 'Seuls les chiffres sont autorisés',
-              ]"
-              placeholder="Saisir le numéro de téléphone"
-              class="mb-5"
-              required
-            ></v-text-field>
-            <!-- <v-select
+            <v-alert v-if="isOrderEditActive" type="info" text dense>
+              Commande #{{ orderEditNumber }} — seuls les produits et leurs
+              suppléments seront modifiés.
+            </v-alert>
+            <template v-else>
+              <v-text-field
+                v-model="formuser.customer"
+                type="text"
+                label="Nom du client"
+                :rules="[(v) => !!v || 'Veuillez saisir le nom']"
+                placeholder="Saisir le nom du client"
+                required
+              ></v-text-field>
+              <v-text-field
+                v-model="formuser.phone"
+                type="tel"
+                prepend-inner-icon="mdi-phone"
+                label="Numéro de téléphone"
+                :rules="[
+                  (v) =>
+                    /^[0-9]+$/.test(v) || 'Seuls les chiffres sont autorisés',
+                ]"
+                placeholder="Saisir le numéro de téléphone"
+                class="mb-5"
+                required
+              ></v-text-field>
+              <!-- <v-select
               v-model="formuser.payment"
               :items="items"
               label="Méthodes de paiement"
               :rules="[(v) => !!v || 'Méthodes de paiement requises']"
             ></v-select> -->
-            <v-textarea
-              v-model="formuser.notes"
-              label="Note à la commande"
-              :rows="2"
-              filled
-              prepend-inner-icon="mdi-comment"
-              placeholder="Ajouter une note à la commande"
-            ></v-textarea>
+              <v-textarea
+                v-model="formuser.notes"
+                label="Note à la commande"
+                :rows="2"
+                filled
+                prepend-inner-icon="mdi-comment"
+                placeholder="Ajouter une note à la commande"
+              ></v-textarea>
+            </template>
             <div
-              v-show="isStripeCheckout && stripePaymentReady"
+              v-show="showStripePaymentPanel"
               class="stripe-checkout-panel mb-4"
             >
               <div ref="stripePaymentElement"></div>
               <v-btn
-                :disabled="
-                  !isValue || loadingBtn || !checkoutPayloadMatchesBoundAttempt
-                "
+                :disabled="stripeConfirmationDisabled"
                 :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
                 block
                 color="success"
                 class="mt-4 text-none font-weight-bold"
-                @click="paymentBtn"
+                @click="confirmStripePayment"
               >
                 Confirmer le paiement
                 <v-icon small right>mdi-credit-card-check</v-icon>
@@ -226,6 +258,18 @@
                 <v-icon small right>mdi-cash-register</v-icon>
               </v-btn>
             </div>
+            <v-btn
+              v-if="isStripeOrderEdit && orderEditPaymentRefresh === 'required'"
+              :loading="loadingBtn"
+              :disabled="loadingBtn"
+              block
+              color="warning"
+              class="mb-4 text-none font-weight-bold"
+              @click="regenerateEditedPayment"
+            >
+              Régénérer le paiement
+              <v-icon small right>mdi-refresh</v-icon>
+            </v-btn>
             <!-- struc -->
             <v-card-title>
               <h5>Total</h5>
@@ -241,7 +285,7 @@
             >
               <v-btn
                 v-if="showFooterCheckoutButton"
-                :disabled="!isValue || loadingBtn || !checkoutPayloadCanStart"
+                :disabled="primaryActionDisabled"
                 :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
                 type="submit"
                 color="success"
@@ -324,6 +368,7 @@
 <script>
 import { loadStripe } from '@stripe/stripe-js'
 import Loading from '@/components/loading'
+import OrderEditBanner from '@/components/orders/OrderEditBanner'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import CartCustomizationSummary from '@/components/products/CartCustomizationSummary'
 import price from '@/helpers/price'
@@ -341,6 +386,7 @@ const { shouldAutoPrepareStripeCheckout } = require('@/helpers/stripeCheckout')
 export default {
   components: {
     Loading,
+    OrderEditBanner,
     ProductCustomizationWizard,
     CartCustomizationSummary,
   },
@@ -349,6 +395,15 @@ export default {
     if (this.$store.get('cart/clientOrderAuthRedirect')) {
       this.resetStripePaymentElement()
       next()
+      return
+    }
+
+    if (
+      this.isOrderEditActive &&
+      this.orderEditDirty &&
+      !this.allowRouteLeave
+    ) {
+      next(window.confirm('Quitter sans enregistrer les modifications ?'))
       return
     }
 
@@ -451,13 +506,75 @@ export default {
     isStripeCheckout() {
       return this.isQrClient && this.selectedCheckoutFlow !== 'counter'
     },
+    isOrderEditActive() {
+      return this.$store.get('orderEdit/active') === true
+    },
+    orderEditId() {
+      return this.$store.get('orderEdit/orderId')
+    },
+    orderEditNumber() {
+      return String(this.$store.get('orderEdit/orderNumber') || '')
+    },
+    orderEditDirty() {
+      return this.$store.get('orderEdit/dirty') === true
+    },
+    orderEditPaymentRefresh() {
+      return this.$store.get('orderEdit/paymentRefresh')
+    },
+    isStripeOrderEdit() {
+      return (
+        this.isOrderEditActive &&
+        String(this.$store.get('orderEdit/paymentProvider')).toLowerCase() ===
+          'stripe'
+      )
+    },
+    showStripePaymentPanel() {
+      return (
+        (this.isStripeCheckout || this.isStripeOrderEdit) &&
+        this.stripePaymentReady
+      )
+    },
+    hasReconfigurationRequired() {
+      return (this.dataCart || []).some(
+        (line) => line.requiresReconfiguration === true
+      )
+    },
+    primaryActionDisabled() {
+      if (this.isOrderEditActive) {
+        return (
+          !Array.isArray(this.dataCart) ||
+          this.dataCart.length === 0 ||
+          this.hasReconfigurationRequired ||
+          this.loadingBtn
+        )
+      }
+      return !this.isValue || this.loadingBtn || !this.checkoutPayloadCanStart
+    },
+    stripeConfirmationDisabled() {
+      if (this.isOrderEditActive) {
+        return this.loadingBtn || !this.stripePaymentReady
+      }
+      return (
+        !this.isValue ||
+        this.loadingBtn ||
+        !this.checkoutPayloadMatchesBoundAttempt
+      )
+    },
     showOrderWithoutPaymentButton() {
-      return this.isFlexibleQrCheckout && this.stripePaymentReady
+      return (
+        !this.isOrderEditActive &&
+        this.isFlexibleQrCheckout &&
+        this.stripePaymentReady
+      )
     },
     showFooterCheckoutButton() {
-      return !(this.isStripeCheckout && this.stripePaymentReady)
+      return !(
+        (this.isStripeCheckout || this.isStripeOrderEdit) &&
+        this.stripePaymentReady
+      )
     },
     checkoutButtonLabel() {
+      if (this.isOrderEditActive) return 'Enregistrer les modifications'
       if (this.isStripeCheckout && this.stripePaymentReady) {
         return 'Confirmer le paiement'
       }
@@ -465,6 +582,7 @@ export default {
       return 'Commander'
     },
     checkoutButtonIcon() {
+      if (this.isOrderEditActive) return 'mdi-content-save'
       if (this.isStripeCheckout) return 'mdi-credit-card-check'
       return 'mdi-silverware-fork-knife'
     },
@@ -526,6 +644,20 @@ export default {
   },
   async mounted() {
     this.loadPage = true
+    if (this.isOrderEditActive) {
+      this.total = this.totalCart
+      await this.$store.dispatch('shop/getCurrentShopInfo')
+      this.loadPage = false
+      const payment = this.$store.get('orderEdit/payment')
+      if (
+        payment &&
+        this.orderEditPaymentRefresh === 'succeeded' &&
+        !this.orderEditDirty
+      ) {
+        await this.mountStripePaymentElement(payment)
+      }
+      return
+    }
     const restoredCheckout = await this.restoreCheckoutFromStore()
     if (!restoredCheckout) this.total = this.totalCart
     await this.$store.dispatch('shop/getCurrentShopInfo')
@@ -556,6 +688,9 @@ export default {
       this.$store.dispatch('cart/setTocart', nextCart)
       this.$store.dispatch('cart/setTotal', total)
       this.$store.dispatch('cart/setIndex', index)
+      if (this.isOrderEditActive) {
+        this.$store.dispatch('orderEdit/updateDirty', nextCart || [])
+      }
     },
     async changeQuantity(lineIndex, delta) {
       const cart = Array.isArray(this.dataCart) ? this.dataCart : []
@@ -619,6 +754,7 @@ export default {
         })),
         price,
         subtotal: this.roundPrice(price * Number(sourceLine.qty || 0)),
+        requiresReconfiguration: false,
       }
       const nextCart = replaceConfiguredCartLine(
         cart,
@@ -726,6 +862,11 @@ export default {
     async resetCheckoutAttempt() {
       this.clearStripeAutoPrepareTimeout()
 
+      if (this.isOrderEditActive) {
+        this.resetStripePaymentElement()
+        return true
+      }
+
       if (this.stripePreparationPromise) {
         this.stripeReplacementPending = true
         await this.stripePreparationPromise
@@ -757,6 +898,12 @@ export default {
       return this.restoreCheckoutAttemptPayload(payload)
     },
     guardCheckoutConfirmation() {
+      if (this.isOrderEditActive) {
+        return (
+          this.stripePaymentReady &&
+          Number(this.stripeOrderId) === Number(this.orderEditId)
+        )
+      }
       if (this.checkoutPayloadMatchesBoundAttempt) return true
 
       this.checkoutErrorMessage =
@@ -806,13 +953,17 @@ export default {
         await this.prepareStripePaymentElement(true, true)
       } else if (flow === 'order') {
         await this.submitOrderWithoutStripe(paymentMethod, true)
+      } else if (flow === 'order-edit') {
+        await this.saveOrderEdit()
       }
     },
     cancelReprice() {
       this.repriceDialog = false
       this.pendingRepriceFlow = null
       this.pendingRepricePaymentMethod = null
-      this.$store.dispatch('cart/abandonCheckout')
+      if (!this.isOrderEditActive) {
+        this.$store.dispatch('cart/abandonCheckout')
+      }
     },
     clearStripeAutoPrepareTimeout() {
       if (!this.stripeAutoPrepareTimeout) return
@@ -821,6 +972,7 @@ export default {
       this.stripeAutoPrepareTimeout = null
     },
     shouldPrepareStripeCheckout() {
+      if (this.isOrderEditActive) return false
       if (this.repriceDialog || this.customizationDialog) return false
       return shouldAutoPrepareStripeCheckout({
         isQrClient: this.isQrClient,
@@ -853,6 +1005,7 @@ export default {
       this.stripeCheckoutSignature = null
     },
     async handleStripeCheckoutChange() {
+      if (this.isOrderEditActive) return
       if (
         this.restoringCheckoutPayload ||
         this.checkoutFinalized ||
@@ -883,8 +1036,110 @@ export default {
 
       if (this.isQrClient) this.scheduleStripeAutoPrepare()
     },
+    async submitPrimaryAction() {
+      if (this.isOrderEditActive) {
+        await this.saveOrderEdit()
+        return
+      }
+      await this.paymentBtn()
+    },
+    async saveOrderEdit() {
+      this.loadingBtn = true
+      this.checkoutErrorMessage = ''
+      let result
+      try {
+        result = await this.$store.dispatch('orderEdit/save')
+      } finally {
+        this.loadingBtn = false
+      }
+
+      if (!result || !result.ok) {
+        const error = result && result.error
+        if (
+          error &&
+          error.code === 'ORDER_REPRICE_REQUIRED' &&
+          error.server_quote
+        ) {
+          this.pendingRepriceFlow = 'order-edit'
+          this.syncCartState(
+            applyServerQuoteToCart(this.dataCart, error.server_quote)
+          )
+          this.repriceDialog = true
+          return
+        }
+        if (
+          error &&
+          ['ORDER_NOT_EDITABLE', 'ORDER_EDIT_CONFLICT'].includes(error.code)
+        ) {
+          this.allowRouteLeave = true
+          const orderId = this.orderEditId
+          await this.$store.dispatch('orderEdit/cancel')
+          this.$router.push(`/orders/detail/${orderId}`)
+          return
+        }
+        const target = findCartTargetForCheckoutError(this.dataCart, error)
+        if (target) {
+          this.editCartLine(
+            target.lineIndex,
+            target.productStepId,
+            error.message
+          )
+        }
+        this.checkoutErrorMessage =
+          error && error.message
+            ? error.message
+            : 'Impossible de modifier la commande.'
+        return
+      }
+
+      if (result.data.payment_refresh === 'succeeded') {
+        try {
+          await this.mountStripePaymentElement(result.data.payment)
+        } catch (error) {
+          this.checkoutErrorMessage =
+            error?.message || 'Impossible d’initialiser le paiement Stripe.'
+        }
+        return
+      }
+      if (result.data.payment_refresh === 'required') {
+        this.checkoutErrorMessage = result.data.payment_refresh_message
+        return
+      }
+
+      this.allowRouteLeave = true
+      const orderId = this.orderEditId
+      await this.$store.dispatch('orderEdit/complete')
+      this.$store.dispatch(
+        'notifications/success',
+        'Commande modifiée avec succès.'
+      )
+      this.$router.push(`/orders/detail/${orderId}`)
+    },
+    async regenerateEditedPayment() {
+      this.loadingBtn = true
+      this.checkoutErrorMessage = ''
+      let result
+      try {
+        result = await this.$store.dispatch('orderEdit/regeneratePayment')
+      } finally {
+        this.loadingBtn = false
+      }
+      if (!result || !result.ok) {
+        this.checkoutErrorMessage =
+          result && result.error
+            ? result.error.message
+            : 'Impossible de régénérer le paiement.'
+        return
+      }
+      try {
+        await this.mountStripePaymentElement(result.data)
+      } catch (error) {
+        this.checkoutErrorMessage =
+          error?.message || 'Impossible d’initialiser le paiement Stripe.'
+      }
+    },
     async paymentBtn() {
-      if (this.isKitchenClosed) {
+      if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.kitchenClosedSnackbar = true
         return
       }
@@ -984,6 +1239,23 @@ export default {
         repriceConfirmation,
       }
     },
+    async mountStripePaymentElement(payment) {
+      if (!payment || !payment.clientSecret || !payment.publishableKey) {
+        throw new Error('Données du nouveau paiement Stripe incomplètes.')
+      }
+      this.resetStripePaymentElement()
+      await this.$nextTick()
+      this.stripe = await loadStripe(payment.publishableKey)
+      if (!this.stripe) throw new Error('Stripe est indisponible.')
+      this.stripeElements = this.stripe.elements({
+        clientSecret: payment.clientSecret,
+      })
+      const paymentElement = this.stripeElements.create('payment')
+      paymentElement.mount(this.$refs.stripePaymentElement)
+      this.stripePaymentReady = true
+      this.stripePaymentIntentId = payment.paymentIntentId
+      this.stripeOrderId = payment.orderId
+    },
     async prepareStripePaymentElement(
       force = false,
       repriceConfirmation = false
@@ -1034,22 +1306,13 @@ export default {
         }
 
         try {
-          this.stripe = await loadStripe(payment.publishableKey)
-          if (!this.stripe) throw new Error('Stripe est indisponible.')
+          await this.mountStripePaymentElement(payment)
 
           if (this.currentStripeCheckoutSignature !== checkoutSignature) {
             this.stripeReplacementPending = true
             return cancelReturnedPayment()
           }
 
-          this.stripeElements = this.stripe.elements({
-            clientSecret: payment.clientSecret,
-          })
-          const paymentElement = this.stripeElements.create('payment')
-          paymentElement.mount(this.$refs.stripePaymentElement)
-          this.stripePaymentReady = true
-          this.stripePaymentIntentId = payment.paymentIntentId
-          this.stripeOrderId = payment.orderId
           this.stripeCheckoutSignature = checkoutSignature
           return false
         } catch (error) {
@@ -1081,7 +1344,9 @@ export default {
         elements: this.stripeElements,
         redirect: 'if_required',
         confirmParams: {
-          return_url: `${window.location.origin}/ordersStatuses`,
+          return_url: this.isOrderEditActive
+            ? `${window.location.origin}/orders/detail/${this.orderEditId}`
+            : `${window.location.origin}/ordersStatuses`,
         },
       })
 
@@ -1099,6 +1364,14 @@ export default {
         'notifications/success',
         'Paiement envoye. La commande sera confirmee par Stripe.'
       )
+      if (this.isOrderEditActive) {
+        const orderId = this.orderEditId
+        this.checkoutFinalized = true
+        this.allowRouteLeave = true
+        await this.$store.dispatch('orderEdit/complete')
+        this.$router.push(`/orders/detail/${orderId}`)
+        return
+      }
       this.checkoutFinalized = true
       this.$store.set('stateDialog', false)
       this.$store.dispatch('cart/setTotal', 0)
@@ -1108,6 +1381,17 @@ export default {
       this.$router.push('/ordersStatuses')
     },
     async cancelCart() {
+      if (this.isOrderEditActive) {
+        if (!window.confirm('Annuler les modifications de cette commande ?')) {
+          return
+        }
+        const orderId = this.orderEditId
+        this.allowRouteLeave = true
+        this.resetStripePaymentElement()
+        await this.$store.dispatch('orderEdit/cancel')
+        this.$router.push(`/orders/detail/${orderId}`)
+        return
+      }
       if (!(await this.resetCheckoutAttempt())) return
 
       this.allowRouteLeave = true

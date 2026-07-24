@@ -81,4 +81,17 @@ assert.ok(detailSource.includes("orderEdit/load"))
 assert.ok(detailSource.includes('canEditOrder'))
 assert.ok(detailSource.includes('replaceCartDialog'))
 
+const menusSource = fs.readFileSync(require.resolve('../pages/menus.vue'), 'utf8')
+const cartSource = fs.readFileSync(require.resolve('../pages/cart.vue'), 'utf8')
+const bannerSource = fs.readFileSync(
+  require.resolve('../components/orders/OrderEditBanner.vue'),
+  'utf8'
+)
+assert.ok(menusSource.includes('OrderEditBanner'))
+assert.ok(menusSource.includes('isOrderEditActive'))
+assert.ok(cartSource.includes('Enregistrer les modifications'))
+assert.ok(cartSource.includes("orderEdit/save"))
+assert.ok(cartSource.includes("orderEdit/regeneratePayment"))
+assert.ok(bannerSource.includes('Modification de la commande'))
+
 console.log('orderEdit tests passed')

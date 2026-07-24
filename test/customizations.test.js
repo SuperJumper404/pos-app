@@ -1371,8 +1371,14 @@ for (const cartContract of [
 
 const menusOptions = loadComponentOptions(
   menusPageSource,
-  ['Loading', 'ProductCustomizationWizard', 'price', 'mergeConfiguredCartLine'],
-  [{}, {}, {}, mergeConfiguredCartLine]
+  [
+    'Loading',
+    'OrderEditBanner',
+    'ProductCustomizationWizard',
+    'price',
+    'mergeConfiguredCartLine',
+  ],
+  [{}, {}, {}, {}, mergeConfiguredCartLine]
 )
 
 const menuProduct = {
@@ -1478,6 +1484,7 @@ const cartExecutable = cartPageSource
 const cartOptions = new Function(
   'loadStripe',
   'Loading',
+  'OrderEditBanner',
   'ProductCustomizationWizard',
   'CartCustomizationSummary',
   'price',
@@ -1491,6 +1498,7 @@ const cartOptions = new Function(
   cartExecutable
 )(
   () => null,
+  {},
   {},
   {},
   {},
