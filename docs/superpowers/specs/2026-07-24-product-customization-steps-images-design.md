@@ -254,13 +254,15 @@ Le service métier commun :
 3. valide les minimums et maximums ;
 4. recalcule le prix unitaire et le total ;
 5. compare le total serveur à `expected_total` et renvoie le nouveau devis sans écrire en base en cas d’écart ;
-6. agrège le besoin de stock du produit parent et de tous les produits liés, multiplié par la quantité de la ligne ;
-7. verrouille les lignes produit dans un ordre stable afin de limiter les interblocages ;
-8. vérifie les stocks ;
-9. crée la commande, les détails, les instantanés et les réservations dans une seule transaction ;
-10. décrémente le stock disponible.
+6. insère la ligne de commande avec le token et le hash comme claim d’idempotence, première écriture de la transaction ;
+7. agrège le besoin de stock du produit parent et de tous les produits liés, multiplié par la quantité de la ligne ;
+8. verrouille les lignes produit dans un ordre stable afin de limiter les interblocages ;
+9. vérifie les stocks ;
+10. crée les détails, les instantanés et les réservations, puis décrémente le stock disponible dans la même transaction.
 
 `client_order_token` est unique par boutique et rend la création idempotente. Un double clic avec le même payload renvoie la commande déjà créée avec `idempotent_replay: true`. La réutilisation du même token avec un payload différent renvoie `409 IDEMPOTENCY_KEY_REUSED`.
+
+Le claim est créé uniquement après la comparaison de prix, qui reste donc sans écriture en cas d’écart. Une erreur ultérieure de stock, de détail ou d’instantané annule aussi ce claim. Deux requêtes concurrentes avec le même token se départagent ainsi avant les verrous de stock : la perdante relit la commande gagnante après rollback au lieu de produire une fausse rupture de stock.
 
 Le flux non-Stripe valide immédiatement les réservations et crée les mouvements de stock. Le flux Stripe conserve les réservations au statut `reserved` jusqu’au résultat du paiement :
 

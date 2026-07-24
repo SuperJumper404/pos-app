@@ -709,14 +709,15 @@ Within `withTransaction`:
 2. read the existing `(shopid, client_order_token)` row and replay it when the stored `client_order_payload_hash` matches;
 3. resolve product configurations and call Task 2 rules;
 4. reject repricing before insert/update;
-5. release expired reservations idempotently before creating new reservations;
-6. aggregate requirements and `SELECT ... FOR UPDATE` products ordered by id;
-7. reject insufficient stock with `409` context;
-8. decrement available stock;
-9. insert the order with both token and hash, then insert details, customization snapshots and reservation rows;
-10. immediately commit reservation status/movements for non-Stripe, or leave Stripe as `reserved` with expiration.
+5. insert the order with token and hash as the idempotency claim;
+6. release expired reservations idempotently before creating new reservations;
+7. aggregate requirements and `SELECT ... FOR UPDATE` products ordered by id;
+8. reject insufficient stock with `409` context;
+9. decrement available stock;
+10. insert details, customization snapshots and reservation rows;
+11. immediately commit reservation status/movements for non-Stripe, or leave Stripe as `reserved` with expiration.
 
-Canonicalization must sort object keys and item/choice ids while preserving meaningful quantities, then hash with SHA-256. Catch a unique-key race on `(shopid, client_order_token)` outside the failed transaction, reread the winning order, and return a replay only when its stored hash matches; otherwise throw `409 IDEMPOTENCY_KEY_REUSED`.
+Canonicalization must sort object keys and item/choice ids while preserving meaningful quantities, then hash with SHA-256. The claim is the first write and occurs only after the reprice check. Any later stock or snapshot failure rolls it back with the transaction. Catch a unique-key race on `(shopid, client_order_token)` outside the failed transaction, reread the winning order, and return a replay only when its stored hash matches; otherwise throw `409 IDEMPOTENCY_KEY_REUSED`.
 
 Return `{ orderId, total, idempotent_replay, payment_status }`.
 
