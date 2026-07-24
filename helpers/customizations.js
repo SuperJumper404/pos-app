@@ -1,4 +1,4 @@
-const { parsePrice, roundPrice } = require('./price')
+const { parsePrice, roundPrice } = require('./price-functions')
 
 const normalizeNumericIds = (values) =>
   Array.from(
