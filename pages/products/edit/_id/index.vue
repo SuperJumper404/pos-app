@@ -1,17 +1,16 @@
 <template>
   <v-container>
-    <div v-if="stsMsg">
-      <p class="red--text">{{ message }}</p>
-    </div>
+    <v-alert v-if="stsMsg" dense text type="error">
+      {{ configurationError || message }}
+    </v-alert>
 
     <Loading v-if="loadPage" />
     <v-row v-else class="mt-5">
       <v-col md="4" sm="5" cols="12">
         <v-card outlined>
-          <!-- <v-img :src="`${staticURL}/api/v1/imgproducts/${image}`" /> -->
           <ImageCropper
             v-model="productImg"
-            :preview-url-prop="`${staticURL}/api/v1/imgproducts/${formeditproduct.image}`"
+            :preview-url-prop="productImageUrl"
           />
         </v-card>
       </v-col>
@@ -33,14 +32,13 @@
             :rules="[(v) => !!v || 'Description du produit requise']"
             placeholder="Saisir la description du produit"
             required
-            autofocus
           />
           <v-text-field
             v-model="formeditproduct.stock"
             label="Stock"
             class="d-inline-flex"
             type="number"
-            :rules="[(v) => !!v || 'Stock required']"
+            :rules="[(v) => !!v || 'Stock requis']"
             placeholder="Saisir le stock du produit"
             required
           />
@@ -52,7 +50,7 @@
             step="0.01"
             class="d-inline-flex"
             append-outer-icon="mdi-currency-eur"
-            :rules="[(v) => !!v || 'Price required']"
+            :rules="[(v) => !!v || 'Prix requis']"
             placeholder="Saisir le prix du produit"
             required
           />
@@ -67,115 +65,50 @@
             label="Catégorie"
             required
           ></v-select>
-          <br />
-          <v-btn
-            color="success"
-            class="text-none mr-3 mb-4"
-            @click.stop="addCustomization"
-            ><v-icon>mdi-plus</v-icon>Ajouter un choix </v-btn
-          ><br />
-          <div
-            v-for="(custom, index) in formeditproduct.product_customization"
-            :key="index"
-          >
-            <v-row>
-              <!-- Row for Customization Name and Message -->
-              <v-col cols="12" md="6">
-                <v-text-field
-                  v-model="formeditproduct.product_customization[index].name"
-                  label="Nom du choix "
-                  :rules="[(v) => !!v || 'Nom du choix requis']"
-                  placeholder="Saisir le nom du choix"
-                  required
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  v-model="
-                    formeditproduct.product_customization[index].description
-                  "
-                  label="Description du choix"
-                  :rules="[(v) => !!v || 'Description requise']"
-                  placeholder="Saisir la description du choix"
-                  required
-                ></v-text-field>
-              </v-col>
 
-              <!-- Row for Max Choices, Switch, and Combobox -->
-              <v-col cols="12" md="6">
-                <v-combobox
-                  v-model="formeditproduct.product_customization[index].items"
-                  label="Options du choix"
-                  chips
-                  multiple
-                  :item-text="displayItem"
-                  @change="processComboboxInput(index)"
-                ></v-combobox> </v-col
-              ><v-col cols="12" md="3">
-                <v-text-field
-                  v-model="
-                    formeditproduct.product_customization[index].limit_choice
-                  "
-                  label="Nombre maximum de choix"
-                  type="number"
-                  :rules="[(v) => !!v || 'Nombre de choix maximum requis']"
-                  placeholder="Saisir le nombre de choix maximum"
-                  required
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" md="3">
-                <v-switch
-                  v-model="
-                    formeditproduct.product_customization[index].mandatory
-                  "
-                  inset
-                  label="Choix obligatoire ?"
-                ></v-switch>
-              </v-col>
-            </v-row>
-            <v-card
-              v-if="formeditproduct.product_customization.length > 1"
-              class="mx-auto"
-              max-width="400"
-            >
-              <v-progress-linear
-                color="success"
-                rounded
-                value="0"
-              ></v-progress-linear>
-            </v-card>
-          </div>
+          <v-divider class="my-6"></v-divider>
+          <ProductStepConfigurator
+            v-model="customizationConfig"
+            :available-steps="availableSteps"
+            @validity-change="setConfigurationValidity"
+          />
+
           <v-btn
             color="warning"
-            class="text-none"
+            class="text-none mt-4"
             @click.stop="$router.push('/products')"
-            >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
           >
+            Annuler
+            <v-icon small right>mdi-close-circle</v-icon>
+          </v-btn>
           <v-btn
-            :disabled="!isValue"
+            :disabled="!isValue || !configurationValid"
             :loading="loadingBtn"
-            class="ml-4 text-none"
+            class="ml-4 text-none mt-4"
             type="submit"
             color="primary"
-            >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
           >
+            Valider
+            <v-icon small right>mdi-check-circle</v-icon>
+          </v-btn>
         </v-form>
       </v-col>
     </v-row>
-    <!-- <pre type="json">{{ detailProduct }}</pre>
-    <pre type="json">{{ formeditproduct }}</pre>
-    <pre type="json">{{ allCategory }}</pre> -->
   </v-container>
 </template>
+
 <script>
 import Loading from '@/components/loading'
+import ProductStepConfigurator from '@/components/customizations/ProductStepConfigurator'
+import { serializeProductCustomizationConfig } from '@/helpers/customizations'
 import price from '@/helpers/price'
+
 export default {
   components: {
     Loading,
+    ProductStepConfigurator,
   },
   mixins: [price],
-
   middleware: 'auth',
   data() {
     return {
@@ -183,10 +116,11 @@ export default {
       isValue: false,
       productImg: null,
       loadingBtn: false,
-      loadingBtnImg: false,
       loadPage: false,
       stsMsg: false,
-      image: '',
+      configurationValid: true,
+      configurationError: '',
+      customizationConfig: [],
       formeditproduct: {
         name: '',
         description: '',
@@ -194,18 +128,22 @@ export default {
         price: '',
         stock: '',
         image: '',
-        product_customization: [],
       },
     }
   },
-
   computed: {
     staticURL() {
-      console.log('staticURL', this.$store.get('staticURL').replace(/\/+$/, ''))
       return this.$store.get('staticURL').replace(/\/+$/, '')
+    },
+    productImageUrl() {
+      if (!this.formeditproduct.image) return null
+      return `${this.staticURL}/api/v1/imgproducts/${this.formeditproduct.image}`
     },
     allCategory() {
       return this.$store.get('categories/dataCategories')
+    },
+    availableSteps() {
+      return this.$store.get('customizations/dataSteps') || []
     },
     detailProduct() {
       return this.$store.get('products/detailProduct')
@@ -214,152 +152,115 @@ export default {
       return this.$store.get('products/message')
     },
   },
-  watch: {
-    async productImg(newBlob) {
-      const ext = newBlob.type === 'image/png' ? 'png' : 'jpg'
-      const filename = `product_${Date.now()}.${ext}`
-      const file = new File([newBlob], filename, { type: newBlob.type })
-      this.formeditproduct.image = file
-
-      this.imageRaw = file
-      const fd = new FormData()
-      fd.append('image', this.imageRaw)
-
-      this.loadingBtnImg = true
-      const res = await this.$store.dispatch('products/updateProduct', {
-        id: this.id,
-        data: fd,
-      })
-      if (res) {
-        this.stsMsg = true
-        this.loadingBtnImg = false
-        this.$router.push('/products')
-      } else {
-        this.stsMsg = true
-        this.loadingBtnImg = false
-      }
-    },
-  },
-  mounted() {
+  async mounted() {
     this.loadPage = true
-
-    const calls = [
+    await Promise.all([
       this.$store.dispatch('categories/getAllCategories'),
+      this.$store.dispatch('customizations/getSteps'),
       this.$store.dispatch('products/getDetailProduct', this.id),
-    ]
+    ])
 
-    Promise.all(calls)
-      .then(() => {
-        this.formeditproduct.name = this.detailProduct[0].name
-        this.formeditproduct.categoryid = this.detailProduct[0].categoryid
-        console.log('category id', this.formeditproduct)
-        this.formeditproduct.price = this.detailProduct[0].price
-        this.formeditproduct.stock = this.detailProduct[0].stock
-        this.formeditproduct.description = this.detailProduct[0].description
-        this.formeditproduct.product_customization = JSON.parse(
-          JSON.stringify(this.detailProduct[0].product_customization)
-        )
-        this.formeditproduct.image = this.detailProduct[0].image
-      })
-      .finally(() => {
-        this.loadPage = false
-      })
+    const product = this.detailProduct[0]
+    if (product) {
+      this.formeditproduct = {
+        name: product.name,
+        categoryid: product.categoryid,
+        price: product.price,
+        stock: product.stock,
+        description: product.description,
+        image: product.image,
+      }
+      this.customizationConfig = (product.customization_steps || []).map(
+        (step, stepIndex) => ({
+          step_id: step.step_id,
+          name: step.name,
+          position: stepIndex,
+          minimum_choices: step.minimum_choices,
+          maximum_choices: step.maximum_choices,
+          active: step.active,
+          choices: (step.choices || []).map((choice, choiceIndex) => ({
+            step_choice_id: choice.step_choice_id,
+            name: choice.name || choice.choice_name,
+            choice_type: choice.choice_type,
+            position: choiceIndex,
+            extra_price: choice.extra_price,
+            active: choice.active,
+          })),
+        })
+      )
+    } else {
+      this.stsMsg = true
+    }
+    this.loadPage = false
   },
-
   methods: {
-    processComboboxInput(index) {
-      const lastItem =
-        this.formeditproduct.product_customization[index].items.slice(-1)[0]
-
-      if (typeof lastItem === 'string') {
-        // Regex to match pattern 'Name (Price)'
-        const match = lastItem.match(/^(.*)\s\(([\d,.]+)\)$/)
-
-        if (match) {
-          const name = match[1].trim()
-          const price = this.roundPrice(match[2])
-
-          // Replace the last string item with an object
-          this.formeditproduct.product_customization[index].items.splice(
-            -1,
-            1,
-            {
-              name,
-              price,
-            }
-          )
-        } else {
-          // If no pattern match, consider the entire string as a name with a default price
-          this.formeditproduct.product_customization[index].items.splice(
-            -1,
-            1,
-            {
-              name: lastItem,
-              price: 0,
-            }
-          )
-        }
-      }
+    setConfigurationValidity({ valid, errors }) {
+      this.configurationValid = valid
+      this.configurationError = valid ? '' : errors[0]
     },
-    displayItem(item) {
-      // Check if price is present and not zero to display it.
-      return item.price && item.price !== 0
-        ? `${item.name} (+${this.formatCurrency(item.price)})`
-        : item.name
-    },
-    addCustomization() {
-      this.formeditproduct.product_customization.push({
-        name: '',
-        description: '',
-        limit_choice: null,
-        items: [],
-        mandatory: false,
-      }) // Ajoute une nouvelle option vide
-    },
-    // changeImgProduct(e) {
-    //   const image = e.target.files[0]
-    //   if (image) {
-    //     if (
-    //       image.type !== 'image/jpeg' &&
-    //       image.type !== 'image/png' &&
-    //       image.type !== 'image/JPEG' &&
-    //       image.type !== 'image/PNG'
-    //     ) {
-    //       alert('Please enter a jpg/jpeg/png')
-    //     } else {
-    //       this.imageUrl = ''
-    //       this.imageRaw = ''
-    //       this.imageUrl = URL.createObjectURL(image)
-    //     }
-    //   }
-    // },
-    async submitEditProduct() {
-      this.loadingBtn = true
+    buildProductPayload() {
       const data = {
-        ...this.formeditproduct,
+        name: this.formeditproduct.name,
+        description: this.formeditproduct.description,
+        stock: this.formeditproduct.stock,
         price: this.roundPrice(this.formeditproduct.price),
-        product_customization: this.formeditproduct.product_customization.map(
-          (customization) => ({
-            ...customization,
-            items: (customization.items || []).map((item) => ({
-              ...item,
-              price: this.roundPrice(item.price),
-            })),
-          })
-        ),
+        categoryid: this.formeditproduct.categoryid,
       }
-      const res = await this.$store.dispatch('products/updateProduct', {
-        id: this.id,
-        data,
-      })
-      if (res) {
+      if (!this.productImg) return data
+
+      const ext = this.productImg.type === 'image/png' ? 'png' : 'jpg'
+      const image = new File(
+        [this.productImg],
+        `product_${Date.now()}.${ext}`,
+        { type: this.productImg.type }
+      )
+      const formData = new FormData()
+      Object.entries(data).forEach(([key, value]) =>
+        formData.append(key, value)
+      )
+      formData.append('image', image)
+      return formData
+    },
+    async submitEditProduct() {
+      if (!this.configurationValid) return
+
+      let serializedConfig
+      try {
+        serializedConfig = serializeProductCustomizationConfig(
+          this.customizationConfig
+        )
+      } catch (error) {
+        this.configurationValid = false
+        this.configurationError = error.message
         this.stsMsg = true
-        this.loadingBtn = false
-        this.$router.push('/products')
-      } else {
-        this.stsMsg = true
-        this.loadingBtn = false
+        return
       }
+
+      this.loadingBtn = true
+      this.stsMsg = false
+      const productSaved = await this.$store.dispatch(
+        'products/updateProduct',
+        {
+          id: this.id,
+          data: this.buildProductPayload(),
+          refresh: false,
+          notify: false,
+        }
+      )
+
+      if (!productSaved) {
+        this.loadingBtn = false
+        this.stsMsg = true
+        return
+      }
+
+      const configurationSaved = await this.$store.dispatch(
+        'products/updateProductCustomizationConfig',
+        { id: this.id, data: serializedConfig }
+      )
+      this.loadingBtn = false
+      this.stsMsg = !configurationSaved
+      if (configurationSaved) this.$router.push('/products')
     },
   },
 }

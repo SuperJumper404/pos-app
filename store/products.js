@@ -16,7 +16,6 @@ export const actions = {
       })
       .then((response) => {
         dispatch('set/dataProduct', response.data.data)
-        console.log('Products received', response.data.data)
         return true
       })
       .catch((error) => {
@@ -70,8 +69,34 @@ export const actions = {
       })
       .then(async (response) => {
         dispatch('set/message', response.data.message)
+        if (params.refresh !== false) await dispatch('getProducts')
+        if (params.notify !== false) {
+          dispatch('notifications/success', 'Produit mis à jour avec succès.', {
+            root: true,
+          })
+        }
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', error.response.data.message)
+        return false
+      })
+  },
+  updateProductCustomizationConfig({ dispatch }, params) {
+    return this.$axios
+      .put(
+        `/baseurl/api/v1/products/${params.id}/customization-config`,
+        params.data,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then(async (response) => {
+        dispatch('set/message', response.data.message)
         await dispatch('getProducts')
-        dispatch('notifications/success', 'Produit mis à jour avec succès.', {
+        dispatch('notifications/success', response.data.message, {
           root: true,
         })
         return true

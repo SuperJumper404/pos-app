@@ -111,6 +111,77 @@ const buildCheckoutItems = (cart) =>
 
 const createComponentInputId = (prefix, vueUid) => `${prefix}-${vueUid}`
 
+const normalizeActive = (value) => ![false, 0, '0', 'false'].includes(value)
+
+const positiveInteger = (value, label) => {
+  const normalized = Number(value)
+  if (!Number.isInteger(normalized) || normalized <= 0) {
+    throw new TypeError(`${label} invalide.`)
+  }
+  return normalized
+}
+
+const nonNegativeInteger = (value, label) => {
+  const normalized = Number(value)
+  if (!Number.isInteger(normalized) || normalized < 0) {
+    throw new TypeError(`${label} invalide.`)
+  }
+  return normalized
+}
+
+const serializeProductCustomizationConfig = (config) => {
+  if (!Array.isArray(config)) {
+    throw new TypeError('La configuration doit être un tableau.')
+  }
+
+  const stepIds = new Set()
+  const choiceIds = new Set()
+
+  return config.map((step, stepIndex) => {
+    const stepId = positiveInteger(step && step.step_id, "L'étape")
+    if (stepIds.has(stepId)) {
+      throw new TypeError(`L'étape ${stepId} est dupliquée.`)
+    }
+    stepIds.add(stepId)
+
+    const minimumChoices = nonNegativeInteger(
+      step.minimum_choices,
+      'Le minimum'
+    )
+    const maximumChoices = positiveInteger(step.maximum_choices, 'Le maximum')
+    if (minimumChoices > maximumChoices) {
+      throw new TypeError('Le minimum ne peut pas dépasser le maximum.')
+    }
+    if (!Array.isArray(step.choices)) {
+      throw new TypeError(`Les choix de l'étape ${stepId} sont invalides.`)
+    }
+
+    return {
+      step_id: stepId,
+      position: stepIndex,
+      minimum_choices: minimumChoices,
+      maximum_choices: maximumChoices,
+      active: normalizeActive(step.active),
+      choices: step.choices.map((choice, choiceIndex) => {
+        const choiceId = positiveInteger(
+          choice && choice.step_choice_id,
+          'Le choix'
+        )
+        if (choiceIds.has(choiceId)) {
+          throw new TypeError(`Le choix ${choiceId} est dupliqué.`)
+        }
+        choiceIds.add(choiceId)
+        return {
+          step_choice_id: choiceId,
+          position: choiceIndex,
+          extra_price: roundPrice(choice.extra_price).toFixed(2),
+          active: normalizeActive(choice.active),
+        }
+      }),
+    }
+  })
+}
+
 module.exports = {
   validateStep,
   calculatePreviewUnitPrice,
@@ -118,4 +189,5 @@ module.exports = {
   mergeConfiguredCartLine,
   buildCheckoutItems,
   createComponentInputId,
+  serializeProductCustomizationConfig,
 }

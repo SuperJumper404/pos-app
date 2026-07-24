@@ -8,6 +8,7 @@ const {
   mergeConfiguredCartLine,
   buildCheckoutItems,
   createComponentInputId,
+  serializeProductCustomizationConfig,
 } = require('../helpers/customizations')
 
 const step = {
@@ -106,6 +107,106 @@ assert.strictEqual(
 assert.notStrictEqual(
   createComponentInputId('image-cropper', 12),
   createComponentInputId('image-cropper', 13)
+)
+
+const serializedProductConfig = serializeProductCustomizationConfig([
+  {
+    step_id: '20',
+    position: '99',
+    minimum_choices: '1',
+    maximum_choices: '2',
+    active: true,
+    choices: [
+      {
+        step_choice_id: '202',
+        position: '12',
+        extra_price: '1,2',
+        active: false,
+      },
+      {
+        step_choice_id: 201,
+        position: 3,
+        extra_price: 0,
+        active: true,
+      },
+    ],
+  },
+  {
+    step_id: 10,
+    position: 0,
+    minimum_choices: 0,
+    maximum_choices: 1,
+    active: false,
+    choices: [
+      {
+        step_choice_id: 101,
+        position: 0,
+        extra_price: '2.345',
+        active: true,
+      },
+    ],
+  },
+])
+
+assert.deepStrictEqual(serializedProductConfig, [
+  {
+    step_id: 20,
+    position: 0,
+    minimum_choices: 1,
+    maximum_choices: 2,
+    active: true,
+    choices: [
+      {
+        step_choice_id: 202,
+        position: 0,
+        extra_price: '1.20',
+        active: false,
+      },
+      {
+        step_choice_id: 201,
+        position: 1,
+        extra_price: '0.00',
+        active: true,
+      },
+    ],
+  },
+  {
+    step_id: 10,
+    position: 1,
+    minimum_choices: 0,
+    maximum_choices: 1,
+    active: false,
+    choices: [
+      {
+        step_choice_id: 101,
+        position: 0,
+        extra_price: '2.35',
+        active: true,
+      },
+    ],
+  },
+])
+
+assert.throws(
+  () =>
+    serializeProductCustomizationConfig([
+      serializedProductConfig[0],
+      { ...serializedProductConfig[0], choices: [] },
+    ]),
+  /dupliquée/i
+)
+assert.throws(
+  () =>
+    serializeProductCustomizationConfig([
+      {
+        ...serializedProductConfig[0],
+        choices: [
+          serializedProductConfig[0].choices[0],
+          serializedProductConfig[0].choices[0],
+        ],
+      },
+    ]),
+  /dupliqué/i
 )
 
 const stepEditorSource = fs.readFileSync(
