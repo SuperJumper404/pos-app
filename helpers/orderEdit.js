@@ -39,9 +39,9 @@ const mapEditableOrderToCart = (editable, products) =>
         product_id: item.product_id,
       })
     }
-    const selectedChoiceIds = (
-      item.selected_product_step_choice_ids || []
-    ).map(Number)
+    const selectedChoiceIds = (item.selected_product_step_choice_ids || []).map(
+      Number
+    )
     const currentSelections = selectedObjects(product, selectedChoiceIds)
     const snapshotSelections = (item.customization_snapshots || []).map(
       (snapshot) => ({
@@ -57,9 +57,10 @@ const mapEditableOrderToCart = (editable, products) =>
         linked_product_id: snapshot.linked_product_id || null,
       })
     )
-    const selections = currentSelections.length === selectedChoiceIds.length
-      ? currentSelections
-      : snapshotSelections
+    const selections =
+      currentSelections.length === selectedChoiceIds.length
+        ? currentSelections
+        : snapshotSelections
     return {
       ...product,
       selectedChoiceIds,
@@ -80,11 +81,7 @@ const mapEditableOrderToCart = (editable, products) =>
     }
   })
 
-const buildOrderEditPayload = ({
-  contentRevision,
-  expectedTotal,
-  cart,
-}) => ({
+const buildOrderEditPayload = ({ contentRevision, expectedTotal, cart }) => ({
   content_revision: contentRevision,
   expected_total: roundPrice(expectedTotal),
   items: buildCheckoutItems(cart),

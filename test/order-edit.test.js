@@ -72,4 +72,13 @@ const axiosSource = fs.readFileSync(require.resolve('../plugins/axios.js'), 'utf
 assert.ok(usersSource.includes("orderEdit/cancel"))
 assert.ok(axiosSource.includes("orderEdit/cancel"))
 
+const detailSource = fs.readFileSync(
+  require.resolve('../pages/orders/detail/_id.vue'),
+  'utf8'
+)
+assert.ok(detailSource.includes('Modifier la commande'))
+assert.ok(detailSource.includes("orderEdit/load"))
+assert.ok(detailSource.includes('canEditOrder'))
+assert.ok(detailSource.includes('replaceCartDialog'))
+
 console.log('orderEdit tests passed')

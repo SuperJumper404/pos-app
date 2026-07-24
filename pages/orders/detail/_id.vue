@@ -114,18 +114,47 @@
 
     <v-card color="grey lighten-3" class="mt-5">
       <v-card-actions>
+        <v-btn
+          v-if="canEditOrder"
+          color="success"
+          class="text-none"
+          :loading="editLoading"
+          :disabled="editLoading"
+          @click="requestOrderEdit"
+        >
+          Modifier la commande <v-icon small right>mdi-pencil</v-icon>
+        </v-btn>
         <v-spacer></v-spacer>
         <v-btn color="primary" class="text-none" @click="$router.go(-1)">
           Retour <v-icon small right>mdi-arrow-left</v-icon>
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <v-dialog v-model="replaceCartDialog" max-width="480">
+      <v-card>
+        <v-card-title>Remplacer le panier actuel ?</v-card-title>
+        <v-card-text>
+          Le panier en cours sera remplacé par les produits de cette commande.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn text class="text-none" @click="replaceCartDialog = false">
+            Garder le panier
+          </v-btn>
+          <v-btn color="primary" class="text-none" @click="confirmReplaceCart">
+            Continuer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script>
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
+import { isOrderEditable } from '@/helpers/orderEdit'
 const {
   getPaymentStatusText,
   getPaymentStatusColor,
@@ -143,6 +172,8 @@ export default {
     return {
       id: this.$route.params.id,
       loadPage: false,
+      editLoading: false,
+      replaceCartDialog: false,
     }
   },
 
@@ -152,6 +183,23 @@ export default {
     },
     detailOrder() {
       return this.$store.get('orders/detailOrder') || []
+    },
+    orderSummary() {
+      return this.detailOrder[0] || null
+    },
+    canEditOrder() {
+      return isOrderEditable(this.orderSummary || {})
+    },
+    hasLocalCart() {
+      const cart = this.$store.get('cart/dataCart')
+      return Array.isArray(cart) && cart.length > 0
+    },
+    hasUnsafeCheckoutAttempt() {
+      const status = this.$store.get('cart/clientOrderStatus') || 'idle'
+      return (
+        Boolean(this.$store.get('cart/clientOrderOrderId')) ||
+        ['pending', 'uncertain', 'stripe_prepared'].includes(status)
+      )
     },
     orderNote() {
       const remark = this.detailOrder[0] && this.detailOrder[0].remark
@@ -163,12 +211,42 @@ export default {
   },
   async mounted() {
     this.loadPage = true
-    const res = await this.$store.dispatch('orders/getDetailOrder', this.id)
-    if (res) {
+    try {
+      await this.$store.dispatch('orders/getDetailOrder', this.id)
+    } finally {
       this.loadPage = false
     }
   },
   methods: {
+    requestOrderEdit() {
+      if (this.hasUnsafeCheckoutAttempt) {
+        this.$store.dispatch(
+          'notifications/error',
+          'Terminez ou vérifiez le paiement en cours avant de modifier une commande.'
+        )
+        this.$router.push('/cart')
+        return
+      }
+      if (this.hasLocalCart) {
+        this.replaceCartDialog = true
+        return
+      }
+      this.beginOrderEdit()
+    },
+    confirmReplaceCart() {
+      this.replaceCartDialog = false
+      this.beginOrderEdit()
+    },
+    async beginOrderEdit() {
+      this.editLoading = true
+      try {
+        const result = await this.$store.dispatch('orderEdit/load', this.id)
+        if (!result || !result.ok) return
+        this.$router.push('/menus')
+      } finally {
+        this.editLoading = false
+      }
+    },
     customizationGroups(item) {
       const value = item || {}
       const snapshots = [

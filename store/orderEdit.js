@@ -26,12 +26,15 @@ const authHeaders = () => ({
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const apiError = (error) => {
   const response = error && error.response && error.response.data
-  const data = response && response.data && typeof response.data === 'object'
-    ? response.data
-    : {}
+  const data =
+    response && response.data && typeof response.data === 'object'
+      ? response.data
+      : {}
   return {
     status: error && error.response ? error.response.status : null,
-    message: (response && response.message) || error.message ||
+    message:
+      (response && response.message) ||
+      error.message ||
       'Impossible de modifier la commande.',
     ...data,
   }
