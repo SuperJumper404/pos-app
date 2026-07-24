@@ -85,6 +85,41 @@ const isSnapshotSelection = (selection) =>
     selection.choice_name !== undefined ||
     selection.choiceName !== undefined)
 
+const firstDefined = (...values) => values.find((value) => value !== undefined)
+
+const snapshotStepName = (selection) =>
+  selectionText(selection.step_name) ||
+  selectionText(selection.stepName) ||
+  'Personnalisation'
+
+const snapshotStepIdentity = (selection, stepName) => {
+  const stepId = [
+    selection.product_customization_step_id,
+    selection.product_step_id,
+    selection.step_id,
+    selection.productStepId,
+  ].find((value) => value !== undefined && value !== null && value !== '')
+  return stepId === undefined ? `name:${stepName}` : `id:${stepId}`
+}
+
+const snapshotChoice = (selection, sourceIndex) => ({
+  name:
+    selectionText(selection.choice_name) ||
+    selectionText(selection.choiceName) ||
+    selectionText(selection.name),
+  price: roundPrice(
+    firstDefined(
+      selection.unit_extra_price,
+      selection.extra_price,
+      selection.price
+    )
+  ),
+  position: numericPosition(
+    firstDefined(selection.choice_position, selection.choicePosition)
+  ),
+  sourceIndex,
+})
+
 const groupCustomizationSelections = (selections) => {
   const normalizedSelections = (Array.isArray(selections) ? selections : [])
     .map((selection, index) => ({ selection, index }))
@@ -92,86 +127,54 @@ const groupCustomizationSelections = (selections) => {
   const snapshots = normalizedSelections.filter(({ selection }) =>
     isSnapshotSelection(selection)
   )
-  const source = snapshots.length
-    ? snapshots
-    : normalizedSelections.filter(({ selection }) =>
-        selectionText(selection.name)
-      )
 
-  if (!source.length) return []
-
-  const orderedSelections = source.slice().sort((left, right) => {
-    if (!snapshots.length) return left.index - right.index
-    const leftSelection = left.selection
-    const rightSelection = right.selection
-    return (
-      numericPosition(
-        leftSelection.step_position === undefined
-          ? leftSelection.stepPosition
-          : leftSelection.step_position
-      ) -
-        numericPosition(
-          rightSelection.step_position === undefined
-            ? rightSelection.stepPosition
-            : rightSelection.step_position
-        ) ||
-      numericPosition(
-        leftSelection.choice_position === undefined
-          ? leftSelection.choicePosition
-          : leftSelection.choice_position
-      ) -
-        numericPosition(
-          rightSelection.choice_position === undefined
-            ? rightSelection.choicePosition
-            : rightSelection.choice_position
-        ) ||
-      left.index - right.index
-    )
-  })
-  const groups = []
-  const groupsByKey = new Map()
-
-  for (const { selection } of orderedSelections) {
-    const stepName = snapshots.length
-      ? selectionText(selection.step_name || selection.stepName) ||
-        'Personnalisation'
-      : 'Personnalisation'
-    const stepId =
-      selection.product_customization_step_id ||
-      selection.product_step_id ||
-      selection.step_id ||
-      selection.productStepId
-    const groupKey = snapshots.length
-      ? `${stepId == null ? 'name' : `id:${stepId}`}:${stepName}`
-      : 'legacy'
-    let group = groupsByKey.get(groupKey)
-    if (!group) {
-      group = { stepName, choices: [] }
-      groupsByKey.set(groupKey, group)
-      groups.push(group)
-    }
-
-    const name = snapshots.length
-      ? selectionText(
-          selection.choice_name === undefined
-            ? selection.choiceName === undefined
-              ? selection.name
-              : selection.choiceName
-            : selection.choice_name
-        )
-      : selectionText(selection.name)
-    if (!name) continue
-    const rawPrice = snapshots.length
-      ? selection.unit_extra_price === undefined
-        ? selection.extra_price === undefined
-          ? selection.price
-          : selection.extra_price
-        : selection.unit_extra_price
-      : selection.price
-    group.choices.push({ name, price: roundPrice(rawPrice) })
+  if (!snapshots.length) {
+    const choices = normalizedSelections
+      .map(({ selection }) => ({
+        name: selectionText(selection.name),
+        price: roundPrice(selection.price),
+      }))
+      .filter((choice) => choice.name)
+    return choices.length ? [{ stepName: 'Personnalisation', choices }] : []
   }
 
-  return groups.filter((group) => group.choices.length)
+  const groupsByKey = new Map()
+  for (const { selection, index } of snapshots) {
+    const stepName = snapshotStepName(selection)
+    const groupKey = snapshotStepIdentity(selection, stepName)
+    let group = groupsByKey.get(groupKey)
+    if (!group) {
+      group = {
+        stepName,
+        position: numericPosition(
+          firstDefined(selection.step_position, selection.stepPosition)
+        ),
+        sourceIndex: index,
+        choices: [],
+      }
+      groupsByKey.set(groupKey, group)
+    }
+    const choice = snapshotChoice(selection, index)
+    if (choice.name) group.choices.push(choice)
+  }
+
+  return Array.from(groupsByKey.values())
+    .filter((group) => group.choices.length)
+    .sort(
+      (left, right) =>
+        left.position - right.position || left.sourceIndex - right.sourceIndex
+    )
+    .map((group) => ({
+      stepName: group.stepName,
+      choices: group.choices
+        .slice()
+        .sort(
+          (left, right) =>
+            left.position - right.position ||
+            left.sourceIndex - right.sourceIndex
+        )
+        .map(({ name, price }) => ({ name, price })),
+    }))
 }
 
 const calculatePreviewUnitPrice = (product, selectedIds) => {

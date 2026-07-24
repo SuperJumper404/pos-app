@@ -184,6 +184,121 @@ assert.deepStrictEqual(
 )
 assert.deepStrictEqual(
   groupCustomizationSelections([
+    {
+      product_customization_step_id: 200,
+      step_name: 'Sauces',
+      step_position: 1,
+      name: 'AlgÃ©rienne',
+      choice_position: 0,
+      price: '1.00',
+    },
+    {
+      product_customization_step_id: 100,
+      step_name: 'Sauces',
+      step_position: 0,
+      name: 'Ketchup',
+      choice_position: 0,
+      price: 0,
+    },
+  ]),
+  [
+    {
+      stepName: 'Sauces',
+      choices: [{ name: 'Ketchup', price: 0 }],
+    },
+    {
+      stepName: 'Sauces',
+      choices: [{ name: 'AlgÃ©rienne', price: 1 }],
+    },
+  ],
+  'distinct backend step ids with the same label must remain separate'
+)
+assert.deepStrictEqual(
+  groupCustomizationSelections([
+    {
+      product_customization_step_id: 10,
+      step_name: 'Options',
+      step_position: 2,
+      name: 'A second',
+      choice_position: 5,
+      price: 0,
+    },
+    {
+      product_customization_step_id: 20,
+      step_name: 'Options',
+      step_position: 2,
+      name: 'B first',
+      choice_position: 0,
+      price: 0,
+    },
+    {
+      product_customization_step_id: 10,
+      step_name: 'Options',
+      step_position: 2,
+      name: 'A first',
+      choice_position: 0,
+      price: 0,
+    },
+  ]),
+  [
+    {
+      stepName: 'Options',
+      choices: [
+        { name: 'A first', price: 0 },
+        { name: 'A second', price: 0 },
+      ],
+    },
+    {
+      stepName: 'Options',
+      choices: [{ name: 'B first', price: 0 }],
+    },
+  ],
+  'choice positions must not reorder groups with equal step positions'
+)
+assert.deepStrictEqual(
+  groupCustomizationSelections([
+    {
+      product_customization_step_id: 30,
+      step_name: 'Extras',
+      step_position: null,
+      name: 'C second',
+      choice_position: 4,
+      price: 0,
+    },
+    {
+      product_customization_step_id: 40,
+      step_name: 'Extras',
+      step_position: null,
+      name: 'D first',
+      choice_position: 0,
+      price: 0,
+    },
+    {
+      product_customization_step_id: 30,
+      step_name: 'Extras',
+      step_position: null,
+      name: 'C first',
+      choice_position: 0,
+      price: 0,
+    },
+  ]),
+  [
+    {
+      stepName: 'Extras',
+      choices: [
+        { name: 'C first', price: 0 },
+        { name: 'C second', price: 0 },
+      ],
+    },
+    {
+      stepName: 'Extras',
+      choices: [{ name: 'D first', price: 0 }],
+    },
+  ],
+  'missing step positions must preserve original group order'
+)
+assert.deepStrictEqual(
+  groupCustomizationSelections([
     null,
     { name: 'Sans oignon', price: '0.00' },
     'invalid',
