@@ -32,15 +32,16 @@
           <v-list-item-content>
             <v-list-item-title class="d-flex align-center">
               <span>{{ item.title }}</span>
-              <v-chip
+              <v-avatar
                 v-if="item.routeName === 'orders' && pendingOrderCount > 0"
-                x-small
                 color="primary"
-                text-color="white"
+                size="26"
                 class="ml-2 flex-shrink-0"
               >
-                {{ pendingOrderBadge }}
-              </v-chip>
+                <span class="white--text text-caption font-weight-bold">
+                  {{ pendingOrderBadge }}
+                </span>
+              </v-avatar>
             </v-list-item-title>
           </v-list-item-content>
         </v-list-item>
