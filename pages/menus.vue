@@ -456,9 +456,37 @@ export default {
         this.$store.get('shop/kitchen_closed')
       )
     },
+    clientOrderStatus() {
+      return this.$store.get('cart/clientOrderStatus') || 'idle'
+    },
+    clientOrderOrderId() {
+      return this.$store.get('cart/clientOrderOrderId') || null
+    },
+    hasUnsafeCheckoutAttempt() {
+      return (
+        Boolean(this.clientOrderOrderId) ||
+        ['pending', 'uncertain', 'stripe_prepared'].includes(
+          this.clientOrderStatus
+        )
+      )
+    },
   },
-  mounted() {
+  async mounted() {
     this.loadPage = true
+
+    if (this.hasUnsafeCheckoutAttempt) {
+      this.restorePersistedCheckoutCart()
+      this.loadPage = false
+      this.$router.replace('/cart')
+      return
+    }
+
+    if (
+      ['prewrite_rejected', 'reprice_required'].includes(this.clientOrderStatus)
+    ) {
+      await this.$store.dispatch('cart/abandonCheckout', { safe: true })
+    }
+
     this.cartItem = []
 
     const calls = [
@@ -466,6 +494,7 @@ export default {
       this.$store.dispatch('shop/getCurrentShopInfo'),
       this.$store.dispatch('cart/setTotal', 0),
       this.$store.dispatch('cart/setIndex', 0),
+      this.$store.dispatch('cart/setTocart', null),
     ]
     console.log('result', this.$store.get('products/dataProduct'))
     Promise.all(calls).finally(() => {
@@ -474,6 +503,27 @@ export default {
   },
 
   methods: {
+    restorePersistedCheckoutCart() {
+      const payload = this.$store.get('cart/clientOrderPayload') || {}
+      const persistedCart = Array.isArray(payload.dataCart)
+        ? payload.dataCart
+        : this.$store.get('cart/dataCart')
+      this.cartItem = Array.isArray(persistedCart)
+        ? JSON.parse(JSON.stringify(persistedCart))
+        : []
+      this.total = Number(
+        payload.expected_total == null
+          ? this.$store.get('cart/totalCart') || 0
+          : payload.expected_total
+      )
+      this.idxCart = this.cartItem.reduce(
+        (sum, line) => sum + Number(line.qty || line.quantity || 0),
+        0
+      )
+      this.$store.dispatch('cart/setTocart', this.cartItem)
+      this.$store.dispatch('cart/setTotal', this.total)
+      this.$store.dispatch('cart/setIndex', this.idxCart)
+    },
     openProductPreview(item) {
       this.previewItem = item
       this.previewDialog = true
@@ -652,10 +702,24 @@ export default {
       this.totalPrice()
       this.indexCart()
     },
-    btnOrder() {
+    async btnOrder() {
       if (this.isKitchenClosed) {
         this.showKitchenClosedSnackbar()
         return
+      }
+
+      if (this.hasUnsafeCheckoutAttempt) {
+        this.restorePersistedCheckoutCart()
+        this.$router.push('/cart')
+        return
+      }
+
+      if (
+        ['prewrite_rejected', 'reprice_required'].includes(
+          this.clientOrderStatus
+        )
+      ) {
+        await this.$store.dispatch('cart/abandonCheckout', { safe: true })
       }
 
       this.$store.dispatch('cart/setTocart', this.cartItem)

@@ -191,7 +191,9 @@
             >
               <div ref="stripePaymentElement"></div>
               <v-btn
-                :disabled="!isValue || loadingBtn"
+                :disabled="
+                  !isValue || loadingBtn || !checkoutPayloadMatchesBoundAttempt
+                "
                 :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
                 block
                 color="success"
@@ -211,7 +213,9 @@
               </div>
               <v-btn
                 v-if="showOrderWithoutPaymentButton"
-                :disabled="!isValue || loadingBtn"
+                :disabled="
+                  !isValue || loadingBtn || !checkoutPayloadMatchesBoundAttempt
+                "
                 :loading="loadingBtn && selectedCheckoutFlow === 'counter'"
                 block
                 color="primary"
@@ -237,7 +241,7 @@
             >
               <v-btn
                 v-if="showFooterCheckoutButton"
-                :disabled="!isValue || loadingBtn"
+                :disabled="!isValue || loadingBtn || !checkoutPayloadCanStart"
                 :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
                 type="submit"
                 color="success"
@@ -342,6 +346,12 @@ export default {
   },
   mixins: [price],
   async beforeRouteLeave(to, from, next) {
+    if (this.$store.get('cart/clientOrderAuthRedirect')) {
+      this.resetStripePaymentElement()
+      next()
+      return
+    }
+
     if (this.checkoutFinalized || this.allowRouteLeave) {
       next()
       return
@@ -467,6 +477,16 @@ export default {
         )
       )
     },
+    checkoutPayloadMatchesBoundAttempt() {
+      const boundSignature = this.$store.get('cart/clientOrderSignature')
+      return Boolean(
+        boundSignature && this.currentStripeCheckoutSignature === boundSignature
+      )
+    },
+    checkoutPayloadCanStart() {
+      const boundSignature = this.$store.get('cart/clientOrderSignature')
+      return !boundSignature || this.checkoutPayloadMatchesBoundAttempt
+    },
   },
   watch: {
     isValue() {
@@ -506,7 +526,8 @@ export default {
   },
   async mounted() {
     this.loadPage = true
-    this.total = this.totalCart
+    const restoredCheckout = await this.restoreCheckoutFromStore()
+    if (!restoredCheckout) this.total = this.totalCart
     await this.$store.dispatch('shop/getCurrentShopInfo')
     this.loadPage = false
     this.scheduleStripeAutoPrepare()
@@ -617,9 +638,34 @@ export default {
       this.formuser.payment = payload.payment || this.formuser.payment
       this.formuser.notes = payload.remark || ''
       if (payload.customerID != null) this.selectedTable = payload.customerID
-      this.$nextTick(() => {
+
+      if (Array.isArray(payload.dataCart)) {
+        const restoredCart = JSON.parse(JSON.stringify(payload.dataCart))
+        const restoredTotal = this.roundPrice(payload.expected_total)
+        const restoredIndex = restoredCart.reduce(
+          (sum, line) => sum + Number(line.qty || line.quantity || 0),
+          0
+        )
+        this.total = restoredTotal
+        this.$store.dispatch('cart/setTocart', restoredCart)
+        this.$store.dispatch('cart/setTotal', restoredTotal)
+        this.$store.dispatch('cart/setIndex', restoredIndex)
+      }
+
+      return this.$nextTick(() => {
         this.restoringCheckoutPayload = false
       })
+    },
+    async restoreCheckoutFromStore() {
+      const token = this.$store.get('cart/clientOrderToken')
+      const payload = this.$store.get('cart/clientOrderPayload')
+      if (!token || !payload) return false
+
+      this.stripeOrderId = this.$store.get('cart/clientOrderOrderId') || null
+      this.stripeCheckoutSignature =
+        this.$store.get('cart/clientOrderSignature') || null
+      await this.restoreCheckoutAttemptPayload(payload)
+      return true
     },
     async cancelPreparedStripeAttempt(orderId = this.stripeOrderId) {
       if (!orderId) {
@@ -651,6 +697,10 @@ export default {
         if (!result || !result.ok) {
           this.checkoutErrorMessage =
             result?.error?.message || 'Impossible d’annuler le paiement Stripe.'
+          const boundPayload = this.$store.get('cart/clientOrderPayload')
+          if (boundPayload) {
+            await this.restoreCheckoutAttemptPayload(boundPayload)
+          }
           return result || { ok: false, data: null, error: null }
         }
 
@@ -680,10 +730,13 @@ export default {
         await this.stripePreparationPromise
       }
 
-      if (this.stripeOrderId) {
-        const canceled = await this.cancelPreparedStripeAttempt(
-          this.stripeOrderId
-        )
+      const persistedOrderId =
+        typeof this.$store.get === 'function'
+          ? this.$store.get('cart/clientOrderOrderId')
+          : null
+      const orderId = this.stripeOrderId || persistedOrderId
+      if (orderId) {
+        const canceled = await this.cancelPreparedStripeAttempt(orderId)
         return Boolean(canceled && canceled.ok)
       }
 
@@ -696,6 +749,19 @@ export default {
         return false
       }
       return true
+    },
+    restoreBoundCheckoutPayload() {
+      const payload = this.$store.get('cart/clientOrderPayload')
+      if (!payload) return
+      return this.restoreCheckoutAttemptPayload(payload)
+    },
+    guardCheckoutConfirmation() {
+      if (this.checkoutPayloadMatchesBoundAttempt) return true
+
+      this.checkoutErrorMessage =
+        'Les informations affichées ne correspondent plus à la tentative préparée.'
+      this.restoreBoundCheckoutPayload()
+      return false
     },
     handleCheckoutError(error, flow, paymentMethod) {
       if (!error) return
@@ -828,22 +894,36 @@ export default {
 
       if (flow === 'stripe') {
         if (!this.stripePaymentReady) {
+          if (!this.checkoutPayloadCanStart) {
+            this.guardCheckoutConfirmation()
+            return
+          }
           await this.prepareStripePaymentElement()
           return
         }
 
+        if (!this.guardCheckoutConfirmation()) return
         await this.confirmStripePayment()
         return
       }
 
+      if (!this.checkoutPayloadCanStart) {
+        this.guardCheckoutConfirmation()
+        return
+      }
       await this.submitOrderWithoutStripe(this.formuser.payment)
     },
     async orderWithoutPayment() {
       if (!this.stripeOrderId) {
+        if (!this.checkoutPayloadCanStart) {
+          this.guardCheckoutConfirmation()
+          return
+        }
         await this.submitOrderWithoutStripe('Paiement au comptoir')
         return
       }
 
+      if (!this.guardCheckoutConfirmation()) return
       this.selectedCheckoutFlow = 'counter'
       this.loadingBtn = true
       const res = await this.$store.dispatch(
@@ -992,6 +1072,8 @@ export default {
       }
     },
     async confirmStripePayment() {
+      if (!this.guardCheckoutConfirmation()) return
+
       this.loadingBtn = true
 
       const result = await this.stripe.confirmPayment({

@@ -1034,6 +1034,13 @@ const cartPageSource = fs.readFileSync(
   path.join(__dirname, '../pages/cart.vue'),
   'utf8'
 )
+const axiosPluginSource = fs.readFileSync(
+  path.join(__dirname, '../plugins/axios.js'),
+  'utf8'
+)
+const loadAxiosPlugin = () =>
+  // eslint-disable-next-line no-new-func
+  new Function(axiosPluginSource.replace('export default', 'return'))()
 
 assert.ok(
   menusPageSource.includes('<ProductCustomizationWizard') &&
@@ -1060,6 +1067,7 @@ for (const cartContract of [
   "'formuser.payment'()",
   'beforeRouteLeave',
   "'cart/cancelStripeCheckout'",
+  '!checkoutPayloadMatchesBoundAttempt',
 ]) {
   assert.ok(
     cartPageSource.includes(cartContract),
@@ -1638,6 +1646,190 @@ const runReviewRegressionTests = async () => {
     'a confirmed pre-write rejection may safely rotate the token for a changed payload'
   )
 
+  for (const precondition of [
+    { status: 401, code: null, label: 'authentication rejection' },
+    { status: 403, code: null, label: 'authorization rejection' },
+    { status: 404, code: 'SHOP_NOT_FOUND', label: 'missing shop' },
+    { status: 409, code: 'KITCHEN_CLOSED', label: 'closed kitchen' },
+    {
+      status: 422,
+      code: 'STRIPE_PAYMENT_DISABLED',
+      label: 'disabled Stripe payment',
+    },
+    {
+      status: 422,
+      code: 'STRIPE_CONNECT_INCOMPLETE',
+      label: 'incomplete Stripe Connect account',
+    },
+  ]) {
+    const state = cartModule.state()
+    const context = {
+      state,
+      dispatch(type, payload) {
+        applyCartStateDispatch(state, type, payload)
+      },
+      commit() {},
+    }
+    const error = new Error(precondition.label)
+    error.response = {
+      status: precondition.status,
+      data: {
+        message: precondition.label,
+        data: precondition.code ? { code: precondition.code } : {},
+      },
+    }
+    await cartModule.actions.checkoutOrder.call(
+      { $axios: { post: () => Promise.reject(error) } },
+      context,
+      { ...checkoutInput, stripe: true, payment: 'Stripe' }
+    )
+    assert.strictEqual(
+      state.clientOrderStatus,
+      'prewrite_rejected',
+      `${precondition.label} must be safe to abandon before auth/menu redirect`
+    )
+    const abandoned = cartModule.actions.abandonCheckout(context)
+    assert.strictEqual(abandoned.ok, true)
+    assert.strictEqual(state.clientOrderToken, null)
+  }
+
+  for (const status of [404, 422]) {
+    const state = cartModule.state()
+    const context = {
+      state,
+      dispatch(type, payload) {
+        applyCartStateDispatch(state, type, payload)
+      },
+      commit() {},
+    }
+    const error = new Error(`code-less ${status}`)
+    error.response = {
+      status,
+      data: { message: `code-less ${status}`, data: {} },
+    }
+    await cartModule.actions.checkoutOrder.call(
+      { $axios: { post: () => Promise.reject(error) } },
+      context,
+      checkoutInput
+    )
+    assert.strictEqual(
+      state.clientOrderStatus,
+      'uncertain',
+      `an arbitrary code-less ${status} must not be assumed pre-write safe`
+    )
+    assert.strictEqual(cartModule.actions.abandonCheckout(context).ok, false)
+  }
+
+  const authRedirectEvents = []
+  let authErrorHandler = null
+  const previousLocalStorage = global.localStorage
+  global.localStorage = {
+    removeItem(key) {
+      authRedirectEvents.push(['remove', key])
+    },
+  }
+  try {
+    loadAxiosPlugin()({
+      $axios: {
+        onError(handler) {
+          authErrorHandler = handler
+        },
+      },
+      store: {
+        dispatch(type, payload) {
+          authRedirectEvents.push([type, payload])
+        },
+      },
+      redirect(pathValue) {
+        authRedirectEvents.push(['redirect', pathValue])
+      },
+      router: {},
+    })
+    authErrorHandler({
+      response: { status: 401, data: { message: 'Session expirée.' } },
+      config: { skipGlobalErrorNotification: true },
+    })
+  } finally {
+    global.localStorage = previousLocalStorage
+  }
+  const authCleanupIndex = authRedirectEvents.findIndex(
+    ([type]) => type === 'cart/clearCheckoutForAuth'
+  )
+  const loginRedirectIndex = authRedirectEvents.findIndex(
+    ([type, payload]) => type === 'redirect' && payload === '/login'
+  )
+  assert.ok(
+    authCleanupIndex >= 0,
+    '401 redirect must clear the in-memory attempt'
+  )
+  assert.ok(
+    authCleanupIndex < loginRedirectIndex,
+    'checkout cleanup must happen before the login redirect starts'
+  )
+
+  const authExitState = cartModule.state()
+  authExitState.clientOrderToken = 'auth-token'
+  authExitState.clientOrderSignature = 'auth-signature'
+  authExitState.clientOrderPayload = { customer: 'Alice' }
+  authExitState.clientOrderOrderId = 55
+  authExitState.clientOrderStatus = 'stripe_prepared'
+  const authExitContext = {
+    state: authExitState,
+    dispatch(type, payload) {
+      applyCartStateDispatch(authExitState, type, payload)
+    },
+  }
+  const authExitResult =
+    cartModule.actions.clearCheckoutForAuth(authExitContext)
+  assert.strictEqual(authExitResult.ok, true)
+  assert.strictEqual(authExitState.clientOrderToken, null)
+  assert.strictEqual(authExitState.clientOrderOrderId, null)
+  assert.strictEqual(authExitState.clientOrderAuthRedirect, true)
+
+  let authRouteDecision = 'not-called'
+  let authLocalResetCount = 0
+  await cartOptions.beforeRouteLeave.call(
+    {
+      checkoutFinalized: false,
+      allowRouteLeave: false,
+      $store: {
+        get(pathValue) {
+          return pathValue === 'cart/clientOrderAuthRedirect'
+        },
+      },
+      resetStripePaymentElement() {
+        authLocalResetCount += 1
+      },
+      resetCheckoutAttempt() {
+        throw new Error('auth redirect must not retry cancellation')
+      },
+    },
+    {},
+    {},
+    (decision) => {
+      authRouteDecision = decision
+    }
+  )
+  assert.strictEqual(authLocalResetCount, 1)
+  assert.strictEqual(authRouteDecision, undefined)
+
+  assert.strictEqual(
+    cartOptions.computed.checkoutPayloadMatchesBoundAttempt.call({
+      currentStripeCheckoutSignature: 'displayed-signature',
+      $store: { get: () => null },
+    }),
+    false,
+    'confirmation requires a present bound signature'
+  )
+  assert.strictEqual(
+    cartOptions.computed.checkoutPayloadCanStart.call({
+      checkoutPayloadMatchesBoundAttempt: false,
+      $store: { get: () => null },
+    }),
+    true,
+    'a first checkout may start before a signature is bound'
+  )
+
   const stripeState = cartModule.state()
   const stripeCalls = []
   const stripeContext = {
@@ -1671,10 +1863,282 @@ const runReviewRegressionTests = async () => {
     'PaymentIntent preparation must retain the token until final payment or abandonment'
   )
   assert.strictEqual(stripeState.clientOrderStatus, 'stripe_prepared')
+  assert.strictEqual(
+    stripeState.clientOrderOrderId,
+    55,
+    'the prepared order id must survive a page refresh in Vuex'
+  )
+  assert.deepStrictEqual(
+    stripeState.clientOrderPayload.dataCart,
+    checkoutInput.dataCart,
+    'the bound attempt must retain an immutable cart snapshot for recovery'
+  )
+  const preparedStripePayload = stripeState.clientOrderPayload
+  const preparedStripeToken = stripeState.clientOrderToken
+  await cartModule.actions.checkoutOrder.call(
+    {
+      $axios: {
+        post() {
+          return Promise.resolve({
+            data: {
+              data: {
+                orderId: 55,
+                clientSecret: 'replayed-secret',
+                publishableKey: 'key',
+              },
+            },
+          })
+        },
+      },
+    },
+    stripeContext,
+    { ...checkoutInput, stripe: true, payment: 'Stripe' }
+  )
+  assert.strictEqual(
+    stripeState.clientOrderToken,
+    preparedStripeToken,
+    'refresh recreation with an unchanged Stripe payload must reuse the token'
+  )
+
+  const replayPreconditionState = {
+    ...stripeState,
+    clientOrderPayload: JSON.parse(
+      JSON.stringify(stripeState.clientOrderPayload)
+    ),
+  }
+  const replayPreconditionContext = {
+    state: replayPreconditionState,
+    dispatch(type, payload) {
+      applyCartStateDispatch(replayPreconditionState, type, payload)
+    },
+    commit() {},
+  }
+  const replayPreconditionError = new Error('Boutique introuvable.')
+  replayPreconditionError.response = {
+    status: 404,
+    data: {
+      message: 'Boutique introuvable.',
+      data: { code: 'SHOP_NOT_FOUND' },
+    },
+  }
+  await cartModule.actions.checkoutOrder.call(
+    {
+      $axios: {
+        post: () => Promise.reject(replayPreconditionError),
+      },
+    },
+    replayPreconditionContext,
+    { ...checkoutInput, stripe: true, payment: 'Stripe' }
+  )
+  assert.strictEqual(
+    replayPreconditionState.clientOrderStatus,
+    'stripe_prepared',
+    'a persisted prepared order must remain unsafe even if replay hits a safe precondition'
+  )
+  assert.strictEqual(
+    cartModule.actions.abandonCheckout(replayPreconditionContext).ok,
+    false
+  )
 
   const preparedAbandon = cartModule.actions.abandonCheckout(stripeContext)
   assert.strictEqual(preparedAbandon.ok, false)
   assert.ok(stripeState.clientOrderToken)
+  assert.strictEqual(preparedAbandon.error.attempt_order_id, 55)
+
+  const restoredCartDispatches = []
+  const restoredCartVm = {
+    formuser: { customer: '', phone: '', payment: '', notes: '' },
+    selectedTable: null,
+    total: 0,
+    stripeOrderId: null,
+    stripeCheckoutSignature: null,
+    restoringCheckoutPayload: false,
+    roundPrice: (value) => Math.round(Number(value) * 100) / 100,
+    $store: {
+      get(pathValue) {
+        const values = {
+          'cart/clientOrderToken': stripeState.clientOrderToken,
+          'cart/clientOrderPayload': stripeState.clientOrderPayload,
+          'cart/clientOrderOrderId': stripeState.clientOrderOrderId,
+          'cart/clientOrderSignature': stripeState.clientOrderSignature,
+        }
+        return values[pathValue]
+      },
+      dispatch(type, payload) {
+        restoredCartDispatches.push([type, payload])
+      },
+    },
+    $nextTick(callback) {
+      if (callback) callback()
+      return Promise.resolve()
+    },
+    restoreCheckoutAttemptPayload(payload) {
+      return cartOptions.methods.restoreCheckoutAttemptPayload.call(
+        this,
+        payload
+      )
+    },
+  }
+  const restored = await cartOptions.methods.restoreCheckoutFromStore.call(
+    restoredCartVm
+  )
+  assert.strictEqual(restored, true)
+  assert.strictEqual(restoredCartVm.formuser.customer, 'Alice')
+  assert.strictEqual(restoredCartVm.formuser.notes, 'Sans couverts')
+  assert.strictEqual(restoredCartVm.selectedTable, 12)
+  assert.strictEqual(restoredCartVm.stripeOrderId, 55)
+  assert.strictEqual(
+    restoredCartVm.stripeCheckoutSignature,
+    stripeState.clientOrderSignature
+  )
+  assert.ok(
+    restoredCartDispatches.some(
+      ([type, payload]) =>
+        type === 'cart/setTocart' && payload[0].selectedChoiceIds[0] === 30
+    ),
+    'refresh recovery must restore the configured display cart, not only public item ids'
+  )
+
+  const persistedCancellationOrderIds = []
+  const persistedCancellationVm = {
+    stripeOrderId: null,
+    stripePreparationPromise: null,
+    stripeReplacementPending: false,
+    clearStripeAutoPrepareTimeout() {},
+    cancelPreparedStripeAttempt(orderId) {
+      persistedCancellationOrderIds.push(orderId)
+      return Promise.resolve({ ok: true, data: null, error: null })
+    },
+    restoreCheckoutAttemptPayload() {},
+    $store: {
+      get(pathValue) {
+        return pathValue === 'cart/clientOrderOrderId' ? 55 : null
+      },
+      dispatch() {
+        throw new Error('persisted prepared orders must cancel by order id')
+      },
+    },
+  }
+  const persistedReset = await cartOptions.methods.resetCheckoutAttempt.call(
+    persistedCancellationVm
+  )
+  assert.strictEqual(persistedReset, true)
+  assert.deepStrictEqual(persistedCancellationOrderIds, [55])
+  assert.strictEqual(
+    menusOptions.computed.hasUnsafeCheckoutAttempt.call({
+      clientOrderStatus: 'prewrite_rejected',
+      clientOrderOrderId: 55,
+    }),
+    true,
+    'menus must treat any persisted prepared order id as unsafe'
+  )
+
+  const unsafeMenuDispatches = []
+  const unsafeMenuRoutes = []
+  const unsafeMenuVm = {
+    loadPage: false,
+    cartItem: [],
+    total: 0,
+    idxCart: 0,
+    clientOrderStatus: 'uncertain',
+    hasUnsafeCheckoutAttempt: true,
+    $store: {
+      get(pathValue) {
+        const values = {
+          'cart/clientOrderPayload': stripeState.clientOrderPayload,
+          'cart/dataCart': checkoutInput.dataCart,
+          'cart/totalCart': 18,
+          'cart/indexCart': 2,
+          'products/dataProduct': [],
+        }
+        return values[pathValue]
+      },
+      dispatch(type, payload) {
+        unsafeMenuDispatches.push([type, payload])
+        return Promise.resolve()
+      },
+    },
+    $router: {
+      replace(pathValue) {
+        unsafeMenuRoutes.push(pathValue)
+      },
+    },
+    restorePersistedCheckoutCart() {
+      return menusOptions.methods.restorePersistedCheckoutCart.call(this)
+    },
+  }
+  await menusOptions.mounted.call(unsafeMenuVm)
+  assert.deepStrictEqual(unsafeMenuRoutes, ['/cart'])
+  assert.strictEqual(unsafeMenuVm.cartItem[0].id, 5)
+  assert.ok(
+    !unsafeMenuDispatches.some(
+      ([type, payload]) =>
+        (type === 'cart/setTotal' || type === 'cart/setIndex') && payload === 0
+    ),
+    'direct menus navigation must not zero an unresolved persisted checkout'
+  )
+
+  unsafeMenuVm.cartItem = [{ id: 9, qty: 1 }]
+  unsafeMenuVm.isKitchenClosed = false
+  unsafeMenuVm.showKitchenClosedSnackbar = () => {}
+  unsafeMenuVm.$router.push = (pathValue) => unsafeMenuRoutes.push(pathValue)
+  await menusOptions.methods.btnOrder.call(unsafeMenuVm)
+  assert.strictEqual(unsafeMenuVm.cartItem[0].id, 5)
+  assert.strictEqual(unsafeMenuRoutes[unsafeMenuRoutes.length - 1], '/cart')
+
+  const safeMountedEvents = []
+  await menusOptions.mounted.call({
+    loadPage: false,
+    cartItem: [{ id: 5 }],
+    clientOrderStatus: 'prewrite_rejected',
+    hasUnsafeCheckoutAttempt: false,
+    $store: {
+      get(pathValue) {
+        return pathValue === 'products/dataProduct' ? [] : null
+      },
+      dispatch(type, payload) {
+        safeMountedEvents.push([type, payload])
+        return Promise.resolve()
+      },
+    },
+  })
+  assert.ok(
+    safeMountedEvents.some(
+      ([type, payload]) => type === 'cart/setTocart' && payload === null
+    ),
+    'a safe rejected attempt must clear its stale persisted cart before a new menu cart'
+  )
+  assert.ok(
+    safeMountedEvents.findIndex(([type]) => type === 'cart/abandonCheckout') <
+      safeMountedEvents.findIndex(([type]) => type === 'cart/setTocart'),
+    'the safe attempt must clear before the persisted cart is reset'
+  )
+
+  const safeMenuEvents = []
+  const safeMenuVm = {
+    isKitchenClosed: false,
+    clientOrderStatus: 'prewrite_rejected',
+    hasUnsafeCheckoutAttempt: false,
+    cartItem: [{ id: 9, qty: 1 }],
+    showKitchenClosedSnackbar() {},
+    restorePersistedCheckoutCart() {},
+    $store: {
+      dispatch(type, payload) {
+        safeMenuEvents.push([type, payload])
+        return Promise.resolve({ ok: true })
+      },
+    },
+    $router: {
+      push(pathValue) {
+        safeMenuEvents.push(['route', pathValue])
+      },
+    },
+  }
+  await menusOptions.methods.btnOrder.call(safeMenuVm)
+  assert.deepStrictEqual(safeMenuEvents.slice(0, 2), [
+    ['cart/abandonCheckout', { safe: true }],
+    ['cart/setTocart', safeMenuVm.cartItem],
+  ])
 
   const cancellationCalls = []
   const cancellationResult = await cartModule.actions.cancelStripeCheckout.call(
@@ -1708,6 +2172,7 @@ const runReviewRegressionTests = async () => {
   })
   assert.strictEqual(safeAbandon.ok, true)
   assert.strictEqual(stripeState.clientOrderToken, null)
+  assert.strictEqual(stripeState.clientOrderOrderId, null)
 
   stripeState.clientOrderToken = 'terminal-token'
   stripeState.clientOrderSignature = 'terminal-signature'
@@ -1782,7 +2247,15 @@ const runReviewRegressionTests = async () => {
     resetStripePaymentElement() {
       failedCancellationEvents.push('reset-local')
     },
+    restoreCheckoutAttemptPayload(payload) {
+      failedCancellationEvents.push(['restore', payload.customer])
+    },
     $store: {
+      get(pathValue) {
+        return pathValue === 'cart/clientOrderPayload'
+          ? preparedStripePayload
+          : null
+      },
       dispatch(type, payload) {
         failedCancellationEvents.push([type, payload])
         return Promise.resolve({
@@ -1805,7 +2278,175 @@ const runReviewRegressionTests = async () => {
   assert.strictEqual(failedCancellationVm.stripeOrderId, 55)
   assert.deepStrictEqual(failedCancellationEvents, [
     ['cart/cancelStripeCheckout', 55],
+    ['restore', 'Alice'],
   ])
+
+  const boundStripePayload = {
+    ...preparedStripePayload,
+    client_order_token: 'bound-token',
+  }
+  const boundStripeSignature = buildCheckoutPayloadSignature({
+    customer: boundStripePayload.customer,
+    customerID: boundStripePayload.customerID,
+    phone: boundStripePayload.phone,
+    remark: boundStripePayload.remark,
+    payment: boundStripePayload.payment,
+    total: boundStripePayload.expected_total,
+    dataCart: boundStripePayload.dataCart,
+    stripe: true,
+  })
+  for (const mutation of [
+    { label: 'customer', apply: (vm) => (vm.formuser.customer = 'Bob') },
+    { label: 'table', apply: (vm) => (vm.selectedTable = 13) },
+    { label: 'phone', apply: (vm) => (vm.formuser.phone = '0700000000') },
+    { label: 'remark', apply: (vm) => (vm.formuser.notes = 'Avec couverts') },
+    { label: 'payment', apply: (vm) => (vm.formuser.payment = 'Carte') },
+  ]) {
+    const vm = {
+      formuser: {
+        customer: boundStripePayload.customer,
+        phone: boundStripePayload.phone,
+        payment: boundStripePayload.payment,
+        notes: boundStripePayload.remark,
+      },
+      selectedTable: boundStripePayload.customerID,
+      total: boundStripePayload.expected_total,
+      dataCart: boundStripePayload.dataCart,
+      isQrClient: true,
+      restoringCheckoutPayload: false,
+      checkoutFinalized: false,
+      repriceDialog: false,
+      stripePreparing: false,
+      stripePreparationPromise: null,
+      stripeCancellationPromise: null,
+      stripeCancellationOrderId: null,
+      stripeReplacementPending: false,
+      stripePaymentReady: true,
+      stripeOrderId: 55,
+      stripeCheckoutSignature: boundStripeSignature,
+      checkoutErrorMessage: '',
+      roundPrice: (value) => Math.round(Number(value) * 100) / 100,
+      get currentStripeCheckoutSignature() {
+        return buildCheckoutPayloadSignature({
+          customer: this.formuser.customer,
+          customerID: this.selectedTable,
+          phone: this.formuser.phone,
+          remark: this.formuser.notes,
+          payment: this.formuser.payment,
+          total: this.total,
+          dataCart: this.dataCart,
+          stripe: true,
+        })
+      },
+      clearStripeAutoPrepareTimeout() {},
+      scheduleStripeAutoPrepare() {},
+      resetStripePaymentElement() {
+        throw new Error('failed cancellation must retain the Stripe element')
+      },
+      restoreCheckoutAttemptPayload(payload) {
+        return cartOptions.methods.restoreCheckoutAttemptPayload.call(
+          this,
+          payload
+        )
+      },
+      cancelPreparedStripeAttempt(orderId) {
+        return cartOptions.methods.cancelPreparedStripeAttempt.call(
+          this,
+          orderId
+        )
+      },
+      resetCheckoutAttempt() {
+        return cartOptions.methods.resetCheckoutAttempt.call(this)
+      },
+      $nextTick(callback) {
+        if (callback) callback()
+        return Promise.resolve()
+      },
+      $store: {
+        get(pathValue) {
+          const values = {
+            'cart/clientOrderPayload': boundStripePayload,
+            'cart/clientOrderSignature': boundStripeSignature,
+            'cart/clientOrderOrderId': 55,
+          }
+          return values[pathValue]
+        },
+        dispatch(type) {
+          if (type === 'cart/cancelStripeCheckout') {
+            return Promise.resolve({
+              ok: false,
+              data: null,
+              error: { message: 'Annulation indisponible.' },
+            })
+          }
+          return Promise.resolve({ ok: true, data: null, error: null })
+        },
+      },
+    }
+    mutation.apply(vm)
+    await cartOptions.methods.handleStripeCheckoutChange.call(vm)
+    assert.deepStrictEqual(
+      vm.formuser,
+      {
+        customer: boundStripePayload.customer,
+        phone: boundStripePayload.phone,
+        payment: boundStripePayload.payment,
+        notes: boundStripePayload.remark,
+      },
+      `${mutation.label} must roll back after cancellation failure`
+    )
+    assert.strictEqual(vm.selectedTable, boundStripePayload.customerID)
+    assert.strictEqual(vm.stripeOrderId, 55)
+    assert.strictEqual(vm.stripePaymentReady, true)
+  }
+
+  let stripeConfirmationCalls = 0
+  let confirmationRestoreCalls = 0
+  await cartOptions.methods.confirmStripePayment.call({
+    checkoutPayloadMatchesBoundAttempt: false,
+    checkoutErrorMessage: '',
+    loadingBtn: false,
+    stripe: {
+      confirmPayment() {
+        stripeConfirmationCalls += 1
+        return Promise.resolve({})
+      },
+    },
+    stripeElements: {},
+    restoreBoundCheckoutPayload() {
+      confirmationRestoreCalls += 1
+    },
+    guardCheckoutConfirmation() {
+      return cartOptions.methods.guardCheckoutConfirmation.call(this)
+    },
+    $store: { dispatch() {}, set() {} },
+    $router: { push() {} },
+  })
+  assert.strictEqual(stripeConfirmationCalls, 0)
+  assert.strictEqual(confirmationRestoreCalls, 1)
+
+  let counterConfirmationCalls = 0
+  await cartOptions.methods.orderWithoutPayment.call({
+    checkoutPayloadMatchesBoundAttempt: false,
+    stripeOrderId: 55,
+    selectedCheckoutFlow: 'stripe',
+    loadingBtn: false,
+    restoreBoundCheckoutPayload() {},
+    guardCheckoutConfirmation() {
+      return cartOptions.methods.guardCheckoutConfirmation.call(this)
+    },
+    $store: {
+      dispatch(type) {
+        if (type === 'cart/markStripeOrderPayAtCounter') {
+          counterConfirmationCalls += 1
+        }
+        return Promise.resolve(true)
+      },
+      set() {},
+    },
+    $router: { push() {} },
+  })
+  assert.strictEqual(counterConfirmationCalls, 0)
 
   const guardedCartVm = {
     ...cartEditVm,
@@ -1916,6 +2557,7 @@ const runReviewRegressionTests = async () => {
     {
       checkoutFinalized: false,
       allowRouteLeave: false,
+      $store: { get: () => false },
       resetCheckoutAttempt() {
         return Promise.resolve(false)
       },

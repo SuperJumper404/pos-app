@@ -22,7 +22,8 @@ export default function ({ $axios, redirect, store, router }) {
 
   $axios.onError((error) => {
     const status = error.response && error.response.status
-    const backendMessage = error.response && error.response.data && error.response.data.message
+    const backendMessage =
+      error.response && error.response.data && error.response.data.message
     const message = backendMessage || errorMessageByStatus(status)
 
     if (!error.config || !error.config.skipGlobalErrorNotification) {
@@ -31,6 +32,7 @@ export default function ({ $axios, redirect, store, router }) {
 
     if (status === 401) {
       console.log('Store Instance', store)
+      store.dispatch('cart/clearCheckoutForAuth')
       clearAuth()
       //   await store.dispatch('set/user.id', null)
       //   await store.dispatch('set/user.access', null)

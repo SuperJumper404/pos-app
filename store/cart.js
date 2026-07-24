@@ -32,8 +32,12 @@ const CHECKOUT_ATTEMPT_UNRESOLVED = 'CHECKOUT_ATTEMPT_UNRESOLVED'
 const SAFE_PREWRITE_ERROR_CODES = new Set([
   'CHECKOUT_REQUEST_INVALID',
   'INSUFFICIENT_STOCK',
+  'KITCHEN_CLOSED',
   'PRODUCT_NOT_FOUND',
   'PRODUCT_UNAVAILABLE',
+  'SHOP_NOT_FOUND',
+  'STRIPE_CONNECT_INCOMPLETE',
+  'STRIPE_PAYMENT_DISABLED',
 ])
 
 const isSafePrewriteErrorCode = (code) =>
@@ -54,6 +58,17 @@ const buildCheckoutPayload = (params, clientOrderToken) => ({
   remark: params.remark,
   phone: params.phone,
   items: buildCheckoutItems(params.dataCart),
+})
+
+const cloneCheckoutCart = (cart) => {
+  if (!Array.isArray(cart)) return null
+  return JSON.parse(JSON.stringify(cart))
+}
+
+const buildCheckoutAttemptPayload = (params, publicPayload) => ({
+  ...publicPayload,
+  dataCart: cloneCheckoutCart(params.dataCart),
+  stripe: params.stripe === true,
 })
 
 const buildCheckoutError = (error) => {
@@ -78,6 +93,8 @@ const clearCheckoutAttempt = (dispatch) => {
   dispatch('set/clientOrderToken', null)
   dispatch('set/clientOrderSignature', null)
   dispatch('set/clientOrderPayload', null)
+  dispatch('set/clientOrderOrderId', null)
+  dispatch('set/clientOrderAuthRedirect', false)
   dispatch('set/clientOrderStatus', 'idle')
 }
 
@@ -89,6 +106,7 @@ const unresolvedCheckoutResult = (state) => ({
     message:
       'La tentative de commande précédente doit être résolue avant de modifier la commande.',
     attempt_payload: state.clientOrderPayload,
+    attempt_order_id: state.clientOrderOrderId,
   },
 })
 
@@ -111,6 +129,8 @@ export const state = () => ({
   clientOrderToken: null,
   clientOrderSignature: null,
   clientOrderPayload: null,
+  clientOrderOrderId: null,
+  clientOrderAuthRedirect: false,
   clientOrderStatus: 'idle',
 })
 
@@ -178,7 +198,11 @@ export const actions = {
       : '/baseurl/api/v1/orders/checkout'
 
     dispatch('set/clientOrderSignature', signature)
-    dispatch('set/clientOrderPayload', payload)
+    dispatch(
+      'set/clientOrderPayload',
+      buildCheckoutAttemptPayload(params, payload)
+    )
+    dispatch('set/clientOrderAuthRedirect', false)
     dispatch('set/clientOrderStatus', 'pending')
 
     try {
@@ -191,6 +215,9 @@ export const actions = {
       if (data && data.orderId) commit('ADD_ORDER_SENT', data.orderId)
       dispatch('set/message', response?.data?.message || '')
       if (stripe) {
+        if (data && data.orderId) {
+          dispatch('set/clientOrderOrderId', data.orderId)
+        }
         dispatch('set/clientOrderStatus', 'stripe_prepared')
       } else {
         clearCheckoutAttempt(dispatch)
@@ -201,12 +228,17 @@ export const actions = {
       return { ok: true, data, error: null }
     } catch (error) {
       const checkoutError = buildCheckoutError(error)
-      const status =
-        checkoutError.code === 'ORDER_REPRICE_REQUIRED'
-          ? 'reprice_required'
-          : isSafePrewriteErrorCode(checkoutError.code)
-          ? 'prewrite_rejected'
-          : 'uncertain'
+      const isAuthenticationRejection = [401, 403].includes(
+        Number(checkoutError.status)
+      )
+      const status = state.clientOrderOrderId
+        ? 'stripe_prepared'
+        : checkoutError.code === 'ORDER_REPRICE_REQUIRED'
+        ? 'reprice_required'
+        : isAuthenticationRejection ||
+          isSafePrewriteErrorCode(checkoutError.code)
+        ? 'prewrite_rejected'
+        : 'uncertain'
       dispatch('set/clientOrderStatus', status)
       dispatch('set/message', checkoutError.message)
       return { ok: false, data: null, error: checkoutError }
@@ -215,14 +247,20 @@ export const actions = {
   abandonCheckout({ state, dispatch }, options = {}) {
     if (
       options.safe !== true &&
-      ['pending', 'uncertain', 'stripe_prepared'].includes(
-        state.clientOrderStatus
-      )
+      (state.clientOrderOrderId ||
+        ['pending', 'uncertain', 'stripe_prepared'].includes(
+          state.clientOrderStatus
+        ))
     ) {
       return unresolvedCheckoutResult(state)
     }
 
     clearCheckoutAttempt(dispatch)
+    return { ok: true, data: null, error: null }
+  },
+  clearCheckoutForAuth({ dispatch }) {
+    clearCheckoutAttempt(dispatch)
+    dispatch('set/clientOrderAuthRedirect', true)
     return { ok: true, data: null, error: null }
   },
   completeCheckout({ dispatch }) {
