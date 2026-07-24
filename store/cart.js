@@ -5,7 +5,10 @@ const {
   filterTodayOrderEntries,
   getOrderIds,
 } = require('../helpers/ordersSent')
-const { buildCheckoutItems } = require('../helpers/customizations')
+const {
+  buildCheckoutItems,
+  buildCheckoutPayloadSignature,
+} = require('../helpers/customizations')
 const { roundPrice } = require('../helpers/price-functions')
 
 const readStoredOrdersSent = () => {
@@ -25,6 +28,70 @@ const writeStoredOrdersSent = (ordersSent) => {
   localStorage.setItem('ordersSent', JSON.stringify(ordersSent))
 }
 
+const CHECKOUT_ATTEMPT_UNRESOLVED = 'CHECKOUT_ATTEMPT_UNRESOLVED'
+const SAFE_PREWRITE_ERROR_CODES = new Set([
+  'CHECKOUT_REQUEST_INVALID',
+  'INSUFFICIENT_STOCK',
+  'PRODUCT_NOT_FOUND',
+  'PRODUCT_UNAVAILABLE',
+])
+
+const isSafePrewriteErrorCode = (code) =>
+  typeof code === 'string' &&
+  (code.startsWith('CUSTOMIZATION_') || SAFE_PREWRITE_ERROR_CODES.has(code))
+
+const readAuthToken = () =>
+  typeof localStorage === 'undefined' ? '' : localStorage.getItem('token')
+
+const buildCheckoutPayload = (params, clientOrderToken) => ({
+  client_order_token: clientOrderToken,
+  expected_total: roundPrice(
+    params.total == null ? params.expected_total : params.total
+  ),
+  customer: params.customer,
+  customerID: params.customerID,
+  payment: params.payment,
+  remark: params.remark,
+  phone: params.phone,
+  items: buildCheckoutItems(params.dataCart),
+})
+
+const buildCheckoutError = (error) => {
+  const responseData = error?.response?.data
+  const domainData =
+    responseData && responseData.data && typeof responseData.data === 'object'
+      ? responseData.data
+      : {}
+
+  return {
+    status: error?.response?.status || responseData?.code || null,
+    code: domainData.code || null,
+    message:
+      responseData?.message ||
+      error?.message ||
+      'Impossible d’envoyer la commande.',
+    ...domainData,
+  }
+}
+
+const clearCheckoutAttempt = (dispatch) => {
+  dispatch('set/clientOrderToken', null)
+  dispatch('set/clientOrderSignature', null)
+  dispatch('set/clientOrderPayload', null)
+  dispatch('set/clientOrderStatus', 'idle')
+}
+
+const unresolvedCheckoutResult = (state) => ({
+  ok: false,
+  data: null,
+  error: {
+    code: CHECKOUT_ATTEMPT_UNRESOLVED,
+    message:
+      'La tentative de commande précédente doit être résolue avant de modifier la commande.',
+    attempt_payload: state.clientOrderPayload,
+  },
+})
+
 // Fonction pour supprimer les commandes qui ne sont pas du jour
 const removeOldOrders = () => {
   const todayOrders = filterTodayOrderEntries(readStoredOrdersSent())
@@ -42,6 +109,9 @@ export const state = () => ({
   allOrdersSent: [],
   message: '',
   clientOrderToken: null,
+  clientOrderSignature: null,
+  clientOrderPayload: null,
+  clientOrderStatus: 'idle',
 })
 
 removeOldOrders()
@@ -77,74 +147,119 @@ export const actions = {
   },
   async checkoutOrder({ state, dispatch, commit }, params = {}) {
     const stripe = params.stripe === true
+    const signature = buildCheckoutPayloadSignature(params)
     let clientOrderToken = state.clientOrderToken
+
+    if (clientOrderToken && state.clientOrderSignature !== signature) {
+      const isConfirmedReprice =
+        params.repriceConfirmation === true &&
+        state.clientOrderStatus === 'reprice_required'
+      const canSafelyReplace = ['idle', 'prewrite_rejected'].includes(
+        state.clientOrderStatus
+      )
+
+      if (!isConfirmedReprice && !canSafelyReplace) {
+        return unresolvedCheckoutResult(state)
+      }
+      if (!isConfirmedReprice) {
+        clearCheckoutAttempt(dispatch)
+        clientOrderToken = null
+      }
+    }
+
     if (!clientOrderToken) {
       clientOrderToken = uuidv4()
       dispatch('set/clientOrderToken', clientOrderToken)
     }
 
-    const payload = {
-      client_order_token: clientOrderToken,
-      expected_total: roundPrice(
-        params.total == null ? params.expected_total : params.total
-      ),
-      customer: params.customer,
-      customerID: params.customerID,
-      payment: params.payment,
-      remark: params.remark,
-      phone: params.phone,
-      items: buildCheckoutItems(params.dataCart),
-    }
+    const payload = buildCheckoutPayload(params, clientOrderToken)
     const endpoint = stripe
       ? '/baseurl/api/v1/stripe/payment-intents/qr-table'
       : '/baseurl/api/v1/orders/checkout'
 
+    dispatch('set/clientOrderSignature', signature)
+    dispatch('set/clientOrderPayload', payload)
+    dispatch('set/clientOrderStatus', 'pending')
+
     try {
       const response = await this.$axios.post(endpoint, payload, {
         headers: {
-          Authorization: `Bearer ${
-            typeof localStorage === 'undefined'
-              ? ''
-              : localStorage.getItem('token')
-          }`,
+          Authorization: `Bearer ${readAuthToken()}`,
         },
       })
       const data = response && response.data ? response.data.data : null
       if (data && data.orderId) commit('ADD_ORDER_SENT', data.orderId)
       dispatch('set/message', response?.data?.message || '')
-      if (!stripe) {
-        dispatch('set/clientOrderToken', null)
+      if (stripe) {
+        dispatch('set/clientOrderStatus', 'stripe_prepared')
+      } else {
+        clearCheckoutAttempt(dispatch)
         dispatch('notifications/success', 'Commande envoyée avec succès.', {
           root: true,
         })
       }
       return { ok: true, data, error: null }
     } catch (error) {
-      const responseData = error?.response?.data
-      const domainData =
-        responseData &&
-        responseData.data &&
-        typeof responseData.data === 'object'
-          ? responseData.data
-          : {}
-      const checkoutError = {
-        status: error?.response?.status || responseData?.code || null,
-        code: domainData.code || null,
-        message:
-          responseData?.message ||
-          error?.message ||
-          'Impossible d’envoyer la commande.',
-        ...domainData,
-      }
+      const checkoutError = buildCheckoutError(error)
+      const status =
+        checkoutError.code === 'ORDER_REPRICE_REQUIRED'
+          ? 'reprice_required'
+          : isSafePrewriteErrorCode(checkoutError.code)
+          ? 'prewrite_rejected'
+          : 'uncertain'
+      dispatch('set/clientOrderStatus', status)
       dispatch('set/message', checkoutError.message)
       return { ok: false, data: null, error: checkoutError }
     }
   },
-  abandonCheckout({ dispatch }) {
-    dispatch('set/clientOrderToken', null)
+  abandonCheckout({ state, dispatch }, options = {}) {
+    if (
+      options.safe !== true &&
+      ['pending', 'uncertain', 'stripe_prepared'].includes(
+        state.clientOrderStatus
+      )
+    ) {
+      return unresolvedCheckoutResult(state)
+    }
+
+    clearCheckoutAttempt(dispatch)
+    return { ok: true, data: null, error: null }
   },
   completeCheckout({ dispatch }) {
-    dispatch('set/clientOrderToken', null)
+    clearCheckoutAttempt(dispatch)
+    return { ok: true, data: null, error: null }
+  },
+  async cancelStripeCheckout({ dispatch }, orderId) {
+    if (!orderId) {
+      return {
+        ok: false,
+        data: null,
+        error: {
+          code: 'STRIPE_ORDER_ID_REQUIRED',
+          message: 'La commande Stripe à annuler est introuvable.',
+        },
+      }
+    }
+
+    try {
+      const response = await this.$axios.post(
+        `/baseurl/api/v1/stripe/payment-intents/qr-table/${orderId}/cancel`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${readAuthToken()}` },
+        }
+      )
+      dispatch('set/message', response?.data?.message || '')
+      return {
+        ok: true,
+        data: response && response.data ? response.data.data : null,
+        error: null,
+      }
+    } catch (error) {
+      const checkoutError = buildCheckoutError(error)
+      dispatch('set/message', checkoutError.message)
+      return { ok: false, data: null, error: checkoutError }
+    }
   },
   postOrder({ dispatch, commit }, params) {
     return this.$axios

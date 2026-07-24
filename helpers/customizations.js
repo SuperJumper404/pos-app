@@ -161,6 +161,47 @@ const buildCheckoutItems = (cart) =>
     selected_product_step_choice_ids: getSelectedChoiceIds(line),
   }))
 
+const normalizedText = (value) => (value == null ? '' : String(value).trim())
+
+const buildCheckoutPayloadSignature = (input = {}) => {
+  const items = buildCheckoutItems(input.dataCart)
+    .map((item) => ({
+      product_id: Number(item.product_id),
+      quantity: Number(item.quantity),
+      selected_product_step_choice_ids: normalizeNumericIds(
+        item.selected_product_step_choice_ids
+      ),
+    }))
+    .sort((left, right) => {
+      if (left.product_id !== right.product_id) {
+        return left.product_id - right.product_id
+      }
+      const leftChoices = left.selected_product_step_choice_ids.join(',')
+      const rightChoices = right.selected_product_step_choice_ids.join(',')
+      const choiceOrder = leftChoices.localeCompare(rightChoices)
+      return choiceOrder || left.quantity - right.quantity
+    })
+  const customer = input.customer
+  const customerName =
+    customer && typeof customer === 'object' ? customer.name : customer
+
+  return JSON.stringify({
+    customer: normalizedText(customerName),
+    customer_id: Number(
+      input.customerID ||
+        (customer && typeof customer === 'object' ? customer.id : 0)
+    ),
+    phone: normalizedText(input.phone),
+    remark: normalizedText(input.remark),
+    payment: normalizedText(input.payment).toLowerCase(),
+    flow: input.stripe === true ? 'stripe' : 'order',
+    expected_total: roundPrice(
+      input.total == null ? input.expected_total : input.total
+    ),
+    items,
+  })
+}
+
 const applyServerQuoteToCart = (cart, serverQuote) => {
   const quoteBySignature = new Map()
   for (const item of (serverQuote && serverQuote.items) || []) {
@@ -197,51 +238,73 @@ const applyServerQuoteToCart = (cart, serverQuote) => {
   })
 }
 
-const findCartLineIndexForCheckoutError = (cart, error) => {
+const findCartTargetForCheckoutError = (cart, error) => {
   const normalizedCart = Array.isArray(cart) ? cart : []
   const details = error && typeof error === 'object' ? error : {}
-  const productId = Number(
-    details.product_id ||
-      (Array.isArray(details.shortages) && details.shortages[0]
-        ? details.shortages[0].product_id
-        : 0)
+  const positiveIdOrZero = (value) => {
+    const normalized = Number(value)
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : 0
+  }
+  const productId = positiveIdOrZero(details.product_id)
+  const productStepId = positiveIdOrZero(details.product_step_id)
+  const choiceId = positiveIdOrZero(
+    details.product_step_choice_id || details.choice_id
   )
-  const productStepId = Number(details.product_step_id)
-  const choiceId = Number(details.product_step_choice_id || details.choice_id)
+  const targets = new Map()
+  const addTarget = (lineIndex, stepId) => {
+    const normalizedStepId = Number(stepId)
+    if (!Number.isInteger(normalizedStepId) || normalizedStepId <= 0) return
+    targets.set(`${lineIndex}:${normalizedStepId}`, {
+      lineIndex,
+      productStepId: normalizedStepId,
+    })
+  }
 
-  const matches = normalizedCart.reduce((indexes, line, index) => {
-    const selections = Array.isArray(line.selections) ? line.selections : []
-    const steps = Array.isArray(line.customization_steps)
-      ? line.customization_steps
-      : []
-    const selectedChoiceIds = getSelectedChoiceIds(line)
+  if (productStepId > 0 || choiceId > 0) {
+    normalizedCart.forEach((line, lineIndex) => {
+      if (productId > 0 && getProductId(line) !== productId) return
+      const selections = Array.isArray(line.selections) ? line.selections : []
+      const steps = Array.isArray(line.customization_steps)
+        ? line.customization_steps
+        : []
 
-    if (
-      productId > 0 &&
-      getProductId(line) !== productId &&
-      !selections.some(
-        (selection) => Number(selection.linked_product_id) === productId
-      )
-    ) {
-      return indexes
-    }
-    if (
-      productStepId > 0 &&
-      !selections.some(
-        (selection) => Number(selection.product_step_id) === productStepId
-      ) &&
-      !steps.some((step) => Number(step.product_step_id) === productStepId)
-    ) {
-      return indexes
-    }
-    if (choiceId > 0 && !selectedChoiceIds.includes(choiceId)) return indexes
-    if (productId <= 0 && productStepId <= 0 && choiceId <= 0) return indexes
+      if (choiceId > 0) {
+        const matchingSelections = selections.filter(
+          (selection) =>
+            Number(selection.product_step_choice_id) === choiceId &&
+            (productStepId <= 0 ||
+              Number(selection.product_step_id) === productStepId)
+        )
+        matchingSelections.forEach((selection) =>
+          addTarget(lineIndex, productStepId || selection.product_step_id)
+        )
+        return
+      }
 
-    indexes.push(index)
-    return indexes
-  }, [])
+      if (
+        steps.some((step) => Number(step.product_step_id) === productStepId)
+      ) {
+        addTarget(lineIndex, productStepId)
+      }
+    })
+  } else if (Array.isArray(details.shortages)) {
+    const shortageIds = new Set(
+      details.shortages
+        .map((shortage) => Number(shortage && shortage.product_id))
+        .filter((shortageId) => shortageId > 0)
+    )
+    normalizedCart.forEach((line, lineIndex) => {
+      const selections = Array.isArray(line.selections) ? line.selections : []
+      selections
+        .filter((selection) =>
+          shortageIds.has(Number(selection.linked_product_id))
+        )
+        .forEach((selection) => addTarget(lineIndex, selection.product_step_id))
+    })
+  }
 
-  return matches.length === 1 ? matches[0] : -1
+  const matches = Array.from(targets.values())
+  return matches.length === 1 ? matches[0] : null
 }
 
 const createComponentInputId = (prefix, vueUid) => `${prefix}-${vueUid}`
@@ -350,8 +413,9 @@ module.exports = {
   mergeConfiguredCartLine,
   replaceConfiguredCartLine,
   buildCheckoutItems,
+  buildCheckoutPayloadSignature,
   applyServerQuoteToCart,
-  findCartLineIndexForCheckoutError,
+  findCartTargetForCheckoutError,
   createComponentInputId,
   serializeProductCustomizationConfig,
   nextVisibleStepIndex,

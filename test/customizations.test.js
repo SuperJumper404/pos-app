@@ -8,8 +8,9 @@ const {
   mergeConfiguredCartLine,
   replaceConfiguredCartLine,
   buildCheckoutItems,
+  buildCheckoutPayloadSignature,
   applyServerQuoteToCart,
-  findCartLineIndexForCheckoutError,
+  findCartTargetForCheckoutError,
   createComponentInputId,
   serializeProductCustomizationConfig,
   nextVisibleStepIndex,
@@ -521,6 +522,63 @@ assert.deepStrictEqual(buildCheckoutItems(mergedCart), [
   },
 ])
 
+const checkoutSignatureInput = {
+  customer: ' Alice ',
+  customerID: 12,
+  payment: 'Stripe',
+  remark: ' Sans couverts ',
+  phone: ' 0600000000 ',
+  total: 18,
+  stripe: true,
+  dataCart: [
+    {
+      id: 5,
+      qty: 2,
+      selectedChoiceIds: [30, 10],
+    },
+  ],
+}
+const checkoutPayloadSignature = buildCheckoutPayloadSignature(
+  checkoutSignatureInput
+)
+assert.strictEqual(
+  checkoutPayloadSignature,
+  buildCheckoutPayloadSignature({
+    ...checkoutSignatureInput,
+    customer: 'Alice',
+    remark: 'Sans couverts',
+    phone: '0600000000',
+    dataCart: [
+      {
+        id: 5,
+        qty: 2,
+        selectedChoiceIds: [10, 30],
+      },
+    ],
+  }),
+  'canonical checkout signatures must normalize strings and selected id order'
+)
+for (const [label, changedInput] of [
+  ['customer', { customer: 'Bob' }],
+  ['table', { customerID: 13 }],
+  ['phone', { phone: '0700000000' }],
+  ['remark', { remark: 'Avec couverts' }],
+  ['payment', { payment: 'Espèce' }],
+  ['flow', { stripe: false }],
+  ['total', { total: 19 }],
+  ['quantity', { dataCart: [{ id: 5, qty: 3, selectedChoiceIds: [10, 30] }] }],
+  ['choices', { dataCart: [{ id: 5, qty: 2, selectedChoiceIds: [10] }] }],
+]) {
+  assert.notStrictEqual(
+    checkoutPayloadSignature,
+    buildCheckoutPayloadSignature({
+      ...checkoutSignatureInput,
+      ...changedInput,
+    }),
+    `${label} must participate in the checkout attempt signature`
+  )
+}
+
 const editSourceCart = [
   {
     id: 5,
@@ -604,32 +662,63 @@ assert.deepStrictEqual(
 )
 
 assert.strictEqual(
-  findCartLineIndexForCheckoutError(editSourceCart, {
+  findCartTargetForCheckoutError(editSourceCart, {
     product_id: 5,
     product_step_id: 100,
   }),
-  -1,
+  null,
   'ambiguous product/step errors must not open the wrong configured line'
 )
-assert.strictEqual(
-  findCartLineIndexForCheckoutError(editSourceCart, {
+assert.deepStrictEqual(
+  findCartTargetForCheckoutError(editSourceCart, {
+    product_id: 5,
     product_step_choice_id: 30,
   }),
-  1,
+  { lineIndex: 1, productStepId: 100 },
   'a unique contextual choice error must recover the matching line'
 )
-assert.strictEqual(
-  findCartLineIndexForCheckoutError(
+assert.deepStrictEqual(
+  findCartTargetForCheckoutError(
     [
       {
         id: 7,
-        selections: [{ linked_product_id: 99 }],
+        selections: [{ linked_product_id: 99, product_step_id: 700 }],
       },
     ],
     { shortages: [{ product_id: 99 }] }
   ),
-  0,
-  'a linked-product stock shortage must recover the parent cart line'
+  { lineIndex: 0, productStepId: 700 },
+  'a linked-product stock shortage must recover its exact parent step'
+)
+assert.strictEqual(
+  findCartTargetForCheckoutError(
+    [
+      {
+        id: 7,
+        selections: [{ linked_product_id: 99, product_step_id: 700 }],
+      },
+    ],
+    { shortages: [{ product_id: 7 }] }
+  ),
+  null,
+  'a parent product shortage must not open an unrelated customization step'
+)
+assert.strictEqual(
+  findCartTargetForCheckoutError(
+    [
+      {
+        id: 7,
+        selections: [{ linked_product_id: 99, product_step_id: 700 }],
+      },
+      {
+        id: 8,
+        selections: [{ linked_product_id: 99, product_step_id: 800 }],
+      },
+    ],
+    { shortages: [{ product_id: 99 }] }
+  ),
+  null,
+  'multiple linked-product shortage matches must remain untargeted'
 )
 
 assert.strictEqual(
@@ -932,6 +1021,11 @@ const loadCartModule = (uuidv4) => {
   )
 }
 
+const applyCartStateDispatch = (state, type, payload) => {
+  if (!type.startsWith('set/')) return
+  state[type.slice(4)] = payload
+}
+
 const menusPageSource = fs.readFileSync(
   path.join(__dirname, '../pages/menus.vue'),
   'utf8'
@@ -962,6 +1056,10 @@ for (const cartContract of [
   "'cart/checkoutOrder'",
   'ORDER_REPRICE_REQUIRED',
   ':initial-step-id="recoveryStepId"',
+  "'formuser.notes'()",
+  "'formuser.payment'()",
+  'beforeRouteLeave',
+  "'cart/cancelStripeCheckout'",
 ]) {
   assert.ok(
     cartPageSource.includes(cartContract),
@@ -1069,7 +1167,7 @@ const cartExecutable = cartPageSource
     ''
   )
   .replace(
-    /const \{\s*buildStripeCheckoutSignature,\s*shouldAutoPrepareStripeCheckout,\s*\} = require\([^\n]+\)/m,
+    /const \{\s*shouldAutoPrepareStripeCheckout\s*\} = require\([^\n]+\)/m,
     ''
   )
   .replace('export default', 'return')
@@ -1082,11 +1180,11 @@ const cartOptions = new Function(
   'CartCustomizationSummary',
   'price',
   'applyServerQuoteToCart',
-  'findCartLineIndexForCheckoutError',
+  'findCartTargetForCheckoutError',
   'replaceConfiguredCartLine',
   'isCounterPaymentAllowed',
   'isQrClientAccess',
-  'buildStripeCheckoutSignature',
+  'buildCheckoutPayloadSignature',
   'shouldAutoPrepareStripeCheckout',
   cartExecutable
 )(
@@ -1096,11 +1194,11 @@ const cartOptions = new Function(
   {},
   {},
   applyServerQuoteToCart,
-  findCartLineIndexForCheckoutError,
+  findCartTargetForCheckoutError,
   replaceConfiguredCartLine,
   () => false,
   () => false,
-  () => '',
+  buildCheckoutPayloadSignature,
   () => false
 )
 
@@ -1128,21 +1226,6 @@ cartOptions.methods.editCartLine.call(cartEditVm, 1, 100, 'Corrigez ce choix')
 assert.deepStrictEqual(cartEditVm.editingSelectedChoiceIds, [30])
 assert.strictEqual(cartEditVm.recoveryStepId, 100)
 assert.strictEqual(cartEditVm.customizationRecoveryMessage, 'Corrigez ce choix')
-
-cartOptions.methods.confirmCartCustomization.call(cartEditVm, {
-  selectedChoiceIds: [10],
-  unitPrice: 9,
-  selections: [{ product_step_choice_id: 10, product_step_id: 100 }],
-})
-assert.deepStrictEqual(
-  cartEditVm.savedCart.map(({ qty, subtotal, configurationSignature }) => ({
-    qty,
-    subtotal,
-    configurationSignature,
-  })),
-  [{ qty: 3, subtotal: 27, configurationSignature: '5:10' }],
-  'the real cart confirm method must merge the edited quantity-two line'
-)
 
 const recoveryVm = {
   dataCart: editSourceCart,
@@ -1206,29 +1289,6 @@ assert.deepStrictEqual(recoveryVm.recoveredLine, {
   productStepId: 100,
   message: 'Ce choix n’est plus disponible.',
 })
-
-const stripeChangeDispatches = []
-const stripeChangeVm = {
-  isQrClient: true,
-  stripePaymentReady: true,
-  stripeCheckoutSignature: 'old-checkout',
-  currentStripeCheckoutSignature: 'changed-checkout',
-  resetStripePaymentElement() {
-    this.stripePaymentReady = false
-  },
-  scheduleStripeAutoPrepare() {},
-  $store: {
-    dispatch(type) {
-      stripeChangeDispatches.push(type)
-    },
-  },
-}
-cartOptions.methods.handleStripeCheckoutChange.call(stripeChangeVm)
-assert.deepStrictEqual(
-  stripeChangeDispatches,
-  ['cart/abandonCheckout'],
-  'changing a prepared Stripe payload must start a new logical checkout token'
-)
 
 const loadProductEditOptions = () => {
   const source = fs.readFileSync(
@@ -1363,9 +1423,7 @@ const runReviewRegressionTests = async () => {
     state: cartState,
     dispatch(type, payload) {
       checkoutDispatches.push([type, payload])
-      if (type === 'set/clientOrderToken') {
-        cartState.clientOrderToken = payload
-      }
+      applyCartStateDispatch(cartState, type, payload)
     },
     commit(type, payload) {
       checkoutCommits.push([type, payload])
@@ -1417,6 +1475,30 @@ const runReviewRegressionTests = async () => {
     'checkout-token-1',
     'transient failures must preserve the current logical checkout token'
   )
+  assert.strictEqual(cartState.clientOrderStatus, 'uncertain')
+  assert.ok(cartState.clientOrderSignature)
+  assert.strictEqual(cartState.clientOrderPayload.customer, 'Alice')
+
+  const changedUncertainCheckout = await cartModule.actions.checkoutOrder.call(
+    checkoutApi,
+    checkoutContext,
+    { ...checkoutInput, customer: 'Bob' }
+  )
+  assert.strictEqual(changedUncertainCheckout.ok, false)
+  assert.strictEqual(
+    changedUncertainCheckout.error.code,
+    'CHECKOUT_ATTEMPT_UNRESOLVED'
+  )
+  assert.strictEqual(
+    checkoutCalls.length,
+    1,
+    'a changed payload must not be sent while the previous request is uncertain'
+  )
+  assert.strictEqual(cartState.clientOrderPayload.customer, 'Alice')
+
+  const unsafeAbandon = cartModule.actions.abandonCheckout(checkoutContext)
+  assert.strictEqual(unsafeAbandon.ok, false)
+  assert.strictEqual(cartState.clientOrderToken, 'checkout-token-1')
 
   const successfulCheckout = await cartModule.actions.checkoutOrder.call(
     checkoutApi,
@@ -1461,9 +1543,7 @@ const runReviewRegressionTests = async () => {
   const repriceContext = {
     state: repriceState,
     dispatch(type, payload) {
-      if (type === 'set/clientOrderToken') {
-        repriceState.clientOrderToken = payload
-      }
+      applyCartStateDispatch(repriceState, type, payload)
     },
     commit() {},
   }
@@ -1500,9 +1580,11 @@ const runReviewRegressionTests = async () => {
     total: 19,
     items: [],
   })
+  assert.strictEqual(repriceState.clientOrderStatus, 'reprice_required')
   await cartModule.actions.checkoutOrder.call(repriceApi, repriceContext, {
     ...checkoutInput,
     total: 19,
+    repriceConfirmation: true,
   })
   assert.strictEqual(
     repriceTokens[0],
@@ -1510,13 +1592,58 @@ const runReviewRegressionTests = async () => {
     'repricing confirmation must reuse the same checkout token'
   )
 
+  const prewriteState = cartModule.state()
+  const prewriteTokens = []
+  let prewriteRequestCount = 0
+  const prewriteContext = {
+    state: prewriteState,
+    dispatch(type, payload) {
+      applyCartStateDispatch(prewriteState, type, payload)
+    },
+    commit() {},
+  }
+  const prewriteApi = {
+    $axios: {
+      post(_url, payload) {
+        prewriteTokens.push(payload.client_order_token)
+        prewriteRequestCount += 1
+        if (prewriteRequestCount === 1) {
+          const error = new Error('Stock insuffisant.')
+          error.response = {
+            status: 409,
+            data: {
+              message: 'Stock insuffisant.',
+              data: { code: 'INSUFFICIENT_STOCK', shortages: [] },
+            },
+          }
+          return Promise.reject(error)
+        }
+        return Promise.resolve({ data: { data: { orderId: 46 } } })
+      },
+    },
+  }
+  await cartModule.actions.checkoutOrder.call(
+    prewriteApi,
+    prewriteContext,
+    checkoutInput
+  )
+  assert.strictEqual(prewriteState.clientOrderStatus, 'prewrite_rejected')
+  await cartModule.actions.checkoutOrder.call(prewriteApi, prewriteContext, {
+    ...checkoutInput,
+    customer: 'Bob',
+  })
+  assert.notStrictEqual(
+    prewriteTokens[0],
+    prewriteTokens[1],
+    'a confirmed pre-write rejection may safely rotate the token for a changed payload'
+  )
+
   const stripeState = cartModule.state()
   const stripeCalls = []
   const stripeContext = {
     state: stripeState,
     dispatch(type, payload) {
-      if (type === 'set/clientOrderToken')
-        stripeState.clientOrderToken = payload
+      applyCartStateDispatch(stripeState, type, payload)
     },
     commit() {},
   }
@@ -1543,8 +1670,267 @@ const runReviewRegressionTests = async () => {
     stripeState.clientOrderToken,
     'PaymentIntent preparation must retain the token until final payment or abandonment'
   )
-  cartModule.actions.abandonCheckout(stripeContext)
+  assert.strictEqual(stripeState.clientOrderStatus, 'stripe_prepared')
+
+  const preparedAbandon = cartModule.actions.abandonCheckout(stripeContext)
+  assert.strictEqual(preparedAbandon.ok, false)
+  assert.ok(stripeState.clientOrderToken)
+
+  const cancellationCalls = []
+  const cancellationResult = await cartModule.actions.cancelStripeCheckout.call(
+    {
+      $axios: {
+        post(url, payload) {
+          cancellationCalls.push([url, payload])
+          return Promise.resolve({
+            data: { data: { orderId: 55, canceled: true } },
+          })
+        },
+      },
+    },
+    stripeContext,
+    55
+  )
+  assert.deepStrictEqual(cancellationCalls, [
+    ['/baseurl/api/v1/stripe/payment-intents/qr-table/55/cancel', {}],
+  ])
+  assert.deepStrictEqual(cancellationResult, {
+    ok: true,
+    data: { orderId: 55, canceled: true },
+    error: null,
+  })
+  assert.ok(
+    stripeState.clientOrderToken,
+    'the cancellation request alone must not rotate the token before the page observes success'
+  )
+  const safeAbandon = cartModule.actions.abandonCheckout(stripeContext, {
+    safe: true,
+  })
+  assert.strictEqual(safeAbandon.ok, true)
   assert.strictEqual(stripeState.clientOrderToken, null)
+
+  stripeState.clientOrderToken = 'terminal-token'
+  stripeState.clientOrderSignature = 'terminal-signature'
+  stripeState.clientOrderStatus = 'stripe_prepared'
+  const terminalError = new Error('Paiement déjà confirmé.')
+  terminalError.response = {
+    status: 409,
+    data: {
+      message: 'Paiement déjà confirmé.',
+      data: { code: 'STRIPE_PAYMENT_ALREADY_SUCCEEDED' },
+    },
+  }
+  const terminalCancellation =
+    await cartModule.actions.cancelStripeCheckout.call(
+      { $axios: { post: () => Promise.reject(terminalError) } },
+      stripeContext,
+      55
+    )
+  assert.strictEqual(terminalCancellation.ok, false)
+  assert.strictEqual(
+    terminalCancellation.error.code,
+    'STRIPE_PAYMENT_ALREADY_SUCCEEDED'
+  )
+  assert.strictEqual(
+    stripeState.clientOrderToken,
+    'terminal-token',
+    'a terminal cancellation conflict must retain the bound attempt'
+  )
+
+  const safeCancellationEvents = []
+  const safeCancellationVm = {
+    stripeOrderId: 55,
+    stripeCancellationPromise: null,
+    stripeCancellationOrderId: null,
+    checkoutErrorMessage: '',
+    resetStripePaymentElement() {
+      safeCancellationEvents.push('reset-local')
+      this.stripeOrderId = null
+    },
+    $store: {
+      dispatch(type, payload) {
+        safeCancellationEvents.push([type, payload])
+        if (type === 'cart/cancelStripeCheckout') {
+          return Promise.resolve({
+            ok: true,
+            data: { orderId: 55 },
+            error: null,
+          })
+        }
+        return Promise.resolve({ ok: true, data: null, error: null })
+      },
+    },
+  }
+  const safePageCancellation =
+    await cartOptions.methods.cancelPreparedStripeAttempt.call(
+      safeCancellationVm,
+      55
+    )
+  assert.strictEqual(safePageCancellation.ok, true)
+  assert.deepStrictEqual(safeCancellationEvents, [
+    ['cart/cancelStripeCheckout', 55],
+    ['cart/abandonCheckout', { safe: true }],
+    'reset-local',
+  ])
+
+  const failedCancellationEvents = []
+  const failedCancellationVm = {
+    stripeOrderId: 55,
+    stripeCancellationPromise: null,
+    stripeCancellationOrderId: null,
+    checkoutErrorMessage: '',
+    resetStripePaymentElement() {
+      failedCancellationEvents.push('reset-local')
+    },
+    $store: {
+      dispatch(type, payload) {
+        failedCancellationEvents.push([type, payload])
+        return Promise.resolve({
+          ok: false,
+          data: null,
+          error: {
+            code: 'STRIPE_PAYMENT_ALREADY_SUCCEEDED',
+            message: 'Paiement déjà confirmé.',
+          },
+        })
+      },
+    },
+  }
+  const failedPageCancellation =
+    await cartOptions.methods.cancelPreparedStripeAttempt.call(
+      failedCancellationVm,
+      55
+    )
+  assert.strictEqual(failedPageCancellation.ok, false)
+  assert.strictEqual(failedCancellationVm.stripeOrderId, 55)
+  assert.deepStrictEqual(failedCancellationEvents, [
+    ['cart/cancelStripeCheckout', 55],
+  ])
+
+  const guardedCartVm = {
+    ...cartEditVm,
+    dataCart: cartEditVm.dataCart.map((line) => ({ ...line })),
+    resetCheckoutAttempt() {
+      return Promise.resolve(false)
+    },
+    syncCartState() {
+      throw new Error('a blocked mutation must not alter the cart')
+    },
+  }
+  await cartOptions.methods.changeQuantity.call(guardedCartVm, 0, 1)
+  assert.strictEqual(guardedCartVm.dataCart[0].qty, 1)
+
+  const editableCartVm = {
+    ...cartEditVm,
+    dataCart: cartEditVm.dataCart.map((line) => ({ ...line })),
+    resetCheckoutAttempt() {
+      return Promise.resolve(true)
+    },
+  }
+  await cartOptions.methods.confirmCartCustomization.call(editableCartVm, {
+    selectedChoiceIds: [10],
+    unitPrice: 9,
+    selections: [{ product_step_choice_id: 10, product_step_id: 100 }],
+  })
+  assert.deepStrictEqual(
+    editableCartVm.savedCart.map(
+      ({ qty, subtotal, configurationSignature }) => ({
+        qty,
+        subtotal,
+        configurationSignature,
+      })
+    ),
+    [{ qty: 3, subtotal: 27, configurationSignature: '5:10' }],
+    'the cart must only apply its edit after the previous checkout is safely resolved'
+  )
+
+  const staleOrderIds = []
+  const stalePreparationVm = {
+    stripePreparationPromise: null,
+    stripeReplacementPending: false,
+    stripePreparing: false,
+    stripePaymentReady: false,
+    stripeCheckoutSignature: null,
+    checkoutErrorMessage: '',
+    signature: 'old-signature',
+    returnedOrderId: 77,
+    cancellationSucceeds: true,
+    get currentStripeCheckoutSignature() {
+      return this.signature
+    },
+    shouldPrepareStripeCheckout: () => true,
+    clearStripeAutoPrepareTimeout() {},
+    buildOrderPayload: () => ({ stripe: true }),
+    handleCheckoutError() {},
+    cancelPreparedStripeAttempt: (orderId) => {
+      staleOrderIds.push(orderId)
+      return Promise.resolve({
+        ok: stalePreparationVm.cancellationSucceeds,
+        data: null,
+        error: null,
+      })
+    },
+    scheduleStripeAutoPrepare() {},
+    $nextTick: () => Promise.resolve(),
+    $store: {
+      dispatch(type) {
+        if (type !== 'cart/checkoutOrder') return Promise.resolve(null)
+        stalePreparationVm.signature = 'changed-signature'
+        return Promise.resolve({
+          ok: true,
+          data: {
+            orderId: stalePreparationVm.returnedOrderId,
+            clientSecret: 'secret',
+            publishableKey: 'key',
+          },
+          error: null,
+        })
+      },
+    },
+  }
+  await cartOptions.methods.prepareStripePaymentElement.call(
+    stalePreparationVm,
+    true
+  )
+  assert.deepStrictEqual(
+    staleOrderIds,
+    [77],
+    'a stale in-flight Stripe success must be canceled before replacement'
+  )
+
+  stalePreparationVm.signature = 'second-old-signature'
+  stalePreparationVm.returnedOrderId = 78
+  stalePreparationVm.cancellationSucceeds = false
+  await cartOptions.methods.prepareStripePaymentElement.call(
+    stalePreparationVm,
+    true
+  )
+  assert.strictEqual(
+    stalePreparationVm.stripeOrderId,
+    78,
+    'a failed stale cancellation must retain the order id so cancellation can be retried'
+  )
+
+  let routeDecision = null
+  await cartOptions.beforeRouteLeave.call(
+    {
+      checkoutFinalized: false,
+      allowRouteLeave: false,
+      resetCheckoutAttempt() {
+        return Promise.resolve(false)
+      },
+    },
+    {},
+    {},
+    (decision) => {
+      routeDecision = decision
+    }
+  )
+  assert.strictEqual(
+    routeDecision,
+    false,
+    'route navigation must be blocked when checkout cancellation is unresolved'
+  )
 }
 
 runReviewRegressionTests()
