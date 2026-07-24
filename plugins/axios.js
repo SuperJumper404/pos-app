@@ -82,12 +82,6 @@ export default function ({ $axios, redirect, store }) {
 
   const clearStoreAuth = async () => {
     try {
-      await store.dispatch('orderEdit/cancel')
-    } catch (error) {
-      // Authentication cleanup must continue if no edit module is available.
-    }
-
-    try {
       await store.dispatch('clearAuthentication')
     } catch (error) {
       // The direct state fallback below still removes the expired session.

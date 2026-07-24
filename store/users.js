@@ -80,7 +80,6 @@ export const actions = {
         }
       )
       .then((response) => {
-        dispatch('orderEdit/cancel', null, { root: true })
         localStorage.removeItem('idUser')
         localStorage.removeItem('access')
         localStorage.removeItem('token')

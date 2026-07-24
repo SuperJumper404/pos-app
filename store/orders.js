@@ -63,15 +63,6 @@ export const actions = {
         dispatch('set/detailOrder', response.data.data)
         return true
       })
-      .catch((error) => {
-        const message =
-          error.response?.data?.message ||
-          error.message ||
-          'Impossible de récupérer la commande.'
-        dispatch('set/detailOrder', [])
-        dispatch('set/message', message)
-        return false
-      })
   },
   getAllDetailOrders({ dispatch }, params) {
     const requests = params.map((element) => {
