@@ -196,6 +196,174 @@ const wizardOptions = loadComponentOptions(
   ]
 )
 
+const availabilityChoice = {
+  product_step_choice_id: 501,
+  choice_type: 'linked_product',
+  active: true,
+  available: true,
+}
+const availabilityStep = {
+  product_step_id: 50,
+  name: 'Boisson',
+  active: true,
+  minimum_choices: 1,
+  maximum_choices: 1,
+  choices: [availabilityChoice],
+}
+const availabilityVm = {
+  steps: [availabilityStep],
+  currentStep: availabilityStep,
+  currentStepChoices: availabilityStep.choices,
+  minimumChoices: 1,
+  selectedChoiceIds: [501],
+  choiceSelectable(choice) {
+    return wizardOptions.methods.choiceSelectable.call(this, choice)
+  },
+}
+availabilityVm.selectableChoiceIds =
+  wizardOptions.computed.selectableChoiceIds.call(availabilityVm)
+
+assert.deepStrictEqual(
+  wizardOptions.computed.selectedForCurrentStep.call(availabilityVm),
+  [501],
+  'an available linked choice initially satisfies the required step'
+)
+assert.strictEqual(
+  wizardOptions.methods.isChoiceSelected.call(
+    availabilityVm,
+    availabilityChoice
+  ),
+  true
+)
+
+availabilityChoice.available = false
+availabilityVm.selectableChoiceIds =
+  wizardOptions.computed.selectableChoiceIds.call(availabilityVm)
+availabilityVm.selectedForCurrentStep =
+  wizardOptions.computed.selectedForCurrentStep.call(availabilityVm)
+
+assert.deepStrictEqual(
+  availabilityVm.selectedForCurrentStep,
+  [],
+  'an unavailable linked choice must stop satisfying the current step reactively'
+)
+assert.strictEqual(
+  wizardOptions.methods.isChoiceSelected.call(
+    availabilityVm,
+    availabilityChoice
+  ),
+  false,
+  'an unavailable linked choice must lose selected styling'
+)
+assert.deepStrictEqual(
+  wizardOptions.computed.currentStepValidation.call(availabilityVm),
+  { valid: false, reason: 'minimum' }
+)
+assert.match(
+  wizardOptions.computed.blockingExplanation.call(availabilityVm),
+  /ne propose pas assez de choix disponibles/i
+)
+
+const inactiveStepChoice = {
+  product_step_choice_id: 601,
+  choice_type: 'simple',
+  choice_name: 'Ancienne option',
+  extra_price: '4.00',
+  active: true,
+  available: true,
+}
+const activeStepChoice = {
+  product_step_choice_id: 602,
+  choice_type: 'simple',
+  choice_name: 'Option active',
+  extra_price: '0.50',
+  active: true,
+  available: true,
+}
+const inactiveSelectionProduct = {
+  id: 60,
+  price: '10.00',
+  customization_steps: [
+    {
+      product_step_id: 60,
+      step_id: 6,
+      name: 'Étape inactive',
+      position: 0,
+      active: false,
+      minimum_choices: 0,
+      maximum_choices: 1,
+      choices: [inactiveStepChoice],
+    },
+    {
+      product_step_id: 61,
+      step_id: 7,
+      name: 'Étape active',
+      position: 1,
+      active: true,
+      minimum_choices: 0,
+      maximum_choices: 1,
+      choices: [activeStepChoice],
+    },
+  ],
+}
+const inactiveSelectionEvents = []
+const inactiveSelectionVm = {
+  product: inactiveSelectionProduct,
+  steps: inactiveSelectionProduct.customization_steps,
+  selectedChoiceIds: [601, 602],
+  choiceSelectable(choice) {
+    return wizardOptions.methods.choiceSelectable.call(this, choice)
+  },
+  sanitizeSelection(values) {
+    return wizardOptions.methods.sanitizeSelection.call(this, values)
+  },
+  $emit(event, payload) {
+    inactiveSelectionEvents.push([event, payload])
+  },
+}
+inactiveSelectionVm.selectableChoiceIds =
+  wizardOptions.computed.selectableChoiceIds.call(inactiveSelectionVm)
+
+wizardOptions.methods.setSelection.call(inactiveSelectionVm, [601, 602])
+assert.deepStrictEqual(
+  inactiveSelectionVm.selectedChoiceIds,
+  [602],
+  'selections from an inactive enclosing step must be removed internally'
+)
+assert.deepStrictEqual(inactiveSelectionEvents, [['input', [602]]])
+
+inactiveSelectionVm.validSelectedChoiceIds =
+  wizardOptions.computed.validSelectedChoiceIds.call(inactiveSelectionVm)
+inactiveSelectionVm.previewUnitPrice =
+  wizardOptions.computed.previewUnitPrice.call(inactiveSelectionVm)
+inactiveSelectionVm.selections =
+  wizardOptions.computed.selections.call(inactiveSelectionVm)
+
+assert.deepStrictEqual(inactiveSelectionVm.validSelectedChoiceIds, [602])
+assert.strictEqual(
+  inactiveSelectionVm.previewUnitPrice,
+  10.5,
+  'inactive-step supplements must not affect the preview price'
+)
+assert.deepStrictEqual(
+  inactiveSelectionVm.selections.map((selection) =>
+    Number(selection.product_step_choice_id)
+  ),
+  [602],
+  'inactive-step choices must not appear in the summary'
+)
+assert.deepStrictEqual(
+  wizardOptions.computed.confirmationPayload.call(inactiveSelectionVm),
+  {
+    selectedChoiceIds: [602],
+    unitPrice: 10.5,
+    selections: inactiveSelectionVm.selections.map((selection) => ({
+      ...selection,
+    })),
+  },
+  'inactive-step choices must not reach the confirm payload'
+)
+
 const requestedStepVm = {
   steps: wizardSteps,
   initialStepId: 20,
@@ -215,6 +383,7 @@ const singleSelectionVm = {
   ],
   maximumChoices: 1,
   selectedChoiceIds: [99, 101],
+  selectableChoiceIds: new Set([99, 101, 102]),
   choiceSelectable: () => true,
   setSelection(selection) {
     this.selectedChoiceIds = selection
@@ -235,6 +404,7 @@ const multipleSelectionVm = {
   ],
   maximumChoices: 2,
   selectedChoiceIds: [201, 202],
+  selectableChoiceIds: new Set([201, 202, 203]),
   choiceSelectable: () => true,
   setSelection(selection) {
     this.selectedChoiceIds = selection

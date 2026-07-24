@@ -191,6 +191,18 @@ export default {
           )
         : []
     },
+    selectableChoiceIds() {
+      const choiceIds = new Set()
+      for (const step of this.steps) {
+        if (!isActive(step.active)) continue
+        for (const choice of step.choices || []) {
+          if (this.choiceSelectable(choice)) {
+            choiceIds.add(Number(choice.product_step_choice_id))
+          }
+        }
+      }
+      return choiceIds
+    },
     minimumChoices() {
       return this.currentStep
         ? Number(this.currentStep.minimum_choices) || 0
@@ -207,8 +219,9 @@ export default {
           Number(choice.product_step_choice_id)
         )
       )
-      return this.selectedChoiceIds.filter((choiceId) =>
-        stepChoiceIds.has(choiceId)
+      return this.selectedChoiceIds.filter(
+        (choiceId) =>
+          stepChoiceIds.has(choiceId) && this.selectableChoiceIds.has(choiceId)
       )
     },
     currentStepValidation() {
@@ -238,16 +251,8 @@ export default {
       return 'Cette étape ne propose pas assez de choix disponibles. Ce produit ne peut pas être commandé pour le moment.'
     },
     validSelectedChoiceIds() {
-      const allowedIds = new Set()
-      for (const step of this.steps) {
-        for (const choice of step.choices || []) {
-          if (this.choiceSelectable(choice)) {
-            allowedIds.add(Number(choice.product_step_choice_id))
-          }
-        }
-      }
       return this.selectedChoiceIds.filter((choiceId) =>
-        allowedIds.has(choiceId)
+        this.selectableChoiceIds.has(choiceId)
       )
     },
     previewUnitPrice() {
@@ -282,8 +287,8 @@ export default {
         const step = this.steps[stepIndex]
         const choiceIds = new Set(
           (step.choices || [])
-            .filter((choice) => this.choiceSelectable(choice))
             .map((choice) => Number(choice.product_step_choice_id))
+            .filter((choiceId) => this.selectableChoiceIds.has(choiceId))
         )
         const selectedIds = this.validSelectedChoiceIds.filter((choiceId) =>
           choiceIds.has(choiceId)
@@ -327,15 +332,9 @@ export default {
       return true
     },
     sanitizeSelection(values) {
-      const allowedIds = new Set()
-      for (const step of this.steps) {
-        for (const choice of step.choices || []) {
-          if (this.choiceSelectable(choice)) {
-            allowedIds.add(Number(choice.product_step_choice_id))
-          }
-        }
-      }
-      return normalizeIds(values).filter((choiceId) => allowedIds.has(choiceId))
+      return normalizeIds(values).filter((choiceId) =>
+        this.selectableChoiceIds.has(choiceId)
+      )
     },
     resetWizardPosition() {
       const requestedIndex = findStepIndexById(this.steps, this.initialStepId)
@@ -350,8 +349,10 @@ export default {
       this.currentStepIndex = nextVisibleStepIndex(this.steps, -1)
     },
     isChoiceSelected(choice) {
-      return this.selectedChoiceIds.includes(
-        Number(choice.product_step_choice_id)
+      const choiceId = Number(choice.product_step_choice_id)
+      return (
+        this.selectableChoiceIds.has(choiceId) &&
+        this.selectedChoiceIds.includes(choiceId)
       )
     },
     setSelection(selection) {
@@ -368,9 +369,9 @@ export default {
       if (!choice || !this.choiceSelectable(choice)) return
 
       const stepChoiceIds = new Set(
-        this.currentStepChoices.map((candidate) =>
-          Number(candidate.product_step_choice_id)
-        )
+        this.currentStepChoices
+          .map((candidate) => Number(candidate.product_step_choice_id))
+          .filter((candidateId) => this.selectableChoiceIds.has(candidateId))
       )
       const selectedInStep = this.selectedChoiceIds.filter((selectedId) =>
         stepChoiceIds.has(selectedId)
@@ -430,9 +431,9 @@ export default {
         const invalidIndex = this.visibleStepIndexes.find((stepIndex) => {
           const step = this.steps[stepIndex]
           const stepChoiceIds = new Set(
-            (step.choices || []).map((choice) =>
-              Number(choice.product_step_choice_id)
-            )
+            (step.choices || [])
+              .map((choice) => Number(choice.product_step_choice_id))
+              .filter((choiceId) => this.selectableChoiceIds.has(choiceId))
           )
           return !validateStep(
             step,
