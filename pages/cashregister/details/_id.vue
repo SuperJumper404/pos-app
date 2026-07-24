@@ -56,12 +56,30 @@
                   {{ formatCurrency(itm.subtotal) }}
                 </h6>
 
-                <div v-if="itm.customizationList">
-                  <v-chip
-                    v-for="(customization, i) in itm.customizationList"
-                    :key="i"
-                    >{{ customization.name }}</v-chip
+                <div
+                  v-if="customizationGroups(itm).length"
+                  class="cashregister-customizations"
+                >
+                  <div
+                    v-for="(group, groupIndex) in customizationGroups(itm)"
+                    :key="`${group.stepName}-${groupIndex}`"
+                    class="mb-1"
                   >
+                    <div class="text-caption font-weight-medium">
+                      {{ group.stepName }}
+                    </div>
+                    <v-chip
+                      v-for="(choice, choiceIndex) in group.choices"
+                      :key="`${choice.name}-${choiceIndex}`"
+                      class="ma-1"
+                      small
+                    >
+                      {{ choice.name }}
+                      <span v-if="choice.price !== 0" class="ml-1">
+                        + {{ formatCurrency(choice.price) }}
+                      </span>
+                    </v-chip>
+                  </div>
                 </div>
                 <div style="text-align: center">
                   Numéro de commande
@@ -105,6 +123,26 @@
                 <p>
                   Qty: <b>{{ itm.qty }}</b> item
                 </p>
+                <div
+                  v-for="(group, groupIndex) in customizationGroups(itm)"
+                  :key="`${group.stepName}-${groupIndex}`"
+                  class="mb-1"
+                >
+                  <div class="text-caption font-weight-medium">
+                    {{ group.stepName }}
+                  </div>
+                  <v-chip
+                    v-for="(choice, choiceIndex) in group.choices"
+                    :key="`${choice.name}-${choiceIndex}`"
+                    class="ma-1"
+                    small
+                  >
+                    {{ choice.name }}
+                    <span v-if="choice.price !== 0" class="ml-1">
+                      + {{ formatCurrency(choice.price) }}
+                    </span>
+                  </v-chip>
+                </div>
               </v-card-text>
             </v-card>
           </td>
@@ -180,6 +218,7 @@
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import moment from 'moment'
+import { groupCustomizationSelections } from '@/helpers/customizations'
 const {
   getPaymentStatusText,
   getPaymentStatusColor,
@@ -263,6 +302,16 @@ export default {
       })
   },
   methods: {
+    customizationGroups(item) {
+      const value = item || {}
+      const snapshots = [
+        value.customization_selections,
+        value.customizationSelections,
+        value.customization_snapshots,
+        value.customizationSnapshots,
+      ].find((selections) => Array.isArray(selections) && selections.length)
+      return groupCustomizationSelections(snapshots || value.customizationList)
+    },
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
@@ -345,5 +394,10 @@ export default {
 .cashregister-detail-image ::v-deep .v-image__image {
   background-position: center;
   background-size: cover;
+}
+
+.cashregister-customizations {
+  min-width: 180px;
+  text-align: center;
 }
 </style>

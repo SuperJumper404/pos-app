@@ -66,6 +66,114 @@ const findStepIndexById = (steps, productStepId) =>
     (step) => step && String(step.product_step_id) === String(productStepId)
   )
 
+const numericPosition = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return Number.MAX_SAFE_INTEGER
+  }
+  const normalized = Number(value)
+  return Number.isFinite(normalized) ? normalized : Number.MAX_SAFE_INTEGER
+}
+
+const selectionText = (value) =>
+  value === undefined || value === null ? '' : String(value).trim()
+
+const isSnapshotSelection = (selection) =>
+  selection &&
+  typeof selection === 'object' &&
+  (selectionText(selection.step_name) ||
+    selectionText(selection.stepName) ||
+    selection.choice_name !== undefined ||
+    selection.choiceName !== undefined)
+
+const groupCustomizationSelections = (selections) => {
+  const normalizedSelections = (Array.isArray(selections) ? selections : [])
+    .map((selection, index) => ({ selection, index }))
+    .filter(({ selection }) => selection && typeof selection === 'object')
+  const snapshots = normalizedSelections.filter(({ selection }) =>
+    isSnapshotSelection(selection)
+  )
+  const source = snapshots.length
+    ? snapshots
+    : normalizedSelections.filter(({ selection }) =>
+        selectionText(selection.name)
+      )
+
+  if (!source.length) return []
+
+  const orderedSelections = source.slice().sort((left, right) => {
+    if (!snapshots.length) return left.index - right.index
+    const leftSelection = left.selection
+    const rightSelection = right.selection
+    return (
+      numericPosition(
+        leftSelection.step_position === undefined
+          ? leftSelection.stepPosition
+          : leftSelection.step_position
+      ) -
+        numericPosition(
+          rightSelection.step_position === undefined
+            ? rightSelection.stepPosition
+            : rightSelection.step_position
+        ) ||
+      numericPosition(
+        leftSelection.choice_position === undefined
+          ? leftSelection.choicePosition
+          : leftSelection.choice_position
+      ) -
+        numericPosition(
+          rightSelection.choice_position === undefined
+            ? rightSelection.choicePosition
+            : rightSelection.choice_position
+        ) ||
+      left.index - right.index
+    )
+  })
+  const groups = []
+  const groupsByKey = new Map()
+
+  for (const { selection } of orderedSelections) {
+    const stepName = snapshots.length
+      ? selectionText(selection.step_name || selection.stepName) ||
+        'Personnalisation'
+      : 'Personnalisation'
+    const stepId =
+      selection.product_customization_step_id ||
+      selection.product_step_id ||
+      selection.step_id ||
+      selection.productStepId
+    const groupKey = snapshots.length
+      ? `${stepId == null ? 'name' : `id:${stepId}`}:${stepName}`
+      : 'legacy'
+    let group = groupsByKey.get(groupKey)
+    if (!group) {
+      group = { stepName, choices: [] }
+      groupsByKey.set(groupKey, group)
+      groups.push(group)
+    }
+
+    const name = snapshots.length
+      ? selectionText(
+          selection.choice_name === undefined
+            ? selection.choiceName === undefined
+              ? selection.name
+              : selection.choiceName
+            : selection.choice_name
+        )
+      : selectionText(selection.name)
+    if (!name) continue
+    const rawPrice = snapshots.length
+      ? selection.unit_extra_price === undefined
+        ? selection.extra_price === undefined
+          ? selection.price
+          : selection.extra_price
+        : selection.unit_extra_price
+      : selection.price
+    group.choices.push({ name, price: roundPrice(rawPrice) })
+  }
+
+  return groups.filter((group) => group.choices.length)
+}
+
 const calculatePreviewUnitPrice = (product, selectedIds) => {
   const selectedChoiceIds = new Set(normalizeNumericIds(selectedIds))
   const contextualChoices = new Map()
@@ -420,4 +528,5 @@ module.exports = {
   serializeProductCustomizationConfig,
   nextVisibleStepIndex,
   findStepIndexById,
+  groupCustomizationSelections,
 }

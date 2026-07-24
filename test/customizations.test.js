@@ -15,6 +15,7 @@ const {
   serializeProductCustomizationConfig,
   nextVisibleStepIndex,
   findStepIndexById,
+  groupCustomizationSelections,
 } = require('../helpers/customizations')
 const {
   parsePersistedState,
@@ -118,6 +119,156 @@ assert.strictEqual(
   'required unavailable steps must remain addressable as blocking steps'
 )
 assert.strictEqual(findStepIndexById(wizardSteps, 'missing'), -1)
+
+const shuffledSnapshotSelections = [
+  {
+    product_customization_step_id: 20,
+    step_name: 'Sauces',
+    step_position: 1,
+    choice_name: 'Curry',
+    choice_position: 1,
+    unit_extra_price: '0.50',
+  },
+  {
+    product_customization_step_id: 10,
+    step_name: 'Boisson',
+    step_position: 0,
+    choice_name: 'Eau',
+    choice_position: 1,
+    unit_extra_price: 0,
+  },
+  {
+    product_customization_step_id: 20,
+    step_name: 'Sauces',
+    step_position: 1,
+    choice_name: 'Barbecue',
+    choice_position: 0,
+    unit_extra_price: 0,
+  },
+  {
+    product_customization_step_id: 10,
+    step_name: 'Boisson',
+    step_position: 0,
+    choice_name: 'Cola',
+    choice_position: 0,
+    unit_extra_price: '1.25',
+  },
+]
+const originalSnapshotSelections = JSON.parse(
+  JSON.stringify(shuffledSnapshotSelections)
+)
+assert.deepStrictEqual(
+  groupCustomizationSelections(shuffledSnapshotSelections),
+  [
+    {
+      stepName: 'Boisson',
+      choices: [
+        { name: 'Cola', price: 1.25 },
+        { name: 'Eau', price: 0 },
+      ],
+    },
+    {
+      stepName: 'Sauces',
+      choices: [
+        { name: 'Barbecue', price: 0 },
+        { name: 'Curry', price: 0.5 },
+      ],
+    },
+  ],
+  'snapshot groups must follow step_position then choice_position'
+)
+assert.deepStrictEqual(
+  shuffledSnapshotSelections,
+  originalSnapshotSelections,
+  'grouping snapshots must not mutate the API response'
+)
+assert.deepStrictEqual(
+  groupCustomizationSelections([
+    null,
+    { name: 'Sans oignon', price: '0.00' },
+    'invalid',
+    { name: 'Bacon', price: '2.50' },
+    {},
+  ]),
+  [
+    {
+      stepName: 'Personnalisation',
+      choices: [
+        { name: 'Sans oignon', price: 0 },
+        { name: 'Bacon', price: 2.5 },
+      ],
+    },
+  ],
+  'legacy name/price entries must remain readable under one fallback group'
+)
+assert.deepStrictEqual(groupCustomizationSelections(null), [])
+assert.deepStrictEqual(groupCustomizationSelections([null, {}, false]), [])
+assert.deepStrictEqual(
+  groupCustomizationSelections([
+    {
+      step_name: 'Boisson',
+      step_position: 0,
+      choice_name: 'Sans position',
+      choice_position: null,
+      unit_extra_price: 0,
+    },
+    {
+      step_name: 'Boisson',
+      step_position: 0,
+      choice_name: 'Premier',
+      choice_position: 0,
+      unit_extra_price: 0,
+    },
+  ]),
+  [
+    {
+      stepName: 'Boisson',
+      choices: [
+        { name: 'Premier', price: 0 },
+        { name: 'Sans position', price: 0 },
+      ],
+    },
+  ],
+  'missing positions must follow explicitly positioned snapshots'
+)
+assert.deepStrictEqual(
+  groupCustomizationSelections([
+    { name: 'Legacy duplicate', price: 3 },
+    {
+      step_name: 'Boisson',
+      name: 'Cola',
+      step_position: 0,
+      choice_position: 0,
+      price: 1,
+    },
+  ]),
+  [
+    {
+      stepName: 'Boisson',
+      choices: [{ name: 'Cola', price: 1 }],
+    },
+  ],
+  'V2 snapshots must take precedence when a legacy projection coexists'
+)
+
+for (const pageFile of [
+  '../pages/orders/detail/_id.vue',
+  '../pages/history/index.vue',
+  '../pages/cashregister/details/_id.vue',
+]) {
+  const source = fs.readFileSync(path.join(__dirname, pageFile), 'utf8')
+  for (const contractToken of [
+    'groupCustomizationSelections',
+    'customizationGroups(itm)',
+    'group.stepName',
+    'group.choices',
+  ]) {
+    assert.ok(
+      source.includes(contractToken),
+      `${pageFile} customization display missing: ${contractToken}`
+    )
+  }
+}
 
 const choiceCardPath = path.join(
   __dirname,

@@ -48,16 +48,29 @@
                 </div>
 
                 <div
-                  v-if="itm.customizationList && itm.customizationList.length"
+                  v-if="customizationGroups(itm).length"
                   class="order-detail-customizations"
                 >
-                  <v-chip
-                    v-for="(customization, j) in itm.customizationList"
-                    :key="j"
-                    class="ma-1"
+                  <div
+                    v-for="(group, groupIndex) in customizationGroups(itm)"
+                    :key="`${group.stepName}-${groupIndex}`"
+                    class="order-detail-customization-group"
                   >
-                    {{ customization.name }}
-                  </v-chip>
+                    <div class="text-caption font-weight-medium">
+                      {{ group.stepName }}
+                    </div>
+                    <v-chip
+                      v-for="(choice, choiceIndex) in group.choices"
+                      :key="`${choice.name}-${choiceIndex}`"
+                      class="ma-1"
+                      small
+                    >
+                      {{ choice.name }}
+                      <span v-if="choice.price !== 0" class="ml-1">
+                        + {{ formatCurrency(choice.price) }}
+                      </span>
+                    </v-chip>
+                  </div>
                 </div>
 
                 <div class="order-detail-meta">
@@ -112,6 +125,7 @@
 
 <script>
 import price from '@/helpers/price'
+import { groupCustomizationSelections } from '@/helpers/customizations'
 const {
   getPaymentStatusText,
   getPaymentStatusColor,
@@ -155,6 +169,16 @@ export default {
     }
   },
   methods: {
+    customizationGroups(item) {
+      const value = item || {}
+      const snapshots = [
+        value.customization_selections,
+        value.customizationSelections,
+        value.customization_snapshots,
+        value.customizationSnapshots,
+      ].find((selections) => Array.isArray(selections) && selections.length)
+      return groupCustomizationSelections(snapshots || value.customizationList)
+    },
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
@@ -266,6 +290,10 @@ export default {
   flex-wrap: wrap;
   justify-content: center;
   min-width: 0;
+}
+
+.order-detail-customization-group + .order-detail-customization-group {
+  margin-top: 4px;
 }
 
 .order-detail-meta {
