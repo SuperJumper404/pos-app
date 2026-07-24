@@ -6,7 +6,10 @@ const {
   calculatePreviewUnitPrice,
   buildConfigurationSignature,
   mergeConfiguredCartLine,
+  replaceConfiguredCartLine,
   buildCheckoutItems,
+  applyServerQuoteToCart,
+  findCartLineIndexForCheckoutError,
   createComponentInputId,
   serializeProductCustomizationConfig,
   nextVisibleStepIndex,
@@ -518,6 +521,117 @@ assert.deepStrictEqual(buildCheckoutItems(mergedCart), [
   },
 ])
 
+const editSourceCart = [
+  {
+    id: 5,
+    qty: 1,
+    selectedChoiceIds: [10],
+    selections: [{ product_step_choice_id: 10, product_step_id: 100 }],
+    price: 9,
+    subtotal: 9,
+  },
+  {
+    id: 5,
+    qty: 2,
+    selectedChoiceIds: [30],
+    selections: [{ product_step_choice_id: 30, product_step_id: 100 }],
+    price: 10,
+    subtotal: 20,
+  },
+]
+
+const editedIntoExisting = replaceConfiguredCartLine(editSourceCart, 1, {
+  ...editSourceCart[1],
+  selectedChoiceIds: [10],
+  selections: [{ product_step_choice_id: 10, product_step_id: 100 }],
+  price: 9,
+  subtotal: 18,
+})
+
+assert.deepStrictEqual(
+  editedIntoExisting.map(({ configurationSignature, qty, subtotal }) => ({
+    configurationSignature,
+    qty,
+    subtotal,
+  })),
+  [{ configurationSignature: '5:10', qty: 3, subtotal: 27 }],
+  'editing a quantity-two line into an existing signature must merge quantities and remove the source line'
+)
+assert.strictEqual(editSourceCart.length, 2, 'cart edits must stay immutable')
+
+const editedToDistinct = replaceConfiguredCartLine(editSourceCart, 1, {
+  ...editSourceCart[1],
+  selectedChoiceIds: [10, 30],
+  price: 10.5,
+  subtotal: 21,
+})
+assert.strictEqual(
+  editedToDistinct.length,
+  2,
+  'editing to a distinct signature must preserve both cart lines'
+)
+assert.deepStrictEqual(
+  editedToDistinct.map((line) => line.configurationSignature),
+  ['5:10', '5:10,30']
+)
+
+const repricedCart = applyServerQuoteToCart(editSourceCart, {
+  total: 24,
+  items: [
+    {
+      product_id: 5,
+      quantity: 1,
+      selected_choice_ids: [10],
+      unit_price: 9.5,
+      total: 9.5,
+    },
+    {
+      product_id: 5,
+      quantity: 2,
+      selected_choice_ids: [30],
+      unit_price: 7.25,
+      total: 14.5,
+    },
+  ],
+})
+assert.deepStrictEqual(
+  repricedCart.map(({ price, qty, subtotal }) => ({ price, qty, subtotal })),
+  [
+    { price: 9.5, qty: 1, subtotal: 9.5 },
+    { price: 7.25, qty: 2, subtotal: 14.5 },
+  ],
+  'a server quote must update matching configured lines without losing quantity'
+)
+
+assert.strictEqual(
+  findCartLineIndexForCheckoutError(editSourceCart, {
+    product_id: 5,
+    product_step_id: 100,
+  }),
+  -1,
+  'ambiguous product/step errors must not open the wrong configured line'
+)
+assert.strictEqual(
+  findCartLineIndexForCheckoutError(editSourceCart, {
+    product_step_choice_id: 30,
+  }),
+  1,
+  'a unique contextual choice error must recover the matching line'
+)
+assert.strictEqual(
+  findCartLineIndexForCheckoutError(
+    [
+      {
+        id: 7,
+        selections: [{ linked_product_id: 99 }],
+      },
+    ],
+    { shortages: [{ product_id: 99 }] }
+  ),
+  0,
+  'a linked-product stock shortage must recover the parent cart line'
+)
+
 assert.strictEqual(
   createComponentInputId('image-cropper', 12),
   'image-cropper-12'
@@ -793,6 +907,329 @@ const loadProductActions = () => {
   )
 }
 
+const loadCartModule = (uuidv4) => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../store/cart.js'),
+    'utf8'
+  )
+  const executable = source
+    .replace(/^import .*$/gm, '')
+    .replace(/export const /g, 'const ')
+    .concat('\nreturn { state, mutations, actions }')
+
+  // eslint-disable-next-line no-new-func
+  return new Function(
+    'EasyAccess',
+    'defaultMutations',
+    'uuidv4',
+    'require',
+    executable
+  )(
+    () => ({}),
+    () => ({}),
+    uuidv4,
+    require
+  )
+}
+
+const menusPageSource = fs.readFileSync(
+  path.join(__dirname, '../pages/menus.vue'),
+  'utf8'
+)
+const cartPageSource = fs.readFileSync(
+  path.join(__dirname, '../pages/cart.vue'),
+  'utf8'
+)
+
+assert.ok(
+  menusPageSource.includes('<ProductCustomizationWizard') &&
+    menusPageSource.includes('mergeConfiguredCartLine'),
+  'menus must add every configured product through the shared wizard and merge helper'
+)
+assert.ok(
+  !menusPageSource.includes('selectedItem.product_customization'),
+  'the legacy inline customization dialog must be removed from menus'
+)
+assert.ok(
+  menusPageSource.includes('customization_available === false') &&
+    menusPageSource.includes('customization_unavailable_reason'),
+  'uncommandable products must expose the backend availability reason'
+)
+for (const cartContract of [
+  '<CartCustomizationSummary',
+  '<ProductCustomizationWizard',
+  'replaceConfiguredCartLine',
+  "'cart/checkoutOrder'",
+  'ORDER_REPRICE_REQUIRED',
+  ':initial-step-id="recoveryStepId"',
+]) {
+  assert.ok(
+    cartPageSource.includes(cartContract),
+    `cart ordering contract missing: ${cartContract}`
+  )
+}
+
+const menusOptions = loadComponentOptions(
+  menusPageSource,
+  ['Loading', 'ProductCustomizationWizard', 'price', 'mergeConfiguredCartLine'],
+  [{}, {}, {}, mergeConfiguredCartLine]
+)
+
+const menuProduct = {
+  id: 5,
+  name: 'Menu',
+  price: 8,
+  stock: 5,
+  customization_available: true,
+  customization_steps: [{ product_step_id: 100, choices: [] }],
+}
+const menusVm = {
+  isKitchenClosed: false,
+  cartItem: [],
+  dataProduct: [menuProduct],
+  selectedItem: null,
+  selectedChoiceIds: [],
+  customizationDialog: false,
+  roundPrice: (value) => Math.round(Number(value) * 100) / 100,
+  parsePrice: Number,
+  totalPrice() {},
+  indexCart() {},
+  showKitchenClosedSnackbar() {},
+  showAlert() {},
+  customizationUnavailableReason(productValue) {
+    return menusOptions.methods.customizationUnavailableReason.call(
+      this,
+      productValue
+    )
+  },
+}
+
+menusOptions.methods.addToCart.call(menusVm, menuProduct)
+assert.strictEqual(menusVm.customizationDialog, true)
+assert.strictEqual(menusVm.cartItem.length, 0)
+
+menusVm.closeCustomizationWizard = () => {
+  menusOptions.methods.closeCustomizationWizard.call(menusVm)
+}
+menusOptions.methods.confirmCustomization.call(menusVm, {
+  selectedChoiceIds: [10],
+  unitPrice: 9,
+  selections: [
+    {
+      product_step_choice_id: 10,
+      product_step_id: 100,
+      choice_name: 'Cola',
+      extra_price: 1,
+    },
+  ],
+})
+assert.deepStrictEqual(menusVm.cartItem[0].selectedChoiceIds, [10])
+assert.strictEqual(menusVm.cartItem[0].configurationSignature, '5:10')
+assert.strictEqual(menusVm.cartItem[0].subtotal, 9)
+
+menusOptions.methods.addToCart.call(menusVm, {
+  id: 6,
+  name: 'Produit simple',
+  price: 4,
+  stock: 2,
+  customization_available: true,
+  customization_steps: [],
+})
+menusOptions.methods.addToCart.call(menusVm, {
+  id: 6,
+  name: 'Produit simple',
+  price: 4,
+  stock: 2,
+  customization_available: true,
+  customization_steps: [],
+})
+assert.deepStrictEqual(
+  menusVm.cartItem.find((line) => line.id === 6),
+  {
+    id: 6,
+    name: 'Produit simple',
+    price: 4,
+    stock: 2,
+    customization_available: true,
+    customization_steps: [],
+    selectedChoiceIds: [],
+    selections: [],
+    customizationList: [],
+    subtotal: 8,
+    qty: 2,
+    configurationSignature: '6:',
+  }
+)
+
+const cartExecutable = cartPageSource
+  .match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
+  .replace(
+    /const \{\s*isCounterPaymentAllowed,\s*isQrClientAccess,\s*\} = require\([^\n]+\)/m,
+    ''
+  )
+  .replace(
+    /const \{\s*buildStripeCheckoutSignature,\s*shouldAutoPrepareStripeCheckout,\s*\} = require\([^\n]+\)/m,
+    ''
+  )
+  .replace('export default', 'return')
+
+// eslint-disable-next-line no-new-func
+const cartOptions = new Function(
+  'loadStripe',
+  'Loading',
+  'ProductCustomizationWizard',
+  'CartCustomizationSummary',
+  'price',
+  'applyServerQuoteToCart',
+  'findCartLineIndexForCheckoutError',
+  'replaceConfiguredCartLine',
+  'isCounterPaymentAllowed',
+  'isQrClientAccess',
+  'buildStripeCheckoutSignature',
+  'shouldAutoPrepareStripeCheckout',
+  cartExecutable
+)(
+  () => null,
+  {},
+  {},
+  {},
+  {},
+  applyServerQuoteToCart,
+  findCartLineIndexForCheckoutError,
+  replaceConfiguredCartLine,
+  () => false,
+  () => false,
+  () => '',
+  () => false
+)
+
+const cartEditVm = {
+  dataCart: editSourceCart.map((line) => ({
+    ...line,
+    customization_steps: [{ product_step_id: 100 }],
+  })),
+  editingCartIndex: null,
+  editingProduct: null,
+  editingSelectedChoiceIds: [],
+  recoveryStepId: null,
+  customizationRecoveryMessage: '',
+  customizationDialog: false,
+  roundPrice: (value) => Math.round(Number(value) * 100) / 100,
+  resetCheckoutAttempt() {},
+  syncCartState(cart) {
+    this.savedCart = cart
+  },
+  closeCartCustomization() {
+    this.customizationDialog = false
+  },
+}
+cartOptions.methods.editCartLine.call(cartEditVm, 1, 100, 'Corrigez ce choix')
+assert.deepStrictEqual(cartEditVm.editingSelectedChoiceIds, [30])
+assert.strictEqual(cartEditVm.recoveryStepId, 100)
+assert.strictEqual(cartEditVm.customizationRecoveryMessage, 'Corrigez ce choix')
+
+cartOptions.methods.confirmCartCustomization.call(cartEditVm, {
+  selectedChoiceIds: [10],
+  unitPrice: 9,
+  selections: [{ product_step_choice_id: 10, product_step_id: 100 }],
+})
+assert.deepStrictEqual(
+  cartEditVm.savedCart.map(({ qty, subtotal, configurationSignature }) => ({
+    qty,
+    subtotal,
+    configurationSignature,
+  })),
+  [{ qty: 3, subtotal: 27, configurationSignature: '5:10' }],
+  'the real cart confirm method must merge the edited quantity-two line'
+)
+
+const recoveryVm = {
+  dataCart: editSourceCart,
+  checkoutErrorMessage: '',
+  pendingRepriceFlow: null,
+  pendingRepricePaymentMethod: null,
+  repriceDialog: false,
+  syncCartState(cart) {
+    this.repricedCart = cart
+  },
+  editCartLine(lineIndex, productStepId, message) {
+    this.recoveredLine = { lineIndex, productStepId, message }
+  },
+}
+cartOptions.methods.handleCheckoutError.call(
+  recoveryVm,
+  {
+    code: 'ORDER_REPRICE_REQUIRED',
+    message: 'Le prix a changé.',
+    server_quote: {
+      total: 18.5,
+      items: [
+        {
+          product_id: 5,
+          quantity: 1,
+          selected_choice_ids: [10],
+          unit_price: 9.5,
+        },
+        {
+          product_id: 5,
+          quantity: 2,
+          selected_choice_ids: [30],
+          unit_price: 4.5,
+        },
+      ],
+    },
+  },
+  'order',
+  'Espèce'
+)
+assert.strictEqual(recoveryVm.repriceDialog, true)
+assert.strictEqual(recoveryVm.pendingRepriceFlow, 'order')
+assert.deepStrictEqual(
+  recoveryVm.repricedCart.map((line) => line.subtotal),
+  [9.5, 9]
+)
+
+cartOptions.methods.handleCheckoutError.call(
+  recoveryVm,
+  {
+    code: 'CUSTOMIZATION_CHOICE_NOT_ALLOWED',
+    message: 'Ce choix n’est plus disponible.',
+    product_step_id: 100,
+    product_step_choice_id: 30,
+  },
+  'order',
+  'Espèce'
+)
+assert.deepStrictEqual(recoveryVm.recoveredLine, {
+  lineIndex: 1,
+  productStepId: 100,
+  message: 'Ce choix n’est plus disponible.',
+})
+
+const stripeChangeDispatches = []
+const stripeChangeVm = {
+  isQrClient: true,
+  stripePaymentReady: true,
+  stripeCheckoutSignature: 'old-checkout',
+  currentStripeCheckoutSignature: 'changed-checkout',
+  resetStripePaymentElement() {
+    this.stripePaymentReady = false
+  },
+  scheduleStripeAutoPrepare() {},
+  $store: {
+    dispatch(type) {
+      stripeChangeDispatches.push(type)
+    },
+  },
+}
+cartOptions.methods.handleStripeCheckoutChange.call(stripeChangeVm)
+assert.deepStrictEqual(
+  stripeChangeDispatches,
+  ['cart/abandonCheckout'],
+  'changing a prepared Stripe payload must start a new logical checkout token'
+)
+
 const loadProductEditOptions = () => {
   const source = fs.readFileSync(
     path.join(__dirname, '../pages/products/edit/_id/index.vue'),
@@ -915,6 +1352,199 @@ const runReviewRegressionTests = async () => {
     ),
     'partial saves must use the existing error notification path'
   )
+
+  let uuidCount = 0
+  const cartModule = loadCartModule(() => `checkout-token-${++uuidCount}`)
+  const cartState = cartModule.state()
+  const checkoutDispatches = []
+  const checkoutCommits = []
+  const checkoutCalls = []
+  const checkoutContext = {
+    state: cartState,
+    dispatch(type, payload) {
+      checkoutDispatches.push([type, payload])
+      if (type === 'set/clientOrderToken') {
+        cartState.clientOrderToken = payload
+      }
+    },
+    commit(type, payload) {
+      checkoutCommits.push([type, payload])
+    },
+  }
+  const checkoutInput = {
+    customer: 'Alice',
+    customerID: 12,
+    payment: 'Espèce',
+    remark: 'Sans couverts',
+    phone: '0600000000',
+    total: 18,
+    dataCart: [
+      {
+        id: 5,
+        qty: 2,
+        price: 9,
+        subtotal: 18,
+        selectedChoiceIds: [30, 10],
+      },
+    ],
+  }
+  const checkoutApi = {
+    $axios: {
+      post(url, payload) {
+        checkoutCalls.push([url, payload])
+        if (checkoutCalls.length === 1)
+          return Promise.reject(new Error('network'))
+        return Promise.resolve({
+          data: {
+            message: 'Commande créée.',
+            data: { orderId: 44, total: 18 },
+          },
+        })
+      },
+    },
+  }
+
+  const failedCheckout = await cartModule.actions.checkoutOrder.call(
+    checkoutApi,
+    checkoutContext,
+    checkoutInput
+  )
+  assert.strictEqual(failedCheckout.ok, false)
+  assert.strictEqual(failedCheckout.data, null)
+  assert.strictEqual(failedCheckout.error.message, 'network')
+  assert.strictEqual(
+    cartState.clientOrderToken,
+    'checkout-token-1',
+    'transient failures must preserve the current logical checkout token'
+  )
+
+  const successfulCheckout = await cartModule.actions.checkoutOrder.call(
+    checkoutApi,
+    checkoutContext,
+    checkoutInput
+  )
+  assert.deepStrictEqual(successfulCheckout, {
+    ok: true,
+    data: { orderId: 44, total: 18 },
+    error: null,
+  })
+  assert.strictEqual(uuidCount, 1, 'a retry must reuse the same UUID')
+  assert.deepStrictEqual(checkoutCalls[0], [
+    '/baseurl/api/v1/orders/checkout',
+    {
+      client_order_token: 'checkout-token-1',
+      expected_total: 18,
+      customer: 'Alice',
+      customerID: 12,
+      payment: 'Espèce',
+      remark: 'Sans couverts',
+      phone: '0600000000',
+      items: [
+        {
+          product_id: 5,
+          quantity: 2,
+          selected_product_step_choice_ids: [10, 30],
+        },
+      ],
+    },
+  ])
+  assert.strictEqual(
+    cartState.clientOrderToken,
+    null,
+    'a completed non-Stripe checkout must clear its token'
+  )
+  assert.deepStrictEqual(checkoutCommits, [['ADD_ORDER_SENT', 44]])
+
+  const repriceState = cartModule.state()
+  const repriceTokens = []
+  let repriceRequestCount = 0
+  const repriceContext = {
+    state: repriceState,
+    dispatch(type, payload) {
+      if (type === 'set/clientOrderToken') {
+        repriceState.clientOrderToken = payload
+      }
+    },
+    commit() {},
+  }
+  const repriceApi = {
+    $axios: {
+      post(_url, payload) {
+        repriceTokens.push(payload.client_order_token)
+        repriceRequestCount += 1
+        if (repriceRequestCount === 1) {
+          const error = new Error('Le prix a changé.')
+          error.response = {
+            status: 409,
+            data: {
+              message: 'Le prix a changé.',
+              data: {
+                code: 'ORDER_REPRICE_REQUIRED',
+                server_quote: { total: 19, items: [] },
+              },
+            },
+          }
+          return Promise.reject(error)
+        }
+        return Promise.resolve({ data: { data: { orderId: 45 } } })
+      },
+    },
+  }
+  const repriceResult = await cartModule.actions.checkoutOrder.call(
+    repriceApi,
+    repriceContext,
+    checkoutInput
+  )
+  assert.strictEqual(repriceResult.error.code, 'ORDER_REPRICE_REQUIRED')
+  assert.deepStrictEqual(repriceResult.error.server_quote, {
+    total: 19,
+    items: [],
+  })
+  await cartModule.actions.checkoutOrder.call(repriceApi, repriceContext, {
+    ...checkoutInput,
+    total: 19,
+  })
+  assert.strictEqual(
+    repriceTokens[0],
+    repriceTokens[1],
+    'repricing confirmation must reuse the same checkout token'
+  )
+
+  const stripeState = cartModule.state()
+  const stripeCalls = []
+  const stripeContext = {
+    state: stripeState,
+    dispatch(type, payload) {
+      if (type === 'set/clientOrderToken')
+        stripeState.clientOrderToken = payload
+    },
+    commit() {},
+  }
+  const stripeResult = await cartModule.actions.checkoutOrder.call(
+    {
+      $axios: {
+        post(url, payload) {
+          stripeCalls.push([url, payload])
+          return Promise.resolve({
+            data: { data: { orderId: 55, clientSecret: 'secret' } },
+          })
+        },
+      },
+    },
+    stripeContext,
+    { ...checkoutInput, stripe: true, payment: 'Stripe' }
+  )
+  assert.strictEqual(stripeResult.ok, true)
+  assert.strictEqual(
+    stripeCalls[0][0],
+    '/baseurl/api/v1/stripe/payment-intents/qr-table'
+  )
+  assert.ok(
+    stripeState.clientOrderToken,
+    'PaymentIntent preparation must retain the token until final payment or abandonment'
+  )
+  cartModule.actions.abandonCheckout(stripeContext)
+  assert.strictEqual(stripeState.clientOrderToken, null)
 }
 
 runReviewRegressionTests()

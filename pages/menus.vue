@@ -65,7 +65,25 @@
                         </div>
 
                         <div class="product-card-price font-weight-bold">
-                          {{ formatCurrency(items.price) }}
+                          <span
+                            v-if="
+                              items.minimum_commandable_price != null &&
+                              parsePrice(items.minimum_commandable_price) >
+                                parsePrice(items.price)
+                            "
+                          >
+                            À partir de
+                            {{
+                              formatCurrency(items.minimum_commandable_price)
+                            }}
+                          </span>
+                          <span v-else>{{ formatCurrency(items.price) }}</span>
+                        </div>
+                        <div
+                          v-if="items.customization_available === false"
+                          class="error--text text-caption mt-1"
+                        >
+                          {{ customizationUnavailableReason(items) }}
                         </div>
                       </v-card-text>
 
@@ -77,7 +95,10 @@
                           color="success"
                           small
                           block
-                          :disabled="isKitchenClosed"
+                          :disabled="
+                            isKitchenClosed ||
+                            items.customization_available === false
+                          "
                           class="text-none font-weight-bold"
                           @click.stop="addToCart(items)"
                         >
@@ -163,7 +184,7 @@
             <div v-else height="100%">
               <v-card
                 v-for="(itm, itemIndex) in cartItem"
-                :key="itm.id"
+                :key="itm.configurationSignature || `${itm.id}-${itemIndex}`"
                 outlined
                 class="cart-item-card d-flex mb-2 flex-column"
                 rounded="7"
@@ -252,11 +273,11 @@
 
                 <v-col>
                   <v-chip
-                    v-for="(choice, index) in itm.customizationList"
-                    :key="index"
+                    v-for="choice in itm.selections || []"
+                    :key="choice.product_step_choice_id"
                     class="mr-1 mt-1"
                   >
-                    {{ choice.name }}
+                    {{ choice.choice_name || choice.name }}
                   </v-chip>
                 </v-col>
               </v-card>
@@ -326,7 +347,9 @@
           <v-btn
             color="success"
             class="text-none font-weight-bold"
-            :disabled="isKitchenClosed"
+            :disabled="
+              isKitchenClosed || previewItem.customization_available === false
+            "
             @click="addPreviewItemToCart"
           >
             <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
@@ -336,88 +359,14 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="itemDialog" max-width="350">
-      <v-form ref="formItem">
-        <v-card>
-          <v-toolbar color="primary" dark
-            >Sélectionner les suppléments</v-toolbar
-          >
-          <v-card-text>
-            <!-- {{ selectedItem }} -->
-            <div
-              v-for="(item, itemId) in selectedItem.product_customization"
-              :key="itemId"
-            >
-              <div class="text-h4 text--primary">{{ item.name }}</div>
-              <!-- <p>
-                {{ item.description }}
-                {{ item.limit_choice ? 'Max(' + item.limit_choice + ')' : '' }}
-              </p> -->
-              <div>
-                <!-- Condition for checkboxes -->
-                <template v-if="item.limit_choice > 1">
-                  <!-- <pre>item {{ item }}</pre>
-                  <pre>currentITem {{ currentItem }}</pre> -->
-                  <div v-for="(choice, i) in item.items" :key="'checkbox-' + i">
-                    <v-checkbox
-                      v-model="currentItem[itemId]"
-                      class="custom-spacing"
-                      multiple
-                      :label="
-                        choice.price > 0
-                          ? `${choice.name} (+${formatCurrency(choice.price)})`
-                          : `${choice.name}`
-                      "
-                      :disabled="
-                        (currentItem[itemId] || []).length >=
-                          Number(item.limit_choice || 0) &&
-                        !(currentItem[itemId] || []).some(
-                          (x) => x.id === choice.id
-                        )
-                      "
-                      :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
-                      :value="choice"
-                    ></v-checkbox>
-                  </div>
-                </template>
-
-                <!-- Condition for radio buttons -->
-                <v-radio-group
-                  v-if="item.limit_choice === 1"
-                  v-model="currentItem[itemId]"
-                  row
-                >
-                  <v-radio
-                    v-for="(choice, i) in item.items"
-                    :key="'radio-' + i"
-                    :label="
-                      choice.price > 0
-                        ? `${choice.name} (+${formatCurrency(choice.price)})`
-                        : choice.name
-                    "
-                    :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
-                    :value="choice"
-                  ></v-radio>
-                </v-radio-group>
-              </div>
-            </div>
-            <!-- <pre type="json">{{ currentItem }}</pre> -->
-            <!-- <pre type="json">{{ [...currentItem] }}</pre> -->
-          </v-card-text>
-          <v-card-actions class="justify-end">
-            <v-btn color="warning" class="text-none" @click="resetForm()"
-              >Retour <v-icon small right>mdi-arrow-left</v-icon></v-btn
-            >
-            <v-btn
-              color="success"
-              class="text-none"
-              :disabled="disableCustomizationValidation()"
-              @click="submitFormItem()"
-              >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
-            >
-          </v-card-actions>
-        </v-card>
-      </v-form>
+    <v-dialog v-model="customizationDialog" max-width="920" persistent>
+      <ProductCustomizationWizard
+        v-if="selectedItem"
+        v-model="selectedChoiceIds"
+        :product="selectedItem"
+        @confirm="confirmCustomization"
+        @cancel="closeCustomizationWizard"
+      />
     </v-dialog>
     <!-- <pre>{{ dataProduct }}</pre> -->
     <!-- <pre>server{{ mainconfig.default.server }}</pre> -->
@@ -431,7 +380,7 @@
       top
     >
       {{ kitchenClosedMessage }}
-      <template v-slot:action="{ attrs }">
+      <template #action="{ attrs }">
         <v-btn text v-bind="attrs" @click="kitchenClosedSnackbar = false">
           Fermer
         </v-btn>
@@ -441,11 +390,14 @@
 </template>
 <script>
 import Loading from '@/components/loading'
+import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import price from '@/helpers/price'
+import { mergeConfiguredCartLine } from '@/helpers/customizations'
 // import * as config from '@/nuxt.config'
 export default {
   components: {
     Loading,
+    ProductCustomizationWizard,
   },
   mixins: [price],
   layout() {
@@ -455,11 +407,11 @@ export default {
   },
   middleware: 'auth',
   data: () => ({
-    itemDialog: false,
+    customizationDialog: false,
     previewDialog: false,
     previewItem: null,
-    selectedItem: [],
-    currentItem: [],
+    selectedItem: null,
+    selectedChoiceIds: [],
     // config: config,
     alert: null,
     alertType: null,
@@ -505,18 +457,6 @@ export default {
       )
     },
   },
-  watch: {
-    itemDialog(newVal) {
-      if (newVal) {
-        console.log('Watch New Val', newVal)
-        // if the dialog is opened
-        if (this.$refs.formItem) {
-          this.$refs.formItem.resetValidation()
-          this.$refs.formItem.reset()
-        }
-      }
-    },
-  },
   mounted() {
     this.loadPage = true
     this.cartItem = []
@@ -552,70 +492,45 @@ export default {
       this.previewDialog = false
       this.addToCart(item)
     },
-    resetForm() {
-      if (this.$refs.formItem) {
-        this.$refs.formItem.resetValidation()
-        this.$refs.formItem.reset()
-        this.itemDialog = false
-      }
+    closeCustomizationWizard() {
+      this.customizationDialog = false
+      this.selectedItem = null
+      this.selectedChoiceIds = []
     },
-    submitFormItem() {
-      const isValid = this.$refs.formItem.validate()
-      console.log('Is FOrm Item Valid', isValid)
-      if (isValid) {
-        this.itemDialog = false
-      }
+    confirmCustomization(customization) {
+      if (!this.selectedItem) return
 
-      const customizationList = [].concat(...this.currentItem)
-      const customizationPrice = customizationList.reduce((acc, item) => {
-        if (item && item.price) {
-          return this.roundPrice(acc + this.parsePrice(item.price))
-        }
-        return acc
-      }, 0)
-      console.log('CustimzationPrice', customizationPrice)
-      console.log('customisation List', customizationList)
-      const price = this.roundPrice(
-        this.parsePrice(this.selectedItem.price) + customizationPrice
-      )
-      const newData = {
-        id: this.selectedItem.id,
-        name: this.selectedItem.name,
-        categoryid: this.selectedItem.categoryid,
-        image: this.selectedItem.image,
-        stock: this.selectedItem.stock,
+      const price = this.roundPrice(customization.unitPrice)
+      const selections = (customization.selections || []).map((selection) => ({
+        ...selection,
+      }))
+      const line = {
+        ...this.selectedItem,
+        selectedChoiceIds: [...(customization.selectedChoiceIds || [])],
+        selections,
+        customizationList: selections.map((selection) => ({
+          ...selection,
+          name: selection.choice_name || selection.name,
+          price: selection.extra_price,
+        })),
         price,
-        subtotal: price,
         qty: 1,
-        customizationList,
+        subtotal: price,
       }
-      this.cartItem = [...this.cartItem, newData]
-
+      this.cartItem = mergeConfiguredCartLine(this.cartItem, line)
+      this.closeCustomizationWizard()
       this.totalPrice()
       this.indexCart()
     },
-
-    rulesCheckboxes(value, mandatory) {
-      // Check if the value length is 0 and the field is mandatory
-      if (mandatory && (!value || value.length === 0)) {
-        return 'Sélectionner au moins un choix'
+    customizationUnavailableReason(product) {
+      const reason = product && product.customization_unavailable_reason
+      if (typeof reason === 'string' && reason.trim()) return reason
+      if (reason && reason.code === 'INSUFFICIENT_AVAILABLE_CHOICES') {
+        return `Choix disponibles insuffisants (${Number(
+          reason.available_choice_count || 0
+        )}/${Number(reason.minimum_choices || 0)}).`
       }
-      return true
-    },
-    disableCustomizationValidation() {
-      let result = false
-      if (!this.selectedItem || !this.selectedItem.product_customization) {
-        return false
-      }
-      this.selectedItem.product_customization.forEach((item, index) => {
-        if (item.mandatory) {
-          const currentSelection = this.currentItem[index]
-          if (!currentSelection || currentSelection.length === 0) {
-            result = true
-          }
-        }
-      })
-      return result
+      return 'La personnalisation requise est indisponible.'
     },
     change() {
       this.dialog = this.stateDialog
@@ -659,46 +574,36 @@ export default {
         return
       }
 
-      if (params.stock < 1) {
+      if (params.customization_available === false) {
+        this.showAlert(this.customizationUnavailableReason(params), 'error')
+        return
+      }
+
+      if (Number(params.stock) < 1) {
         this.showAlert('Produit non disponible', 'error')
         return
       }
 
-      if (params.product_customization.length > 0) {
-        this.itemDialog = true
-        this.selectedItem = this.dataProduct.find((x) => x.id === params.id)
-        this.currentItem = this.selectedItem.product_customization.map(() => [])
-      } else {
-        const existingIndex = this.cartItem.findIndex(
-          (item) => item.id === params.id
-        )
-
-        if (existingIndex !== -1) {
-          // Si l’item est déjà dans le panier, on augmente juste la quantité
-          this.cartItem[existingIndex].qty += 1
-          this.cartItem[existingIndex].subtotal = this.roundPrice(
-            this.cartItem[existingIndex].qty *
-              this.parsePrice(this.cartItem[existingIndex].price)
-          )
-        } else {
-          // Sinon on l’ajoute
-          const newData = {
-            id: params.id,
-            name: params.name,
-            categoryid: params.categoryid,
-            image: params.image,
-            stock: params.stock,
-            price: this.roundPrice(params.price),
-            subtotal: this.roundPrice(params.price),
-            qty: 1,
-          }
-          this.cartItem = [...this.cartItem, newData]
-        }
-
-        this.idItem = params.id
-        this.totalPrice()
-        this.indexCart()
+      if ((params.customization_steps || []).length > 0) {
+        this.selectedItem =
+          this.dataProduct.find((product) => product.id === params.id) || params
+        this.selectedChoiceIds = []
+        this.customizationDialog = true
+        return
       }
+
+      const price = this.roundPrice(params.price)
+      this.cartItem = mergeConfiguredCartLine(this.cartItem, {
+        ...params,
+        selectedChoiceIds: [],
+        selections: [],
+        customizationList: [],
+        price,
+        subtotal: price,
+        qty: 1,
+      })
+      this.totalPrice()
+      this.indexCart()
     },
     minusBtn(params, index) {
       console.log('Index Minus Btn', this.cartItem, index, params)

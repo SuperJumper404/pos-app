@@ -1,5 +1,13 @@
 <template>
   <v-container>
+    <v-alert
+      v-if="checkoutErrorMessage"
+      type="error"
+      dismissible
+      @input="checkoutErrorMessage = ''"
+    >
+      {{ checkoutErrorMessage }}
+    </v-alert>
     <v-row class="mt-8">
       <v-col md="8" sm="12" cols="12">
         <v-card outlined height="100%" class="pa-2 overflow-y-auto">
@@ -11,8 +19,8 @@
           </v-card-text>
           <div v-else>
             <v-card
-              v-for="itm in dataCart"
-              :key="itm.id"
+              v-for="(itm, itemIndex) in dataCart"
+              :key="itm.configurationSignature || `${itm.id}-${itemIndex}`"
               outlined
               class="d-flex mb-2 flex-column"
               rounded="7"
@@ -57,6 +65,15 @@
                   cols="auto"
                 >
                   <v-btn
+                    icon
+                    small
+                    color="warning"
+                    aria-label="Retirer une unité"
+                    @click="changeQuantity(itemIndex, -1)"
+                  >
+                    <v-icon>mdi-minus</v-icon>
+                  </v-btn>
+                  <v-btn
                     class="cart-summary-qty mx-2"
                     style="font-size: x-large"
                     color="success"
@@ -66,18 +83,36 @@
                   >
                     {{ itm.qty }}
                   </v-btn>
+                  <v-btn
+                    icon
+                    small
+                    color="success"
+                    aria-label="Ajouter une unité"
+                    @click="changeQuantity(itemIndex, 1)"
+                  >
+                    <v-icon>mdi-plus</v-icon>
+                  </v-btn>
                 </v-col>
               </v-row>
 
-              <!-- Chips below -->
               <v-col class="cart-summary-customizations pt-2">
-                <v-chip
-                  v-for="(choice, index) in itm.customizationList"
-                  :key="index"
-                  class="mr-1 mt-1"
+                <CartCustomizationSummary
+                  v-if="(itm.customization_steps || []).length > 0"
+                  :selections="itm.selections || []"
+                  :unit-price="itm.price"
+                  @edit="editCartLine(itemIndex, $event)"
+                />
+                <v-btn
+                  v-if="(itm.customization_steps || []).length > 0"
+                  text
+                  small
+                  color="primary"
+                  class="text-none px-0"
+                  @click="editCartLine(itemIndex)"
                 >
-                  {{ choice.name }}
-                </v-chip>
+                  <v-icon small left>mdi-pencil</v-icon>
+                  Modifier
+                </v-btn>
               </v-col>
             </v-card>
           </div>
@@ -227,6 +262,43 @@
         </v-card>
       </v-col>
     </v-row>
+    <v-dialog v-model="customizationDialog" max-width="920" persistent>
+      <div v-if="editingProduct">
+        <v-alert
+          v-if="customizationRecoveryMessage"
+          type="warning"
+          tile
+          class="mb-0"
+        >
+          {{ customizationRecoveryMessage }}
+        </v-alert>
+        <ProductCustomizationWizard
+          v-model="editingSelectedChoiceIds"
+          :product="editingProduct"
+          :initial-step-id="recoveryStepId"
+          @confirm="confirmCartCustomization"
+          @cancel="closeCartCustomization"
+        />
+      </div>
+    </v-dialog>
+
+    <v-dialog v-model="repriceDialog" max-width="520" persistent>
+      <v-card>
+        <v-card-title>Le prix de la commande a changé</v-card-title>
+        <v-card-text>
+          Le nouveau total est de
+          <strong>{{ formatCurrency(total) }}</strong
+          >. Voulez-vous continuer ?
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text class="text-none" @click="cancelReprice"> Annuler </v-btn>
+          <v-btn color="primary" class="text-none" @click="confirmReprice">
+            Confirmer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <!-- {{ dataCart }}
     <pre>acces :{{ access }}</pre>
     <pre>current table : {{ selectedTable }}</pre> -->
@@ -237,7 +309,7 @@
       top
     >
       {{ kitchenClosedMessage }}
-      <template v-slot:action="{ attrs }">
+      <template #action="{ attrs }">
         <v-btn text v-bind="attrs" @click="kitchenClosedSnackbar = false">
           Fermer
         </v-btn>
@@ -248,7 +320,14 @@
 <script>
 import { loadStripe } from '@stripe/stripe-js'
 import Loading from '@/components/loading'
+import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
+import CartCustomizationSummary from '@/components/products/CartCustomizationSummary'
 import price from '@/helpers/price'
+import {
+  applyServerQuoteToCart,
+  findCartLineIndexForCheckoutError,
+  replaceConfiguredCartLine,
+} from '@/helpers/customizations'
 const {
   isCounterPaymentAllowed,
   isQrClientAccess,
@@ -260,6 +339,8 @@ const {
 export default {
   components: {
     Loading,
+    ProductCustomizationWizard,
+    CartCustomizationSummary,
   },
   mixins: [price],
   layout() {
@@ -283,6 +364,16 @@ export default {
     stripeCheckoutSignature: null,
     stripeAutoPrepareTimeout: null,
     selectedCheckoutFlow: null,
+    customizationDialog: false,
+    editingCartIndex: null,
+    editingProduct: null,
+    editingSelectedChoiceIds: [],
+    recoveryStepId: null,
+    customizationRecoveryMessage: '',
+    checkoutErrorMessage: '',
+    repriceDialog: false,
+    pendingRepriceFlow: null,
+    pendingRepricePaymentMethod: null,
     kitchenClosedSnackbar: false,
     kitchenClosedMessage:
       'La cuisine est fermée. Aucune nouvelle commande possible.',
@@ -408,6 +499,146 @@ export default {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
     },
+    syncCartState(cart) {
+      const nextCart = Array.isArray(cart) && cart.length > 0 ? cart : null
+      const total = this.roundPrice(
+        (nextCart || []).reduce(
+          (sum, line) => sum + this.parsePrice(line.subtotal),
+          0
+        )
+      )
+      const index = (nextCart || []).reduce(
+        (sum, line) => sum + Number(line.qty || 0),
+        0
+      )
+      this.total = total
+      this.$store.dispatch('cart/setTocart', nextCart)
+      this.$store.dispatch('cart/setTotal', total)
+      this.$store.dispatch('cart/setIndex', index)
+    },
+    changeQuantity(lineIndex, delta) {
+      const cart = Array.isArray(this.dataCart) ? this.dataCart : []
+      const line = cart[lineIndex]
+      if (!line) return
+
+      const qty = Number(line.qty || 0) + Number(delta || 0)
+      const nextCart = cart
+        .filter((_, index) => index !== lineIndex || qty > 0)
+        .map((cartLine, index) => {
+          if (index !== lineIndex || qty <= 0) return { ...cartLine }
+          const price = this.roundPrice(cartLine.price)
+          return {
+            ...cartLine,
+            price,
+            qty,
+            subtotal: this.roundPrice(price * qty),
+          }
+        })
+      this.resetCheckoutAttempt()
+      this.syncCartState(nextCart)
+    },
+    editCartLine(lineIndex, productStepId = null, message = '') {
+      const line = Array.isArray(this.dataCart)
+        ? this.dataCart[lineIndex]
+        : null
+      if (!line || !(line.customization_steps || []).length) return
+
+      this.editingCartIndex = lineIndex
+      this.editingProduct = { ...line }
+      this.editingSelectedChoiceIds = [...(line.selectedChoiceIds || [])]
+      this.recoveryStepId = productStepId
+      this.customizationRecoveryMessage = message
+      this.customizationDialog = true
+    },
+    closeCartCustomization() {
+      this.customizationDialog = false
+      this.editingCartIndex = null
+      this.editingProduct = null
+      this.editingSelectedChoiceIds = []
+      this.recoveryStepId = null
+      this.customizationRecoveryMessage = ''
+    },
+    confirmCartCustomization(customization) {
+      const cart = Array.isArray(this.dataCart) ? this.dataCart : []
+      const sourceLine = cart[this.editingCartIndex]
+      if (!sourceLine) return
+
+      const price = this.roundPrice(customization.unitPrice)
+      const selections = (customization.selections || []).map((selection) => ({
+        ...selection,
+      }))
+      const editedLine = {
+        ...sourceLine,
+        selectedChoiceIds: [...(customization.selectedChoiceIds || [])],
+        selections,
+        customizationList: selections.map((selection) => ({
+          ...selection,
+          name: selection.choice_name || selection.name,
+          price: selection.extra_price,
+        })),
+        price,
+        subtotal: this.roundPrice(price * Number(sourceLine.qty || 0)),
+      }
+      const nextCart = replaceConfiguredCartLine(
+        cart,
+        this.editingCartIndex,
+        editedLine
+      )
+      this.resetCheckoutAttempt()
+      this.syncCartState(nextCart)
+      this.closeCartCustomization()
+    },
+    resetCheckoutAttempt() {
+      if (this.stripeOrderId || this.stripePaymentReady) {
+        this.resetStripePaymentElement()
+      }
+      this.$store.dispatch('cart/abandonCheckout')
+    },
+    handleCheckoutError(error, flow, paymentMethod) {
+      if (!error) return
+      this.checkoutErrorMessage = error.message || 'Commande impossible.'
+
+      if (error.code === 'ORDER_REPRICE_REQUIRED' && error.server_quote) {
+        const repricedCart = applyServerQuoteToCart(
+          this.dataCart,
+          error.server_quote
+        )
+        this.syncCartState(repricedCart)
+        this.pendingRepriceFlow = flow
+        this.pendingRepricePaymentMethod = paymentMethod || null
+        this.repriceDialog = true
+        return
+      }
+
+      const lineIndex = findCartLineIndexForCheckoutError(this.dataCart, error)
+      if (lineIndex >= 0) {
+        this.editCartLine(
+          lineIndex,
+          error.product_step_id || null,
+          this.checkoutErrorMessage
+        )
+      }
+    },
+    async confirmReprice() {
+      const flow = this.pendingRepriceFlow
+      const paymentMethod = this.pendingRepricePaymentMethod
+      this.repriceDialog = false
+      this.pendingRepriceFlow = null
+      this.pendingRepricePaymentMethod = null
+      this.checkoutErrorMessage = ''
+
+      if (flow === 'stripe') {
+        await this.prepareStripePaymentElement(true)
+      } else if (flow === 'order') {
+        await this.submitOrderWithoutStripe(paymentMethod)
+      }
+    },
+    cancelReprice() {
+      this.repriceDialog = false
+      this.pendingRepriceFlow = null
+      this.pendingRepricePaymentMethod = null
+      this.$store.dispatch('cart/abandonCheckout')
+    },
     clearStripeAutoPrepareTimeout() {
       if (!this.stripeAutoPrepareTimeout) return
 
@@ -415,6 +646,7 @@ export default {
       this.stripeAutoPrepareTimeout = null
     },
     shouldPrepareStripeCheckout() {
+      if (this.repriceDialog || this.customizationDialog) return false
       return shouldAutoPrepareStripeCheckout({
         isQrClient: this.isQrClient,
         isStripeCheckout: this.isStripeCheckout,
@@ -454,6 +686,7 @@ export default {
         this.currentStripeCheckoutSignature !== this.stripeCheckoutSignature
       ) {
         this.resetStripePaymentElement()
+        this.$store.dispatch('cart/abandonCheckout')
       }
 
       this.scheduleStripeAutoPrepare()
@@ -503,67 +736,40 @@ export default {
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)
       this.$store.dispatch('cart/setTocart', null)
+      this.$store.dispatch('cart/completeCheckout')
       this.$router.push('/ordersStatuses')
     },
     async submitOrderWithoutStripe(paymentMethod) {
       this.loadingBtn = true
-      const params = {
-        customer: this.formuser.customer,
-        customerID: this.selectedTable,
-        subtotal: this.roundPrice(this.total),
-        payment: paymentMethod,
-        remark: this.formuser.notes,
-        phone: this.formuser.phone,
-        status: 1, // 1 pending & 2 approve
-        created: new Date(),
-      }
-      console.log('Parametre de la commande ', params)
-      const res = await this.$store.dispatch('cart/postOrder', params)
-      if (res) {
-        for (const e of this.dataCart) {
-          const detailData = {
-            orderid: this.insertId,
-            productid: e.id,
-            price: this.roundPrice(e.price),
-            qty: e.qty,
-            total: this.roundPrice(e.qty * this.parsePrice(e.price)),
-            remark: 'Transaction',
-            customizationList: e.customizationList,
-            operator: 2,
-          }
-          await this.$store.dispatch('cart/postDetailOrder', detailData)
-        }
+      const result = await this.$store.dispatch(
+        'cart/checkoutOrder',
+        this.buildOrderPayload(paymentMethod, false)
+      )
+      if (result.ok) {
         this.$store.set('stateDialog', false)
         this.$store.dispatch('cart/setTotal', 0)
         this.$store.dispatch('cart/setIndex', 0)
         this.$store.dispatch('cart/setTocart', null)
         this.$router.push(this.isQrClient ? '/ordersStatuses' : '/menus')
       } else {
-        // console.log(this.message)
+        this.handleCheckoutError(result.error, 'order', paymentMethod)
       }
       this.loadingBtn = false
     },
-    buildOrderPayload() {
+    buildOrderPayload(paymentMethod = 'Stripe', stripe = true) {
       return {
         customer: this.formuser.customer,
         customerID: this.selectedTable,
-        subtotal: this.roundPrice(this.total),
-        payment: 'Stripe',
+        total: this.roundPrice(this.total),
+        payment: paymentMethod,
         remark: this.formuser.notes,
         phone: this.formuser.phone,
-        status: 1,
-        created: new Date(),
-        items: this.dataCart.map((e) => ({
-          productid: e.id,
-          price: this.roundPrice(e.price),
-          qty: e.qty,
-          total: this.roundPrice(e.qty * this.parsePrice(e.price)),
-          customizationList: e.customizationList,
-        })),
+        dataCart: this.dataCart,
+        stripe,
       }
     },
-    async prepareStripePaymentElement() {
-      if (!this.shouldPrepareStripeCheckout()) return
+    async prepareStripePaymentElement(force = false) {
+      if (!force && !this.shouldPrepareStripeCheckout()) return
 
       this.clearStripeAutoPrepareTimeout()
       this.stripePreparing = true
@@ -572,10 +778,15 @@ export default {
       const checkoutSignature = this.currentStripeCheckoutSignature
 
       try {
-        const payment = await this.$store.dispatch(
-          'cart/createStripeQrTablePayment',
-          this.buildOrderPayload()
+        const checkoutResult = await this.$store.dispatch(
+          'cart/checkoutOrder',
+          this.buildOrderPayload('Stripe', true)
         )
+        if (!checkoutResult.ok) {
+          this.handleCheckoutError(checkoutResult.error, 'stripe', 'Stripe')
+          return
+        }
+        const payment = checkoutResult.data
 
         if (!payment || !payment.clientSecret || !payment.publishableKey) {
           return
@@ -583,6 +794,7 @@ export default {
 
         if (this.currentStripeCheckoutSignature !== checkoutSignature) {
           this.stripePreparing = false
+          this.$store.dispatch('cart/abandonCheckout')
           this.scheduleStripeAutoPrepare()
           return
         }
@@ -630,12 +842,15 @@ export default {
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)
       this.$store.dispatch('cart/setTocart', null)
+      this.$store.dispatch('cart/completeCheckout')
       this.$router.push('/ordersStatuses')
     },
     cancelCart() {
       this.$store.set('stateDialog', false)
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)
+      this.$store.dispatch('cart/setTocart', null)
+      this.$store.dispatch('cart/abandonCheckout')
       this.$router.push('/menus')
     },
   },
