@@ -41,6 +41,13 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-format-list-numbered',
+          title: 'Étapes produits',
+          routeName: 'customizations',
+          to: '/customizations',
+          isAdmin: true,
+        },
+        {
           icon: 'mdi-shape-plus',
           title: 'Modifier le produit',
           routeName: 'products-edit-id',

@@ -5,6 +5,7 @@ const {
   buildConfigurationSignature,
   mergeConfiguredCartLine,
   buildCheckoutItems,
+  createComponentInputId,
 } = require('../helpers/customizations')
 
 const step = {
@@ -95,6 +96,15 @@ assert.deepStrictEqual(buildCheckoutItems(mergedCart), [
     selected_product_step_choice_ids: [10, 30],
   },
 ])
+
+assert.strictEqual(
+  createComponentInputId('image-cropper', 12),
+  'image-cropper-12'
+)
+assert.notStrictEqual(
+  createComponentInputId('image-cropper', 12),
+  createComponentInputId('image-cropper', 13)
+)
 
 // eslint-disable-next-line no-console
 console.log('customization frontend tests passed')

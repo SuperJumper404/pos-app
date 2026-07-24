@@ -109,10 +109,13 @@ const buildCheckoutItems = (cart) =>
     selected_product_step_choice_ids: getSelectedChoiceIds(line),
   }))
 
+const createComponentInputId = (prefix, vueUid) => `${prefix}-${vueUid}`
+
 module.exports = {
   validateStep,
   calculatePreviewUnitPrice,
   buildConfigurationSignature,
   mergeConfiguredCartLine,
   buildCheckoutItems,
+  createComponentInputId,
 }
