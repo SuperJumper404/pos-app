@@ -413,6 +413,17 @@ export default {
     ProductCustomizationWizard,
   },
   mixins: [price],
+  beforeRouteLeave(to, from, next) {
+    if (
+      this.isOrderEditActive &&
+      this.orderEditDirty &&
+      !this.allowRouteLeave
+    ) {
+      next(window.confirm('Quitter sans enregistrer les modifications ?'))
+      return
+    }
+    next()
+  },
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
@@ -437,6 +448,7 @@ export default {
     cartItem: [],
     total: 0,
     idxCart: 0,
+    allowRouteLeave: false,
   }),
 
   computed: {
@@ -488,6 +500,9 @@ export default {
     },
     orderEditNumber() {
       return String(this.$store.get('orderEdit/orderNumber') || '')
+    },
+    orderEditDirty() {
+      return this.$store.get('orderEdit/dirty') === true
     },
   },
   async mounted() {
@@ -742,6 +757,7 @@ export default {
 
       if (this.hasUnsafeCheckoutAttempt) {
         this.restorePersistedCheckoutCart()
+        this.allowRouteLeave = true
         this.$router.push('/cart')
         return
       }
@@ -755,6 +771,7 @@ export default {
       }
 
       this.$store.dispatch('cart/setTocart', this.cartItem)
+      this.allowRouteLeave = true
       this.$router.push('/cart')
     },
     async btnCancel() {
@@ -764,6 +781,7 @@ export default {
         }
         const orderId = this.$store.get('orderEdit/orderId')
         await this.$store.dispatch('orderEdit/cancel')
+        this.allowRouteLeave = true
         this.$router.push(`/orders/detail/${orderId}`)
         return
       }

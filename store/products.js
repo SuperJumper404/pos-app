@@ -27,7 +27,10 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', error.response.data.data)
+        dispatch(
+          'set/message',
+          getErrorMessage(error, 'Impossible de charger les produits.')
+        )
         dispatch('set/dataProduct', [])
         return false
       })

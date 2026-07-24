@@ -87,11 +87,18 @@ export const actions = {
         `/baseurl/api/v1/orders/${orderId}/edit`,
         { headers: authHeaders() }
       )
-      if (
-        !Array.isArray(rootState.products.dataProduct) ||
-        rootState.products.dataProduct.length === 0
-      ) {
-        await dispatch('products/getProducts', null, { root: true })
+      let catalogLoaded = false
+      try {
+        catalogLoaded = await dispatch('products/getProducts', null, {
+          root: true,
+        })
+      } catch {
+        catalogLoaded = false
+      }
+      if (catalogLoaded !== true) {
+        throw new Error(
+          'Impossible de charger le catalogue actuel pour modifier la commande.'
+        )
       }
       const editable = response.data.data
       const cart = mapEditableOrderToCart(
