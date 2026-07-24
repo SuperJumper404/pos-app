@@ -262,19 +262,24 @@ Le frontend recharge les détails après ces conflits et n'essaie pas de fusionn
 Une commande `requires_payment` peut déjà posséder un PaymentIntent dont le montant correspond à l'ancien panier. L'orchestration est donc explicite :
 
 1. effectuer le devis sans écriture ;
-2. synchroniser l'état Stripe courant ;
-3. si Stripe indique un succès, enregistrer l'encaissement et refuser la modification ;
-4. sinon annuler l'ancien PaymentIntent ;
-5. si l'annulation est incertaine, refuser avant toute modification SQL ;
-6. une fois l'annulation confirmée, marquer l'ancien paiement comme annulé ;
-7. exécuter la transaction de contenu en faisant passer temporairement la commande à `payment_status = unpaid` et en supprimant la référence vers l'ancien PaymentIntent ;
-8. générer et attacher un nouveau PaymentIntent idempotent pour le nouveau montant ;
-9. remettre la commande à `payment_status = requires_payment` seulement après l'attachement réussi ;
-10. renvoyer le nouveau client secret et les informations QR publiques.
+2. ouvrir la transaction SQL et verrouiller la commande, son contenu, ses réservations et les produits nécessaires ;
+3. répéter sous verrou toutes les validations susceptibles de refuser l'écriture ;
+4. synchroniser l'état Stripe courant pendant que le verrou de commande empêche la préparation ou l'encaissement SQL de gagner la course ;
+5. si Stripe indique un succès, annuler la transaction, enregistrer l'encaissement puis refuser la modification ;
+6. sinon annuler l'ancien PaymentIntent ;
+7. si l'annulation est incertaine, annuler la transaction avant toute modification SQL ;
+8. une fois l'annulation confirmée, marquer l'ancien paiement comme annulé dans la transaction ;
+9. remplacer le contenu et faire passer temporairement la commande à `payment_status = unpaid` en supprimant la référence vers l'ancien PaymentIntent ;
+10. valider la transaction ;
+11. générer et attacher un nouveau PaymentIntent idempotent pour le nouveau montant ;
+12. remettre la commande à `payment_status = requires_payment` seulement après l'attachement réussi ;
+13. renvoyer le nouveau client secret et les informations QR publiques.
+
+L'appel Stripe est volontairement placé après les validations et verrous SQL mais avant les écritures finales. Il ne peut donc pas être suivi d'un refus métier normal. Si une panne SQL inattendue survient malgré tout après l'annulation externe, un chemin de récupération obligatoire synchronise l'ancien paiement comme annulé et permet de régénérer un paiement à partir du contenu resté en base ; l'interface ne réutilise jamais l'ancien QR.
 
 La clé d'idempotence du nouveau PaymentIntent inclut la boutique, la commande et la nouvelle révision. L'ancien QR devient invalide.
 
-Si l'étape 8 échoue après la validation SQL, la commande reste modifiée avec `payment_status = unpaid`, sans référence vers un PaymentIntent actif et avec ses réservations temporaires. L'interface distingue clairement « commande modifiée » de « paiement à régénérer ».
+Si l'étape 11 échoue après la validation SQL, la commande reste modifiée avec `payment_status = unpaid`, sans référence vers un PaymentIntent actif et avec ses réservations temporaires. L'interface distingue clairement « commande modifiée » de « paiement à régénérer ».
 
 `POST /api/v1/stripe/payment-intents/orders/:id/regenerate` fournit l'action idempotente **Régénérer le paiement**. Elle est authentifiée et limitée à la boutique, exige une commande toujours en attente, non payée et configurée pour Stripe, puis revérifie ou renouvelle les réservations avant de créer le PaymentIntent. Si les réservations ont expiré et que le stock n'est plus disponible, elle échoue sans créer de paiement et renvoie `INSUFFICIENT_STOCK`.
 
