@@ -19,7 +19,7 @@
             class="text-none"
             @click="openCustomizationSteps"
           >
-            <v-icon left>mdi-format-list-numbered</v-icon>
+            <v-icon left>mdi-tune-variant</v-icon>
             Gérer les étapes
           </v-btn>
           <v-btn
