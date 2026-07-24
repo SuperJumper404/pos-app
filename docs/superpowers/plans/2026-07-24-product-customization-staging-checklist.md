@@ -3,10 +3,10 @@
 Date de préparation : 24 juillet 2026
 Décision actuelle : **Blocked — ne pas déployer en staging partagé**
 
-Deux gates restent non satisfaits : le vérificateur de migration local bloque
-sur six groupes legacy orphelins et le lint global sort encore avec 23 erreurs.
-La matrice manuelle n'a pas été exécutée. Aucun résultat manuel n'est déduit
-des tests unitaires ou du build.
+Trois gates restent non satisfaits : le vérificateur de migration local bloque
+sur six groupes legacy orphelins, le lint global sort encore avec 23 erreurs
+sans dérogation signée, et la matrice manuelle n'a pas été exécutée. Aucun
+résultat manuel n'est déduit des tests unitaires ou du build.
 
 ## Statut des contrôles automatisés
 
@@ -68,13 +68,29 @@ déploiement.
 
 | Ordre | Étape | Gate attendu | Statut |
 | ---: | --- | --- | --- |
-| 1 | Sauvegarde MySQL + volume d'images | restauration testée | Not run |
-| 2 | Migration additive V2 | commande code 0 | Not run en staging |
-| 3 | Vérificateur V2 | tous les deltas/anomalies à 0 | Blocked localement |
-| 4 | Déploiement backend V2 | healthcheck et logs sains | Not run |
-| 5 | Smoke de l'ancien frontend | parcours legacy inchangés | Not run |
-| 6 | Déploiement frontend V2 | build artifact sous Node 18 | Not run |
-| 7 | Smoke V2 et observation | matrice ci-dessous validée | Not run |
+| 1 | Maintenance et drain de tous les writers sur chaque instance | aucune création/archivage de commande, checkout, écriture produit/personnalisation ou requête en cours | Not run |
+| 2 | Sauvegarde MySQL + volume d'images | restauration testée | Not run |
+| 3 | Migration additive V2, writers gelés | commande code 0 | Not run en staging |
+| 4 | Premier vérificateur V2, writers gelés | tous les deltas/anomalies à 0 | Blocked localement |
+| 5 | Déploiement backend V2 sur toutes les instances, writers gelés | nouvelle version partout | Not run |
+| 6 | Santé backend | healthcheck, images et logs sains | Not run |
+| 7 | Second vérificateur V2 après santé backend | code 0, données inchangées pendant la fenêtre | Not run |
+| 8 | Réouverture du trafic d'écriture | uniquement après étapes 4, 6 et 7 au vert | Not run |
+| 9 | Smoke de l'ancien frontend | parcours legacy inchangés | Not run |
+| 10 | Déploiement frontend V2 | build artifact sous Node 18 | Not run |
+| 11 | Smoke V2 et observation | matrice ci-dessous validée | Not run |
+
+Le gel commence avant la migration et reste actif jusqu'au second
+vérificateur. Il concerne toutes les instances, workers et routes directes qui
+créent ou archivent des commandes, exécutent un checkout legacy/V2 ou modifient
+un produit ou une personnalisation. Attendre la fin des requêtes et paiements
+en cours ; les webhooks Stripe ne doivent pas être perdus pendant le drain.
+
+Cette fenêtre est nécessaire parce que la migration ne rétroalimente que les
+commandes actives déjà présentes. Une commande legacy personnalisée créée
+après cette migration n'aurait pas de snapshot V2 ; son archivage par le
+backend V2 copierait uniquement les snapshots puis supprimerait les sélections
+legacy, rendant ses choix absents de l'archive.
 
 Commandes backend à exécuter dans l'environnement staging chargé :
 
@@ -83,6 +99,10 @@ node --version
 npm ci --include=dev
 npm test
 npm run db:up:staging
+# Premier vérificateur, writers toujours gelés
+ENV_FILE=.env.staging node scripts/verify-customization-v2.js
+# Déployer et contrôler toutes les instances backend, puis :
+# Second vérificateur avant toute réouverture
 ENV_FILE=.env.staging node scripts/verify-customization-v2.js
 ```
 
@@ -96,8 +116,9 @@ npm run build-local
 ```
 
 Ne pas passer à l'étape suivante si la commande précédente sort avec un code
-non nul. Le frontend V2 dépend du backend V2 et ne doit jamais être déployé en
-premier.
+non nul. Ne rouvrir le trafic d'écriture qu'après la santé de toutes les
+instances et le second vérificateur au vert. Le frontend V2 dépend du backend
+V2 et ne doit jamais être déployé en premier.
 
 ## Matrice d'acceptation manuelle
 
