@@ -209,6 +209,73 @@ assert.throws(
   /dupliqué/i
 )
 
+assert.throws(
+  () =>
+    serializeProductCustomizationConfig([
+      { ...serializedProductConfig[0], step_id: true },
+    ]),
+  /invalide/i
+)
+assert.throws(
+  () =>
+    serializeProductCustomizationConfig([
+      {
+        ...serializedProductConfig[0],
+        minimum_choices: false,
+      },
+    ]),
+  /invalide/i
+)
+assert.throws(
+  () =>
+    serializeProductCustomizationConfig([
+      {
+        ...serializedProductConfig[0],
+        maximum_choices: true,
+      },
+    ]),
+  /invalide/i
+)
+assert.throws(
+  () =>
+    serializeProductCustomizationConfig([
+      {
+        ...serializedProductConfig[0],
+        choices: [
+          { ...serializedProductConfig[0].choices[0], step_choice_id: true },
+        ],
+      },
+    ]),
+  /invalide/i
+)
+
+for (const invalidPrice of [
+  true,
+  '',
+  'prix',
+  'Infinity',
+  Infinity,
+  NaN,
+  [],
+  '0x10',
+]) {
+  assert.throws(
+    () =>
+      serializeProductCustomizationConfig([
+        {
+          ...serializedProductConfig[0],
+          choices: [
+            {
+              ...serializedProductConfig[0].choices[0],
+              extra_price: invalidPrice,
+            },
+          ],
+        },
+      ]),
+    /supplément.*invalide/i
+  )
+}
+
 const stepEditorSource = fs.readFileSync(
   path.join(__dirname, '../components/customizations/StepEditor.vue'),
   'utf8'
@@ -291,5 +358,154 @@ assert.ok(
   'canceling choice deactivation must explicitly clear its pending target'
 )
 
-// eslint-disable-next-line no-console
-console.log('customization frontend tests passed')
+const loadProductActions = () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../store/products.js'),
+    'utf8'
+  )
+  const executable = source
+    .replace(/^import .*$/m, '')
+    .replace(/export const /g, 'const ')
+    .concat('\nreturn actions')
+
+  // eslint-disable-next-line no-new-func
+  return new Function('EasyAccess', 'defaultMutations', executable)(
+    () => ({}),
+    () => ({})
+  )
+}
+
+const loadProductEditOptions = () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../pages/products/edit/_id/index.vue'),
+    'utf8'
+  )
+  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const executable = script
+    .replace(/^import .*$/gm, '')
+    .replace('export default', 'return')
+
+  // eslint-disable-next-line no-new-func
+  return new Function(
+    'Loading',
+    'ProductStepConfigurator',
+    'serializeProductCustomizationConfig',
+    'price',
+    executable
+  )({}, {}, serializeProductCustomizationConfig, {})
+}
+
+const runReviewRegressionTests = async () => {
+  const productActions = loadProductActions()
+  const originalLocalStorage = global.localStorage
+  global.localStorage = { getItem: () => 'test-token' }
+
+  try {
+    for (const scenario of [
+      {
+        action: 'postProducts',
+        method: 'post',
+        params: {},
+        fallback: 'Impossible de créer le produit.',
+      },
+      {
+        action: 'updateProduct',
+        method: 'patch',
+        params: { id: 1, data: {} },
+        fallback: 'Impossible de mettre à jour le produit.',
+      },
+      {
+        action: 'updateProductCustomizationConfig',
+        method: 'put',
+        params: { id: 1, data: [] },
+        fallback: 'Impossible de mettre à jour la configuration du produit.',
+      },
+    ]) {
+      const dispatched = []
+      const result = await productActions[scenario.action].call(
+        {
+          $axios: {
+            [scenario.method]: () => Promise.reject(new Error('network')),
+          },
+        },
+        {
+          dispatch(type, payload) {
+            dispatched.push([type, payload])
+          },
+        },
+        scenario.params
+      )
+
+      assert.strictEqual(result, false, `${scenario.action} must resolve false`)
+      assert.ok(
+        dispatched.some(
+          ([type, payload]) =>
+            type === 'set/message' && payload === scenario.fallback
+        ),
+        `${scenario.action} must expose a recoverable network error`
+      )
+    }
+  } finally {
+    global.localStorage = originalLocalStorage
+  }
+
+  const editOptions = loadProductEditOptions()
+  const dispatched = []
+  let navigationCount = 0
+  const viewModel = {
+    configurationValid: true,
+    configurationError: '',
+    customizationConfig: [],
+    loadingBtn: false,
+    stsMsg: false,
+    id: 5,
+    buildProductPayload: () => ({}),
+    $store: {
+      dispatch: (type, payload) => {
+        dispatched.push([type, payload])
+        if (type === 'products/updateProduct') return true
+        if (type === 'products/updateProductCustomizationConfig') return false
+        return true
+      },
+    },
+    $router: {
+      push: () => {
+        navigationCount += 1
+      },
+    },
+  }
+
+  await editOptions.methods.submitEditProduct.call(viewModel)
+
+  const partialSaveMessage =
+    'Le produit a été enregistré, mais sa configuration n’a pas pu être mise à jour.'
+  assert.strictEqual(viewModel.loadingBtn, false)
+  assert.strictEqual(viewModel.stsMsg, true)
+  assert.strictEqual(viewModel.configurationError, partialSaveMessage)
+  assert.strictEqual(navigationCount, 0)
+  assert.ok(
+    dispatched.some(
+      ([type, payload]) =>
+        type === 'products/set/message' && payload === partialSaveMessage
+    ),
+    'partial saves must replace the generic product message'
+  )
+  assert.ok(
+    dispatched.some(
+      ([type, payload]) =>
+        type === 'notifications/error' && payload === partialSaveMessage
+    ),
+    'partial saves must use the existing error notification path'
+  )
+}
+
+runReviewRegressionTests()
+  .then(() => {
+    // eslint-disable-next-line no-console
+    console.log('customization frontend tests passed')
+  })
+  .catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error(error)
+    process.exitCode = 1
+  })

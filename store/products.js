@@ -6,6 +6,14 @@ export const state = () => ({
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
+
+const getErrorMessage = (error, fallback) =>
+  (error &&
+    error.response &&
+    error.response.data &&
+    error.response.data.message) ||
+  fallback
+
 export const actions = {
   getProducts({ dispatch }) {
     return this.$axios
@@ -56,7 +64,10 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', error.response.data.message)
+        dispatch(
+          'set/message',
+          getErrorMessage(error, 'Impossible de créer le produit.')
+        )
         return false
       })
   },
@@ -78,7 +89,10 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', error.response.data.message)
+        dispatch(
+          'set/message',
+          getErrorMessage(error, 'Impossible de mettre à jour le produit.')
+        )
         return false
       })
   },
@@ -102,7 +116,13 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', error.response.data.message)
+        dispatch(
+          'set/message',
+          getErrorMessage(
+            error,
+            'Impossible de mettre à jour la configuration du produit.'
+          )
+        )
         return false
       })
   },

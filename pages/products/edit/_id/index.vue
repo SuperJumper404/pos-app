@@ -103,6 +103,9 @@ import ProductStepConfigurator from '@/components/customizations/ProductStepConf
 import { serializeProductCustomizationConfig } from '@/helpers/customizations'
 import price from '@/helpers/price'
 
+const PARTIAL_SAVE_MESSAGE =
+  'Le produit a été enregistré, mais sa configuration n’a pas pu être mise à jour.'
+
 export default {
   components: {
     Loading,
@@ -259,8 +262,16 @@ export default {
         { id: this.id, data: serializedConfig }
       )
       this.loadingBtn = false
-      this.stsMsg = !configurationSaved
-      if (configurationSaved) this.$router.push('/products')
+      if (!configurationSaved) {
+        this.configurationError = PARTIAL_SAVE_MESSAGE
+        this.stsMsg = true
+        this.$store.dispatch('products/set/message', PARTIAL_SAVE_MESSAGE)
+        this.$store.dispatch('notifications/error', PARTIAL_SAVE_MESSAGE)
+        return
+      }
+
+      this.stsMsg = false
+      this.$router.push('/products')
     },
   },
 }

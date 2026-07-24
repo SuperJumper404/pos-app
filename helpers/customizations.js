@@ -113,7 +113,14 @@ const createComponentInputId = (prefix, vueUid) => `${prefix}-${vueUid}`
 
 const normalizeActive = (value) => ![false, 0, '0', 'false'].includes(value)
 
+const isInvalidNumericInput = (value) =>
+  !['number', 'string'].includes(typeof value) ||
+  value === null ||
+  value === undefined ||
+  (typeof value === 'string' && value.trim() === '')
+
 const positiveInteger = (value, label) => {
+  if (isInvalidNumericInput(value)) throw new TypeError(`${label} invalide.`)
   const normalized = Number(value)
   if (!Number.isInteger(normalized) || normalized <= 0) {
     throw new TypeError(`${label} invalide.`)
@@ -122,11 +129,30 @@ const positiveInteger = (value, label) => {
 }
 
 const nonNegativeInteger = (value, label) => {
+  if (isInvalidNumericInput(value)) throw new TypeError(`${label} invalide.`)
   const normalized = Number(value)
   if (!Number.isInteger(normalized) || normalized < 0) {
     throw new TypeError(`${label} invalide.`)
   }
   return normalized
+}
+
+const decimalPrice = (value) => {
+  if (isInvalidNumericInput(value)) {
+    throw new TypeError('Le supplément est invalide.')
+  }
+  const rawValue = String(value).trim()
+  if (
+    typeof value === 'string' &&
+    !/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(rawValue)
+  ) {
+    throw new TypeError('Le supplément est invalide.')
+  }
+  const normalized = Number(rawValue.replace(',', '.'))
+  if (!Number.isFinite(normalized)) {
+    throw new TypeError('Le supplément est invalide.')
+  }
+  return roundPrice(normalized).toFixed(2)
 }
 
 const serializeProductCustomizationConfig = (config) => {
@@ -174,7 +200,7 @@ const serializeProductCustomizationConfig = (config) => {
         return {
           step_choice_id: choiceId,
           position: choiceIndex,
-          extra_price: roundPrice(choice.extra_price).toFixed(2),
+          extra_price: decimalPrice(choice.extra_price),
           active: normalizeActive(choice.active),
         }
       }),
