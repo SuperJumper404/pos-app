@@ -132,7 +132,12 @@ export const actions = {
 
   updateDirty({ dispatch, state, rootState }, cart) {
     const currentCart = cart || rootState.cart.dataCart || []
-    dispatch('set/dirty', isOrderEditDirty(state.originalCart, currentCart))
+    const dirty = isOrderEditDirty(state.originalCart, currentCart)
+    dispatch('set/dirty', dirty)
+    if (dirty) {
+      dispatch('set/paymentRefresh', null)
+      dispatch('set/payment', null)
+    }
   },
 
   async save({ dispatch, state, rootState }) {
@@ -176,6 +181,15 @@ export const actions = {
   },
 
   async retryPayment({ dispatch, state }, requestedOrderId) {
+    if (state.dirty) {
+      const error = {
+        code: 'ORDER_EDIT_UNSAVED_CHANGES',
+        message: 'Enregistrez les modifications avant de relancer le paiement.',
+      }
+      dispatch('set/message', error.message)
+      return { ok: false, data: null, error }
+    }
+
     const orderId = Number(requestedOrderId || state.orderId)
     dispatch('set/loading', true)
     try {

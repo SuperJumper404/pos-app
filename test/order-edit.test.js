@@ -518,6 +518,34 @@ const runCartEditContracts = async () => {
     )
     assert.strictEqual(refreshState.paymentRefresh, 'required')
 
+    refreshState.paymentRefresh = 'succeeded'
+    refreshState.payment = refreshPayment
+    orderEditStore.actions.updateDirty(
+      {
+        dispatch: refreshDispatch,
+        state: refreshState,
+        rootState: { cart: { dataCart: [{ ...cart[0], qty: 3 }] } },
+      },
+      [{ ...cart[0], qty: 3 }]
+    )
+    assert.strictEqual(refreshState.dirty, true)
+    assert.strictEqual(refreshState.paymentRefresh, null)
+    assert.strictEqual(refreshState.payment, null)
+
+    let dirtyRetryRequested = false
+    const dirtyRetryResult = await orderEditStore.actions.retryPayment.call(
+      {
+        $axios: {
+          post() {
+            dirtyRetryRequested = true
+          },
+        },
+      },
+      { dispatch: refreshDispatch, state: refreshState }
+    )
+    assert.strictEqual(dirtyRetryResult.ok, false)
+    assert.strictEqual(dirtyRetryRequested, false)
+
     const menusOptions = loadPageOptions(
       menusSource,
       [
@@ -609,6 +637,27 @@ const runCartEditContracts = async () => {
     const previousWindow = global.window
     global.window = { confirm: () => confirms }
     try {
+      const menuExitDecisions = []
+      const menuExitVm = {
+        isOrderEditActive: true,
+        orderEditDirty: true,
+        allowRouteLeave: false,
+        $store: menuVm.$store,
+      }
+      confirms = true
+      await menusOptions.beforeRouteLeave.call(
+        menuExitVm,
+        {},
+        {},
+        (decision) => menuExitDecisions.push(decision)
+      )
+      assert.ok(
+        menuDispatches.some(([type]) => type === 'orderEdit/cancel'),
+        'leaving menus after confirmation must clear the edit session'
+      )
+      assert.deepStrictEqual(menuExitDecisions, [undefined])
+
+      confirms = false
       const emptyCartVm = {
         isOrderEditActive: true,
         orderEditId: 42,
@@ -658,6 +707,59 @@ const runCartEditContracts = async () => {
         ['orderEdit/retryPayment'],
         ['mount', 'pi_new'],
       ])
+
+      const dirtyRetryCalls = []
+      await cartOptions.methods.retryEditedPayment.call({
+        ...retryVm,
+        orderEditDirty: true,
+        $store: {
+          dispatch(type) {
+            dirtyRetryCalls.push(type)
+          },
+        },
+      })
+      assert.deepStrictEqual(dirtyRetryCalls, [])
+
+      const dirtyConfirmationVm = {
+        isOrderEditActive: true,
+        orderEditDirty: true,
+        stripePaymentReady: true,
+        stripeOrderId: 42,
+        orderEditId: 42,
+        checkoutErrorMessage: '',
+      }
+      assert.strictEqual(
+        cartOptions.methods.guardCheckoutConfirmation.call(
+          dirtyConfirmationVm
+        ),
+        false
+      )
+      assert.ok(dirtyConfirmationVm.checkoutErrorMessage.includes('Enregistrez'))
+
+      const cartExitDispatches = []
+      const cartExitDecisions = []
+      await cartOptions.beforeRouteLeave.call(
+        {
+          isOrderEditActive: true,
+          orderEditDirty: true,
+          orderEditPaymentRefresh: null,
+          allowRouteLeave: false,
+          checkoutFinalized: false,
+          resetStripePaymentElement() {},
+          $store: {
+            get: () => false,
+            dispatch(type) {
+              cartExitDispatches.push(type)
+              return Promise.resolve()
+            },
+          },
+        },
+        {},
+        {},
+        (decision) => cartExitDecisions.push(decision)
+      )
+      assert.deepStrictEqual(cartExitDispatches, ['orderEdit/cancel'])
+      assert.deepStrictEqual(cartExitDecisions, [undefined])
     } finally {
       global.window = previousWindow
     }

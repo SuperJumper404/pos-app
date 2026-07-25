@@ -403,7 +403,13 @@ export default {
       (this.orderEditDirty || this.orderEditPaymentRefresh) &&
       !this.allowRouteLeave
     ) {
-      next(window.confirm('Quitter sans terminer la modification ?'))
+      if (!window.confirm('Quitter sans terminer la modification ?')) {
+        next(false)
+        return
+      }
+      this.resetStripePaymentElement()
+      await this.$store.dispatch('orderEdit/cancel')
+      next()
       return
     }
 
@@ -547,7 +553,9 @@ export default {
     },
     stripeConfirmationDisabled() {
       if (this.isOrderEditActive) {
-        return this.loadingBtn || !this.stripePaymentReady
+        return (
+          this.loadingBtn || this.orderEditDirty || !this.stripePaymentReady
+        )
       }
       return (
         !this.isValue ||
@@ -899,6 +907,11 @@ export default {
     },
     guardCheckoutConfirmation() {
       if (this.isOrderEditActive) {
+        if (this.orderEditDirty) {
+          this.checkoutErrorMessage =
+            'Enregistrez les modifications avant de confirmer le paiement.'
+          return false
+        }
         return (
           this.stripePaymentReady &&
           Number(this.stripeOrderId) === Number(this.orderEditId)
@@ -1138,6 +1151,11 @@ export default {
       this.$router.push(`/orders/detail/${orderId}`)
     },
     async retryEditedPayment() {
+      if (this.orderEditDirty) {
+        this.checkoutErrorMessage =
+          'Enregistrez les modifications avant de relancer le paiement.'
+        return
+      }
       this.loadingBtn = true
       this.checkoutErrorMessage = ''
       let result

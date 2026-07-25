@@ -431,13 +431,18 @@ export default {
     ProductCustomizationWizard,
   },
   mixins: [price],
-  beforeRouteLeave(to, from, next) {
+  async beforeRouteLeave(to, from, next) {
     if (
       this.isOrderEditActive &&
       this.orderEditDirty &&
       !this.allowRouteLeave
     ) {
-      next(window.confirm('Quitter sans enregistrer les modifications ?'))
+      if (!window.confirm('Quitter sans enregistrer les modifications ?')) {
+        next(false)
+        return
+      }
+      await this.$store.dispatch('orderEdit/cancel')
+      next()
       return
     }
     next()
