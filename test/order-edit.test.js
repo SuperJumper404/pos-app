@@ -673,6 +673,42 @@ const runCartEditContracts = async () => {
         () => false,
       ]
     )
+    assert.ok(
+      cartOptions.props && cartOptions.props.embeddedOrderEdit,
+      'cart must declare its embedded order-edit mode'
+    )
+    const embeddedCartEvents = []
+    const embeddedCartRoutes = []
+    const embeddedCartVm = {
+      embeddedOrderEdit: true,
+      isOrderEditActive: true,
+      $emit: (...args) => embeddedCartEvents.push(args),
+      $router: { push: (path) => embeddedCartRoutes.push(path) },
+    }
+    cartOptions.methods.showOrderEditMenu.call(embeddedCartVm)
+    cartOptions.methods.finishOrderEdit.call(embeddedCartVm, 42)
+    assert.deepStrictEqual(embeddedCartEvents, [
+      ['show-menu'],
+      ['edit-complete', 42],
+    ])
+    assert.deepStrictEqual(embeddedCartRoutes, [])
+
+    const standaloneCartRoutes = []
+    const standaloneCartVm = {
+      embeddedOrderEdit: false,
+      isOrderEditActive: true,
+      $emit() {},
+      $router: { push: (path) => standaloneCartRoutes.push(path) },
+    }
+    cartOptions.methods.showOrderEditMenu.call(standaloneCartVm)
+    cartOptions.methods.finishOrderEdit.call(standaloneCartVm, 42)
+    assert.deepStrictEqual(standaloneCartRoutes, [
+      '/menus',
+      '/orders/detail/42',
+    ])
+    assert.ok(modalSource.includes('@show-menu="step = \'menu\'"'))
+    assert.ok(modalSource.includes('@request-close="requestClose"'))
+    assert.ok(modalSource.includes('@edit-complete="completeEdit"'))
     const pageDispatches = []
     const pageRoutes = []
     let confirms = false
@@ -701,6 +737,7 @@ const runCartEditContracts = async () => {
 
       confirms = false
       const emptyCartVm = {
+        embeddedOrderEdit: false,
         isOrderEditActive: true,
         orderEditId: 42,
         dataCart: null,
@@ -721,6 +758,9 @@ const runCartEditContracts = async () => {
           },
         },
         $router: { push: (path) => pageRoutes.push(path) },
+        finishOrderEdit(orderId) {
+          return cartOptions.methods.finishOrderEdit.call(this, orderId)
+        },
       }
       await cartOptions.methods.saveOrderEdit.call(emptyCartVm)
       assert.ok(!pageDispatches.some(([type]) => type === 'orderEdit/save'))

@@ -160,7 +160,7 @@
               width="100%"
               dark
               class="text-none"
-              @click="$router.push('/menus')"
+              @click="showOrderEditMenu"
               >Retourner au menu
               <v-icon small right>mdi-arrow-left</v-icon></v-btn
             >
@@ -284,6 +284,17 @@
               }"
             >
               <v-btn
+                v-if="embeddedOrderEdit && isOrderEditActive"
+                type="button"
+                color="primary"
+                class="cart-checkout-btn text-none"
+                @click="showOrderEditMenu"
+              >
+                Retour au menu
+                <v-icon small right>mdi-arrow-left</v-icon>
+              </v-btn>
+
+              <v-btn
                 v-if="showFooterCheckoutButton"
                 :disabled="primaryActionDisabled"
                 :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
@@ -384,6 +395,12 @@ const {
 } = require('@/helpers/checkoutAccess')
 const { shouldAutoPrepareStripeCheckout } = require('@/helpers/stripeCheckout')
 export default {
+  props: {
+    embeddedOrderEdit: {
+      type: Boolean,
+      default: false,
+    },
+  },
   components: {
     Loading,
     OrderEditBanner,
@@ -1056,6 +1073,20 @@ export default {
       }
       await this.paymentBtn()
     },
+    showOrderEditMenu() {
+      if (this.embeddedOrderEdit && this.isOrderEditActive) {
+        this.$emit('show-menu')
+        return
+      }
+      this.$router.push('/menus')
+    },
+    finishOrderEdit(orderId) {
+      if (this.embeddedOrderEdit) {
+        this.$emit('edit-complete', orderId)
+        return
+      }
+      this.$router.push(`/orders/detail/${orderId}`)
+    },
     async saveOrderEdit() {
       const orderId = this.orderEditId
       if (
@@ -1106,7 +1137,7 @@ export default {
           )
           this.allowRouteLeave = true
           await this.$store.dispatch('orderEdit/cancel')
-          this.$router.push(`/orders/detail/${orderId}`)
+          this.finishOrderEdit(orderId)
           return
         }
 
@@ -1148,7 +1179,7 @@ export default {
           ? 'Commande annulée avec succès.'
           : 'Commande modifiée avec succès.'
       )
-      this.$router.push(`/orders/detail/${orderId}`)
+      this.finishOrderEdit(orderId)
     },
     async retryEditedPayment() {
       if (this.orderEditDirty) {
@@ -1420,7 +1451,7 @@ export default {
         this.checkoutFinalized = true
         this.allowRouteLeave = true
         await this.$store.dispatch('orderEdit/complete')
-        this.$router.push(`/orders/detail/${orderId}`)
+        this.finishOrderEdit(orderId)
         return
       }
       this.checkoutFinalized = true
@@ -1433,6 +1464,10 @@ export default {
     },
     async cancelCart() {
       if (this.isOrderEditActive) {
+        if (this.embeddedOrderEdit) {
+          this.$emit('request-close')
+          return
+        }
         if (!window.confirm('Annuler les modifications de cette commande ?')) {
           return
         }
@@ -1440,7 +1475,7 @@ export default {
         this.allowRouteLeave = true
         this.resetStripePaymentElement()
         await this.$store.dispatch('orderEdit/cancel')
-        this.$router.push(`/orders/detail/${orderId}`)
+        this.finishOrderEdit(orderId)
         return
       }
       if (!(await this.resetCheckoutAttempt())) return
