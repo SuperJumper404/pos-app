@@ -18,7 +18,10 @@
         lg="3"
       >
         <v-card outlined class="pa-4 border-radius-10">
-          <v-card-title> Commande #{{ item.ordernumber }} </v-card-title>
+          <v-card-title>
+            Commande #{{ item.ordernumber }}
+            <TakeawayChip :value="item.is_takeaway" class="ml-2" />
+          </v-card-title>
 
           <v-card-subtitle class="pt-0">
             <div class="mb-2 primary--text">
@@ -175,6 +178,7 @@
   </v-container>
 </template>
 <script>
+import TakeawayChip from '@/components/orders/TakeawayChip'
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import moment from 'moment'
@@ -184,6 +188,7 @@ const {
 } = require('@/helpers/paymentStatus')
 
 export default {
+  components: { TakeawayChip },
   mixins: [formatdate, price],
   layout() {
     return parseInt(localStorage.getItem('access')) === 0

@@ -20,6 +20,9 @@
           {{ paymentStatusText(orderPaymentStatus) }}
         </v-chip>
       </v-card-text>
+      <v-card-text v-if="orderSummary" class="pt-2 pb-0">
+        <TakeawayChip :value="orderSummary.is_takeaway" />
+      </v-card-text>
 
       <div class="order-detail-list">
         <v-card
@@ -174,6 +177,7 @@
 
 <script>
 import OrderEditModal from '@/components/orders/OrderEditModal'
+import TakeawayChip from '@/components/orders/TakeawayChip'
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
 const {
@@ -189,6 +193,7 @@ const {
 export default {
   components: {
     OrderEditModal,
+    TakeawayChip,
   },
   mixins: [price],
   layout() {

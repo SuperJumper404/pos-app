@@ -76,6 +76,7 @@
         <template #[`item.ordernumber`]="{ item }">
           <div class="order-reference">
             <div class="order-reference__number">#{{ item.ordernumber }}</div>
+            <TakeawayChip :value="item.is_takeaway" />
             <div class="order-reference__date">
               {{ orderHour(item.created) }} • {{ orderDayMonth(item.created) }}
             </div>
@@ -168,6 +169,7 @@
   </v-container>
 </template>
 <script>
+import TakeawayChip from '@/components/orders/TakeawayChip'
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
@@ -176,6 +178,7 @@ const {
   getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
 export default {
+  components: { TakeawayChip },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {

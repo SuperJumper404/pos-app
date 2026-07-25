@@ -297,13 +297,15 @@
               class="cart-checkout-actions"
               :class="{
                 'cart-checkout-actions--single': !showFooterCheckoutButton,
+                'cart-checkout-actions--embedded':
+                  embeddedOrderEdit && isOrderEditActive,
               }"
             >
               <v-btn
                 v-if="embeddedOrderEdit && isOrderEditActive"
                 type="button"
                 color="primary"
-                class="cart-checkout-btn text-none"
+                class="cart-checkout-btn cart-checkout-btn--menu text-none"
                 @click="showOrderEditMenu"
               >
                 Retour au menu
@@ -1577,6 +1579,31 @@ export default {
   flex: 1 1 100%;
 }
 
+.cart-checkout-actions--embedded {
+  display: grid;
+  gap: 12px;
+  grid-template-areas: 'save save' 'menu cancel';
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.cart-checkout-actions--embedded .cart-checkout-btn {
+  margin: 0 !important;
+  max-width: none;
+  width: 100%;
+}
+
+.cart-checkout-actions--embedded .cart-checkout-btn--menu {
+  grid-area: menu;
+}
+
+.cart-checkout-actions--embedded .cart-checkout-btn--submit {
+  grid-area: save;
+}
+
+.cart-checkout-actions--embedded .cart-checkout-btn--cancel {
+  grid-area: cancel;
+}
+
 .cart-checkout-btn ::v-deep .v-btn__content {
   min-width: 0;
   white-space: nowrap;
@@ -1614,6 +1641,13 @@ export default {
     font-size: 0.78rem !important;
     padding-left: 8px !important;
     padding-right: 8px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .cart-checkout-actions--embedded {
+    grid-template-areas: 'save' 'menu' 'cancel';
+    grid-template-columns: 1fr;
   }
 }
 

@@ -63,6 +63,10 @@
         single-expand
         :disable-sort="$vuetify.breakpoint.smAndDown"
       >
+        <template #[`item.ordernumber`]="{ item }">
+          <div>#{{ item.ordernumber }}</div>
+          <TakeawayChip :value="item.is_takeaway" />
+        </template>
         <template #expanded-item="{ item }">
           <td colspan="12">
             <v-card
@@ -231,6 +235,7 @@
   </v-container>
 </template>
 <script>
+import TakeawayChip from '@/components/orders/TakeawayChip'
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
@@ -240,6 +245,7 @@ const {
   getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
 export default {
+  components: { TakeawayChip },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {

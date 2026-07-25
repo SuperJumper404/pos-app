@@ -189,6 +189,14 @@ assert.ok(modalSource.includes("orderEdit/cancel"))
 assert.ok(detailSource.includes('<OrderEditModal'))
 assert.ok(detailSource.includes('canOpenOrderEditModal'))
 assert.ok(detailSource.includes('this.orderEditDialog = true'))
+const takeawayChipPath = '../components/orders/TakeawayChip.vue'
+assert.doesNotThrow(() => require.resolve(takeawayChipPath))
+const takeawayChipSource = fs.readFileSync(
+  require.resolve(takeawayChipPath),
+  'utf8'
+)
+assert.ok(takeawayChipSource.includes('À emporter'))
+assert.ok(detailSource.includes('<TakeawayChip'))
 assert.ok(
   detailSource.includes('Modifier la commande'),
   'an unpaid editable order must expose the edit action'
@@ -326,6 +334,8 @@ assert.ok(
 
 const menusSource = fs.readFileSync(require.resolve('../pages/menus.vue'), 'utf8')
 const cartSource = fs.readFileSync(require.resolve('../pages/cart.vue'), 'utf8')
+assert.ok(cartSource.includes('cart-checkout-actions--embedded'))
+assert.ok(cartSource.includes("grid-template-areas: 'save save' 'menu cancel'"))
 const bannerPath = '../components/orders/OrderEditBanner.vue'
 
 assert.ok(
