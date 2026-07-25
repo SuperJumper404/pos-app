@@ -2,6 +2,13 @@ const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
 
+function loadVueComponentOptions(source) {
+  const script = source.match(/<script>([\s\S]*?)<\/script>/)
+  assert.ok(script, 'component script must exist')
+  // eslint-disable-next-line no-new-func
+  return new Function(script[1].replace('export default', 'return'))()
+}
+
 const {
   canEditOrder,
   canStartComplementaryOrder,
@@ -197,7 +204,47 @@ const takeawayChipSource = fs.readFileSync(
   'utf8'
 )
 assert.ok(takeawayChipSource.includes('À emporter'))
+const takeawayChipOptions = loadVueComponentOptions(takeawayChipSource)
+assert.ok(
+  takeawayChipOptions.props.showDineIn,
+  'the chip must expose an opt-in dine-in mode'
+)
+assert.strictEqual(takeawayChipOptions.props.showDineIn.default, false)
+assert.strictEqual(
+  takeawayChipOptions.computed.visible.call({
+    isTakeaway: false,
+    showDineIn: false,
+  }),
+  false
+)
+assert.strictEqual(
+  takeawayChipOptions.computed.visible.call({
+    isTakeaway: false,
+    showDineIn: true,
+  }),
+  true
+)
+assert.strictEqual(
+  takeawayChipOptions.computed.label.call({ isTakeaway: false }),
+  'Sur place'
+)
 assert.ok(detailSource.includes('<TakeawayChip'))
+for (const headerContract of [
+  'order-detail-header',
+  'orderSummary.ordernumber',
+  'orderSummary.customer',
+  'show-dine-in',
+  'order-detail-header__payment',
+]) {
+  assert.ok(
+    detailSource.includes(headerContract),
+    `order detail header missing: ${headerContract}`
+  )
+}
+assert.ok(
+  !detailSource.includes('order-detail-meta'),
+  'order and customer metadata must not be repeated on every product line'
+)
 assert.ok(
   detailSource.includes('Modifier la commande'),
   'an unpaid editable order must expose the edit action'

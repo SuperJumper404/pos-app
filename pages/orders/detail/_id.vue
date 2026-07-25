@@ -14,15 +14,39 @@
     </v-alert>
 
     <v-card v-else outlined class="mt-5 order-detail-panel">
-      <v-card-text v-if="orderPaymentStatus" class="pb-0">
-        Statut paiement :
-        <v-chip small dark :color="paymentStatusColor(orderPaymentStatus)">
-          {{ paymentStatusText(orderPaymentStatus) }}
-        </v-chip>
+      <v-card-text v-if="orderSummary" class="order-detail-header">
+        <div class="order-detail-header__identity">
+          <div class="order-detail-header__field">
+            <span class="order-detail-header__label">Commande</span>
+            <strong>#{{ orderSummary.ordernumber || '—' }}</strong>
+          </div>
+          <div class="order-detail-header__field">
+            <span class="order-detail-header__label">Client</span>
+            <strong>{{ orderSummary.customer || '—' }}</strong>
+          </div>
+        </div>
+
+        <div class="order-detail-header__chips">
+          <div
+            v-if="orderPaymentStatus"
+            class="order-detail-header__payment"
+          >
+            <span class="order-detail-header__label">Paiement</span>
+            <v-chip
+              small
+              dark
+              :color="paymentStatusColor(orderPaymentStatus)"
+            >
+              {{ paymentStatusText(orderPaymentStatus) }}
+            </v-chip>
+          </div>
+          <TakeawayChip
+            :value="orderSummary.is_takeaway"
+            show-dine-in
+          />
+        </div>
       </v-card-text>
-      <v-card-text v-if="orderSummary" class="pt-2 pb-0">
-        <TakeawayChip :value="orderSummary.is_takeaway" />
-      </v-card-text>
+      <v-divider v-if="orderSummary"></v-divider>
 
       <div class="order-detail-list">
         <v-card
@@ -60,22 +84,6 @@
                   class="order-detail-customizations"
                 />
 
-                <div class="order-detail-meta">
-                  <div class="order-detail-meta-block">
-                    <span class="order-detail-meta-label">
-                      Numéro de commande
-                    </span>
-                    <strong class="order-detail-meta-value">
-                      #{{ itm.ordernumber }}
-                    </strong>
-                  </div>
-                  <div class="order-detail-meta-block">
-                    <span class="order-detail-meta-label">Client</span>
-                    <strong class="order-detail-meta-value">
-                      {{ itm.customer }}
-                    </strong>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -431,6 +439,49 @@ export default {
   overflow-y: auto;
 }
 
+.order-detail-header {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+
+.order-detail-header__identity {
+  display: grid;
+  gap: 12px 28px;
+  grid-template-columns: repeat(2, minmax(120px, auto));
+  min-width: 0;
+}
+
+.order-detail-header__field,
+.order-detail-header__payment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-detail-header__field strong {
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-detail-header__label {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.order-detail-header__chips {
+  align-items: flex-end;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+}
+
 .order-detail-list {
   padding: 8px 16px 16px;
 }
@@ -465,10 +516,7 @@ export default {
 
 .order-detail-main {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1.5fr) minmax(
-      180px,
-      1fr
-    );
+  grid-template-columns: minmax(140px, 0.75fr) minmax(240px, 2fr);
   align-items: center;
   gap: 16px;
   min-width: 0;
@@ -479,14 +527,12 @@ export default {
 }
 
 .order-detail-product,
-.order-detail-customizations,
-.order-detail-meta {
+.order-detail-customizations {
   min-width: 0;
 }
 
 .order-detail-product-name,
-.order-detail-product-price,
-.order-detail-meta-value {
+.order-detail-product-price {
   color: rgba(0, 0, 0, 0.8);
   font-weight: bold;
 }
@@ -512,33 +558,6 @@ export default {
 
 .order-detail-customizations {
   min-width: 0;
-}
-
-.order-detail-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.order-detail-meta-block {
-  min-width: 0;
-  text-align: center;
-}
-
-.order-detail-meta-label {
-  color: rgba(0, 0, 0, 0.65);
-  display: block;
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.order-detail-meta-value {
-  display: block;
-  font-size: 17px;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .order-detail-qty {
@@ -578,12 +597,26 @@ export default {
     gap: 8px;
   }
 
-  .order-detail-meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 600px) {
+  .order-detail-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .order-detail-header__identity {
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .order-detail-header__chips {
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+
   .order-detail-list {
     padding: 8px;
   }
@@ -599,7 +632,6 @@ export default {
     gap: 6px 12px;
     grid-template-areas:
       'image product qty'
-      'order order client'
       'custom custom custom';
     grid-template-columns: 92px minmax(0, 1fr) 38px;
   }
@@ -645,33 +677,14 @@ export default {
     font-size: 16px;
   }
 
-  .order-detail-product-price,
-  .order-detail-meta-value {
+  .order-detail-product-price {
     font-size: 15px;
-  }
-
-  .order-detail-meta {
-    display: contents;
-  }
-
-  .order-detail-meta-block:first-child {
-    grid-area: order;
-    text-align: left;
-  }
-
-  .order-detail-meta-block:last-child {
-    align-self: end;
-    grid-area: client;
-    text-align: right;
   }
 
   .order-detail-customizations {
     grid-area: custom;
   }
 
-  .order-detail-meta-label {
-    font-size: 11px;
-  }
 }
 
 @media (max-width: 380px) {
