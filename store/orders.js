@@ -4,6 +4,7 @@ export const state = () => ({
   dataOrdersByUserId: [],
   message: '',
   detailOrder: [],
+  detailOrderRequestId: 0,
   AllDetailOrders: [],
   lastCreatedOrder: null,
   complementaryOrder: null,
@@ -53,7 +54,10 @@ export const actions = {
         return false
       })
   },
-  getDetailOrder({ dispatch }, params) {
+  getDetailOrder({ dispatch, state }, params) {
+    const requestId = Number(state.detailOrderRequestId || 0) + 1
+    dispatch('set/detailOrderRequestId', requestId)
+    dispatch('set/detailOrder', [])
     return this.$axios
       .get(`/baseurl/api/v1/detailorder/${params}`, {
         headers: {
@@ -61,10 +65,12 @@ export const actions = {
         },
       })
       .then((response) => {
+        if (state.detailOrderRequestId !== requestId) return false
         dispatch('set/detailOrder', response.data.data)
         return true
       })
       .catch((error) => {
+        if (state.detailOrderRequestId !== requestId) return false
         const message =
           error.response?.data?.message ||
           error.message ||

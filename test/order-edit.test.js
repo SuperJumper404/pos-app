@@ -177,11 +177,11 @@ assert.ok(
   'a paid Stripe order must expose the complementary-order action'
 )
 assert.ok(
-  detailSource.includes('v-if="canEditOrder"'),
+  detailSource.includes('v-if="canEditOrder && !loadPage"'),
   'the edit action must keep the helper eligibility guard'
 )
 assert.ok(
-  detailSource.includes('v-if="canStartComplementaryOrder"'),
+  detailSource.includes('v-if="canStartComplementaryOrder && !loadPage"'),
   'the complementary action must keep the Stripe paid eligibility guard'
 )
 assert.ok(
@@ -229,6 +229,43 @@ assert.ok(
 assert.ok(
   ordersSource.includes("dispatch('set/detailOrder', [])"),
   'loading order details must expose a stable error message'
+)
+assert.ok(
+  ordersSource.includes('detailOrderRequestId: 0'),
+  'detail requests must have a monotonically increasing guard'
+)
+assert.ok(
+  ordersSource.indexOf("dispatch('set/detailOrder', [])") <
+    ordersSource.indexOf('.get(`/baseurl/api/v1/detailorder/${params}`'),
+  'starting a detail request must clear the singleton before the request'
+)
+assert.ok(
+  detailSource.includes('detailLoadError'),
+  'a failed detail load must leave an actionable error state'
+)
+assert.ok(
+  detailSource.includes('async loadOrderDetail('),
+  'detail loading must be shared by initial and route-change navigation'
+)
+assert.ok(
+  detailSource.includes("'$route.params.id'"),
+  'changing the detail route must reload the requested order'
+)
+assert.ok(
+  detailSource.includes('loadedOrderId'),
+  'order actions must only read a detail matching the current route'
+)
+assert.ok(
+  detailSource.includes('finally'),
+  'the loading state must be cleared after successful and failed requests'
+)
+assert.ok(
+  detailSource.includes('v-if="canEditOrder && !loadPage"'),
+  'the edit action must be hidden while another detail is loading'
+)
+assert.ok(
+  detailSource.includes('v-if="canStartComplementaryOrder && !loadPage"'),
+  'the complementary action must be hidden while another detail is loading'
 )
 
 console.log('order edit tests passed')

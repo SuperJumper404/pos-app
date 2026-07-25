@@ -9,6 +9,10 @@
       <Loading />
     </v-card>
 
+    <v-alert v-else-if="detailLoadError" class="mt-5" outlined text type="error">
+      {{ detailLoadError }}
+    </v-alert>
+
     <v-card v-else outlined class="mt-5 order-detail-panel">
       <v-card-text v-if="orderPaymentStatus" class="pb-0">
         Statut paiement :
@@ -115,7 +119,7 @@
     <v-card color="grey lighten-3" class="mt-5">
       <v-card-actions>
         <v-btn
-          v-if="canEditOrder"
+          v-if="canEditOrder && !loadPage"
           color="success"
           class="text-none"
           :loading="startLoading"
@@ -125,7 +129,7 @@
           Modifier la commande <v-icon small right>mdi-pencil</v-icon>
         </v-btn>
         <v-btn
-          v-if="canStartComplementaryOrder"
+          v-if="canStartComplementaryOrder && !loadPage"
           color="success"
           class="text-none"
           :loading="startLoading"
@@ -186,6 +190,9 @@ export default {
     return {
       id: this.$route.params.id,
       loadPage: false,
+      loadedOrderId: null,
+      detailLoadError: '',
+      detailRequestId: 0,
       startLoading: false,
       replaceCartDialog: false,
       pendingStart: null,
@@ -197,6 +204,7 @@ export default {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
     detailOrder() {
+      if (this.loadPage || this.loadedOrderId !== String(this.id)) return []
       return this.$store.get('orders/detailOrder') || []
     },
     orderSummary() {
@@ -227,14 +235,40 @@ export default {
       return this.detailOrder[0] || null
     },
   },
-  async mounted() {
-    this.loadPage = true
-    const res = await this.$store.dispatch('orders/getDetailOrder', this.id)
-    if (res) {
-      this.loadPage = false
-    }
+  mounted() {
+    this.loadOrderDetail(this.id)
+  },
+  watch: {
+    '$route.params.id'(id) {
+      this.loadOrderDetail(id)
+    },
   },
   methods: {
+    async loadOrderDetail(id) {
+      const requestedId = String(id)
+      const requestId = this.detailRequestId + 1
+      this.detailRequestId = requestId
+      this.id = id
+      this.loadPage = true
+      this.loadedOrderId = null
+      this.detailLoadError = ''
+      this.replaceCartDialog = false
+      this.pendingStart = null
+
+      try {
+        const loaded = await this.$store.dispatch('orders/getDetailOrder', id)
+        if (requestId !== this.detailRequestId) return
+        if (!loaded) {
+          this.detailLoadError =
+            this.$store.get('orders/message') ||
+            'Impossible de charger la commande.'
+          return
+        }
+        this.loadedOrderId = requestedId
+      } finally {
+        if (requestId === this.detailRequestId) this.loadPage = false
+      }
+    },
     requestOrderEdit() {
       if (!this.canEditOrder) return
       this.requestOrderStart('edit')
@@ -276,17 +310,27 @@ export default {
       if (type === 'complementary') return this.startComplementaryOrder()
     },
     async startOrderEdit() {
+      const orderId = this.loadedOrderId
+      if (this.loadPage || !this.canEditOrder || !orderId) return
       this.startLoading = true
       try {
         this.$store.dispatch('orders/setComplementaryOrder', null)
-        const result = await this.$store.dispatch('orderEdit/begin', this.id)
-        if (!result || !result.ok) return
+        const result = await this.$store.dispatch('orderEdit/begin', orderId)
+        if (
+          !result ||
+          !result.ok ||
+          this.loadPage ||
+          this.loadedOrderId !== orderId
+        ) {
+          return
+        }
         this.$router.push('/menus')
       } finally {
         this.startLoading = false
       }
     },
     async startComplementaryOrder() {
+      if (this.loadPage || !this.canStartComplementaryOrder) return
       const order = this.orderSummary || {}
       this.startLoading = true
       try {
