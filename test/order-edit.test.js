@@ -30,32 +30,50 @@ const product = {
 }
 
 const editable = {
-  order_id: 42,
-  order_number: '0042',
-  status: 1,
-  payment_status: 'unpaid',
-  total: 19,
+  order: {
+    id: 42,
+    ordernumber: '0042',
+    subtotal: '19.00',
+    status: 1,
+    payment_status: 'unpaid',
+    payment_provider: 'cash',
+  },
   content_revision: 'revision-1',
   items: [
     {
       product_id: 10,
       quantity: 2,
       unit_price: 9.5,
-      line_total: 19,
-      selected_product_step_choice_ids: [30],
-      customization_snapshots: [],
+      total: 19,
+      selections: [
+        { product_customization_step_choice_id: 30 },
+      ],
+      historical_customizations: [
+        {
+          product_customization_step_id: 20,
+          product_customization_step_choice_id: 30,
+          step_name: 'Boisson',
+          choice_name: 'Cola',
+          unit_extra_price: 1.5,
+          choice_type: 'linked_product',
+          linked_product_id: 11,
+        },
+      ],
       requires_reconfiguration: false,
     },
   ],
 }
 
-assert.strictEqual(canEditOrder(editable), true)
+assert.strictEqual(canEditOrder(editable.order), true)
 assert.strictEqual(
-  canEditOrder({ ...editable, payment_status: 'requires_payment' }),
+  canEditOrder({ ...editable.order, payment_status: 'requires_payment' }),
   true
 )
-assert.strictEqual(canEditOrder({ ...editable, status: 2 }), false)
-assert.strictEqual(canEditOrder({ ...editable, payment_status: 'paid' }), false)
+assert.strictEqual(canEditOrder({ ...editable.order, status: 2 }), false)
+assert.strictEqual(
+  canEditOrder({ ...editable.order, payment_status: 'paid' }),
+  false
+)
 assert.strictEqual(
   canStartComplementaryOrder({
     payment_provider: 'stripe',
@@ -63,7 +81,7 @@ assert.strictEqual(
   }),
   true
 )
-assert.strictEqual(canStartComplementaryOrder(editable), false)
+assert.strictEqual(canStartComplementaryOrder(editable.order), false)
 
 const cart = editableOrderToCart(editable, [product])
 assert.strictEqual(cart[0].id, 10)
@@ -127,6 +145,18 @@ assert.ok(
 assert.ok(
   storeSource.includes("dispatch('set/active', false)"),
   'cancelling or completing must clear the active edit session'
+)
+assert.ok(
+  storeSource.includes("dispatch('set/orderId', Number(order.id))"),
+  'the active session must retain the API order id'
+)
+assert.ok(
+  storeSource.includes("dispatch('set/orderNumber', String(order.ordernumber))"),
+  'the active session must retain the API order number'
+)
+assert.ok(
+  storeSource.includes("dispatch('cart/setTotal', Number(order.subtotal), { root: true })"),
+  'the active session must use the API order subtotal'
 )
 
 const usersSource = fs.readFileSync(require.resolve('../store/users.js'), 'utf8')

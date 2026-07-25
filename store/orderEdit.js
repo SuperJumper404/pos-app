@@ -58,18 +58,20 @@ const clear = (dispatch) => {
 }
 
 const startSession = (dispatch, editable, cart) => {
+  const order = editable.order || {}
+
   dispatch('set/active', true)
-  dispatch('set/orderId', Number(editable.order_id))
-  dispatch('set/orderNumber', String(editable.order_number))
+  dispatch('set/orderId', Number(order.id))
+  dispatch('set/orderNumber', String(order.ordernumber))
   dispatch('set/contentRevision', editable.content_revision)
   dispatch('set/originalCart', clone(cart))
   dispatch('set/dirty', false)
-  dispatch('set/paymentProvider', editable.payment_provider || null)
-  dispatch('set/paymentStatus', editable.payment_status)
+  dispatch('set/paymentProvider', order.payment_provider || null)
+  dispatch('set/paymentStatus', order.payment_status)
   dispatch('set/paymentRefresh', null)
   dispatch('set/payment', null)
   dispatch('cart/setTocart', clone(cart), { root: true })
-  dispatch('cart/setTotal', Number(editable.total), { root: true })
+  dispatch('cart/setTotal', Number(order.subtotal), { root: true })
   dispatch(
     'cart/setIndex',
     cart.reduce((total, line) => total + Number(line.qty || 0), 0),

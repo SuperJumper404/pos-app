@@ -41,8 +41,12 @@ const snapshotSelections = (snapshots) =>
         ? null
         : Number(snapshot.product_customization_step_choice_id),
     step_name: snapshot.step_name,
-    choice_name: snapshot.choice_name,
-    extra_price: Number(snapshot.unit_extra_price || 0),
+    choice_name: snapshot.choice_name || snapshot.name,
+    extra_price: Number(
+      snapshot.unit_extra_price != null
+        ? snapshot.unit_extra_price
+        : snapshot.price || 0
+    ),
     choice_type: snapshot.choice_type,
     linked_product_id: snapshot.linked_product_id || null,
   }))
@@ -59,14 +63,17 @@ const editableOrderToCart = (editable = {}, products = []) =>
       })
     }
 
-    const selectedChoiceIds = (item.selected_product_step_choice_ids || []).map(
-      Number
-    )
+    const selectedChoiceIds = (item.selections || [])
+      .map((selection) =>
+        Number(selection.product_customization_step_choice_id)
+      )
+      .filter((choiceId) => Number.isInteger(choiceId) && choiceId > 0)
     const currentSelections = selectedObjects(product, selectedChoiceIds)
     const selections =
-      currentSelections.length === selectedChoiceIds.length
+      currentSelections.length === selectedChoiceIds.length &&
+      item.requires_reconfiguration !== true
         ? currentSelections
-        : snapshotSelections(item.customization_snapshots)
+        : snapshotSelections(item.historical_customizations)
 
     return {
       ...product,
@@ -83,7 +90,7 @@ const editableOrderToCart = (editable = {}, products = []) =>
       ),
       qty: Number(item.quantity),
       price: roundPrice(item.unit_price),
-      subtotal: roundPrice(item.line_total),
+      subtotal: roundPrice(item.total),
       requiresReconfiguration: item.requires_reconfiguration === true,
     }
   })
