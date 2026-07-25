@@ -1424,12 +1424,13 @@ const menusOptions = loadComponentOptions(
   menusPageSource,
   [
     'Loading',
+    'OrderEditBanner',
     'ProductCustomizationWizard',
     'price',
     'mergeConfiguredCartLine',
     'replaceConfiguredCartLine',
   ],
-  [{}, {}, {}, mergeConfiguredCartLine, replaceConfiguredCartLine]
+  [{}, {}, {}, {}, mergeConfiguredCartLine, replaceConfiguredCartLine]
 )
 
 const menuProduct = {
@@ -1594,6 +1595,7 @@ const cartExecutable = cartPageSource
 const cartOptions = new Function(
   'loadStripe',
   'Loading',
+  'OrderEditBanner',
   'ProductCustomizationWizard',
   'CartCustomizationSummary',
   'price',
@@ -1607,6 +1609,7 @@ const cartOptions = new Function(
   cartExecutable
 )(
   () => null,
+  {},
   {},
   {},
   {},
@@ -1729,6 +1732,24 @@ const loadProductEditOptions = () => {
 }
 
 const runReviewRegressionTests = async () => {
+  let orderEditCheckoutDispatches = 0
+  const orderEditReset = await cartOptions.methods.resetCheckoutAttempt.call({
+    isOrderEditActive: true,
+    clearStripeAutoPrepareTimeout() {},
+    resetStripePaymentElement() {},
+    $store: {
+      dispatch() {
+        orderEditCheckoutDispatches += 1
+      },
+    },
+  })
+  assert.strictEqual(orderEditReset, true)
+  assert.strictEqual(
+    orderEditCheckoutDispatches,
+    0,
+    'editing a cart line must not abandon or replace the normal checkout state'
+  )
+
   const productActions = loadProductActions()
   const originalLocalStorage = global.localStorage
   global.localStorage = { getItem: () => 'test-token' }

@@ -1,9 +1,19 @@
 <template>
   <v-container>
+    <OrderEditBanner
+      v-if="isOrderEditActive"
+      :order-number="orderEditNumber"
+      @cancel="btnCancel"
+    />
     <v-alert :value="alert" :type="alertType" dismissible>{{
       alertText
     }}</v-alert>
-    <v-alert v-if="isKitchenClosed" dense text type="warning">
+    <v-alert
+      v-if="isKitchenClosed && !isOrderEditActive"
+      dense
+      text
+      type="warning"
+    >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
     <v-row class="mt-5">
@@ -96,7 +106,7 @@
                           small
                           block
                           :disabled="
-                            isKitchenClosed ||
+                            (isKitchenClosed && !isOrderEditActive) ||
                             items.customization_available === false
                           "
                           class="text-none font-weight-bold"
@@ -363,7 +373,8 @@
             color="success"
             class="text-none font-weight-bold"
             :disabled="
-              isKitchenClosed || previewItem.customization_available === false
+              (isKitchenClosed && !isOrderEditActive) ||
+              previewItem.customization_available === false
             "
             @click="addPreviewItemToCart"
           >
@@ -405,6 +416,7 @@
 </template>
 <script>
 import Loading from '@/components/loading'
+import OrderEditBanner from '@/components/orders/OrderEditBanner'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import price from '@/helpers/price'
 import {
@@ -415,9 +427,21 @@ import {
 export default {
   components: {
     Loading,
+    OrderEditBanner,
     ProductCustomizationWizard,
   },
   mixins: [price],
+  beforeRouteLeave(to, from, next) {
+    if (
+      this.isOrderEditActive &&
+      this.orderEditDirty &&
+      !this.allowRouteLeave
+    ) {
+      next(window.confirm('Quitter sans enregistrer les modifications ?'))
+      return
+    }
+    next()
+  },
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
@@ -443,6 +467,7 @@ export default {
     cartItem: [],
     total: 0,
     idxCart: 0,
+    allowRouteLeave: false,
   }),
 
   computed: {
@@ -489,9 +514,32 @@ export default {
         )
       )
     },
+    isOrderEditActive() {
+      return this.$store.get('orderEdit/active') === true
+    },
+    orderEditNumber() {
+      return String(this.$store.get('orderEdit/orderNumber') || '')
+    },
+    orderEditDirty() {
+      return this.$store.get('orderEdit/dirty') === true
+    },
   },
   async mounted() {
     this.loadPage = true
+
+    if (this.isOrderEditActive) {
+      this.cartItem = JSON.parse(
+        JSON.stringify(this.$store.get('cart/dataCart') || [])
+      )
+      this.total = Number(this.$store.get('cart/totalCart') || 0)
+      this.idxCart = Number(this.$store.get('cart/indexCart') || 0)
+      await Promise.all([
+        this.$store.dispatch('products/getProducts'),
+        this.$store.dispatch('shop/getCurrentShopInfo'),
+      ])
+      this.loadPage = false
+      return
+    }
 
     if (this.hasUnsafeCheckoutAttempt) {
       this.restorePersistedCheckoutCart()
@@ -636,13 +684,20 @@ export default {
         return this.roundPrice(sum + this.parsePrice(el.subtotal))
       }, 0)
       this.$store.dispatch('cart/setTotal', this.total)
+      this.$store.dispatch(
+        'cart/setTocart',
+        this.cartItem.length > 0 ? this.cartItem : null
+      )
+      if (this.isOrderEditActive) {
+        this.$store.dispatch('orderEdit/updateDirty', this.cartItem)
+      }
     },
     indexCart() {
-      this.idxCart = 0
-      this.cartItem.forEach((elm) => {
-        this.idxCart = this.idxCart + elm.qty
-        this.$store.dispatch('cart/setIndex', this.idxCart)
-      })
+      this.idxCart = this.cartItem.reduce(
+        (total, item) => total + Number(item.qty || 0),
+        0
+      )
+      this.$store.dispatch('cart/setIndex', this.idxCart)
     },
     showAlert(text, type) {
       this.alert = true
@@ -657,7 +712,7 @@ export default {
       this.kitchenClosedSnackbar = true
     },
     addToCart(params) {
-      if (this.isKitchenClosed) {
+      if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.showKitchenClosedSnackbar()
         return
       }
@@ -741,7 +796,7 @@ export default {
       this.indexCart()
     },
     async btnOrder() {
-      if (this.isKitchenClosed) {
+      if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.showKitchenClosedSnackbar()
         return
       }
@@ -761,9 +816,20 @@ export default {
       }
 
       this.$store.dispatch('cart/setTocart', this.cartItem)
+      this.allowRouteLeave = true
       this.$router.push('/cart')
     },
-    btnCancel() {
+    async btnCancel() {
+      if (this.isOrderEditActive) {
+        if (!window.confirm('Annuler les modifications de cette commande ?')) {
+          return
+        }
+        const orderId = this.$store.get('orderEdit/orderId')
+        await this.$store.dispatch('orderEdit/cancel')
+        this.allowRouteLeave = true
+        this.$router.push(`/orders/detail/${orderId}`)
+        return
+      }
       this.cartItem = []
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)

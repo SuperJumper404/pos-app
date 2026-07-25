@@ -236,7 +236,9 @@ assert.ok(
 )
 assert.ok(
   ordersSource.indexOf("dispatch('set/detailOrder', [])") <
-    ordersSource.indexOf('.get(`/baseurl/api/v1/detailorder/${params}`'),
+    ordersSource.indexOf(
+      '.get(`/baseurl/api/v1/detailorder/$' + '{params}`'
+    ),
   'starting a detail request must clear the singleton before the request'
 )
 assert.ok(
@@ -301,4 +303,376 @@ assert.ok(
   'a delayed complementary flow must not alter the cart, session, or prefill for a new route'
 )
 
-console.log('order edit tests passed')
+const menusSource = fs.readFileSync(require.resolve('../pages/menus.vue'), 'utf8')
+const cartSource = fs.readFileSync(require.resolve('../pages/cart.vue'), 'utf8')
+const bannerPath = '../components/orders/OrderEditBanner.vue'
+
+assert.ok(
+  menusSource.includes('<OrderEditBanner') &&
+    cartSource.includes('<OrderEditBanner'),
+  'menus and cart must expose the active order edit session'
+)
+assert.ok(
+  cartSource.includes('Enregistrer les modifications'),
+  'the cart primary action must describe the order edit save'
+)
+assert.ok(
+  cartSource.includes("'orderEdit/retryPayment'"),
+  'a failed replacement payment must expose the current retry action'
+)
+
+const loadOrderEditStore = () => {
+  const executable = storeSource
+    .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
+    .replace(/export const /g, 'const ')
+    .concat('\nreturn { state, actions }')
+
+  // eslint-disable-next-line no-new-func
+  return new Function(
+    'EasyAccess',
+    'defaultMutations',
+    'cartToOrderEditPayload',
+    'editableOrderToCart',
+    'isOrderEditDirty',
+    executable
+  )(
+    () => ({}),
+    () => ({}),
+    cartToOrderEditPayload,
+    editableOrderToCart,
+    isOrderEditDirty
+  )
+}
+
+const loadPageOptions = (source, dependencies, values) => {
+  const executable = source
+    .match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
+    .replace(
+      /const \{\s*isCounterPaymentAllowed,\s*isQrClientAccess,\s*\} = require\([^\n]+\)/m,
+      ''
+    )
+    .replace(
+      /const \{\s*shouldAutoPrepareStripeCheckout\s*\} = require\([^\n]+\)/m,
+      ''
+    )
+    .replace('export default', 'return')
+
+  // eslint-disable-next-line no-new-func
+  return new Function(...dependencies, executable)(...values)
+}
+
+const runCartEditContracts = async () => {
+  assert.doesNotThrow(() => require.resolve(bannerPath))
+  const bannerSource = fs.readFileSync(require.resolve(bannerPath), 'utf8')
+  assert.ok(bannerSource.includes('Modification de la commande'))
+  assert.ok(bannerSource.includes('Annuler la modification'))
+
+  const orderEditStore = loadOrderEditStore()
+  const previousLocalStorage = global.localStorage
+  global.localStorage = { getItem: () => 'token' }
+  try {
+    const emptyState = {
+      ...orderEditStore.state(),
+      active: true,
+      orderId: 42,
+      orderNumber: '0042',
+      contentRevision: 'revision-1',
+    }
+    let emptyPatch
+    const emptyDispatches = []
+    const emptyDispatch = (type, payload) => {
+      emptyDispatches.push([type, payload])
+      if (type.startsWith('set/')) {
+        emptyState[type.slice(4)] = payload
+      } else if (type === 'complete') {
+        return orderEditStore.actions.complete({
+          dispatch: emptyDispatch,
+          state: emptyState,
+        })
+      } else if (type === 'cancel') {
+        return orderEditStore.actions.cancel({
+          dispatch: emptyDispatch,
+          state: emptyState,
+        })
+      }
+      return null
+    }
+    const emptyResult = await orderEditStore.actions.save.call(
+      {
+        $axios: {
+          patch(url, payload) {
+            emptyPatch = { url, payload }
+            return Promise.resolve({
+              data: { data: { order_id: 42, canceled: true, total: 0 } },
+            })
+          },
+        },
+      },
+      {
+        dispatch: emptyDispatch,
+        state: emptyState,
+        rootState: { cart: { dataCart: null, totalCart: 0 } },
+      }
+    )
+    assert.strictEqual(emptyResult.ok, true)
+    assert.deepStrictEqual(emptyPatch.payload.items, [])
+    assert.strictEqual(emptyState.active, false)
+    assert.ok(
+      emptyDispatches.some(
+        ([type, payload]) => type === 'cart/setTocart' && payload === null
+      ),
+      'a successful empty save must clean the cart session'
+    )
+
+    const refreshState = {
+      ...orderEditStore.state(),
+      active: true,
+      orderId: 42,
+      orderNumber: '0042',
+      contentRevision: 'revision-1',
+      originalCart: cart,
+      dirty: true,
+      paymentProvider: 'stripe',
+      paymentStatus: 'requires_payment',
+    }
+    const refreshDispatches = []
+    const refreshDispatch = (type, payload) => {
+      refreshDispatches.push([type, payload])
+      if (type.startsWith('set/')) refreshState[type.slice(4)] = payload
+      return null
+    }
+    const refreshPayment = {
+      orderId: 42,
+      paymentIntentId: 'pi_new',
+      clientSecret: 'secret',
+      publishableKey: 'pk_test',
+    }
+    const refreshResult = await orderEditStore.actions.save.call(
+      {
+        $axios: {
+          patch: () =>
+            Promise.resolve({
+              data: {
+                data: {
+                  order_id: 42,
+                  content_revision: 'revision-2',
+                  total: 19,
+                  payment_status: 'requires_payment',
+                  payment_refresh: 'succeeded',
+                  payment: refreshPayment,
+                },
+              },
+            }),
+        },
+      },
+      {
+        dispatch: refreshDispatch,
+        state: refreshState,
+        rootState: { cart: { dataCart: cart, totalCart: 19 } },
+      }
+    )
+    assert.strictEqual(refreshResult.ok, true)
+    assert.strictEqual(refreshState.active, true)
+    assert.strictEqual(refreshState.dirty, false)
+    assert.strictEqual(refreshState.contentRevision, 'revision-2')
+    assert.strictEqual(refreshState.paymentRefresh, 'succeeded')
+    assert.deepStrictEqual(refreshState.payment, refreshPayment)
+    assert.ok(
+      !refreshDispatches.some(([type]) => type === 'complete'),
+      'payment confirmation must keep the edit context active'
+    )
+
+    const retryResult = await orderEditStore.actions.retryPayment.call(
+      {
+        $axios: {
+          post: () => Promise.resolve({ data: { data: refreshPayment } }),
+        },
+      },
+      { dispatch: refreshDispatch, state: refreshState }
+    )
+    assert.strictEqual(retryResult.ok, true)
+    assert.strictEqual(refreshState.active, true)
+    assert.strictEqual(refreshState.paymentRefresh, 'succeeded')
+    assert.deepStrictEqual(refreshState.payment, refreshPayment)
+
+    const paymentRefreshError = new Error('Paiement à reprendre.')
+    paymentRefreshError.response = {
+      status: 409,
+      data: {
+        message: 'Paiement à reprendre.',
+        data: {
+          code: 'ORDER_EDIT_CONFLICT',
+          payment_refresh: 'required',
+          payment_refresh_message: 'Rechargez la commande avant de réessayer.',
+        },
+      },
+    }
+    await orderEditStore.actions.save.call(
+      { $axios: { patch: () => Promise.reject(paymentRefreshError) } },
+      {
+        dispatch: refreshDispatch,
+        state: refreshState,
+        rootState: { cart: { dataCart: cart, totalCart: 19 } },
+      }
+    )
+    assert.strictEqual(refreshState.paymentRefresh, 'required')
+
+    const menusOptions = loadPageOptions(
+      menusSource,
+      [
+        'Loading',
+        'OrderEditBanner',
+        'ProductCustomizationWizard',
+        'price',
+        'mergeConfiguredCartLine',
+        'replaceConfiguredCartLine',
+      ],
+      [{}, {}, {}, {}, () => [], () => []]
+    )
+    const mountedCart = [{ ...cart[0] }]
+    const menuDispatches = []
+    const menuVm = {
+      loadPage: false,
+      isOrderEditActive: true,
+      hasUnsafeCheckoutAttempt: false,
+      clientOrderStatus: 'idle',
+      cartItem: [],
+      total: 0,
+      idxCart: 0,
+      $store: {
+        get(path) {
+          const values = {
+            'cart/dataCart': mountedCart,
+            'cart/totalCart': 19,
+            'cart/indexCart': 2,
+            'products/dataProduct': [product],
+          }
+          return values[path]
+        },
+        dispatch(type, payload) {
+          menuDispatches.push([type, payload])
+          return Promise.resolve(true)
+        },
+      },
+      $router: { replace() {} },
+    }
+    await menusOptions.mounted.call(menuVm)
+    assert.strictEqual(menuVm.cartItem[0].id, mountedCart[0].id)
+    assert.strictEqual(menuVm.cartItem[0].qty, mountedCart[0].qty)
+    assert.notStrictEqual(menuVm.cartItem, mountedCart)
+    assert.ok(
+      !menuDispatches.some(
+        ([type, payload]) =>
+          (type === 'cart/setTocart' && payload === null) ||
+          (type === 'cart/setTotal' && payload === 0)
+      ),
+      'opening menus during an edit must never clear the edit cart'
+    )
+
+    const cartOptions = loadPageOptions(
+      cartSource,
+      [
+        'loadStripe',
+        'Loading',
+        'OrderEditBanner',
+        'ProductCustomizationWizard',
+        'CartCustomizationSummary',
+        'price',
+        'applyServerQuoteToCart',
+        'buildCheckoutPayloadSignature',
+        'findCartTargetForCheckoutError',
+        'replaceConfiguredCartLine',
+        'isCounterPaymentAllowed',
+        'isQrClientAccess',
+        'shouldAutoPrepareStripeCheckout',
+      ],
+      [
+        () => null,
+        {},
+        {},
+        {},
+        {},
+        {},
+        (sourceCart) => sourceCart,
+        () => '',
+        () => null,
+        () => [],
+        () => false,
+        () => false,
+        () => false,
+      ]
+    )
+    const pageDispatches = []
+    const pageRoutes = []
+    let confirms = false
+    const previousWindow = global.window
+    global.window = { confirm: () => confirms }
+    try {
+      const emptyCartVm = {
+        isOrderEditActive: true,
+        orderEditId: 42,
+        dataCart: null,
+        loadingBtn: false,
+        checkoutErrorMessage: '',
+        allowRouteLeave: false,
+        $store: {
+          dispatch(type, payload) {
+            pageDispatches.push([type, payload])
+            if (type === 'orderEdit/save') {
+              return Promise.resolve({
+                ok: true,
+                data: { order_id: 42, canceled: true },
+                error: null,
+              })
+            }
+            return Promise.resolve(null)
+          },
+        },
+        $router: { push: (path) => pageRoutes.push(path) },
+      }
+      await cartOptions.methods.saveOrderEdit.call(emptyCartVm)
+      assert.ok(!pageDispatches.some(([type]) => type === 'orderEdit/save'))
+      confirms = true
+      await cartOptions.methods.saveOrderEdit.call(emptyCartVm)
+      assert.ok(pageDispatches.some(([type]) => type === 'orderEdit/save'))
+      assert.strictEqual(pageRoutes[0], '/orders/detail/42')
+
+      const retryCalls = []
+      const retryVm = {
+        loadingBtn: false,
+        checkoutErrorMessage: '',
+        mountEditedPayment(payment) {
+          retryCalls.push(['mount', payment.paymentIntentId])
+          return Promise.resolve()
+        },
+        $store: {
+          dispatch(type) {
+            retryCalls.push([type])
+            return Promise.resolve({ ok: true, data: refreshPayment, error: null })
+          },
+        },
+      }
+      await cartOptions.methods.retryEditedPayment.call(retryVm)
+      assert.deepStrictEqual(retryCalls, [
+        ['orderEdit/retryPayment'],
+        ['mount', 'pi_new'],
+      ])
+    } finally {
+      global.window = previousWindow
+    }
+  } finally {
+    global.localStorage = previousLocalStorage
+  }
+}
+
+runCartEditContracts()
+  .then(() => {
+    // eslint-disable-next-line no-console
+    console.log('order edit tests passed')
+  })
+  .catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error(error)
+    process.exitCode = 1
+  })

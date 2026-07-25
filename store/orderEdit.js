@@ -152,11 +152,23 @@ export const actions = {
         { headers: authHeaders() }
       )
       const data = response.data.data
-      dispatch('complete')
+      if (data && data.payment_refresh) {
+        dispatch('set/contentRevision', data.content_revision)
+        dispatch('set/originalCart', clone(cart))
+        dispatch('set/dirty', false)
+        dispatch('set/paymentStatus', data.payment_status)
+        dispatch('set/paymentRefresh', data.payment_refresh)
+        dispatch('set/payment', data.payment || null)
+      } else {
+        dispatch('complete')
+      }
       return { ok: true, data, error: null }
     } catch (error) {
       const normalized = apiError(error)
       dispatch('set/message', normalized.message)
+      if (normalized.payment_refresh) {
+        dispatch('set/paymentRefresh', normalized.payment_refresh)
+      }
       return { ok: false, data: null, error: normalized }
     } finally {
       dispatch('set/loading', false)
@@ -173,7 +185,9 @@ export const actions = {
         { headers: authHeaders() }
       )
       const data = response.data.data
-      dispatch('complete')
+      dispatch('set/paymentRefresh', 'succeeded')
+      dispatch('set/paymentStatus', 'requires_payment')
+      dispatch('set/payment', data)
       return { ok: true, data, error: null }
     } catch (error) {
       const normalized = apiError(error)
