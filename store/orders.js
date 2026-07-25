@@ -6,6 +6,7 @@ export const state = () => ({
   detailOrder: [],
   AllDetailOrders: [],
   lastCreatedOrder: null,
+  complementaryOrder: null,
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
@@ -62,6 +63,15 @@ export const actions = {
       .then((response) => {
         dispatch('set/detailOrder', response.data.data)
         return true
+      })
+      .catch((error) => {
+        const message =
+          error.response?.data?.message ||
+          error.message ||
+          'Impossible de rÃ©cupÃ©rer la commande.'
+        dispatch('set/detailOrder', [])
+        dispatch('set/message', message)
+        return false
       })
   },
   getAllDetailOrders({ dispatch }, params) {

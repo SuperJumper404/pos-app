@@ -114,18 +114,61 @@
 
     <v-card color="grey lighten-3" class="mt-5">
       <v-card-actions>
+        <v-btn
+          v-if="canEditOrder"
+          color="success"
+          class="text-none"
+          :loading="startLoading"
+          :disabled="startLoading"
+          @click="requestOrderEdit"
+        >
+          Modifier la commande <v-icon small right>mdi-pencil</v-icon>
+        </v-btn>
+        <v-btn
+          v-if="canStartComplementaryOrder"
+          color="success"
+          class="text-none"
+          :loading="startLoading"
+          :disabled="startLoading"
+          @click="requestComplementaryOrder"
+        >
+          Ajouter une commande complÃ©mentaire
+          <v-icon small right>mdi-plus</v-icon>
+        </v-btn>
         <v-spacer></v-spacer>
         <v-btn color="primary" class="text-none" @click="$router.go(-1)">
           Retour <v-icon small right>mdi-arrow-left</v-icon>
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <v-dialog v-model="replaceCartDialog" max-width="480">
+      <v-card>
+        <v-card-title>Remplacer le panier actuel ?</v-card-title>
+        <v-card-text>
+          Le panier en cours sera remplacÃ© par les produits de cette commande.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text class="text-none" @click="cancelReplaceCart">
+            Garder le panier
+          </v-btn>
+          <v-btn color="primary" class="text-none" @click="confirmReplaceCart">
+            Continuer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script>
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
+const {
+  canEditOrder: isOrderEditable,
+  canStartComplementaryOrder: canCreateComplementaryOrder,
+} = require('@/helpers/orderEdit')
 const {
   getPaymentStatusText,
   getPaymentStatusColor,
@@ -143,6 +186,9 @@ export default {
     return {
       id: this.$route.params.id,
       loadPage: false,
+      startLoading: false,
+      replaceCartDialog: false,
+      pendingStart: null,
     }
   },
 
@@ -152,6 +198,26 @@ export default {
     },
     detailOrder() {
       return this.$store.get('orders/detailOrder') || []
+    },
+    orderSummary() {
+      return this.detailOrder[0] || null
+    },
+    canEditOrder() {
+      return isOrderEditable(this.orderSummary || {})
+    },
+    canStartComplementaryOrder() {
+      return canCreateComplementaryOrder(this.orderSummary || {})
+    },
+    hasLocalCart() {
+      const cart = this.$store.get('cart/dataCart')
+      return Array.isArray(cart) && cart.length > 0
+    },
+    hasUnsafeCheckoutAttempt() {
+      const status = this.$store.get('cart/clientOrderStatus') || 'idle'
+      return (
+        Boolean(this.$store.get('cart/clientOrderOrderId')) ||
+        ['pending', 'uncertain', 'stripe_prepared'].includes(status)
+      )
     },
     orderNote() {
       const remark = this.detailOrder[0] && this.detailOrder[0].remark
@@ -169,6 +235,75 @@ export default {
     }
   },
   methods: {
+    requestOrderEdit() {
+      if (!this.canEditOrder) return
+      this.requestOrderStart('edit')
+    },
+    requestComplementaryOrder() {
+      if (!this.canStartComplementaryOrder) return
+      this.requestOrderStart('complementary')
+    },
+    requestOrderStart(type) {
+      this.pendingStart = type
+      if (this.hasUnsafeCheckoutAttempt) {
+        this.pendingStart = null
+        this.$store.dispatch(
+          'notifications/error',
+          'Terminez ou vÃ©rifiez le paiement en cours avant de modifier une commande.'
+        )
+        this.$router.push('/cart')
+        return
+      }
+      if (this.hasLocalCart) {
+        this.pendingStart = type
+        this.replaceCartDialog = true
+        return
+      }
+      this.startPendingOrder()
+    },
+    cancelReplaceCart() {
+      this.replaceCartDialog = false
+      this.pendingStart = null
+    },
+    confirmReplaceCart() {
+      this.replaceCartDialog = false
+      this.startPendingOrder()
+    },
+    startPendingOrder() {
+      const type = this.pendingStart
+      this.pendingStart = null
+      if (type === 'edit') return this.startOrderEdit()
+      if (type === 'complementary') return this.startComplementaryOrder()
+    },
+    async startOrderEdit() {
+      this.startLoading = true
+      try {
+        this.$store.dispatch('orders/setComplementaryOrder', null)
+        const result = await this.$store.dispatch('orderEdit/begin', this.id)
+        if (!result || !result.ok) return
+        this.$router.push('/menus')
+      } finally {
+        this.startLoading = false
+      }
+    },
+    async startComplementaryOrder() {
+      const order = this.orderSummary || {}
+      this.startLoading = true
+      try {
+        await this.$store.dispatch('cart/abandonCheckout', { safe: true })
+        await this.$store.dispatch('orderEdit/cancel')
+        this.$store.dispatch('cart/setTocart', null)
+        this.$store.dispatch('cart/setTotal', 0)
+        this.$store.dispatch('cart/setIndex', 0)
+        this.$store.dispatch('orders/setComplementaryOrder', {
+          customer: order.customer || '',
+          customerID: order.customerID == null ? null : order.customerID,
+        })
+        this.$router.push('/menus')
+      } finally {
+        this.startLoading = false
+      }
+    },
     customizationGroups(item) {
       const value = item || {}
       const snapshots = [

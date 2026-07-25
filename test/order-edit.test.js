@@ -164,4 +164,71 @@ const axiosSource = fs.readFileSync(require.resolve('../plugins/axios.js'), 'utf
 assert.ok(usersSource.includes("orderEdit/cancel"))
 assert.ok(axiosSource.includes("orderEdit/cancel"))
 
+const detailSource = fs.readFileSync(
+  require.resolve('../pages/orders/detail/_id.vue'),
+  'utf8'
+)
+assert.ok(
+  detailSource.includes('Modifier la commande'),
+  'an unpaid editable order must expose the edit action'
+)
+assert.ok(
+  detailSource.includes('@click="requestComplementaryOrder"'),
+  'a paid Stripe order must expose the complementary-order action'
+)
+assert.ok(
+  detailSource.includes('v-if="canEditOrder"'),
+  'the edit action must keep the helper eligibility guard'
+)
+assert.ok(
+  detailSource.includes('v-if="canStartComplementaryOrder"'),
+  'the complementary action must keep the Stripe paid eligibility guard'
+)
+assert.ok(
+  detailSource.includes('requestOrderEdit('),
+  'the edit action must request a guarded start'
+)
+assert.ok(
+  detailSource.includes('requestComplementaryOrder('),
+  'the complementary action must request a guarded start'
+)
+assert.ok(
+  detailSource.includes('startOrderEdit('),
+  'the edit flow must start the edit session after confirmation'
+)
+assert.ok(
+  detailSource.includes('startComplementaryOrder('),
+  'the complementary flow must start a normal checkout after confirmation'
+)
+assert.ok(
+  detailSource.includes('replaceCartDialog'),
+  'replacing a non-empty local cart must require confirmation'
+)
+assert.ok(
+  detailSource.includes("orderEdit/begin"),
+  'starting an edit must hydrate the edit session through its store action'
+)
+assert.ok(
+  detailSource.includes("orders/setComplementaryOrder"),
+  'a complementary order must retain its customer and table prefill'
+)
+assert.ok(
+  detailSource.includes("orderEdit/cancel"),
+  'a complementary order must never retain an edit session'
+)
+assert.ok(
+  detailSource.includes("this.$router.push('/menus')"),
+  'both order starts must navigate to the catalogue'
+)
+
+const ordersSource = fs.readFileSync(require.resolve('../store/orders.js'), 'utf8')
+assert.ok(
+  ordersSource.includes('complementaryOrder: null'),
+  'the complementary checkout prefill must be retained outside the edit session'
+)
+assert.ok(
+  ordersSource.includes("dispatch('set/detailOrder', [])"),
+  'loading order details must expose a stable error message'
+)
+
 console.log('order edit tests passed')
