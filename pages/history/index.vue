@@ -45,7 +45,7 @@
         <v-text-field
           v-model="searchFilter"
           class="mt-6"
-          placeholder="Recherche une commande, table ou client"
+          placeholder="Rechercher une commande, table ou client"
           label="Rechercher une commande, table ou client"
           outlined
           dense
@@ -202,10 +202,10 @@
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
-            En preparation
+            En préparation
           </v-chip>
-          <v-chip v-if="item.status === 3" color="primary"> Terminer </v-chip>
-          <v-chip v-if="item.status === 4" color="warning"> Annuler </v-chip>
+          <v-chip v-if="item.status === 3" color="primary"> Terminée </v-chip>
+          <v-chip v-if="item.status === 4" color="warning"> Annulée </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
           <v-row class="d-flex flex-nowrap">
@@ -270,7 +270,7 @@ export default {
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true },
         { text: 'Paiement', value: 'payment_status', filterable: true },
-        { text: 'Status', value: 'status', filterable: true },
+        { text: 'Statut', value: 'status', filterable: true },
         { text: 'Actions', value: 'actions' },
       ],
       items: [

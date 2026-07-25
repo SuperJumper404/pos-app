@@ -74,7 +74,7 @@ export const actions = {
         const message =
           error.response?.data?.message ||
           error.message ||
-          'Impossible de rÃ©cupÃ©rer la commande.'
+          'Impossible de récupérer la commande.'
         dispatch('set/detailOrder', [])
         dispatch('set/message', message)
         return false
@@ -181,7 +181,7 @@ export const actions = {
       )
       .then((response) => {
         dispatch('set/message', response.data.message)
-        dispatch('notifications/success', 'Commande remboursee.', {
+        dispatch('notifications/success', 'Commande remboursée.', {
           root: true,
         })
         return true

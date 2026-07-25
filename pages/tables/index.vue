@@ -16,12 +16,12 @@
           color="success"
           class="text-none mr-3"
           @click="$router.push('/tables/newtable')"
-          ><v-icon>mdi-plus</v-icon> Table</v-btn
+          ><v-icon>mdi-plus</v-icon> Ajouter une table</v-btn
         >
       </v-app-bar>
       <v-card-title v-if="dataTables.length == 0" class="d-flex justify-center">
         <v-icon large>mdi-emoticon-neutral-outline</v-icon>
-        <h4>Tables vide</h4>
+        <h4>Aucune table</h4>
       </v-card-title>
       <v-card
         v-for="items in dataTables"
@@ -53,7 +53,7 @@
           </div>
 
           <div class="subtitle-2 font-weight-bold text--darken-1 mb-1">
-            URL de connexion automatique:
+            URL de connexion automatique :
           </div>
           <v-sheet
             color="grey lighten-4"

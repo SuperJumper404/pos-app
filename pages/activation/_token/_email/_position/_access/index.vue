@@ -13,7 +13,7 @@
         <h4>OK!</h4>
         <p>Votre compte a bien été activé !</p>
         <v-btn color="primary" @click="$router.push('/login')">
-          Take me to login page
+          Aller à la page de connexion
         </v-btn>
       </div>
     </div>
@@ -27,13 +27,13 @@
         <!-- <h1 class="text-muted">
           <b-icon icon="emoji-frown-fill" class="text-dark" />
         </h1> -->
-        <h4>Something not good</h4>
+        <h4>Échec de l'activation</h4>
         <p>
-          Maybe, your token was expired or typo. Dont make any unique for token
-          that requested for activation
+          Le lien d'activation est peut-être expiré ou incorrect. Demandez un
+          nouveau lien d'activation, puis réessayez.
         </p>
         <v-btn color="primary" @click="$router.push('/')">
-          Go to dashboard
+          Retour au tableau de bord
         </v-btn>
       </div>
     </div>

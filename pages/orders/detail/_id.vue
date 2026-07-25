@@ -139,7 +139,7 @@
           :disabled="startLoading"
           @click="requestComplementaryOrder"
         >
-          Ajouter une commande complÃ©mentaire
+          Ajouter une commande complémentaire
           <v-icon small right>mdi-plus</v-icon>
         </v-btn>
         <v-spacer></v-spacer>
@@ -153,7 +153,7 @@
       <v-card>
         <v-card-title>Remplacer le panier actuel ?</v-card-title>
         <v-card-text>
-          Le panier en cours sera remplacÃ© par les produits de cette commande.
+          Le panier en cours sera remplacé par les produits de cette commande.
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -316,7 +316,7 @@ export default {
         this.pendingStart = null
         this.$store.dispatch(
           'notifications/error',
-          'Terminez ou vÃ©rifiez le paiement en cours avant de modifier une commande.'
+          'Terminez ou vérifiez le paiement en cours avant de modifier une commande.'
         )
         this.$router.push('/cart')
         return

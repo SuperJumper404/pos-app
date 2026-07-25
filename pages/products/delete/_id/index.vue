@@ -9,7 +9,7 @@
           <h3>Supprimer le produit</h3>
         </v-card-title>
         <v-card-text class="text-center">
-          <p>Etes-vous sur de supprimer ce produit?</p>
+          <p>Êtes-vous sûr de vouloir supprimer ce produit ?</p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>

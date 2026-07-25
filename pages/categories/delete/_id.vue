@@ -22,7 +22,7 @@
             dark
             class="text-none"
             @click="btnYes"
-            >OUI, supprimer! <v-icon small right>mdi-trash-can</v-icon></v-btn
+            >Oui, supprimer ! <v-icon small right>mdi-trash-can</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>

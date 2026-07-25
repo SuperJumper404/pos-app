@@ -14,8 +14,8 @@
         <div class="mt-6">
           <v-text-field
             type="number"
-            placeholder="Search ordernumber"
-            label="Seaching"
+            placeholder="Rechercher un numéro de commande"
+            label="Rechercher"
             outlined
             dense
             append-icon="mdi-card-search"
@@ -28,12 +28,12 @@
           <thead>
             <tr>
               <th class="text-left">Date</th>
-              <th class="text-left">Order Number</th>
-              <th class="text-left">Customer</th>
-              <th class="text-left">Operator</th>
+              <th class="text-left">Numéro de commande</th>
+              <th class="text-left">Client</th>
+              <th class="text-left">Opérateur</th>
               <th class="text-left">Total</th>
-              <th class="text-left">Payment</th>
-              <th class="text-left">Status</th>
+              <th class="text-left">Paiement</th>
+              <th class="text-left">Statut</th>
             </tr>
           </thead>
           <tbody>
@@ -41,8 +41,8 @@
               <td>-</td>
               <td>-</td>
               <td>-</td>
-              <td>Order</td>
-              <td>Empty!</td>
+              <td>Commande</td>
+              <td>Aucune commande</td>
               <td>-</td>
               <td>-</td>
               <td>-</td>
@@ -54,7 +54,7 @@
               <td>{{ item.operator ? item.operator : '-' }}</td>
               <td>{{ formatCurrency(item.subtotal) }}</td>
               <td>{{ item.payment }}</td>
-              <td>{{ item.status === 1 ? 'Pending' : 'Approve' }}</td>
+              <td>{{ item.status === 1 ? 'En attente' : 'Approuvée' }}</td>
             </tr>
           </tbody>
         </template>

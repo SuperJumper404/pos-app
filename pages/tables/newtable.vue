@@ -17,7 +17,7 @@
 
       <v-switch
         v-model="editableForm"
-        label="Changer mots de passe par defaut"
+        label="Changer le mot de passe par défaut"
       ></v-switch>
       <v-text-field
         v-model="formtable.clearpass"
@@ -31,21 +31,21 @@
       ></v-text-field>
       <v-text-field
         v-model="formtable.email"
-        label="Email"
+        label="E-mail"
         type="text"
         disabled
-        :rules="[(v) => !!v || 'Email de la table requis']"
-        placeholder="Insérer l'email de la table"
+        :rules="[(v) => !!v || 'E-mail de la table requis']"
+        placeholder="Insérer l'e-mail de la table"
         required
         autofocus
       ></v-text-field>
       <!-- The holder should come form config file -->
       <v-text-field
         v-model="websiteUrl"
-        label="Web Site Url"
+        label="URL du site web"
         type="text"
         disabled
-        :rules="[(v) => !!v || 'Table mail required']"
+        :rules="[(v) => !!v || 'L’URL du site est requise']"
         :placeholder="websiteUrl"
         autofocus
       ></v-text-field>

@@ -9,7 +9,7 @@
           <h3>Supprimer la table?</h3>
         </v-card-title>
         <v-card-text class="text-center">
-          <p>Etes vous sur de vouloir supprimer cette table?</p>
+          <p>Êtes-vous sûr de vouloir supprimer cette table ?</p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>

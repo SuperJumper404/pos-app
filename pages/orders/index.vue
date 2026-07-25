@@ -31,7 +31,7 @@
             :input-value="isKitchenClosed"
             :loading="kitchenToggleLoading"
             :disabled="kitchenToggleLoading"
-            :label="isKitchenClosed ? 'Cuisine fermee' : 'Cuisine ouverte'"
+            :label="isKitchenClosed ? 'Cuisine fermée' : 'Cuisine ouverte'"
             color="red"
             dense
             hide-details
@@ -93,7 +93,7 @@
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
-            En preparation
+            En préparation
           </v-chip>
           <v-chip v-if="item.status === 3" color="primary"> Terminée </v-chip>
           <v-chip v-if="item.status === 4" color="warning"> Annulée </v-chip>
@@ -127,7 +127,7 @@
                 color="default"
                 class="text-none"
                 @click="$router.push(`orders/detail/${item.id}`)"
-                >Details
+                >Détails
                 <v-icon small right>mdi-information-outline</v-icon>
               </v-btn>
             </v-card-actions>
@@ -202,7 +202,7 @@ export default {
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true },
         { text: 'Paiement', value: 'payment_status', filterable: true },
-        { text: 'Status', value: 'status', filterable: true },
+        { text: 'Statut', value: 'status', filterable: true },
         { text: 'Actions', value: 'actions' },
       ],
       items: [

@@ -1469,14 +1469,14 @@ export default {
       if (result.error) {
         this.$store.dispatch(
           'notifications/error',
-          result.error.message || 'Le paiement a echoue.'
+          result.error.message || 'Le paiement a échoué.'
         )
         return
       }
 
       this.$store.dispatch(
         'notifications/success',
-        'Paiement envoye. La commande sera confirmee par Stripe.'
+        'Paiement envoyé. La commande sera confirmée par Stripe.'
       )
       if (this.isOrderEditActive) {
         const orderId = this.orderEditId

@@ -9,10 +9,10 @@
       <v-form v-model="isValue" @submit.prevent="submitEditCategory">
         <v-text-field
           v-model="formcategory.name"
-          label="Name"
+          label="Nom"
           type="text"
-          :rules="[(v) => !!v || 'Name category required']"
-          placeholder="Insert category name"
+          :rules="[(v) => !!v || 'Le nom de la catégorie est requis']"
+          placeholder="Saisir le nom de la catégorie"
           required
           autofocus
         ></v-text-field>
@@ -25,7 +25,7 @@
           class="ml-4"
           type="submit"
           color="primary"
-          >Submit <v-icon small right>mdi-check-circle</v-icon></v-btn
+          >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
         >
       </v-form>
     </div>

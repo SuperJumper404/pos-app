@@ -37,7 +37,7 @@
         class="d-none d-sm-flex justify-center"
       >
         <v-icon large>mdi-emoticon-neutral-outline</v-icon>
-        <h4>Product Empty</h4>
+        <h4>Aucun produit</h4>
       </v-card-title>
       <!-- md -->
       <div v-else>
@@ -125,7 +125,7 @@
         class="d-flex d-sm-none justify-center"
       >
         <v-icon large>mdi-emoticon-neutral-outline</v-icon>
-        <h4>Product Empty</h4>
+        <h4>Aucun produit</h4>
       </v-card-title>
 
       <div v-else>

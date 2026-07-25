@@ -23,7 +23,7 @@
         class="d-flex justify-center"
       >
         <v-icon large>mdi-emoticon-neutral-outline</v-icon>
-        <h4>Categories Empty</h4>
+        <h4>Aucune catégorie</h4>
       </v-card-title>
       <v-card
         v-for="items in dataCategories"
