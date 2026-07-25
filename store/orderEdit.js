@@ -17,6 +17,7 @@ export const state = () => ({
   paymentRefresh: null,
   payment: null,
   loading: false,
+  beginRequestId: 0,
   message: '',
 })
 
@@ -80,18 +81,32 @@ const startSession = (dispatch, editable, cart) => {
 }
 
 export const actions = {
-  async begin({ dispatch, rootState }, orderId) {
+  invalidateBegin({ dispatch, state }) {
+    const requestId = Number(state.beginRequestId || 0) + 1
+    dispatch('set/beginRequestId', requestId)
+    dispatch('set/loading', false)
+    return requestId
+  },
+
+  async begin({ dispatch, rootState, state }, orderId) {
+    const requestId = await dispatch('invalidateBegin')
     dispatch('set/loading', true)
     try {
       const response = await this.$axios.get(
         `/baseurl/api/v1/orders/${orderId}/edit`,
         { headers: authHeaders() }
       )
+      if (state.beginRequestId !== requestId) {
+        return { ok: false, data: null, error: null, cancelled: true }
+      }
       if (
         !Array.isArray(rootState.products.dataProduct) ||
         rootState.products.dataProduct.length === 0
       ) {
         await dispatch('products/getProducts', null, { root: true })
+      }
+      if (state.beginRequestId !== requestId) {
+        return { ok: false, data: null, error: null, cancelled: true }
       }
       const editable = response.data.data
       const cart = editableOrderToCart(
@@ -101,12 +116,17 @@ export const actions = {
       startSession(dispatch, editable, cart)
       return { ok: true, data: editable, error: null }
     } catch (error) {
+      if (state.beginRequestId !== requestId) {
+        return { ok: false, data: null, error: null, cancelled: true }
+      }
       const normalized = apiError(error)
       dispatch('set/message', normalized.message)
       dispatch('notifications/error', normalized.message, { root: true })
       return { ok: false, data: null, error: normalized }
     } finally {
-      dispatch('set/loading', false)
+      if (state.beginRequestId === requestId) {
+        dispatch('set/loading', false)
+      }
     }
   },
 
@@ -165,6 +185,7 @@ export const actions = {
   },
 
   cancel({ dispatch, state }) {
+    dispatch('invalidateBegin')
     const clearCart = state.active === true
     clear(dispatch)
     if (clearCart) {

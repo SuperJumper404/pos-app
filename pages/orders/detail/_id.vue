@@ -193,6 +193,7 @@ export default {
       loadedOrderId: null,
       detailLoadError: '',
       detailRequestId: 0,
+      actionRequestId: 0,
       startLoading: false,
       replaceCartDialog: false,
       pendingStart: null,
@@ -248,6 +249,9 @@ export default {
       const requestedId = String(id)
       const requestId = this.detailRequestId + 1
       this.detailRequestId = requestId
+      this.actionRequestId += 1
+      this.startLoading = false
+      this.$store.dispatch('orderEdit/invalidateBegin')
       this.id = id
       this.loadPage = true
       this.loadedOrderId = null
@@ -295,6 +299,14 @@ export default {
       }
       this.startPendingOrder()
     },
+    isCurrentOrderDetail(orderId, actionRequestId) {
+      return (
+        !this.loadPage &&
+        this.loadedOrderId === String(orderId) &&
+        String(this.$route.params.id) === String(orderId) &&
+        this.actionRequestId === actionRequestId
+      )
+    },
     cancelReplaceCart() {
       this.replaceCartDialog = false
       this.pendingStart = null
@@ -311,7 +323,14 @@ export default {
     },
     async startOrderEdit() {
       const orderId = this.loadedOrderId
-      if (this.loadPage || !this.canEditOrder || !orderId) return
+      const actionRequestId = this.actionRequestId + 1
+      this.actionRequestId = actionRequestId
+      if (
+        !this.isCurrentOrderDetail(orderId, actionRequestId) ||
+        !this.canEditOrder
+      ) {
+        return
+      }
       this.startLoading = true
       try {
         this.$store.dispatch('orders/setComplementaryOrder', null)
@@ -319,23 +338,34 @@ export default {
         if (
           !result ||
           !result.ok ||
-          this.loadPage ||
-          this.loadedOrderId !== orderId
+          !this.isCurrentOrderDetail(orderId, actionRequestId)
         ) {
           return
         }
         this.$router.push('/menus')
       } finally {
-        this.startLoading = false
+        if (this.actionRequestId === actionRequestId) {
+          this.startLoading = false
+        }
       }
     },
     async startComplementaryOrder() {
-      if (this.loadPage || !this.canStartComplementaryOrder) return
+      const orderId = this.loadedOrderId
+      const actionRequestId = this.actionRequestId + 1
+      this.actionRequestId = actionRequestId
+      if (
+        !this.isCurrentOrderDetail(orderId, actionRequestId) ||
+        !this.canStartComplementaryOrder
+      ) {
+        return
+      }
       const order = this.orderSummary || {}
       this.startLoading = true
       try {
         await this.$store.dispatch('cart/abandonCheckout', { safe: true })
+        if (!this.isCurrentOrderDetail(orderId, actionRequestId)) return
         await this.$store.dispatch('orderEdit/cancel')
+        if (!this.isCurrentOrderDetail(orderId, actionRequestId)) return
         this.$store.dispatch('cart/setTocart', null)
         this.$store.dispatch('cart/setTotal', 0)
         this.$store.dispatch('cart/setIndex', 0)
@@ -345,7 +375,9 @@ export default {
         })
         this.$router.push('/menus')
       } finally {
-        this.startLoading = false
+        if (this.actionRequestId === actionRequestId) {
+          this.startLoading = false
+        }
       }
     },
     customizationGroups(item) {

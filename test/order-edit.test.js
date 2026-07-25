@@ -268,4 +268,37 @@ assert.ok(
   'the complementary action must be hidden while another detail is loading'
 )
 
+assert.ok(
+  storeSource.includes('beginRequestId: 0'),
+  'a deferred edit begin must carry an invalidatable request generation'
+)
+assert.ok(
+  storeSource.includes('invalidateBegin('),
+  'the edit session must expose explicit begin invalidation'
+)
+assert.ok(
+  storeSource.includes('state.beginRequestId !== requestId'),
+  'a late edit response must not hydrate a superseded order session or cart'
+)
+assert.ok(
+  detailSource.includes("'orderEdit/invalidateBegin'"),
+  'a detail route change must invalidate an in-flight edit begin'
+)
+assert.ok(
+  detailSource.includes('isCurrentOrderDetail('),
+  'deferred detail actions must recheck their captured route and order id'
+)
+assert.ok(
+  detailSource.includes('await this.$store.dispatch(\'cart/abandonCheckout\''),
+  'the complementary action must model its deferred checkout cleanup'
+)
+assert.ok(
+  detailSource.includes('await this.$store.dispatch(\'orderEdit/cancel\')'),
+  'the complementary action must model its deferred edit cleanup'
+)
+assert.ok(
+  detailSource.includes('this.isCurrentOrderDetail(orderId, actionRequestId)'),
+  'a delayed complementary flow must not alter the cart, session, or prefill for a new route'
+)
+
 console.log('order edit tests passed')
