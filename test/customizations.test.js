@@ -2893,9 +2893,14 @@ const runReviewRegressionTests = async () => {
   )
 
   unsafeMenuVm.cartItem = [{ id: 9, qty: 1 }]
+  unsafeMenuVm.embeddedOrderEdit = false
+  unsafeMenuVm.isOrderEditActive = false
   unsafeMenuVm.isKitchenClosed = false
   unsafeMenuVm.showKitchenClosedSnackbar = () => {}
   unsafeMenuVm.$router.push = (pathValue) => unsafeMenuRoutes.push(pathValue)
+  unsafeMenuVm.openCart = function () {
+    return menusOptions.methods.openCart.call(this)
+  }
   await menusOptions.methods.btnOrder.call(unsafeMenuVm)
   assert.strictEqual(unsafeMenuVm.cartItem[0].id, 5)
   assert.strictEqual(unsafeMenuRoutes[unsafeMenuRoutes.length - 1], '/cart')
@@ -2930,12 +2935,17 @@ const runReviewRegressionTests = async () => {
 
   const safeMenuEvents = []
   const safeMenuVm = {
+    embeddedOrderEdit: false,
+    isOrderEditActive: false,
     isKitchenClosed: false,
     clientOrderStatus: 'prewrite_rejected',
     hasUnsafeCheckoutAttempt: false,
     cartItem: [{ id: 9, qty: 1 }],
     showKitchenClosedSnackbar() {},
     restorePersistedCheckoutCart() {},
+    openCart() {
+      return menusOptions.methods.openCart.call(this)
+    },
     $store: {
       dispatch(type, payload) {
         safeMenuEvents.push([type, payload])

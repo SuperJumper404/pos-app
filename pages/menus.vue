@@ -425,12 +425,6 @@ import {
 } from '@/helpers/customizations'
 // import * as config from '@/nuxt.config'
 export default {
-  props: {
-    embeddedOrderEdit: {
-      type: Boolean,
-      default: false,
-    },
-  },
   components: {
     Loading,
     OrderEditBanner,
@@ -459,6 +453,12 @@ export default {
       : 'clientside'
   },
   middleware: 'auth',
+  props: {
+    embeddedOrderEdit: {
+      type: Boolean,
+      default: false,
+    },
+  },
   data: () => ({
     customizationDialog: false,
     previewDialog: false,

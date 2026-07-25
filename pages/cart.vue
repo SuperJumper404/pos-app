@@ -395,12 +395,6 @@ const {
 } = require('@/helpers/checkoutAccess')
 const { shouldAutoPrepareStripeCheckout } = require('@/helpers/stripeCheckout')
 export default {
-  props: {
-    embeddedOrderEdit: {
-      type: Boolean,
-      default: false,
-    },
-  },
   components: {
     Loading,
     OrderEditBanner,
@@ -444,6 +438,12 @@ export default {
       : 'clientside'
   },
   middleware: 'auth',
+  props: {
+    embeddedOrderEdit: {
+      type: Boolean,
+      default: false,
+    },
+  },
   data: () => ({
     ppn: 0,
     total: 0,
