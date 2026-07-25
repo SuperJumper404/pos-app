@@ -1,10 +1,5 @@
 <template>
   <v-container>
-    <OrderEditBanner
-      v-if="isOrderEditActive"
-      :order-number="orderEditNumber"
-      @cancel="btnCancel"
-    />
     <v-alert :value="alert" :type="alertType" dismissible>{{
       alertText
     }}</v-alert>
@@ -416,7 +411,6 @@
 </template>
 <script>
 import Loading from '@/components/loading'
-import OrderEditBanner from '@/components/orders/OrderEditBanner'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import price from '@/helpers/price'
 import {
@@ -427,7 +421,6 @@ import {
 export default {
   components: {
     Loading,
-    OrderEditBanner,
     ProductCustomizationWizard,
   },
   mixins: [price],
@@ -527,9 +520,6 @@ export default {
     },
     isOrderEditActive() {
       return this.$store.get('orderEdit/active') === true
-    },
-    orderEditNumber() {
-      return String(this.$store.get('orderEdit/orderNumber') || '')
     },
     orderEditDirty() {
       return this.$store.get('orderEdit/dirty') === true

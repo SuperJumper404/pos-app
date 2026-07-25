@@ -1,10 +1,5 @@
 <template>
   <v-container>
-    <OrderEditBanner
-      v-if="isOrderEditActive"
-      :order-number="orderEditNumber"
-      @cancel="cancelCart"
-    />
     <v-alert
       v-if="checkoutErrorMessage"
       type="error"
@@ -397,7 +392,6 @@
 <script>
 import { loadStripe } from '@stripe/stripe-js'
 import Loading from '@/components/loading'
-import OrderEditBanner from '@/components/orders/OrderEditBanner'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import CartCustomizationSummary from '@/components/products/CartCustomizationSummary'
 import price from '@/helpers/price'
@@ -415,7 +409,6 @@ const { shouldAutoPrepareStripeCheckout } = require('@/helpers/stripeCheckout')
 export default {
   components: {
     Loading,
-    OrderEditBanner,
     ProductCustomizationWizard,
     CartCustomizationSummary,
   },

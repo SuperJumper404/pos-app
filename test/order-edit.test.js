@@ -1,5 +1,6 @@
 const assert = require('assert')
 const fs = require('fs')
+const path = require('path')
 
 const {
   canEditOrder,
@@ -336,12 +337,13 @@ const menusSource = fs.readFileSync(require.resolve('../pages/menus.vue'), 'utf8
 const cartSource = fs.readFileSync(require.resolve('../pages/cart.vue'), 'utf8')
 assert.ok(cartSource.includes('cart-checkout-actions--embedded'))
 assert.ok(cartSource.includes("grid-template-areas: 'save save' 'menu cancel'"))
-const bannerPath = '../components/orders/OrderEditBanner.vue'
-
 assert.ok(
-  menusSource.includes('<OrderEditBanner') &&
-    cartSource.includes('<OrderEditBanner'),
-  'menus and cart must expose the active order edit session'
+  !menusSource.includes('OrderEditBanner') &&
+    !cartSource.includes('OrderEditBanner') &&
+    !fs.existsSync(
+      path.join(__dirname, '..', 'components', 'orders', 'OrderEditBanner.vue')
+    ),
+  'the redundant order edit banner must be removed'
 )
 assert.ok(
   cartSource.includes('Enregistrer les modifications'),
@@ -394,11 +396,6 @@ const loadPageOptions = (source, dependencies, values) => {
 }
 
 const runCartEditContracts = async () => {
-  assert.doesNotThrow(() => require.resolve(bannerPath))
-  const bannerSource = fs.readFileSync(require.resolve(bannerPath), 'utf8')
-  assert.ok(bannerSource.includes('Modification de la commande'))
-  assert.ok(bannerSource.includes('Annuler la modification'))
-
   const orderEditStore = loadOrderEditStore()
   const previousLocalStorage = global.localStorage
   global.localStorage = { getItem: () => 'token' }
@@ -581,13 +578,12 @@ const runCartEditContracts = async () => {
       menusSource,
       [
         'Loading',
-        'OrderEditBanner',
         'ProductCustomizationWizard',
         'price',
         'mergeConfiguredCartLine',
         'replaceConfiguredCartLine',
       ],
-      [{}, {}, {}, {}, () => [], () => []]
+      [{}, {}, {}, () => [], () => []]
     )
     assert.ok(
       menusOptions.props && menusOptions.props.embeddedOrderEdit,
@@ -657,7 +653,6 @@ const runCartEditContracts = async () => {
       [
         'loadStripe',
         'Loading',
-        'OrderEditBanner',
         'ProductCustomizationWizard',
         'CartCustomizationSummary',
         'price',
@@ -671,7 +666,6 @@ const runCartEditContracts = async () => {
       ],
       [
         () => null,
-        {},
         {},
         {},
         {},
