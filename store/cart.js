@@ -55,6 +55,7 @@ const buildCheckoutPayload = (params, clientOrderToken) => ({
   customer: params.customer,
   customerID: params.customerID,
   payment: params.payment,
+  is_takeaway: params.isTakeaway === true,
   remark: params.remark,
   phone: params.phone,
   items: buildCheckoutItems(params.dataCart),

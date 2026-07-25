@@ -11,6 +11,8 @@ export const state = () => ({
   orderNumber: '',
   contentRevision: null,
   originalCart: [],
+  originalTakeaway: false,
+  takeaway: false,
   dirty: false,
   paymentProvider: null,
   paymentStatus: null,
@@ -50,6 +52,8 @@ const clear = (dispatch) => {
   dispatch('set/orderNumber', '')
   dispatch('set/contentRevision', null)
   dispatch('set/originalCart', [])
+  dispatch('set/originalTakeaway', false)
+  dispatch('set/takeaway', false)
   dispatch('set/dirty', false)
   dispatch('set/paymentProvider', null)
   dispatch('set/paymentStatus', null)
@@ -66,6 +70,9 @@ const startSession = (dispatch, editable, cart) => {
   dispatch('set/orderNumber', String(order.ordernumber))
   dispatch('set/contentRevision', editable.content_revision)
   dispatch('set/originalCart', clone(cart))
+  const takeaway = [true, 1, '1'].includes(order.is_takeaway)
+  dispatch('set/originalTakeaway', takeaway)
+  dispatch('set/takeaway', takeaway)
   dispatch('set/dirty', false)
   dispatch('set/paymentProvider', order.payment_provider || null)
   dispatch('set/paymentStatus', order.payment_status)
@@ -132,12 +139,19 @@ export const actions = {
 
   updateDirty({ dispatch, state, rootState }, cart) {
     const currentCart = cart || rootState.cart.dataCart || []
-    const dirty = isOrderEditDirty(state.originalCart, currentCart)
+    const dirty =
+      isOrderEditDirty(state.originalCart, currentCart) ||
+      state.takeaway !== state.originalTakeaway
     dispatch('set/dirty', dirty)
     if (dirty) {
       dispatch('set/paymentRefresh', null)
       dispatch('set/payment', null)
     }
+  },
+
+  setTakeaway({ dispatch, rootState }, value) {
+    dispatch('set/takeaway', value === true)
+    return dispatch('updateDirty', rootState.cart.dataCart || [])
   },
 
   async save({ dispatch, state, rootState }) {
@@ -147,6 +161,7 @@ export const actions = {
     const payload = cartToOrderEditPayload({
       contentRevision: state.contentRevision,
       expectedTotal: rootState.cart.totalCart,
+      isTakeaway: state.takeaway,
       cart,
     })
     dispatch('set/loading', true)
@@ -160,6 +175,7 @@ export const actions = {
       if (data && data.payment_refresh) {
         dispatch('set/contentRevision', data.content_revision)
         dispatch('set/originalCart', clone(cart))
+        dispatch('set/originalTakeaway', state.takeaway)
         dispatch('set/dirty', false)
         dispatch('set/paymentStatus', data.payment_status)
         dispatch('set/paymentRefresh', data.payment_refresh)

@@ -305,6 +305,7 @@ const buildCheckoutPayloadSignature = (input = {}) => {
     phone: normalizedText(input.phone),
     remark: normalizedText(input.remark),
     payment: normalizedText(input.payment).toLowerCase(),
+    is_takeaway: input.isTakeaway === true,
     flow: input.stripe === true ? 'stripe' : 'order',
     expected_total: roundPrice(
       input.total == null ? input.expected_total : input.total

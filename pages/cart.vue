@@ -204,6 +204,13 @@
                 class="mb-5"
                 required
               ></v-text-field>
+              <v-checkbox
+                v-model="formuser.isTakeaway"
+                label="À emporter"
+                color="primary"
+                class="mt-0 mb-4"
+                hide-details
+              ></v-checkbox>
               <!-- <v-select
               v-model="formuser.payment"
               :items="items"
@@ -219,6 +226,15 @@
                 placeholder="Ajouter une note à la commande"
               ></v-textarea>
             </template>
+            <v-checkbox
+              v-if="isOrderEditActive"
+              :input-value="orderEditTakeaway"
+              label="À emporter"
+              color="primary"
+              class="mt-0 mb-4"
+              hide-details
+              @change="setOrderEditTakeaway"
+            ></v-checkbox>
             <div
               v-show="showStripePaymentPanel"
               class="stripe-checkout-panel mb-4"
@@ -486,6 +502,7 @@ export default {
       phone: '',
       payment: 'Espèce',
       notes: '',
+      isTakeaway: false,
     },
     // Pour le moment on a que l'espece
     items: ['Carte Bleu ', 'Espèce', 'Ticket Restaurant'],
@@ -540,6 +557,9 @@ export default {
     },
     orderEditDirty() {
       return this.$store.get('orderEdit/dirty') === true
+    },
+    orderEditTakeaway() {
+      return this.$store.get('orderEdit/takeaway') === true
     },
     orderEditPaymentRefresh() {
       return this.$store.get('orderEdit/paymentRefresh')
@@ -653,6 +673,9 @@ export default {
       this.handleStripeCheckoutChange()
     },
     'formuser.payment'() {
+      this.handleStripeCheckoutChange()
+    },
+    'formuser.isTakeaway'() {
       this.handleStripeCheckoutChange()
     },
     qrPaymentMode() {
@@ -798,6 +821,7 @@ export default {
       this.formuser.phone = payload.phone || ''
       this.formuser.payment = payload.payment || this.formuser.payment
       this.formuser.notes = payload.remark || ''
+      this.formuser.isTakeaway = [true, 1, '1'].includes(payload.is_takeaway)
       if (payload.customerID != null) this.selectedTable = payload.customerID
 
       if (Array.isArray(payload.dataCart)) {
@@ -1073,6 +1097,9 @@ export default {
       }
       await this.paymentBtn()
     },
+    setOrderEditTakeaway(value) {
+      this.$store.dispatch('orderEdit/setTakeaway', value === true)
+    },
     showOrderEditMenu() {
       if (this.embeddedOrderEdit && this.isOrderEditActive) {
         this.$emit('show-menu')
@@ -1307,6 +1334,9 @@ export default {
         payment: paymentMethod,
         remark: this.formuser.notes,
         phone: this.formuser.phone,
+        isTakeaway: this.isOrderEditActive
+          ? this.orderEditTakeaway
+          : this.formuser.isTakeaway,
         dataCart: this.dataCart,
         stripe,
         repriceConfirmation,

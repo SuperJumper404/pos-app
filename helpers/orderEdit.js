@@ -98,9 +98,15 @@ const editableOrderToCart = (editable = {}, products = []) =>
     }
   })
 
-const cartToOrderEditPayload = ({ contentRevision, expectedTotal, cart } = {}) => ({
+const cartToOrderEditPayload = ({
+  contentRevision,
+  expectedTotal,
+  isTakeaway,
+  cart,
+} = {}) => ({
   content_revision: contentRevision,
   expected_total: roundPrice(expectedTotal),
+  is_takeaway: isTakeaway === true,
   items: buildCheckoutItems(cart),
 })
 

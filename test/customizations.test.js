@@ -1412,6 +1412,24 @@ assert.ok(
     cartHeaderBlock.includes('@click="editCartLine(itemIndex)"'),
   'the global pencil action must live below product name and price'
 )
+assert.notStrictEqual(
+  buildCheckoutPayloadSignature({
+    customer: 'Ada',
+    customerID: 12,
+    total: 10,
+    payment: 'cash',
+    dataCart: [{ id: 10, qty: 1, selectedChoiceIds: [] }],
+    isTakeaway: false,
+  }),
+  buildCheckoutPayloadSignature({
+    customer: 'Ada',
+    customerID: 12,
+    total: 10,
+    payment: 'cash',
+    dataCart: [{ id: 10, qty: 1, selectedChoiceIds: [] }],
+    isTakeaway: true,
+  })
+)
 const cartCustomizationBlock = cartPageSource.match(
   /<v-col class="cart-summary-customizations pt-2">[\s\S]*?<\/v-col>/
 )[0]
@@ -1957,6 +1975,7 @@ const runReviewRegressionTests = async () => {
       expected_total: 18,
       customer: 'Alice',
       customerID: 12,
+      is_takeaway: false,
       payment: 'Espèce',
       remark: 'Sans couverts',
       phone: '0600000000',
@@ -3132,6 +3151,7 @@ const runReviewRegressionTests = async () => {
         phone: boundStripePayload.phone,
         payment: boundStripePayload.payment,
         notes: boundStripePayload.remark,
+        isTakeaway: false,
       },
       selectedTable: boundStripePayload.customerID,
       total: boundStripePayload.expected_total,
@@ -3216,6 +3236,7 @@ const runReviewRegressionTests = async () => {
         phone: boundStripePayload.phone,
         payment: boundStripePayload.payment,
         notes: boundStripePayload.remark,
+        isTakeaway: false,
       },
       `${mutation.label} must roll back after cancellation failure`
     )

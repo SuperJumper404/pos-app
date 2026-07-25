@@ -112,11 +112,13 @@ assert.deepStrictEqual(
   cartToOrderEditPayload({
     contentRevision: 'revision-1',
     expectedTotal: 19,
+    isTakeaway: true,
     cart,
   }),
   {
     content_revision: 'revision-1',
     expected_total: 19,
+    is_takeaway: true,
     items: [
       {
         product_id: 10,
