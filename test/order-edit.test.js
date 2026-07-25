@@ -577,6 +577,29 @@ const runCartEditContracts = async () => {
       ],
       [{}, {}, {}, {}, () => [], () => []]
     )
+    assert.ok(
+      menusOptions.props && menusOptions.props.embeddedOrderEdit,
+      'menus must declare its embedded order-edit mode'
+    )
+    const embeddedMenuEvents = []
+    const embeddedMenuRoutes = []
+    menusOptions.methods.openCart.call({
+      embeddedOrderEdit: true,
+      isOrderEditActive: true,
+      $emit: (...args) => embeddedMenuEvents.push(args),
+      $router: { push: (path) => embeddedMenuRoutes.push(path) },
+    })
+    assert.deepStrictEqual(embeddedMenuEvents, [['show-cart']])
+    assert.deepStrictEqual(embeddedMenuRoutes, [])
+
+    const standaloneMenuRoutes = []
+    menusOptions.methods.openCart.call({
+      embeddedOrderEdit: false,
+      isOrderEditActive: true,
+      $emit() {},
+      $router: { push: (path) => standaloneMenuRoutes.push(path) },
+    })
+    assert.deepStrictEqual(standaloneMenuRoutes, ['/cart'])
     const mountedCart = [{ ...cart[0] }]
     const menuDispatches = []
     const menuVm = {

@@ -425,6 +425,12 @@ import {
 } from '@/helpers/customizations'
 // import * as config from '@/nuxt.config'
 export default {
+  props: {
+    embeddedOrderEdit: {
+      type: Boolean,
+      default: false,
+    },
+  },
   components: {
     Loading,
     OrderEditBanner,
@@ -800,6 +806,13 @@ export default {
       this.totalPrice()
       this.indexCart()
     },
+    openCart() {
+      if (this.embeddedOrderEdit && this.isOrderEditActive) {
+        this.$emit('show-cart')
+        return
+      }
+      this.$router.push('/cart')
+    },
     async btnOrder() {
       if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.showKitchenClosedSnackbar()
@@ -808,7 +821,7 @@ export default {
 
       if (this.hasUnsafeCheckoutAttempt) {
         this.restorePersistedCheckoutCart()
-        this.$router.push('/cart')
+        this.openCart()
         return
       }
 
@@ -822,10 +835,14 @@ export default {
 
       this.$store.dispatch('cart/setTocart', this.cartItem)
       this.allowRouteLeave = true
-      this.$router.push('/cart')
+      this.openCart()
     },
     async btnCancel() {
       if (this.isOrderEditActive) {
+        if (this.embeddedOrderEdit) {
+          this.$emit('request-close')
+          return
+        }
         if (!window.confirm('Annuler les modifications de cette commande ?')) {
           return
         }
