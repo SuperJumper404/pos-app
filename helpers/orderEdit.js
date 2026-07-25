@@ -11,6 +11,9 @@ const canEditOrder = (order = {}) =>
 const canStartComplementaryOrder = (order = {}) =>
   order.payment_provider === 'stripe' && order.payment_status === 'paid'
 
+const canUseOrderEditModal = (access, order = {}) =>
+  Number(access) === 0 && canEditOrder(order)
+
 const selectedObjects = (product, selectedIds) => {
   const selected = new Set((selectedIds || []).map(Number))
   const selections = []
@@ -108,6 +111,7 @@ const isOrderEditDirty = (originalCart, currentCart) =>
 module.exports = {
   canEditOrder,
   canStartComplementaryOrder,
+  canUseOrderEditModal,
   editableOrderToCart,
   cartToOrderEditPayload,
   isOrderEditDirty,

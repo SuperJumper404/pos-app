@@ -119,7 +119,7 @@
     <v-card color="grey lighten-3" class="mt-5">
       <v-card-actions>
         <v-btn
-          v-if="canEditOrder && !loadPage"
+          v-if="canOpenOrderEditModal && !loadPage"
           color="success"
           class="text-none"
           :loading="startLoading"
@@ -163,15 +163,23 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <OrderEditModal
+      v-model="orderEditDialog"
+      :order-number="String((orderSummary && orderSummary.ordernumber) || '')"
+      @completed="handleOrderEditCompleted"
+    />
   </v-container>
 </template>
 
 <script>
+import OrderEditModal from '@/components/orders/OrderEditModal'
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
 const {
   canEditOrder: isOrderEditable,
   canStartComplementaryOrder: canCreateComplementaryOrder,
+  canUseOrderEditModal,
 } = require('@/helpers/orderEdit')
 const {
   getPaymentStatusText,
@@ -179,6 +187,9 @@ const {
 } = require('@/helpers/paymentStatus')
 
 export default {
+  components: {
+    OrderEditModal,
+  },
   mixins: [price],
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
@@ -195,6 +206,7 @@ export default {
       detailRequestId: 0,
       actionRequestId: 0,
       startLoading: false,
+      orderEditDialog: false,
       replaceCartDialog: false,
       pendingStart: null,
     }
@@ -213,6 +225,17 @@ export default {
     },
     canEditOrder() {
       return isOrderEditable(this.orderSummary || {})
+    },
+    userAccess() {
+      const user = this.$store.get('users/user') || {}
+      const access =
+        user.access === undefined || user.access === null
+          ? localStorage.getItem('access')
+          : user.access
+      return Number(access)
+    },
+    canOpenOrderEditModal() {
+      return canUseOrderEditModal(this.userAccess, this.orderSummary || {})
     },
     canStartComplementaryOrder() {
       return canCreateComplementaryOrder(this.orderSummary || {})
@@ -256,6 +279,7 @@ export default {
       this.loadPage = true
       this.loadedOrderId = null
       this.detailLoadError = ''
+      this.orderEditDialog = false
       this.replaceCartDialog = false
       this.pendingStart = null
 
@@ -274,7 +298,7 @@ export default {
       }
     },
     requestOrderEdit() {
-      if (!this.canEditOrder) return
+      if (!this.canOpenOrderEditModal) return
       this.requestOrderStart('edit')
     },
     requestComplementaryOrder() {
@@ -327,7 +351,7 @@ export default {
       this.actionRequestId = actionRequestId
       if (
         !this.isCurrentOrderDetail(orderId, actionRequestId) ||
-        !this.canEditOrder
+        !this.canOpenOrderEditModal
       ) {
         return
       }
@@ -342,7 +366,7 @@ export default {
         ) {
           return
         }
-        this.$router.push('/menus')
+        this.orderEditDialog = true
       } finally {
         if (this.actionRequestId === actionRequestId) {
           this.startLoading = false
@@ -379,6 +403,9 @@ export default {
           this.startLoading = false
         }
       }
+    },
+    handleOrderEditCompleted() {
+      this.loadOrderDetail(this.id)
     },
     customizationGroups(item) {
       const value = item || {}

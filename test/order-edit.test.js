@@ -4,6 +4,7 @@ const fs = require('fs')
 const {
   canEditOrder,
   canStartComplementaryOrder,
+  canUseOrderEditModal,
   editableOrderToCart,
   cartToOrderEditPayload,
   isOrderEditDirty,
@@ -82,6 +83,13 @@ assert.strictEqual(
   true
 )
 assert.strictEqual(canStartComplementaryOrder(editable.order), false)
+assert.strictEqual(canUseOrderEditModal(0, editable.order), true)
+assert.strictEqual(canUseOrderEditModal(2, editable.order), false)
+assert.strictEqual(canUseOrderEditModal(3, editable.order), false)
+assert.strictEqual(
+  canUseOrderEditModal(0, { ...editable.order, status: 2 }),
+  false
+)
 
 const cart = editableOrderToCart(editable, [product])
 assert.strictEqual(cart[0].id, 10)
@@ -168,6 +176,17 @@ const detailSource = fs.readFileSync(
   require.resolve('../pages/orders/detail/_id.vue'),
   'utf8'
 )
+const modalPath = '../components/orders/OrderEditModal.vue'
+assert.doesNotThrow(() => require.resolve(modalPath))
+const modalSource = fs.readFileSync(require.resolve(modalPath), 'utf8')
+assert.ok(modalSource.includes('<v-dialog'))
+assert.ok(modalSource.includes('fullscreen'))
+assert.ok(modalSource.includes("step === 'menu'"))
+assert.ok(modalSource.includes("step === 'cart'"))
+assert.ok(modalSource.includes("orderEdit/cancel"))
+assert.ok(detailSource.includes('<OrderEditModal'))
+assert.ok(detailSource.includes('canOpenOrderEditModal'))
+assert.ok(detailSource.includes('this.orderEditDialog = true'))
 assert.ok(
   detailSource.includes('Modifier la commande'),
   'an unpaid editable order must expose the edit action'
@@ -177,8 +196,8 @@ assert.ok(
   'a paid Stripe order must expose the complementary-order action'
 )
 assert.ok(
-  detailSource.includes('v-if="canEditOrder && !loadPage"'),
-  'the edit action must keep the helper eligibility guard'
+  detailSource.includes('v-if="canOpenOrderEditModal && !loadPage"'),
+  'the edit action must keep the kitchen and helper eligibility guards'
 )
 assert.ok(
   detailSource.includes('v-if="canStartComplementaryOrder && !loadPage"'),
@@ -218,7 +237,7 @@ assert.ok(
 )
 assert.ok(
   detailSource.includes("this.$router.push('/menus')"),
-  'both order starts must navigate to the catalogue'
+  'a complementary order must still navigate to the catalogue'
 )
 
 const ordersSource = fs.readFileSync(require.resolve('../store/orders.js'), 'utf8')
@@ -262,7 +281,7 @@ assert.ok(
   'the loading state must be cleared after successful and failed requests'
 )
 assert.ok(
-  detailSource.includes('v-if="canEditOrder && !loadPage"'),
+  detailSource.includes('v-if="canOpenOrderEditModal && !loadPage"'),
   'the edit action must be hidden while another detail is loading'
 )
 assert.ok(
