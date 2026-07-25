@@ -117,10 +117,12 @@
               </v-row>
 
               <v-col class="cart-summary-customizations pt-2">
-                <CartCustomizationSummary
+                <CustomizationSummary
                   v-if="(itm.customization_steps || []).length > 0"
-                  :selections="itm.selections || []"
+                  :groups="customizationGroups(itm)"
                   :unit-price="itm.price"
+                  editable
+                  show-total
                   @edit="editCartLine(itemIndex, $event)"
                 />
               </v-col>
@@ -393,12 +395,13 @@
 import { loadStripe } from '@stripe/stripe-js'
 import Loading from '@/components/loading'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
-import CartCustomizationSummary from '@/components/products/CartCustomizationSummary'
+import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import {
   applyServerQuoteToCart,
   buildCheckoutPayloadSignature,
   findCartTargetForCheckoutError,
+  groupCustomizationSelections,
   replaceConfiguredCartLine,
 } from '@/helpers/customizations'
 const {
@@ -410,7 +413,7 @@ export default {
   components: {
     Loading,
     ProductCustomizationWizard,
-    CartCustomizationSummary,
+    CustomizationSummary,
   },
   mixins: [price],
   async beforeRouteLeave(to, from, next) {
@@ -711,6 +714,12 @@ export default {
     this.clearStripeAutoPrepareTimeout()
   },
   methods: {
+    customizationGroups(item) {
+      const value = item || {}
+      return groupCustomizationSelections(
+        value.selections || value.customizationList
+      )
+    },
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`

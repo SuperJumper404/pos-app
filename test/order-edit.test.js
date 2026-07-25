@@ -654,7 +654,7 @@ const runCartEditContracts = async () => {
         'loadStripe',
         'Loading',
         'ProductCustomizationWizard',
-        'CartCustomizationSummary',
+        'CustomizationSummary',
         'price',
         'applyServerQuoteToCart',
         'buildCheckoutPayloadSignature',

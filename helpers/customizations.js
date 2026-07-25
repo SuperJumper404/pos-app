@@ -102,6 +102,16 @@ const snapshotStepIdentity = (selection, stepName) => {
   return stepId === undefined ? `name:${stepName}` : `id:${stepId}`
 }
 
+const editableStepId = (selection) => {
+  const stepId = firstDefined(
+    selection.product_step_id,
+    selection.productStepId
+  )
+  return stepId === undefined || stepId === null || stepId === ''
+    ? null
+    : Number(stepId)
+}
+
 const snapshotChoice = (selection, sourceIndex) => ({
   name:
     selectionText(selection.choice_name) ||
@@ -146,6 +156,7 @@ const groupCustomizationSelections = (selections) => {
     if (!group) {
       group = {
         stepName,
+        stepId: editableStepId(selection),
         position: numericPosition(
           firstDefined(selection.step_position, selection.stepPosition)
         ),
@@ -166,6 +177,7 @@ const groupCustomizationSelections = (selections) => {
     )
     .map((group) => ({
       stepName: group.stepName,
+      ...(group.stepId == null ? {} : { stepId: group.stepId }),
       choices: group.choices
         .slice()
         .sort(

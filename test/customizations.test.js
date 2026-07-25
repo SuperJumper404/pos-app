@@ -321,6 +321,24 @@ assert.deepStrictEqual(groupCustomizationSelections([null, {}, false]), [])
 assert.deepStrictEqual(
   groupCustomizationSelections([
     {
+      product_step_id: 72,
+      step_name: 'Boisson',
+      choice_name: 'Cola',
+      extra_price: '1.50',
+    },
+  ]),
+  [
+    {
+      stepName: 'Boisson',
+      stepId: 72,
+      choices: [{ name: 'Cola', price: 1.5 }],
+    },
+  ],
+  'current cart groups must retain the editable product step id'
+)
+assert.deepStrictEqual(
+  groupCustomizationSelections([
+    {
       step_name: 'Boisson',
       step_position: 0,
       choice_name: 'Sans position',
@@ -367,7 +385,6 @@ assert.deepStrictEqual(
 )
 
 for (const pageFile of [
-  '../pages/orders/detail/_id.vue',
   '../pages/history/index.vue',
   '../pages/cashregister/details/_id.vue',
 ]) {
@@ -385,6 +402,22 @@ for (const pageFile of [
   }
 }
 
+const orderDetailSource = fs.readFileSync(
+  path.join(__dirname, '../pages/orders/detail/_id.vue'),
+  'utf8'
+)
+for (const contractToken of [
+  'groupCustomizationSelections',
+  'customizationGroups(itm)',
+  '<CustomizationSummary',
+  ':groups="customizationGroups(itm)"',
+]) {
+  assert.ok(
+    orderDetailSource.includes(contractToken),
+    `order detail shared customization display missing: ${contractToken}`
+  )
+}
+
 const choiceCardPath = path.join(
   __dirname,
   '../components/products/CustomizationChoiceCard.vue'
@@ -393,13 +426,28 @@ const wizardPath = path.join(
   __dirname,
   '../components/products/ProductCustomizationWizard.vue'
 )
-const cartSummaryPath = path.join(
+const customizationSummaryPath = path.join(
+  __dirname,
+  '../components/products/CustomizationSummary.vue'
+)
+const legacyCartSummaryPath = path.join(
   __dirname,
   '../components/products/CartCustomizationSummary.vue'
 )
+assert.ok(
+  fs.existsSync(customizationSummaryPath),
+  'the shared customization summary component must exist'
+)
+assert.ok(
+  !fs.existsSync(legacyCartSummaryPath),
+  'the cart-only customization summary must be removed'
+)
 const choiceCardSource = fs.readFileSync(choiceCardPath, 'utf8')
 const wizardSource = fs.readFileSync(wizardPath, 'utf8')
-const cartSummarySource = fs.readFileSync(cartSummaryPath, 'utf8')
+const customizationSummarySource = fs.readFileSync(
+  customizationSummaryPath,
+  'utf8'
+)
 
 assert.ok(
   choiceCardSource.includes("this.$emit('toggle', this.choiceId)"),
@@ -434,9 +482,10 @@ for (const contractToken of [
   )
 }
 assert.ok(
-  cartSummarySource.includes('groupedSelections') &&
-    cartSummarySource.includes('Total'),
-  'the cart summary must group selections and display the total'
+  customizationSummarySource.includes('editable') &&
+    customizationSummarySource.includes('showTotal') &&
+    customizationSummarySource.includes('Total'),
+  'the shared summary must expose independent edit and total modes'
 )
 
 const loadComponentOptions = (source, dependencyNames, dependencies) => {
@@ -454,7 +503,8 @@ const wizardOptions = loadComponentOptions(
   wizardSource,
   [
     'CustomizationChoiceCard',
-    'CartCustomizationSummary',
+    'CustomizationSummary',
+    'groupCustomizationSelections',
     'calculatePreviewUnitPrice',
     'findStepIndexById',
     'nextVisibleStepIndex',
@@ -463,6 +513,7 @@ const wizardOptions = loadComponentOptions(
   [
     {},
     {},
+    groupCustomizationSelections,
     calculatePreviewUnitPrice,
     findStepIndexById,
     nextVisibleStepIndex,
@@ -698,32 +749,33 @@ assert.deepStrictEqual(
 )
 
 const summaryOptions = loadComponentOptions(
-  cartSummarySource,
-  ['formatPrice'],
-  [(value) => Number(value).toFixed(2)]
+  customizationSummarySource,
+  ['formatPrice', 'parsePrice'],
+  [(value) => Number(value).toFixed(2), Number]
+)
+assert.strictEqual(summaryOptions.props.editable.default, false)
+assert.strictEqual(summaryOptions.props.showTotal.default, false)
+const summaryEvents = []
+summaryOptions.methods.editGroup.call(
+  {
+    editable: true,
+    canEditGroup: summaryOptions.methods.canEditGroup,
+    $emit: (...args) => summaryEvents.push(args),
+  },
+  { stepId: 72 }
+)
+summaryOptions.methods.editGroup.call(
+  {
+    editable: false,
+    canEditGroup: summaryOptions.methods.canEditGroup,
+    $emit: (...args) => summaryEvents.push(args),
+  },
+  { stepId: 73 }
 )
 assert.deepStrictEqual(
-  summaryOptions.computed.groupedSelections.call({
-    selections: [
-      { step_name: 'Boisson', choice_name: 'Cola', extra_price: '0.50' },
-      { step_name: 'Sauce', choice_name: 'Curry', extra_price: 0 },
-      { step_name: 'Boisson', choice_name: 'Eau', extra_price: 0 },
-    ],
-  }),
-  [
-    {
-      stepName: 'Boisson',
-      choices: [
-        { step_name: 'Boisson', choice_name: 'Cola', extra_price: '0.50' },
-        { step_name: 'Boisson', choice_name: 'Eau', extra_price: 0 },
-      ],
-    },
-    {
-      stepName: 'Sauce',
-      choices: [{ step_name: 'Sauce', choice_name: 'Curry', extra_price: 0 }],
-    },
-  ],
-  'summary groups must preserve step and choice order'
+  summaryEvents,
+  [['edit', 72]],
+  'the summary must emit edit only in editable mode'
 )
 
 const product = {
@@ -1387,7 +1439,7 @@ assert.ok(
   'uncommandable products must expose the backend availability reason'
 )
 for (const cartContract of [
-  '<CartCustomizationSummary',
+  '<CustomizationSummary',
   '<ProductCustomizationWizard',
   'replaceConfiguredCartLine',
   "'cart/checkoutOrder'",
@@ -1613,7 +1665,7 @@ const cartOptions = new Function(
   'loadStripe',
   'Loading',
   'ProductCustomizationWizard',
-  'CartCustomizationSummary',
+  'CustomizationSummary',
   'price',
   'applyServerQuoteToCart',
   'findCartTargetForCheckoutError',

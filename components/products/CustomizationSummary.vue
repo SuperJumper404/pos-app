@@ -1,20 +1,20 @@
 <template>
   <div class="customization-summary">
     <div
-      v-for="group in groupedSelections"
-      :key="group.stepName"
+      v-for="(group, groupIndex) in groups"
+      :key="group.stepId || `${group.stepName}-${groupIndex}`"
       class="customization-summary__group mb-3"
     >
       <div class="d-flex align-center mb-1">
         <span class="font-weight-bold">{{ group.stepName }}</span>
         <v-spacer></v-spacer>
         <v-btn
-          v-if="group.choices[0] && group.choices[0].product_step_id != null"
+          v-if="canEditGroup(group)"
           text
           x-small
           color="primary"
           class="text-none"
-          @click="$emit('edit', group.choices[0].product_step_id)"
+          @click="editGroup(group)"
         >
           Modifier
         </v-btn>
@@ -35,17 +35,19 @@
       </div>
     </div>
 
-    <p v-if="groupedSelections.length === 0" class="grey--text mb-3">
+    <p v-if="groups.length === 0" class="grey--text mb-3">
       Aucune option sélectionnée.
     </p>
 
-    <v-divider class="mb-3"></v-divider>
-    <div class="d-flex justify-space-between align-center text-subtitle-1">
-      <span class="font-weight-bold">Total</span>
-      <span class="font-weight-bold primary--text">
-        {{ formattedPrice(unitPrice) }} €
-      </span>
-    </div>
+    <template v-if="showTotal">
+      <v-divider class="mb-3"></v-divider>
+      <div class="d-flex justify-space-between align-center text-subtitle-1">
+        <span class="font-weight-bold">Total</span>
+        <span class="font-weight-bold primary--text">
+          {{ formattedPrice(unitPrice) }} €
+        </span>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -53,31 +55,33 @@
 import { formatPrice, parsePrice } from '@/helpers/price'
 
 export default {
-  name: 'CartCustomizationSummary',
+  name: 'CustomizationSummary',
   props: {
-    selections: {
+    groups: {
       type: Array,
       default: () => [],
+    },
+    editable: {
+      type: Boolean,
+      default: false,
+    },
+    showTotal: {
+      type: Boolean,
+      default: false,
     },
     unitPrice: {
       type: [Number, String],
       default: 0,
     },
   },
-  computed: {
-    groupedSelections() {
-      const groups = new Map()
-      for (const selection of this.selections || []) {
-        const stepName = selection.step_name || 'Personnalisation'
-        if (!groups.has(stepName)) {
-          groups.set(stepName, { stepName, choices: [] })
-        }
-        groups.get(stepName).choices.push(selection)
-      }
-      return Array.from(groups.values())
-    },
-  },
   methods: {
+    canEditGroup(group) {
+      return this.editable && group && group.stepId != null
+    },
+    editGroup(group) {
+      if (!this.canEditGroup(group)) return
+      this.$emit('edit', group.stepId)
+    },
     choiceKey(choice, index) {
       return choice.product_step_choice_id || choice.choice_id || index
     },
@@ -87,7 +91,9 @@ export default {
     choiceSupplement(choice) {
       return parsePrice(
         choice.extra_price == null
-          ? choice.unit_extra_price
+          ? choice.unit_extra_price == null
+            ? choice.price
+            : choice.unit_extra_price
           : choice.extra_price
       )
     },

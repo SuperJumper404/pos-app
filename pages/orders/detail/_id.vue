@@ -54,31 +54,11 @@
                   </div>
                 </div>
 
-                <div
+                <CustomizationSummary
                   v-if="customizationGroups(itm).length"
+                  :groups="customizationGroups(itm)"
                   class="order-detail-customizations"
-                >
-                  <div
-                    v-for="(group, groupIndex) in customizationGroups(itm)"
-                    :key="`${group.stepName}-${groupIndex}`"
-                    class="order-detail-customization-group"
-                  >
-                    <div class="text-caption font-weight-medium">
-                      {{ group.stepName }}
-                    </div>
-                    <v-chip
-                      v-for="(choice, choiceIndex) in group.choices"
-                      :key="`${choice.name}-${choiceIndex}`"
-                      class="ma-1"
-                      small
-                    >
-                      {{ choice.name }}
-                      <span v-if="choice.price !== 0" class="ml-1">
-                        + {{ formatCurrency(choice.price) }}
-                      </span>
-                    </v-chip>
-                  </div>
-                </div>
+                />
 
                 <div class="order-detail-meta">
                   <div class="order-detail-meta-block">
@@ -178,6 +158,7 @@
 <script>
 import OrderEditModal from '@/components/orders/OrderEditModal'
 import TakeawayChip from '@/components/orders/TakeawayChip'
+import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
 const {
@@ -194,6 +175,7 @@ export default {
   components: {
     OrderEditModal,
     TakeawayChip,
+    CustomizationSummary,
   },
   mixins: [price],
   layout() {
@@ -529,14 +511,7 @@ export default {
 }
 
 .order-detail-customizations {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
   min-width: 0;
-}
-
-.order-detail-customization-group + .order-detail-customization-group {
-  margin-top: 4px;
 }
 
 .order-detail-meta {
@@ -601,10 +576,6 @@ export default {
   .order-detail-main {
     grid-template-columns: 1fr;
     gap: 8px;
-  }
-
-  .order-detail-customizations {
-    justify-content: flex-start;
   }
 
   .order-detail-meta {

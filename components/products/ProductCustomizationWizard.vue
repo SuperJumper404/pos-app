@@ -57,9 +57,11 @@
 
       <template v-else>
         <h2 class="text-h5 mb-4">Votre sélection</h2>
-        <CartCustomizationSummary
-          :selections="selections"
+        <CustomizationSummary
+          :groups="summaryGroups"
           :unit-price="previewUnitPrice"
+          editable
+          show-total
           @edit="openStep"
         />
       </template>
@@ -98,10 +100,11 @@
 
 <script>
 import CustomizationChoiceCard from '@/components/products/CustomizationChoiceCard'
-import CartCustomizationSummary from '@/components/products/CartCustomizationSummary'
+import CustomizationSummary from '@/components/products/CustomizationSummary'
 import {
   calculatePreviewUnitPrice,
   findStepIndexById,
+  groupCustomizationSelections,
   nextVisibleStepIndex,
   validateStep,
 } from '@/helpers/customizations'
@@ -121,7 +124,7 @@ export default {
   name: 'ProductCustomizationWizard',
   components: {
     CustomizationChoiceCard,
-    CartCustomizationSummary,
+    CustomizationSummary,
   },
   props: {
     product: {
@@ -144,6 +147,9 @@ export default {
     }
   },
   computed: {
+    summaryGroups() {
+      return groupCustomizationSelections(this.selections)
+    },
     steps() {
       return [...(this.product.customization_steps || [])].sort(
         (left, right) =>
