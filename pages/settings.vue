@@ -373,7 +373,7 @@ export default {
     formReady: false,
     loadingBtn: false,
     shopId: localStorage.getItem('shopid'),
-    AllPaymentsMethods: ['Cheques', 'Especes', 'Tickets Restaurants'],
+    AllPaymentsMethods: ['Chèque', 'Espèces ', 'Tickets Restaurants'],
     shopImg: null,
     imageUrl: null,
     formShop: {
