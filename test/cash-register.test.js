@@ -166,6 +166,15 @@ assert.deepStrictEqual(
   resolveRetryDueOrderIds({
     failedOrderIds: [2],
     fallbackDueOrderIds: [2],
+    refreshedOrders: [{ id: 99, payment_status: 'refunded' }],
+    refreshSucceeded: true,
+  }),
+  { reliable: true, orderIds: [], dueOrderIds: [] }
+)
+assert.deepStrictEqual(
+  resolveRetryDueOrderIds({
+    failedOrderIds: [2],
+    fallbackDueOrderIds: [2],
     refreshedOrders: null,
     refreshSucceeded: true,
   }),

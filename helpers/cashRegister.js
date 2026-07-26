@@ -79,11 +79,10 @@ const resolveRetryDueOrderIds = ({
     if (!order || typeof order !== 'object' || Array.isArray(order)) return false
 
     const orderId = Number(order.id)
-    return (
-      Number.isSafeInteger(orderId) &&
-      orderId > 0 &&
-      CASH_REGISTER_PAYMENT_STATUSES.has(order.payment_status)
-    )
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return false
+    if (!failedOrderIdsSet.has(orderId)) return true
+
+    return CASH_REGISTER_PAYMENT_STATUSES.has(order.payment_status)
   })
   if (!hasReliableOrders) return fallback
 
