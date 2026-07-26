@@ -171,6 +171,23 @@ assert.deepStrictEqual(
   }),
   { reliable: false, orderIds: [2], dueOrderIds: [2] }
 )
+for (const malformedOrders of [
+  [{ payment_status: 'paid' }],
+  [{ id: 'not-an-id', payment_status: 'paid' }],
+  [{ id: 2 }],
+  [{ id: 2, payment_status: 'unknown' }],
+  [null],
+]) {
+  assert.deepStrictEqual(
+    resolveRetryDueOrderIds({
+      failedOrderIds: [2],
+      fallbackDueOrderIds: [2],
+      refreshedOrders: malformedOrders,
+      refreshSucceeded: true,
+    }),
+    { reliable: false, orderIds: [2], dueOrderIds: [2] }
+  )
+}
 const runAsyncAssertions = async () => {
   const attemptedOrderIds = []
   const archiveSummary = await archiveOrdersSafely(

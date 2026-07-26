@@ -1,4 +1,9 @@
 const PAID_STATUS = 'paid'
+const CASH_REGISTER_PAYMENT_STATUSES = new Set([
+  PAID_STATUS,
+  'unpaid',
+  'requires_payment',
+])
 
 const toArray = (value) => {
   if (Array.isArray(value)) return value
@@ -70,6 +75,17 @@ const resolveRetryDueOrderIds = ({
   }
 
   if (!refreshSucceeded || !Array.isArray(refreshedOrders)) return fallback
+  const hasReliableOrders = refreshedOrders.every((order) => {
+    if (!order || typeof order !== 'object' || Array.isArray(order)) return false
+
+    const orderId = Number(order.id)
+    return (
+      Number.isSafeInteger(orderId) &&
+      orderId > 0 &&
+      CASH_REGISTER_PAYMENT_STATUSES.has(order.payment_status)
+    )
+  })
+  if (!hasReliableOrders) return fallback
 
   const refreshedOrdersById = refreshedOrders.reduce(
     (ordersById, order) => {

@@ -88,6 +88,21 @@ const runAssertions = async () => {
         )
       )
     }
+
+    for (const status of [undefined, 'unknown']) {
+      const uncertain = await runRefund(status)
+      assert.strictEqual(uncertain.result, false)
+      assert.ok(
+        uncertain.dispatches.some(
+          ([type]) => type === 'notifications/warning'
+        )
+      )
+      assert.ok(
+        !uncertain.dispatches.some(
+          ([type]) => type === 'notifications/success'
+        )
+      )
+    }
   } finally {
     global.localStorage = previousLocalStorage
   }
