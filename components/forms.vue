@@ -51,10 +51,10 @@
         v-if="formprops.access !== 1"
         v-model="formsdata.username"
         type="text"
-        label="Username"
+        label="Nom d'utilisateur"
         :counter="15"
         :rules="usernameRules"
-        placeholder="Input username"
+        placeholder="Saisir le nom d'utilisateur"
         required
         :autofocus="formprops.access !== 1 ? true : false"
       >
@@ -63,7 +63,7 @@
         v-if="formprops.access !== 1"
         v-model="formsdata.phone"
         type="text"
-        label="Phone"
+        label="Téléphone"
         :maxlength="15"
         :counter="15"
         :rules="phoneRules"
@@ -153,11 +153,11 @@ export default {
         (v) => !!v || "Nom d'utilisateur requis",
         (v) =>
           (v && v.length <= 15) ||
-          "Nom d'utilisateur doit être inférieur à 15 caractères",
+          "Le nom d'utilisateur doit être inférieur à 15 caractères",
       ],
       phoneRules: [
         (v) => !!v || 'Numéro de téléphone requis',
-        (v) => (v && v.length <= 10) || 'Numéro de téléphone invalide!',
+        (v) => (v && v.length <= 10) || 'Numéro de téléphone invalide !',
       ],
       emailRules: [
         (v) => !!v || 'E-mail requis',
@@ -239,7 +239,7 @@ export default {
           console.log('Je passe dans cette condition ? ')
 
           this.$store.set('users/alertSuccess', true)
-          this.$store.set('users/message', 'Vérifiez votre email.')
+          this.$store.set('users/message', 'Vérifiez votre e-mail.')
           this.$router.push('/login')
         } else {
           this.loadingBtn = false

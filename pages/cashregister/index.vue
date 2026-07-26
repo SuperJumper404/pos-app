@@ -41,7 +41,7 @@
               >
                 {{ table.preparing }}
               </v-avatar>
-              En preparation
+              En préparation
             </v-chip>
           </v-chip-group>
           <v-icon color="error" icon="mdi-fire-circle" size="small"></v-icon>
@@ -73,7 +73,7 @@
             </template>
             <template #[`item.paid_amount`]="{ item }">
               <v-chip v-if="item.paid_amount > 0" small dark color="#635BFF">
-                {{ formatCurrency(item.paid_amount) }} deja paye
+                {{ formatCurrency(item.paid_amount) }} déjà payé
               </v-chip>
               <span v-else>-</span>
             </template>
@@ -82,7 +82,7 @@
                 En attente
               </v-chip>
               <v-chip v-if="item.status === 2" color="success">
-                En preparation
+                En préparation
               </v-chip>
               <v-chip v-if="item.status === 3" color="primary">
                 Terminer
@@ -97,10 +97,10 @@
         <v-divider class="mx-4 mb-1"></v-divider>
 
         <v-card-title>
-          A encaisser: {{ formatCurrency(table.totalPerTable) }}
+          À encaisser : {{ formatCurrency(table.totalPerTable) }}
         </v-card-title>
         <v-card-subtitle v-if="table.alreadyPaidTotal > 0">
-          Deja paye: {{ formatCurrency(table.alreadyPaidTotal) }}
+          Déjà payé : {{ formatCurrency(table.alreadyPaidTotal) }}
         </v-card-subtitle>
         <div class="px-4">
           <!-- <v-chip-group v-model="selection">
@@ -129,7 +129,7 @@
                 : null
             "
           >
-            {{ selectedRowsHaveAmountDue() ? 'Encaisser' : 'Cloturer' }}
+            {{ selectedRowsHaveAmountDue() ? 'Encaisser' : 'Clôturer' }}
             <v-icon small right>
               {{
                 selectedRowsHaveAmountDue()
@@ -150,7 +150,7 @@
                 )
             "
           >
-            Details
+            Détails
             <v-icon small right>mdi-information-outline</v-icon>
           </v-btn>
         </v-card-actions>
@@ -199,16 +199,16 @@ export default {
         { text: 'Client', value: 'customer', filterable: true },
         // { text: 'Operateur', value: 'operator' },
         {
-          text: 'A encaisser',
+          text: 'À encaisser',
           value: 'sum_amount',
           filterable: true,
         },
         {
-          text: 'Deja paye',
+          text: 'Déjà payé',
           value: 'paid_amount',
           filterable: true,
         },
-        // { text: 'Status', value: 'status', filterable: true },
+        // { text: 'Statut', value: 'status', filterable: true },
         // { text: 'Actions', value: 'actions', width: '500px' },
       ],
       isLoaded: null,

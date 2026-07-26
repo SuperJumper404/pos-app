@@ -68,7 +68,7 @@
                 outlined
                 suffix="H"
                 :disabled="!day.isOpen"
-                label="From"
+                label="De"
                 @keypress="validateInput"
               ></v-text-field>
             </v-col>
@@ -84,7 +84,7 @@
                 suffix="H"
                 dense
                 :disabled="!day.isOpen"
-                label="To"
+                label="À"
               ></v-text-field>
             </v-col>
           </v-row>
@@ -130,9 +130,9 @@
         <v-col cols="6">
           <v-text-field
             v-model="formShop.shop_status"
-            label="Status / Message d'information pour vos client"
+            label="Statut / Message d'information pour vos clients"
             type="text"
-            placeholder="Un status particulier, évenements..."
+            placeholder="Un statut particulier, événements..."
             required
           ></v-text-field>
         </v-col>
@@ -151,7 +151,7 @@
           <v-combobox
             v-model="formShop.shop_payment_methods"
             :items="AllPaymentsMethods"
-            label="Sélectionner les moyens de paiements disponible"
+            label="Sélectionner les moyens de paiement disponibles"
             multiple
             chips
           ></v-combobox>
@@ -159,10 +159,10 @@
         <v-col cols="6">
           <v-text-field
             v-model="formShop.shop_siret"
-            label="Numéro de S.I.R.E.T"
+            label="Numéro de SIRET"
             type="text"
-            :rules="[(v) => !!v || 'Numéro de S.I.R.E.T requis']"
-            placeholder="Insérez le numéro de S.I.R.E.T"
+            :rules="[(v) => !!v || 'Numéro de SIRET requis']"
+            placeholder="Insérez le numéro de SIRET"
             required
           ></v-text-field
         ></v-col>
@@ -185,8 +185,8 @@
               type="text"
               :disabled="!formShop.smart_print_app"
               max-width="20%"
-              :rules="[(v) => !!v || 'Adresse Ip requise']"
-              placeholder="Insérez l'adresse Ip de l'imprimante"
+              :rules="[(v) => !!v || 'Adresse IP requise']"
+              placeholder="Insérez l'adresse IP de l'imprimante"
               required
             ></v-text-field>
             <v-switch
@@ -373,7 +373,7 @@ export default {
     formReady: false,
     loadingBtn: false,
     shopId: localStorage.getItem('shopid'),
-    AllPaymentsMethods: ['Cheques', 'Especes', 'Tickets Restaurants'],
+    AllPaymentsMethods: ['Chèque', 'Espèces ', 'Tickets Restaurants'],
     shopImg: null,
     imageUrl: null,
     formShop: {
@@ -476,7 +476,7 @@ export default {
     stripeStatusLabel() {
       if (this.stripeReady) return 'Le restaurant peut recevoir les paiements.'
       if (this.$store.get('shop/stripe_account_id')) {
-        return 'Compte cree, onboarding Stripe a terminer.'
+        return 'Compte créé, intégration Stripe à terminer.'
       }
       return 'Connectez Stripe pour accepter Apple Pay, Google Pay et carte.'
     },

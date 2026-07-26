@@ -4,34 +4,34 @@
       <p class="red--text">{{ message }}</p>
     </div>
     <div class="mt-5">
-      <h3>Form New Category</h3>
+      <h3>Nouveau mouvement de stock</h3>
     </div>
     <v-form v-model="isValue">
       <v-select
         v-model="formstock.productid"
         :items="dataProduct"
-        :rules="[(v) => !!v || 'Products riquired']"
+        :rules="[(v) => !!v || 'Le produit est requis']"
         item-value="id"
         item-text="name"
-        label="Products"
+        label="Produit"
         required
       ></v-select>
       <v-text-field
         v-model="formstock.qty"
-        label="Quantity"
+        label="Quantité"
         type="number"
-        :rules="[(v) => !!v || 'Quatity required']"
-        placeholder="Insert quantity"
+        :rules="[(v) => !!v || 'La quantité est requise']"
+        placeholder="Saisir la quantité"
         required
       ></v-text-field>
       <v-textarea
         v-model="formstock.remark"
         name="input-2-1"
-        label="Remark"
+        label="Remarque"
         type="text"
-        :rules="[(v) => !!v || 'Remark required']"
-        placeholder="Input text Add or Reduce or Adjustmen"
-        hint="Remark wajib diisi!"
+        :rules="[(v) => !!v || 'La remarque est requise']"
+        placeholder="Préciser l'ajout, le retrait ou l'ajustement"
+        hint="La remarque est obligatoire."
         class="mb-5"
       ></v-textarea>
       <!-- sm upto md lg -->
@@ -46,7 +46,7 @@
           color="success"
           dark
           @click="addStock"
-          >Add <v-icon small right>mdi-plus-circle</v-icon></v-btn
+          >Ajouter <v-icon small right>mdi-plus-circle</v-icon></v-btn
         >
         <v-btn
           :disabled="!isValue"
@@ -55,16 +55,16 @@
           color="primary"
           dark
           @click="reduceStock"
-          >Reduce <v-icon small right>mdi-minus-circle</v-icon></v-btn
+          >Retirer <v-icon small right>mdi-minus-circle</v-icon></v-btn
         >
         <v-btn
           :disabled="!isValue"
           :loading="loadingBtn3"
           class="ml-2"
-          color="red ligthen-4"
+          color="red lighten-4"
           dark
           @click="adjusmentStock"
-          >Adjusment <v-icon small right>mdi-tune</v-icon></v-btn
+          >Ajuster <v-icon small right>mdi-tune</v-icon></v-btn
         >
       </div>
       <!-- xs -->
@@ -87,7 +87,7 @@
             small
             width="100%"
             @click="addStock"
-            >Add <v-icon small right>mdi-plus-circle</v-icon></v-btn
+            >Ajouter <v-icon small right>mdi-plus-circle</v-icon></v-btn
           >
         </v-col>
         <v-col cols="6">
@@ -99,19 +99,19 @@
             small
             width="100%"
             @click="reduceStock"
-            >Reduce <v-icon small right>mdi-minus-circle</v-icon></v-btn
+            >Retirer <v-icon small right>mdi-minus-circle</v-icon></v-btn
           >
         </v-col>
         <v-col cols="6">
           <v-btn
             :disabled="!isValue"
             :loading="loadingBtn3"
-            color="red ligthen-4"
+            color="red lighten-4"
             dark
             small
             width="100%"
             @click="adjusmentStock"
-            >Adjusment <v-icon small right>mdi-tune</v-icon></v-btn
+            >Ajuster <v-icon small right>mdi-tune</v-icon></v-btn
           >
         </v-col>
       </v-row>

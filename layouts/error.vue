@@ -4,9 +4,9 @@
       <v-icon x-large color="red lighten-2" class="mb-5"
         >mdi-emoticon-sad-outline</v-icon
       >
-      <h4 class="mb-5">Sorry! We couldn't find it! (404)</h4>
+      <h4 class="mb-5">Désolé, cette page est introuvable (404).</h4>
       <v-btn outlined color="primary" @click="$router.push('/')">
-        Go to dashboard
+        Retour au tableau de bord
       </v-btn>
     </div>
 

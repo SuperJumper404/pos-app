@@ -11,7 +11,15 @@ export const state = () => ({
   },
   userDetail: [],
 })
-export const mutations = { ...defaultMutations(state()) }
+export const mutations = {
+  ...defaultMutations(state()),
+  CLEAR_AUTHENTICATED_USER(currentState) {
+    currentState.user.id = null
+    currentState.user.access = null
+    currentState.user.token = null
+    currentState.user.shopid = null
+  },
+}
 export const plugins = [EasyAccess()]
 export const actions = {
   postRegister({ dispatch }, params) {
@@ -41,6 +49,7 @@ export const actions = {
         dispatch('set/user.access', response.data.data[0].access)
         dispatch('set/user.token', response.data.data[0].token)
         dispatch('set/user.shopid', response.data.data[0].shopid)
+        dispatch('setAuthentication', true, { root: true })
         dispatch('set/message', response.data.message)
         dispatch('notifications/success', response.data.message, { root: true })
         return true
@@ -50,6 +59,13 @@ export const actions = {
         dispatch('set/message', error.response.data.message)
         return false
       })
+  },
+  clearAuthenticatedUser({ dispatch }) {
+    dispatch('set/user.id', null)
+    dispatch('set/user.access', null)
+    dispatch('set/user.token', null)
+    dispatch('set/user.shopid', null)
+    return true
   },
   postLogout({ dispatch }) {
     const id = localStorage.getItem('idUser')
@@ -64,16 +80,15 @@ export const actions = {
         }
       )
       .then((response) => {
+        dispatch('orderEdit/cancel', null, { root: true })
         localStorage.removeItem('idUser')
         localStorage.removeItem('access')
         localStorage.removeItem('token')
         localStorage.removeItem('shopid')
-        dispatch('set/user.id', null)
-        dispatch('set/user.access', null)
-        dispatch('set/user.token', null)
+        dispatch('clearAuthenticatedUser')
+        dispatch('clearAuthentication', null, { root: true })
         dispatch('set/message', response.data.message)
         dispatch('set/alertSuccess', true)
-        dispatch('set/user.shopid', null)
         dispatch('notifications/success', response.data.message, { root: true })
         return true
       })

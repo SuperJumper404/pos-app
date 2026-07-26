@@ -10,15 +10,15 @@
             {{ actionTitle }} <br />
             {{ id }} ?
           </h3>
-          <h6>commandes : {{ ordersToArchive.join(', ') }}</h6>
+          <h6>Commandes : {{ ordersToArchive.join(', ') }}</h6>
 
           <div class="cashregister-payout-summary">
             <div>
-              <strong>A encaisser</strong><br />
+              <strong>À encaisser</strong><br />
               {{ formatCurrency(paymentSummary.dueAmount) }}
             </div>
             <div>
-              <strong>Deja paye</strong><br />
+              <strong>Déjà payé</strong><br />
               {{ formatCurrency(paymentSummary.paidAmount) }}
             </div>
           </div>
@@ -39,7 +39,7 @@
           <p>Assurez vous d'avoir encaissé avant de valider</p>
         </v-card-text>
         <v-card-text v-else class="text-center">
-          <p>Ces commandes sont deja payees. Vous pouvez les cloturer.</p>
+          <p>Ces commandes sont déjà payées. Vous pouvez les clôturer.</p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -109,10 +109,10 @@ export default {
     actionTitle() {
       return this.requiresPaymentMethod
         ? 'Encaisser la table'
-        : 'Cloturer la table'
+        : 'Clôturer la table'
     },
     actionButtonLabel() {
-      return this.requiresPaymentMethod ? 'Encaisser' : 'Cloturer'
+      return this.requiresPaymentMethod ? 'Encaisser' : 'Clôturer'
     },
   },
   mounted() {

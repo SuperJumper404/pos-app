@@ -18,7 +18,10 @@
         lg="3"
       >
         <v-card outlined class="pa-4 border-radius-10">
-          <v-card-title> Commande #{{ item.ordernumber }} </v-card-title>
+          <v-card-title>
+            Commande #{{ item.ordernumber }}
+            <TakeawayChip :value="item.is_takeaway" class="ml-2" />
+          </v-card-title>
 
           <v-card-subtitle class="pt-0">
             <div class="mb-2 primary--text">
@@ -133,10 +136,10 @@
         <template #[`item.status`]="{ item }">
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
-            En preparation
+            En préparation
           </v-chip>
-          <v-chip v-if="item.status === 3" color="primary"> Terminer </v-chip>
-          <v-chip v-if="item.status === 4" color="warning"> Annuler </v-chip>
+          <v-chip v-if="item.status === 3" color="primary"> Terminée </v-chip>
+          <v-chip v-if="item.status === 4" color="warning"> Annulée </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
           <v-row>
@@ -147,7 +150,7 @@
                 color="default"
                 class="text-none"
                 @click="$router.push(`orders/detail/${item.id}`)"
-                >Details
+                >Détails
                 <v-icon small right>mdi-information-outline</v-icon>
               </v-btn>
             </v-card-actions>
@@ -175,6 +178,7 @@
   </v-container>
 </template>
 <script>
+import TakeawayChip from '@/components/orders/TakeawayChip'
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import moment from 'moment'
@@ -184,6 +188,7 @@ const {
 } = require('@/helpers/paymentStatus')
 
 export default {
+  components: { TakeawayChip },
   mixins: [formatdate, price],
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
@@ -211,7 +216,7 @@ export default {
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true, width: '100px' },
         { text: 'Paiement', value: 'payment_status', filterable: true },
-        { text: 'Status', value: 'status', filterable: true },
+        { text: 'Statut', value: 'status', filterable: true },
         { text: 'Actions', value: 'actions', width: '500px' },
       ],
       items: [

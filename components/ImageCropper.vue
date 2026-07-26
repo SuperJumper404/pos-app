@@ -1,7 +1,8 @@
 <template>
   <v-card outlined>
     <v-file-input
-      id="imageCropperInput"
+      :id="inputId"
+      ref="fileInput"
       v-model="rawInput"
       type="file"
       accept="image/*"
@@ -17,8 +18,8 @@
         <div class="placeholder">
           <v-icon
             size="140"
-            onclick="document.getElementById('imageCropperInput').click()"
             :class="['placeholder-icon', { 'placeholder-icon--hover': hover }]"
+            @click="$refs.fileInput.$el.querySelector('input').click()"
           >
             mdi-image-plus-outline
           </v-icon>
@@ -27,8 +28,8 @@
       <v-btn
         :loading="loadingBtnImg"
         color="success"
-        onclick="document.getElementById('imageCropperInput').click()"
         class="text-none mt-5 mb-5"
+        @click="$refs.fileInput.$el.querySelector('input').click()"
       >
         <v-icon class="mr-1">mdi-cloud-upload</v-icon> Importer une image
       </v-btn>
@@ -79,6 +80,7 @@
 
 <script>
 import { Cropper } from 'vue-advanced-cropper'
+import { createComponentInputId } from '@/helpers/customizations'
 
 export default {
   name: 'ImageCropper',
@@ -110,6 +112,11 @@ export default {
       previewObjUrl: null,
       previewUrlLocal: null,
     }
+  },
+  computed: {
+    inputId() {
+      return createComponentInputId('image-cropper', this._uid)
+    },
   },
   watch: {
     previewUrlProp: {

@@ -14,13 +14,13 @@
           color="success"
           class="text-none mr-3"
           @click="$router.push('/stocks/newstock')"
-          ><v-icon>mdi-plus</v-icon> Stocks</v-btn
+          ><v-icon>mdi-plus</v-icon> Ajouter un mouvement</v-btn
         >
         <v-spacer></v-spacer>
         <div class="mt-6">
           <v-text-field
-            placeholder="Search name operator"
-            label="Seaching"
+            placeholder="Rechercher un opérateur"
+            label="Rechercher"
             outlined
             dense
             append-icon="mdi-card-search"
@@ -60,11 +60,11 @@ export default {
           sortable: false,
           value: 'created',
         },
-        { text: 'Product', value: 'productid' },
-        { text: 'Quantity', value: 'qty' },
-        { text: 'ID Operator', value: 'operator' },
-        { text: 'Operator', value: 'username' },
-        { text: 'Remark', value: 'remark' },
+        { text: 'Produit', value: 'productid' },
+        { text: 'Quantité', value: 'qty' },
+        { text: "ID de l'opérateur", value: 'operator' },
+        { text: 'Opérateur', value: 'username' },
+        { text: 'Remarque', value: 'remark' },
       ],
     }
   },

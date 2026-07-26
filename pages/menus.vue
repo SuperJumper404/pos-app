@@ -3,7 +3,12 @@
     <v-alert :value="alert" :type="alertType" dismissible>{{
       alertText
     }}</v-alert>
-    <v-alert v-if="isKitchenClosed" dense text type="warning">
+    <v-alert
+      v-if="isKitchenClosed && !isOrderEditActive"
+      dense
+      text
+      type="warning"
+    >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
     <v-row class="mt-5">
@@ -65,7 +70,25 @@
                         </div>
 
                         <div class="product-card-price font-weight-bold">
-                          {{ formatCurrency(items.price) }}
+                          <span
+                            v-if="
+                              items.minimum_commandable_price != null &&
+                              parsePrice(items.minimum_commandable_price) >
+                                parsePrice(items.price)
+                            "
+                          >
+                            À partir de
+                            {{
+                              formatCurrency(items.minimum_commandable_price)
+                            }}
+                          </span>
+                          <span v-else>{{ formatCurrency(items.price) }}</span>
+                        </div>
+                        <div
+                          v-if="items.customization_available === false"
+                          class="error--text text-caption mt-1"
+                        >
+                          {{ customizationUnavailableReason(items) }}
                         </div>
                       </v-card-text>
 
@@ -77,7 +100,10 @@
                           color="success"
                           small
                           block
-                          :disabled="isKitchenClosed"
+                          :disabled="
+                            (isKitchenClosed && !isOrderEditActive) ||
+                            items.customization_available === false
+                          "
                           class="text-none font-weight-bold"
                           @click.stop="addToCart(items)"
                         >
@@ -163,7 +189,7 @@
             <div v-else height="100%">
               <v-card
                 v-for="(itm, itemIndex) in cartItem"
-                :key="itm.id"
+                :key="itm.configurationSignature || `${itm.id}-${itemIndex}`"
                 outlined
                 class="cart-item-card d-flex mb-2 flex-column"
                 rounded="7"
@@ -181,7 +207,22 @@
                   no-gutters
                 >
                   <!-- Left block: avatar + texts -->
-                  <v-col class="cart-item-info d-flex align-center">
+                  <v-col
+                    class="cart-item-info d-flex align-center"
+                    :class="{
+                      'cart-item-info--editable': (
+                        itm.customization_steps || []
+                      ).length,
+                    }"
+                    :role="
+                      (itm.customization_steps || []).length ? 'button' : null
+                    "
+                    :tabindex="
+                      (itm.customization_steps || []).length ? 0 : null
+                    "
+                    @click="editCartLine(itemIndex)"
+                    @keydown.enter.prevent="editCartLine(itemIndex)"
+                  >
                     <v-avatar
                       size="64"
                       rounded
@@ -252,11 +293,11 @@
 
                 <v-col>
                   <v-chip
-                    v-for="(choice, index) in itm.customizationList"
-                    :key="index"
+                    v-for="choice in itm.selections || []"
+                    :key="choice.product_step_choice_id"
                     class="mr-1 mt-1"
                   >
-                    {{ choice.name }}
+                    {{ choice.choice_name || choice.name }}
                   </v-chip>
                 </v-col>
               </v-card>
@@ -326,7 +367,10 @@
           <v-btn
             color="success"
             class="text-none font-weight-bold"
-            :disabled="isKitchenClosed"
+            :disabled="
+              (isKitchenClosed && !isOrderEditActive) ||
+              previewItem.customization_available === false
+            "
             @click="addPreviewItemToCart"
           >
             <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
@@ -336,88 +380,14 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="itemDialog" max-width="350">
-      <v-form ref="formItem">
-        <v-card>
-          <v-toolbar color="primary" dark
-            >Sélectionner les suppléments</v-toolbar
-          >
-          <v-card-text>
-            <!-- {{ selectedItem }} -->
-            <div
-              v-for="(item, itemId) in selectedItem.product_customization"
-              :key="itemId"
-            >
-              <div class="text-h4 text--primary">{{ item.name }}</div>
-              <!-- <p>
-                {{ item.description }}
-                {{ item.limit_choice ? 'Max(' + item.limit_choice + ')' : '' }}
-              </p> -->
-              <div>
-                <!-- Condition for checkboxes -->
-                <template v-if="item.limit_choice > 1">
-                  <!-- <pre>item {{ item }}</pre>
-                  <pre>currentITem {{ currentItem }}</pre> -->
-                  <div v-for="(choice, i) in item.items" :key="'checkbox-' + i">
-                    <v-checkbox
-                      v-model="currentItem[itemId]"
-                      class="custom-spacing"
-                      multiple
-                      :label="
-                        choice.price > 0
-                          ? `${choice.name} (+${formatCurrency(choice.price)})`
-                          : `${choice.name}`
-                      "
-                      :disabled="
-                        (currentItem[itemId] || []).length >=
-                          Number(item.limit_choice || 0) &&
-                        !(currentItem[itemId] || []).some(
-                          (x) => x.id === choice.id
-                        )
-                      "
-                      :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
-                      :value="choice"
-                    ></v-checkbox>
-                  </div>
-                </template>
-
-                <!-- Condition for radio buttons -->
-                <v-radio-group
-                  v-if="item.limit_choice === 1"
-                  v-model="currentItem[itemId]"
-                  row
-                >
-                  <v-radio
-                    v-for="(choice, i) in item.items"
-                    :key="'radio-' + i"
-                    :label="
-                      choice.price > 0
-                        ? `${choice.name} (+${formatCurrency(choice.price)})`
-                        : choice.name
-                    "
-                    :rules="[(v) => rulesCheckboxes(v, item.mandatory)]"
-                    :value="choice"
-                  ></v-radio>
-                </v-radio-group>
-              </div>
-            </div>
-            <!-- <pre type="json">{{ currentItem }}</pre> -->
-            <!-- <pre type="json">{{ [...currentItem] }}</pre> -->
-          </v-card-text>
-          <v-card-actions class="justify-end">
-            <v-btn color="warning" class="text-none" @click="resetForm()"
-              >Retour <v-icon small right>mdi-arrow-left</v-icon></v-btn
-            >
-            <v-btn
-              color="success"
-              class="text-none"
-              :disabled="disableCustomizationValidation()"
-              @click="submitFormItem()"
-              >Valider <v-icon small right>mdi-check-circle</v-icon></v-btn
-            >
-          </v-card-actions>
-        </v-card>
-      </v-form>
+    <v-dialog v-model="customizationDialog" max-width="920" persistent>
+      <ProductCustomizationWizard
+        v-if="selectedItem"
+        v-model="selectedChoiceIds"
+        :product="selectedItem"
+        @confirm="confirmCustomization"
+        @cancel="closeCustomizationWizard"
+      />
     </v-dialog>
     <!-- <pre>{{ dataProduct }}</pre> -->
     <!-- <pre>server{{ mainconfig.default.server }}</pre> -->
@@ -431,7 +401,7 @@
       top
     >
       {{ kitchenClosedMessage }}
-      <template v-slot:action="{ attrs }">
+      <template #action="{ attrs }">
         <v-btn text v-bind="attrs" @click="kitchenClosedSnackbar = false">
           Fermer
         </v-btn>
@@ -441,25 +411,54 @@
 </template>
 <script>
 import Loading from '@/components/loading'
+import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import price from '@/helpers/price'
+import {
+  mergeConfiguredCartLine,
+  replaceConfiguredCartLine,
+} from '@/helpers/customizations'
 // import * as config from '@/nuxt.config'
 export default {
   components: {
     Loading,
+    ProductCustomizationWizard,
   },
   mixins: [price],
+  async beforeRouteLeave(to, from, next) {
+    if (
+      this.isOrderEditActive &&
+      this.orderEditDirty &&
+      !this.allowRouteLeave
+    ) {
+      if (!window.confirm('Quitter sans enregistrer les modifications ?')) {
+        next(false)
+        return
+      }
+      await this.$store.dispatch('orderEdit/cancel')
+      next()
+      return
+    }
+    next()
+  },
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
       : 'clientside'
   },
   middleware: 'auth',
+  props: {
+    embeddedOrderEdit: {
+      type: Boolean,
+      default: false,
+    },
+  },
   data: () => ({
-    itemDialog: false,
+    customizationDialog: false,
     previewDialog: false,
     previewItem: null,
-    selectedItem: [],
-    currentItem: [],
+    selectedItem: null,
+    selectedChoiceIds: [],
+    editingCartIndex: null,
     // config: config,
     alert: null,
     alertType: null,
@@ -472,6 +471,7 @@ export default {
     cartItem: [],
     total: 0,
     idxCart: 0,
+    allowRouteLeave: false,
   }),
 
   computed: {
@@ -504,21 +504,57 @@ export default {
         this.$store.get('shop/kitchen_closed')
       )
     },
-  },
-  watch: {
-    itemDialog(newVal) {
-      if (newVal) {
-        console.log('Watch New Val', newVal)
-        // if the dialog is opened
-        if (this.$refs.formItem) {
-          this.$refs.formItem.resetValidation()
-          this.$refs.formItem.reset()
-        }
-      }
+    clientOrderStatus() {
+      return this.$store.get('cart/clientOrderStatus') || 'idle'
+    },
+    clientOrderOrderId() {
+      return this.$store.get('cart/clientOrderOrderId') || null
+    },
+    hasUnsafeCheckoutAttempt() {
+      return (
+        Boolean(this.clientOrderOrderId) ||
+        ['pending', 'uncertain', 'stripe_prepared'].includes(
+          this.clientOrderStatus
+        )
+      )
+    },
+    isOrderEditActive() {
+      return this.$store.get('orderEdit/active') === true
+    },
+    orderEditDirty() {
+      return this.$store.get('orderEdit/dirty') === true
     },
   },
-  mounted() {
+  async mounted() {
     this.loadPage = true
+
+    if (this.isOrderEditActive) {
+      this.cartItem = JSON.parse(
+        JSON.stringify(this.$store.get('cart/dataCart') || [])
+      )
+      this.total = Number(this.$store.get('cart/totalCart') || 0)
+      this.idxCart = Number(this.$store.get('cart/indexCart') || 0)
+      await Promise.all([
+        this.$store.dispatch('products/getProducts'),
+        this.$store.dispatch('shop/getCurrentShopInfo'),
+      ])
+      this.loadPage = false
+      return
+    }
+
+    if (this.hasUnsafeCheckoutAttempt) {
+      this.restorePersistedCheckoutCart()
+      this.loadPage = false
+      this.$router.replace('/cart')
+      return
+    }
+
+    if (
+      ['prewrite_rejected', 'reprice_required'].includes(this.clientOrderStatus)
+    ) {
+      await this.$store.dispatch('cart/abandonCheckout', { safe: true })
+    }
+
     this.cartItem = []
 
     const calls = [
@@ -526,6 +562,7 @@ export default {
       this.$store.dispatch('shop/getCurrentShopInfo'),
       this.$store.dispatch('cart/setTotal', 0),
       this.$store.dispatch('cart/setIndex', 0),
+      this.$store.dispatch('cart/setTocart', null),
     ]
     console.log('result', this.$store.get('products/dataProduct'))
     Promise.all(calls).finally(() => {
@@ -534,6 +571,27 @@ export default {
   },
 
   methods: {
+    restorePersistedCheckoutCart() {
+      const payload = this.$store.get('cart/clientOrderPayload') || {}
+      const persistedCart = Array.isArray(payload.dataCart)
+        ? payload.dataCart
+        : this.$store.get('cart/dataCart')
+      this.cartItem = Array.isArray(persistedCart)
+        ? JSON.parse(JSON.stringify(persistedCart))
+        : []
+      this.total = Number(
+        payload.expected_total == null
+          ? this.$store.get('cart/totalCart') || 0
+          : payload.expected_total
+      )
+      this.idxCart = this.cartItem.reduce(
+        (sum, line) => sum + Number(line.qty || line.quantity || 0),
+        0
+      )
+      this.$store.dispatch('cart/setTocart', this.cartItem)
+      this.$store.dispatch('cart/setTotal', this.total)
+      this.$store.dispatch('cart/setIndex', this.idxCart)
+    },
     openProductPreview(item) {
       this.previewItem = item
       this.previewDialog = true
@@ -552,70 +610,64 @@ export default {
       this.previewDialog = false
       this.addToCart(item)
     },
-    resetForm() {
-      if (this.$refs.formItem) {
-        this.$refs.formItem.resetValidation()
-        this.$refs.formItem.reset()
-        this.itemDialog = false
-      }
+    closeCustomizationWizard() {
+      this.customizationDialog = false
+      this.selectedItem = null
+      this.selectedChoiceIds = []
+      this.editingCartIndex = null
     },
-    submitFormItem() {
-      const isValid = this.$refs.formItem.validate()
-      console.log('Is FOrm Item Valid', isValid)
-      if (isValid) {
-        this.itemDialog = false
-      }
+    editCartLine(lineIndex) {
+      const line = this.cartItem[lineIndex]
+      if (!line || !(line.customization_steps || []).length) return
 
-      const customizationList = [].concat(...this.currentItem)
-      const customizationPrice = customizationList.reduce((acc, item) => {
-        if (item && item.price) {
-          return this.roundPrice(acc + this.parsePrice(item.price))
-        }
-        return acc
-      }, 0)
-      console.log('CustimzationPrice', customizationPrice)
-      console.log('customisation List', customizationList)
-      const price = this.roundPrice(
-        this.parsePrice(this.selectedItem.price) + customizationPrice
-      )
-      const newData = {
-        id: this.selectedItem.id,
-        name: this.selectedItem.name,
-        categoryid: this.selectedItem.categoryid,
-        image: this.selectedItem.image,
-        stock: this.selectedItem.stock,
+      this.editingCartIndex = lineIndex
+      this.selectedItem = { ...line }
+      this.selectedChoiceIds = [...(line.selectedChoiceIds || [])]
+      this.customizationDialog = true
+    },
+    confirmCustomization(customization) {
+      if (!this.selectedItem) return
+
+      const isEditing = Number.isInteger(this.editingCartIndex)
+      const sourceLine = isEditing ? this.cartItem[this.editingCartIndex] : null
+      if (isEditing && !sourceLine) {
+        this.closeCustomizationWizard()
+        return
+      }
+      const qty = sourceLine ? Number(sourceLine.qty || 1) : 1
+      const price = this.roundPrice(customization.unitPrice)
+      const selections = (customization.selections || []).map((selection) => ({
+        ...selection,
+      }))
+      const line = {
+        ...this.selectedItem,
+        selectedChoiceIds: [...(customization.selectedChoiceIds || [])],
+        selections,
+        customizationList: selections.map((selection) => ({
+          ...selection,
+          name: selection.choice_name || selection.name,
+          price: selection.extra_price,
+        })),
         price,
-        subtotal: price,
-        qty: 1,
-        customizationList,
+        qty,
+        subtotal: this.roundPrice(price * qty),
       }
-      this.cartItem = [...this.cartItem, newData]
-
+      this.cartItem = sourceLine
+        ? replaceConfiguredCartLine(this.cartItem, this.editingCartIndex, line)
+        : mergeConfiguredCartLine(this.cartItem, line)
+      this.closeCustomizationWizard()
       this.totalPrice()
       this.indexCart()
     },
-
-    rulesCheckboxes(value, mandatory) {
-      // Check if the value length is 0 and the field is mandatory
-      if (mandatory && (!value || value.length === 0)) {
-        return 'Sélectionner au moins un choix'
+    customizationUnavailableReason(product) {
+      const reason = product && product.customization_unavailable_reason
+      if (typeof reason === 'string' && reason.trim()) return reason
+      if (reason && reason.code === 'INSUFFICIENT_AVAILABLE_CHOICES') {
+        return `Choix disponibles insuffisants (${Number(
+          reason.available_choice_count || 0
+        )}/${Number(reason.minimum_choices || 0)}).`
       }
-      return true
-    },
-    disableCustomizationValidation() {
-      let result = false
-      if (!this.selectedItem || !this.selectedItem.product_customization) {
-        return false
-      }
-      this.selectedItem.product_customization.forEach((item, index) => {
-        if (item.mandatory) {
-          const currentSelection = this.currentItem[index]
-          if (!currentSelection || currentSelection.length === 0) {
-            result = true
-          }
-        }
-      })
-      return result
+      return 'La personnalisation requise est indisponible.'
     },
     change() {
       this.dialog = this.stateDialog
@@ -633,13 +685,20 @@ export default {
         return this.roundPrice(sum + this.parsePrice(el.subtotal))
       }, 0)
       this.$store.dispatch('cart/setTotal', this.total)
+      this.$store.dispatch(
+        'cart/setTocart',
+        this.cartItem.length > 0 ? this.cartItem : null
+      )
+      if (this.isOrderEditActive) {
+        this.$store.dispatch('orderEdit/updateDirty', this.cartItem)
+      }
     },
     indexCart() {
-      this.idxCart = 0
-      this.cartItem.forEach((elm) => {
-        this.idxCart = this.idxCart + elm.qty
-        this.$store.dispatch('cart/setIndex', this.idxCart)
-      })
+      this.idxCart = this.cartItem.reduce(
+        (total, item) => total + Number(item.qty || 0),
+        0
+      )
+      this.$store.dispatch('cart/setIndex', this.idxCart)
     },
     showAlert(text, type) {
       this.alert = true
@@ -654,51 +713,41 @@ export default {
       this.kitchenClosedSnackbar = true
     },
     addToCart(params) {
-      if (this.isKitchenClosed) {
+      if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.showKitchenClosedSnackbar()
         return
       }
 
-      if (params.stock < 1) {
+      if (params.customization_available === false) {
+        this.showAlert(this.customizationUnavailableReason(params), 'error')
+        return
+      }
+
+      if (Number(params.stock) < 1) {
         this.showAlert('Produit non disponible', 'error')
         return
       }
 
-      if (params.product_customization.length > 0) {
-        this.itemDialog = true
-        this.selectedItem = this.dataProduct.find((x) => x.id === params.id)
-        this.currentItem = this.selectedItem.product_customization.map(() => [])
-      } else {
-        const existingIndex = this.cartItem.findIndex(
-          (item) => item.id === params.id
-        )
-
-        if (existingIndex !== -1) {
-          // Si l’item est déjà dans le panier, on augmente juste la quantité
-          this.cartItem[existingIndex].qty += 1
-          this.cartItem[existingIndex].subtotal = this.roundPrice(
-            this.cartItem[existingIndex].qty *
-              this.parsePrice(this.cartItem[existingIndex].price)
-          )
-        } else {
-          // Sinon on l’ajoute
-          const newData = {
-            id: params.id,
-            name: params.name,
-            categoryid: params.categoryid,
-            image: params.image,
-            stock: params.stock,
-            price: this.roundPrice(params.price),
-            subtotal: this.roundPrice(params.price),
-            qty: 1,
-          }
-          this.cartItem = [...this.cartItem, newData]
-        }
-
-        this.idItem = params.id
-        this.totalPrice()
-        this.indexCart()
+      if ((params.customization_steps || []).length > 0) {
+        this.selectedItem =
+          this.dataProduct.find((product) => product.id === params.id) || params
+        this.selectedChoiceIds = []
+        this.customizationDialog = true
+        return
       }
+
+      const price = this.roundPrice(params.price)
+      this.cartItem = mergeConfiguredCartLine(this.cartItem, {
+        ...params,
+        selectedChoiceIds: [],
+        selections: [],
+        customizationList: [],
+        price,
+        subtotal: price,
+        qty: 1,
+      })
+      this.totalPrice()
+      this.indexCart()
     },
     minusBtn(params, index) {
       console.log('Index Minus Btn', this.cartItem, index, params)
@@ -747,16 +796,52 @@ export default {
       this.totalPrice()
       this.indexCart()
     },
-    btnOrder() {
-      if (this.isKitchenClosed) {
+    openCart() {
+      if (this.embeddedOrderEdit && this.isOrderEditActive) {
+        this.$emit('show-cart')
+        return
+      }
+      this.$router.push('/cart')
+    },
+    async btnOrder() {
+      if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.showKitchenClosedSnackbar()
         return
       }
 
+      if (this.hasUnsafeCheckoutAttempt) {
+        this.restorePersistedCheckoutCart()
+        this.openCart()
+        return
+      }
+
+      if (
+        ['prewrite_rejected', 'reprice_required'].includes(
+          this.clientOrderStatus
+        )
+      ) {
+        await this.$store.dispatch('cart/abandonCheckout', { safe: true })
+      }
+
       this.$store.dispatch('cart/setTocart', this.cartItem)
-      this.$router.push('/cart')
+      this.allowRouteLeave = true
+      this.openCart()
     },
-    btnCancel() {
+    async btnCancel() {
+      if (this.isOrderEditActive) {
+        if (this.embeddedOrderEdit) {
+          this.$emit('request-close')
+          return
+        }
+        if (!window.confirm('Annuler les modifications de cette commande ?')) {
+          return
+        }
+        const orderId = this.$store.get('orderEdit/orderId')
+        await this.$store.dispatch('orderEdit/cancel')
+        this.allowRouteLeave = true
+        this.$router.push(`/orders/detail/${orderId}`)
+        return
+      }
       this.cartItem = []
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)
@@ -867,6 +952,16 @@ export default {
 .cart-item-info {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.cart-item-info--editable {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.cart-item-info--editable:focus-visible {
+  outline: 2px solid var(--v-primary-base);
+  outline-offset: 2px;
 }
 
 .cart-item-avatar {

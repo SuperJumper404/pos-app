@@ -9,6 +9,11 @@
       <Loading />
     </v-card>
     <template>
+      <TakeawayChip
+        v-if="dataArchivedOrder"
+        :value="dataArchivedOrder.is_takeaway"
+        class="mt-3"
+      />
       <v-row>
         <v-col cols="12" md="6">
           <div v-if="urlPDF" class="border rounded shadow">
@@ -47,6 +52,7 @@
   </v-container>
 </template>
 <script>
+import TakeawayChip from '@/components/orders/TakeawayChip'
 // import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 // import moment from 'moment'
@@ -55,6 +61,7 @@ import { jsPDF as JSPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 export default {
+  components: { TakeawayChip },
   mixins: [price],
   data() {
     return {

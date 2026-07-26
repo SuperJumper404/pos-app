@@ -14,9 +14,20 @@ export const state = () => ({
   staticURL: getHost().backEndPoint.replace(/\/+$/, ''),
   stateDialog: false,
 })
-export const mutations = { ...defaultMutations(state()) }
+export const mutations = {
+  ...defaultMutations(state()),
+  CLEAR_AUTHENTICATION_STATE(currentState) {
+    currentState.authenticated = false
+  },
+}
 export const plugins = [EasyAccess()]
 export const actions = {
+  setAuthentication({ dispatch }, authenticated) {
+    return dispatch('set/authenticated', Boolean(authenticated))
+  },
+  clearAuthentication({ dispatch }) {
+    return dispatch('set/authenticated', false)
+  },
   setDialog({ dispatch }, params) {
     dispatch('set/stateDialog', params)
   },

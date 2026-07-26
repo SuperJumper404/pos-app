@@ -86,7 +86,7 @@
                 </v-icon>
                 {{
                   isKitchenClosed
-                    ? 'Cuisine fermee'
+                    ? 'Cuisine fermée'
                     : isRestaurantOpen
                     ? 'Ouvert'
                     : 'Fermé'
