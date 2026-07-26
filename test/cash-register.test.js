@@ -2,6 +2,7 @@ const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
 const {
+  archiveOrdersSafely,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
@@ -118,22 +119,65 @@ assert.deepStrictEqual(summarizeArchiveResults(['1', 2, '3'], [true]), {
   allSucceeded: false,
 })
 
-const payoutSource = fs.readFileSync(
-  path.join(__dirname, '../pages/cashregister/payout/_id.vue'),
-  'utf8'
-)
-assert.ok(payoutSource.includes('summarizeArchiveResults'))
-assert.ok(payoutSource.includes('Promise.allSettled'))
-assert.ok(payoutSource.includes('failedOrderIds'))
-assert.ok(payoutSource.includes("notifications/error"))
-assert.ok(payoutSource.includes('if (!archiveSummary.allSucceeded)'))
-assert.ok(!payoutSource.includes('Promise.all(ordersToArchive).finally'))
+assert.deepStrictEqual(summarizeArchiveResults([], []), {
+  successfulOrderIds: [],
+  failedOrderIds: [],
+  allSucceeded: false,
+})
 
-const ordersSource = fs.readFileSync(
-  path.join(__dirname, '../store/orders.js'),
-  'utf8'
-)
-assert.ok(ordersSource.includes('error.response?.data?.message'))
-assert.ok(ordersSource.includes("Impossible d'archiver la commande."))
+const runAsyncAssertions = async () => {
+  const attemptedOrderIds = []
+  const archiveSummary = await archiveOrdersSafely(
+    [1, 2, 3, 4],
+    (orderId) => {
+      attemptedOrderIds.push(orderId)
+      if (orderId === 1) throw new Error('sync failure')
+      if (orderId === 2) return Promise.reject(new Error('async failure'))
+      if (orderId === 3) return false
+      return true
+    }
+  )
 
-console.log('cashRegister tests passed')
+  assert.deepStrictEqual(attemptedOrderIds, [1, 2, 3, 4])
+  assert.deepStrictEqual(archiveSummary, {
+    successfulOrderIds: [4],
+    failedOrderIds: [1, 2, 3],
+    allSucceeded: false,
+  })
+
+  const payoutSource = fs.readFileSync(
+    path.join(__dirname, '../pages/cashregister/payout/_id.vue'),
+    'utf8'
+  )
+  assert.ok(payoutSource.includes('archiveOrdersSafely'))
+  assert.ok(!payoutSource.includes('Promise.allSettled'))
+  assert.ok(payoutSource.includes('notify: false'))
+  assert.ok(payoutSource.includes('this.$router.replace'))
+  assert.ok(payoutSource.includes('if (!orderIds.length)'))
+  assert.ok(payoutSource.includes('retryPaymentMethod'))
+  assert.ok(payoutSource.includes('retryRequiresPaymentMethod'))
+  const btnYesSource = payoutSource.slice(payoutSource.indexOf('async btnYes'))
+  assert.ok(
+    btnYesSource.indexOf('this.ordersToArchive = archiveSummary.failedOrderIds') <
+      btnYesSource.indexOf("dispatch('orders/getAllOrder'")
+  )
+
+  const ordersSource = fs.readFileSync(
+    path.join(__dirname, '../store/orders.js'),
+    'utf8'
+  )
+  const archiveOrderSource = ordersSource.slice(
+    ordersSource.indexOf('archiveOrder'),
+    ordersSource.indexOf('refundStripeOrder')
+  )
+  assert.ok(archiveOrderSource.includes('error.response?.data?.message'))
+  assert.ok(archiveOrderSource.includes("Impossible d'archiver la commande."))
+  assert.ok(archiveOrderSource.includes('params.notify !== false'))
+
+  console.log('cashRegister tests passed')
+}
+
+runAsyncAssertions().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

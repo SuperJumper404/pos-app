@@ -157,9 +157,11 @@ export const actions = {
       )
       .then((response) => {
         dispatch('set/message', response.data.message)
-        dispatch('notifications/success', 'Commande archivée avec succès.', {
-          root: true,
-        })
+        if (params.notify !== false) {
+          dispatch('notifications/success', 'Commande archivée avec succès.', {
+            root: true,
+          })
+        }
         return true
       })
       .catch((error) => {
@@ -168,7 +170,9 @@ export const actions = {
           error.message ||
           "Impossible d'archiver la commande."
         dispatch('set/message', message)
-        dispatch('notifications/error', message, { root: true })
+        if (params.notify !== false) {
+          dispatch('notifications/error', message, { root: true })
+        }
         return false
       })
   },

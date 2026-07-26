@@ -64,9 +64,9 @@
 <script>
 import price from '@/helpers/price'
 const {
+  archiveOrdersSafely,
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
-  summarizeArchiveResults,
 } = require('@/helpers/cashRegister')
 
 export default {
@@ -80,6 +80,8 @@ export default {
       loadingBtn: false,
       ordersLoaded: false,
       selectedPaymentMethod: null,
+      retryPaymentMethod: null,
+      retryRequiresPaymentMethod: false,
     }
   },
   computed: {
@@ -99,12 +101,18 @@ export default {
       return getCashRegisterPaymentSummary(this.selectedOrders)
     },
     requiresPaymentMethod() {
-      return this.paymentSummary.hasAmountDue
+      return this.retryRequiresPaymentMethod || this.paymentSummary.hasAmountDue
+    },
+    paymentMethodToUse() {
+      if (this.retryRequiresPaymentMethod) return this.retryPaymentMethod
+      return this.requiresPaymentMethod ? this.selectedPaymentMethod : null
     },
     confirmDisabled() {
       return (
         !this.ordersLoaded ||
-        (this.requiresPaymentMethod && this.selectedPaymentMethod === null)
+        this.loadingBtn ||
+        !this.ordersToArchive.length ||
+        (this.requiresPaymentMethod && this.paymentMethodToUse === null)
       )
     },
     actionTitle() {
@@ -127,35 +135,55 @@ export default {
       this.$router.push('/cashregister')
     },
     async btnYes() {
+      if (this.loadingBtn) return
+
       this.loadingBtn = true
       const orderIds = this.ordersToArchive.slice()
-      const paymentMethod = this.requiresPaymentMethod
-        ? this.selectedPaymentMethod
-        : null
-      let allSucceeded = false
+      const requiresPaymentMethod = this.requiresPaymentMethod
+      const paymentMethod = this.paymentMethodToUse
 
       try {
-        const archiveResults = await Promise.allSettled(
-          orderIds.map((orderId) =>
-            Promise.resolve().then(() =>
-              this.$store.dispatch('orders/archiveOrder', {
-                id: orderId,
-                payment_method: paymentMethod,
-              })
-            )
+        if (!orderIds.length) {
+          this.$store.dispatch(
+            'notifications/error',
+            'Aucune commande à archiver.',
+            { root: true }
           )
-        )
-        const archiveSummary = summarizeArchiveResults(
-          orderIds,
-          archiveResults.map(
-            (result) => result.status === 'fulfilled' && result.value
-          )
-        )
+          return
+        }
 
-        await this.$store.dispatch('orders/getAllOrder', { refresh: Date.now() })
+        const archiveSummary = await archiveOrdersSafely(
+          orderIds,
+          (orderId) =>
+            this.$store.dispatch('orders/archiveOrder', {
+              id: orderId,
+              payment_method: paymentMethod,
+              notify: false,
+            })
+        )
 
         if (!archiveSummary.allSucceeded) {
           this.ordersToArchive = archiveSummary.failedOrderIds
+          this.retryPaymentMethod = paymentMethod
+          this.retryRequiresPaymentMethod = requiresPaymentMethod
+
+          await Promise.resolve()
+            .then(() =>
+              this.$router.replace({
+                query: {
+                  ...this.$route.query,
+                  orders: archiveSummary.failedOrderIds,
+                },
+              })
+            )
+            .catch(() => {})
+
+          try {
+            await this.$store.dispatch('orders/getAllOrder', {
+              refresh: Date.now(),
+            })
+          } catch (error) {}
+
           this.$store.dispatch(
             'notifications/error',
             `${archiveSummary.failedOrderIds.length} commande(s) n'ont pas pu être archivées.`,
@@ -164,13 +192,25 @@ export default {
           return
         }
 
+        try {
+          await this.$store.dispatch('orders/getAllOrder', {
+            refresh: Date.now(),
+          })
+        } catch (error) {}
+
+        this.retryPaymentMethod = null
+        this.retryRequiresPaymentMethod = false
+        this.$store.dispatch(
+          'notifications/success',
+          `${archiveSummary.successfulOrderIds.length} commande(s) archivée(s) avec succès.`,
+          { root: true }
+        )
         this.dialog = false
-        allSucceeded = true
       } finally {
         this.loadingBtn = false
       }
 
-      if (allSucceeded) this.$router.push('/cashregister')
+      this.$router.push('/cashregister')
     },
   },
 }

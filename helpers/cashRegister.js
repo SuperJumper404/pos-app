@@ -13,10 +13,11 @@ const normalizeOrderIds = (value) =>
     .filter((id) => Number.isFinite(id))
 
 const summarizeArchiveResults = (orderIds, results = []) => {
+  const normalizedOrderIds = normalizeOrderIds(orderIds)
   const successfulOrderIds = []
   const failedOrderIds = []
 
-  normalizeOrderIds(orderIds).forEach((orderId, index) => {
+  normalizedOrderIds.forEach((orderId, index) => {
     const wasArchived = Boolean(results[index])
     if (wasArchived) {
       successfulOrderIds.push(orderId)
@@ -28,9 +29,20 @@ const summarizeArchiveResults = (orderIds, results = []) => {
   return {
     successfulOrderIds,
     failedOrderIds,
-    allSucceeded: failedOrderIds.length === 0,
+    allSucceeded:
+      normalizedOrderIds.length > 0 && failedOrderIds.length === 0,
   }
 }
+
+const archiveOrdersSafely = (orderIds, archiveOrder) =>
+  Promise.all(
+    normalizeOrderIds(orderIds).map((orderId) =>
+      Promise.resolve()
+        .then(() => archiveOrder(orderId))
+        .then((value) => Boolean(value))
+        .catch(() => false)
+    )
+  ).then((results) => summarizeArchiveResults(orderIds, results))
 
 const toAmount = (value) => {
   const amount = Number(value)
@@ -100,6 +112,7 @@ const buildCashRegisterCustomerRows = (orders = []) => {
 }
 
 module.exports = {
+  archiveOrdersSafely,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   isCashRegisterOrderPaid,
