@@ -66,6 +66,7 @@ import price from '@/helpers/price'
 const {
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
+  summarizeArchiveResults,
 } = require('@/helpers/cashRegister')
 
 export default {
@@ -116,7 +117,6 @@ export default {
     },
   },
   mounted() {
-    console.log('Ordres to Archivessss', this.ordersToArchive)
     this.$store.dispatch('orders/getAllOrder').finally(() => {
       this.ordersLoaded = true
     })
@@ -128,29 +128,49 @@ export default {
     },
     async btnYes() {
       this.loadingBtn = true
+      const orderIds = this.ordersToArchive.slice()
       const paymentMethod = this.requiresPaymentMethod
         ? this.selectedPaymentMethod
         : null
-      const ordersToArchive = this.ordersToArchive.map(async (x) => {
-        return await this.$store.dispatch('orders/archiveOrder', {
-          id: x,
-          payment_method: paymentMethod,
-        })
-      })
-      console.log('OrderToArchive', ordersToArchive)
-      await Promise.all(ordersToArchive).finally(async () => {
+      let allSucceeded = false
+
+      try {
+        const archiveResults = await Promise.allSettled(
+          orderIds.map((orderId) =>
+            Promise.resolve().then(() =>
+              this.$store.dispatch('orders/archiveOrder', {
+                id: orderId,
+                payment_method: paymentMethod,
+              })
+            )
+          )
+        )
+        const archiveSummary = summarizeArchiveResults(
+          orderIds,
+          archiveResults.map(
+            (result) => result.status === 'fulfilled' && result.value
+          )
+        )
+
+        await this.$store.dispatch('orders/getAllOrder', { refresh: Date.now() })
+
+        if (!archiveSummary.allSucceeded) {
+          this.ordersToArchive = archiveSummary.failedOrderIds
+          this.$store.dispatch(
+            'notifications/error',
+            `${archiveSummary.failedOrderIds.length} commande(s) n'ont pas pu être archivées.`,
+            { root: true }
+          )
+          return
+        }
+
         this.dialog = false
+        allSucceeded = true
+      } finally {
         this.loadingBtn = false
-        await this.$store
-          .dispatch('orders/getAllOrder', { refresh: Date.now() })
-          .then(() => {
-            this.$router.push({
-              path: '/cashregister',
-              query: {},
-              force: true,
-            })
-          })
-      })
+      }
+
+      if (allSucceeded) this.$router.push('/cashregister')
     },
   },
 }

@@ -163,8 +163,12 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        console.error('Error to Archive order ')
-        dispatch('set/message', error.response.data.message)
+        const message =
+          error.response?.data?.message ||
+          error.message ||
+          "Impossible d'archiver la commande."
+        dispatch('set/message', message)
+        dispatch('notifications/error', message, { root: true })
         return false
       })
   },

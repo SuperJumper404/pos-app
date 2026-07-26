@@ -1,8 +1,11 @@
 const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
 const {
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
+  summarizeArchiveResults,
 } = require('../helpers/cashRegister')
 
 const orders = [
@@ -96,5 +99,41 @@ assert.deepStrictEqual(
 assert.deepStrictEqual(normalizeOrderIds(['1', 2, 'bad', null]), [1, 2])
 assert.deepStrictEqual(normalizeOrderIds('7'), [7])
 assert.deepStrictEqual(normalizeOrderIds(undefined), [])
+
+assert.deepStrictEqual(summarizeArchiveResults([1, 2, 3], [true, false, true]), {
+  successfulOrderIds: [1, 3],
+  failedOrderIds: [2],
+  allSucceeded: false,
+})
+
+assert.deepStrictEqual(summarizeArchiveResults(['1', 2], [true, true]), {
+  successfulOrderIds: [1, 2],
+  failedOrderIds: [],
+  allSucceeded: true,
+})
+
+assert.deepStrictEqual(summarizeArchiveResults(['1', 2, '3'], [true]), {
+  successfulOrderIds: [1],
+  failedOrderIds: [2, 3],
+  allSucceeded: false,
+})
+
+const payoutSource = fs.readFileSync(
+  path.join(__dirname, '../pages/cashregister/payout/_id.vue'),
+  'utf8'
+)
+assert.ok(payoutSource.includes('summarizeArchiveResults'))
+assert.ok(payoutSource.includes('Promise.allSettled'))
+assert.ok(payoutSource.includes('failedOrderIds'))
+assert.ok(payoutSource.includes("notifications/error"))
+assert.ok(payoutSource.includes('if (!archiveSummary.allSucceeded)'))
+assert.ok(!payoutSource.includes('Promise.all(ordersToArchive).finally'))
+
+const ordersSource = fs.readFileSync(
+  path.join(__dirname, '../store/orders.js'),
+  'utf8'
+)
+assert.ok(ordersSource.includes('error.response?.data?.message'))
+assert.ok(ordersSource.includes("Impossible d'archiver la commande."))
 
 console.log('cashRegister tests passed')

@@ -12,6 +12,26 @@ const normalizeOrderIds = (value) =>
     .map((id) => Number(id))
     .filter((id) => Number.isFinite(id))
 
+const summarizeArchiveResults = (orderIds, results = []) => {
+  const successfulOrderIds = []
+  const failedOrderIds = []
+
+  normalizeOrderIds(orderIds).forEach((orderId, index) => {
+    const wasArchived = Boolean(results[index])
+    if (wasArchived) {
+      successfulOrderIds.push(orderId)
+    } else {
+      failedOrderIds.push(orderId)
+    }
+  })
+
+  return {
+    successfulOrderIds,
+    failedOrderIds,
+    allSucceeded: failedOrderIds.length === 0,
+  }
+}
+
 const toAmount = (value) => {
   const amount = Number(value)
   return Number.isFinite(amount) ? amount : 0
@@ -84,4 +104,5 @@ module.exports = {
   getCashRegisterPaymentSummary,
   isCashRegisterOrderPaid,
   normalizeOrderIds,
+  summarizeArchiveResults,
 }
