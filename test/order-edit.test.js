@@ -210,6 +210,16 @@ assert.ok(
   'the chip must expose an opt-in dine-in mode'
 )
 assert.strictEqual(takeawayChipOptions.props.showDineIn.default, false)
+assert.ok(
+  takeawayChipOptions.props.small,
+  'the chip must expose an opt-in small size'
+)
+assert.strictEqual(takeawayChipOptions.props.small.default, false)
+assert.ok(
+  takeawayChipOptions.props.showIcon,
+  'the chip must expose an opt-in icon'
+)
+assert.strictEqual(takeawayChipOptions.props.showIcon.default, false)
 assert.strictEqual(
   takeawayChipOptions.computed.visible.call({
     isTakeaway: false,
@@ -228,13 +238,18 @@ assert.strictEqual(
   takeawayChipOptions.computed.label.call({ isTakeaway: false }),
   'Sur place'
 )
+assert.strictEqual(
+  takeawayChipOptions.computed.icon.call({ isTakeaway: true }),
+  'mdi-basket'
+)
 assert.ok(detailSource.includes('<TakeawayChip'))
 for (const headerContract of [
   'order-detail-header',
   'orderSummary.ordernumber',
   'orderSummary.customer',
+  'totalItemCount',
+  'Nombre d’articles',
   'show-dine-in',
-  'order-detail-header__payment',
 ]) {
   assert.ok(
     detailSource.includes(headerContract),
@@ -246,7 +261,7 @@ assert.ok(
   'order and customer metadata must not be repeated on every product line'
 )
 assert.ok(
-  detailSource.includes('Modifier la commande'),
+  detailSource.includes('Modifier <v-icon small right>mdi-pencil</v-icon>'),
   'an unpaid editable order must expose the edit action'
 )
 assert.ok(

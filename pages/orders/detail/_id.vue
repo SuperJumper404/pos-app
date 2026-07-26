@@ -13,87 +13,108 @@
       {{ detailLoadError }}
     </v-alert>
 
-    <v-card v-else outlined class="mt-5 order-detail-panel">
-      <v-card-text v-if="orderSummary" class="order-detail-header">
-        <div class="order-detail-header__identity">
-          <div class="order-detail-header__field">
-            <span class="order-detail-header__label">Commande</span>
-            <strong>#{{ orderSummary.ordernumber || '—' }}</strong>
-          </div>
-          <div class="order-detail-header__field">
-            <span class="order-detail-header__label">Client</span>
-            <strong>{{ orderSummary.customer || '—' }}</strong>
-          </div>
-        </div>
-
-        <div class="order-detail-header__chips">
-          <div
-            v-if="orderPaymentStatus"
-            class="order-detail-header__payment"
-          >
-            <span class="order-detail-header__label">Paiement</span>
-            <v-chip
-              small
-              dark
-              :color="paymentStatusColor(orderPaymentStatus)"
-            >
-              {{ paymentStatusText(orderPaymentStatus) }}
-            </v-chip>
-          </div>
-          <TakeawayChip
-            :value="orderSummary.is_takeaway"
-            show-dine-in
-          />
-        </div>
-      </v-card-text>
-      <v-divider v-if="orderSummary"></v-divider>
-
-      <div class="order-detail-list">
-        <v-card
-          v-for="(itm, i) in detailOrder"
-          :key="i"
-          outlined
-          class="order-detail-item mb-3 pa-2"
-        >
-          <div class="order-detail-content">
-            <div class="order-detail-image-wrap">
-              <v-img
-                :src="productImageSrc(itm.image)"
-                class="order-detail-image"
-                :aspect-ratio="4 / 3"
-                height="96"
-                width="128"
-                max-width="128px"
-              ></v-img>
+    <div v-else class="mt-5 order-detail-panel">
+      <v-card outlined class="order-detail-header-card">
+        <v-card-text v-if="orderSummary" class="order-detail-header">
+          <div class="order-detail-header__identity">
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Commande</span>
+              <strong>#{{ orderSummary.ordernumber || '—' }}</strong>
             </div>
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Client</span>
+              <strong>{{ orderSummary.customer || '—' }}</strong>
+            </div>
+            <div
+              v-if="orderPaymentStatus"
+              class="order-detail-header__field"
+            >
+              <span class="order-detail-header__label">Paiement</span>
+              <v-chip
+                small
+                dark
+                :color="paymentStatusColor(orderPaymentStatus)"
+              >
+                {{ paymentStatusText(orderPaymentStatus) }}
+              </v-chip>
+            </div>
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Nombre d’articles</span>
+              <strong>{{ totalItemCount }}</strong>
+            </div>
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Service</span>
+              <TakeawayChip
+                :value="orderSummary.is_takeaway"
+                show-dine-in
+                show-icon
+                :icon-size="18"
+                small
+              />
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
 
-            <div class="order-detail-body">
-              <div class="order-detail-main">
-                <div class="order-detail-product">
-                  <div class="order-detail-product-name">
-                    {{ itm.name }}
+      <v-card outlined class="order-detail-list-card">
+        <div class="order-detail-list">
+          <v-card
+            v-for="(itm, i) in detailOrder"
+            :key="i"
+            outlined
+            class="order-detail-item mb-3"
+          >
+            <div class="order-detail-content">
+              <div class="order-detail-image-wrap">
+                <v-img
+                  :src="productImageSrc(itm.image)"
+                  class="order-detail-image"
+                  :aspect-ratio="4 / 3"
+                  height="96"
+                  width="128"
+                  max-width="128px"
+                ></v-img>
+              </div>
+
+              <div class="order-detail-body">
+                <div class="order-detail-product-row">
+                  <div class="order-detail-product">
+                    <div class="order-detail-product-name">
+                      {{ itm.name }}
+                    </div>
+                    <div class="order-detail-product-price">
+                      {{ lineItemAmount(itm) }}
+                    </div>
                   </div>
-                  <div class="order-detail-product-price">
-                    {{ lineItemAmount(itm) }}
+
+                  <div
+                    class="order-detail-qty primary white--text"
+                    :aria-label="`Quantité : ${itm.qty}`"
+                  >
+                    <strong>{{ itm.qty }}</strong>
                   </div>
                 </div>
 
-                <CustomizationSummary
+                <div
                   v-if="customizationGroups(itm).length"
-                  :groups="customizationGroups(itm)"
                   class="order-detail-customizations"
-                />
-
+                >
+                  <div class="order-detail-customizations__title">
+                    <v-icon size="17" color="primary">
+                      mdi-tune-variant
+                    </v-icon>
+                    <span>Choix et suppléments</span>
+                  </div>
+                  <CustomizationSummary
+                    :groups="customizationGroups(itm)"
+                  />
+                </div>
               </div>
             </div>
-
-            <v-btn class="order-detail-qty" color="success" fab small dark>
-              {{ itm.qty }}
-            </v-btn>
-          </div>
-        </v-card>
-      </div>
-    </v-card>
+          </v-card>
+        </div>
+      </v-card>
+    </div>
 
     <v-alert
       v-if="orderNote"
@@ -108,7 +129,7 @@
     </v-alert>
 
     <v-card color="grey lighten-3" class="mt-5">
-      <v-card-actions>
+      <v-card-actions class="order-detail-footer-actions">
         <v-btn
           v-if="canOpenOrderEditModal && !loadPage"
           color="success"
@@ -117,7 +138,7 @@
           :disabled="startLoading"
           @click="requestOrderEdit"
         >
-          Modifier la commande <v-icon small right>mdi-pencil</v-icon>
+          Modifier <v-icon small right>mdi-pencil</v-icon>
         </v-btn>
         <v-btn
           v-if="canStartComplementaryOrder && !loadPage"
@@ -130,7 +151,6 @@
           Ajouter une commande complémentaire
           <v-icon small right>mdi-plus</v-icon>
         </v-btn>
-        <v-spacer></v-spacer>
         <v-btn color="primary" class="text-none" @click="$router.go(-1)">
           Retour <v-icon small right>mdi-arrow-left</v-icon>
         </v-btn>
@@ -253,14 +273,20 @@ export default {
     orderPaymentStatus() {
       return this.detailOrder[0] || null
     },
-  },
-  mounted() {
-    this.loadOrderDetail(this.id)
+    totalItemCount() {
+      return this.detailOrder.reduce((total, item) => {
+        const quantity = Number(item && item.qty)
+        return total + (Number.isFinite(quantity) ? quantity : 0)
+      }, 0)
+    },
   },
   watch: {
     '$route.params.id'(id) {
       this.loadOrderDetail(id)
     },
+  },
+  mounted() {
+    this.loadOrderDetail(this.id)
   },
   methods: {
     async loadOrderDetail(id) {
@@ -439,74 +465,98 @@ export default {
   overflow-y: auto;
 }
 
+.order-detail-header-card,
+.order-detail-list-card {
+  border-radius: 12px !important;
+}
+
+.order-detail-list-card {
+  margin-top: 12px;
+  overflow: hidden;
+}
+
 .order-detail-header {
   align-items: center;
+  color: rgba(0, 0, 0, 0.87);
   display: flex;
   gap: 20px;
   justify-content: space-between;
+  padding-bottom: 24px;
   padding: 16px 20px;
 }
 
 .order-detail-header__identity {
   display: grid;
   gap: 12px 28px;
-  grid-template-columns: repeat(2, minmax(120px, auto));
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
   min-width: 0;
+  width: 100%;
 }
 
-.order-detail-header__field,
-.order-detail-header__payment {
+.order-detail-header__field {
+  align-items: center;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  text-align: center;
 }
 
 .order-detail-header__field strong {
-  font-size: 18px;
+  color: rgba(0, 0, 0, 0.87);
+  font-family: Poppins, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.order-detail-header__field .v-chip {
+  align-self: center;
+  font-size: 12px;
+  height: 28px;
+  padding: 0 14px;
+}
+
 .order-detail-header__label {
-  color: rgba(0, 0, 0, 0.6);
+  color: rgba(0, 0, 0, 0.87);
   font-size: 12px;
   line-height: 1.2;
 }
 
-.order-detail-header__chips {
-  align-items: flex-end;
-  display: flex;
-  flex: 0 0 auto;
-  gap: 12px;
-}
-
 .order-detail-list {
-  padding: 8px 16px 16px;
+  background: #f7f8fa;
+  padding: 16px 16px 4px;
 }
 
 .order-detail-item {
+  border-color: rgba(0, 0, 0, 0.1);
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(25, 39, 52, 0.04) !important;
   overflow: hidden;
 }
 
 .order-detail-content {
+  align-items: flex-start;
   display: flex;
-  align-items: center;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
+  padding: 16px;
   width: 100%;
 }
 
 .order-detail-image-wrap {
-  flex: 0 0 128px;
-  min-width: 128px;
+  flex: 0 0 112px;
+  min-width: 112px;
 }
 
 .order-detail-image {
-  border-radius: 4px;
+  border-radius: 10px;
   display: block;
-  width: 128px;
+  height: 84px !important;
+  max-width: 112px !important;
+  width: 112px;
 }
 
 .order-detail-body {
@@ -514,11 +564,11 @@ export default {
   min-width: 0;
 }
 
-.order-detail-main {
-  display: grid;
-  grid-template-columns: minmax(140px, 0.75fr) minmax(240px, 2fr);
+.order-detail-product-row {
   align-items: center;
-  gap: 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
   min-width: 0;
 }
 
@@ -539,8 +589,8 @@ export default {
 
 .order-detail-product-name {
   display: -webkit-box;
-  font-size: 18px;
-  line-height: 1.2;
+  font-size: 17px;
+  line-height: 1.25;
   max-width: 100%;
   overflow: hidden;
   overflow-wrap: break-word;
@@ -549,7 +599,8 @@ export default {
 }
 
 .order-detail-product-price {
-  font-size: 17px;
+  color: #1976d2;
+  font-size: 16px;
   margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -557,16 +608,75 @@ export default {
 }
 
 .order-detail-customizations {
+  background: #f7f9fc;
+  border: 1px solid rgba(25, 118, 210, 0.1);
+  border-radius: 10px;
+  margin-top: 12px;
   min-width: 0;
+  padding: 10px;
+}
+
+.order-detail-customizations__title {
+  align-items: center;
+  color: rgba(0, 0, 0, 0.68);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.order-detail-customizations ::v-deep .customization-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.order-detail-customizations
+  ::v-deep
+  .customization-summary__group {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 8px;
+  margin-bottom: 0 !important;
+  min-width: 0;
+  padding: 9px 10px 2px;
+}
+
+.order-detail-customizations
+  ::v-deep
+  .customization-summary__group
+  > .d-flex:first-child {
+  color: rgba(0, 0, 0, 0.8);
+  font-size: 13px;
+  line-height: 1.2;
+  margin-bottom: 6px !important;
+}
+
+.order-detail-customizations ::v-deep .v-chip {
+  background: #fff !important;
+  border-color: rgba(25, 118, 210, 0.24) !important;
+  font-size: 11px;
+  height: 25px;
+  margin-bottom: 7px !important;
 }
 
 .order-detail-qty {
+  align-items: center;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.2);
+  display: flex;
   flex: 0 0 auto;
+  height: 34px;
+  justify-content: center;
+  min-width: 34px;
+  padding: 0;
+  width: 34px;
 }
 
-.order-detail-qty ::v-deep .v-btn__content {
-  font-size: 24px;
-  font-weight: 700;
+.order-detail-qty strong {
+  font-size: 17px;
   line-height: 1;
 }
 
@@ -575,28 +685,39 @@ export default {
   background-size: cover;
 }
 
+.order-detail-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.order-detail-footer-actions .v-btn {
+  margin: 0 !important;
+}
+
 @media (max-width: 960px) {
+  .order-detail-header__identity {
+    grid-template-columns: repeat(2, minmax(120px, auto));
+  }
+
   .order-detail-content {
-    align-items: flex-start;
     gap: 12px;
   }
 
   .order-detail-image-wrap {
-    flex-basis: 84px;
-    min-width: 84px;
+    flex-basis: 96px;
+    min-width: 96px;
   }
 
   .order-detail-image {
-    height: 84px !important;
-    max-width: 84px !important;
-    width: 84px;
+    height: 72px !important;
+    max-width: 96px !important;
+    width: 96px;
   }
 
-  .order-detail-main {
-    grid-template-columns: 1fr;
-    gap: 8px;
+  .order-detail-customizations ::v-deep .customization-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
 }
 
 @media (max-width: 600px) {
@@ -604,7 +725,7 @@ export default {
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
-    padding: 14px 16px;
+    padding: 14px 16px 22px;
   }
 
   .order-detail-header__identity {
@@ -612,65 +733,46 @@ export default {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .order-detail-header__chips {
-    align-items: flex-end;
-    justify-content: space-between;
-  }
-
   .order-detail-list {
     padding: 8px;
   }
 
   .order-detail-item {
-    padding: 10px !important;
     position: relative;
   }
 
   .order-detail-content {
-    align-items: start;
     display: grid;
-    gap: 6px 12px;
-    grid-template-areas:
-      'image product qty'
-      'custom custom custom';
-    grid-template-columns: 92px minmax(0, 1fr) 38px;
+    gap: 10px 12px;
+    grid-template-columns: 80px minmax(0, 1fr);
+    padding: 10px;
   }
 
   .order-detail-image-wrap {
-    align-self: start;
     flex: none;
-    grid-area: image;
+    grid-column: 1;
     min-width: 0;
   }
 
   .order-detail-image {
-    height: 92px !important;
-    max-width: 92px !important;
-    width: 92px;
+    height: 60px !important;
+    max-width: 80px !important;
+    width: 80px;
   }
 
   .order-detail-body {
     display: contents;
-    min-width: 0;
+  }
+
+  .order-detail-product-row {
+    grid-column: 2;
   }
 
   .order-detail-qty {
-    grid-area: qty;
-    height: 34px !important;
-    min-width: 34px !important;
-    width: 34px !important;
-  }
-
-  .order-detail-qty ::v-deep .v-btn__content {
-    font-size: 18px;
-  }
-
-  .order-detail-main {
-    display: contents;
-  }
-
-  .order-detail-product {
-    grid-area: product;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+    width: 28px;
   }
 
   .order-detail-product-name {
@@ -682,20 +784,24 @@ export default {
   }
 
   .order-detail-customizations {
-    grid-area: custom;
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
 
+  .order-detail-customizations ::v-deep .customization-summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 380px) {
   .order-detail-content {
-    grid-template-columns: 78px minmax(0, 1fr) 34px;
+    grid-template-columns: 68px minmax(0, 1fr);
   }
 
   .order-detail-image {
-    height: 78px !important;
-    max-width: 78px !important;
-    width: 78px;
+    height: 52px !important;
+    max-width: 68px !important;
+    width: 68px;
   }
 }
 </style>

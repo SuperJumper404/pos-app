@@ -75,8 +75,20 @@
       >
         <template #[`item.ordernumber`]="{ item }">
           <div class="order-reference">
-            <div class="order-reference__number">#{{ item.ordernumber }}</div>
-            <TakeawayChip :value="item.is_takeaway" />
+            <div class="order-reference__number">
+              #{{ item.ordernumber }}
+              <v-chip
+                v-if="isTakeawayOrder(item)"
+                small
+                color="orange darken-1"
+                dark
+                class="order-reference__takeaway-icon"
+                aria-label="À emporter"
+                title="À emporter"
+              >
+                <v-icon x-small>mdi-basket</v-icon>
+              </v-chip>
+            </div>
             <div class="order-reference__date">
               {{ orderHour(item.created) }} • {{ orderDayMonth(item.created) }}
             </div>
@@ -86,17 +98,43 @@
           <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
         <template #[`item.payment_status`]="{ item }">
-          <v-chip dark :color="paymentStatusColor(item)">
+          <v-chip
+            dark
+            :color="paymentStatusColor(item)"
+            class="orders-data-chip"
+          >
             {{ paymentStatusText(item) }}
           </v-chip>
         </template>
         <template #[`item.status`]="{ item }">
-          <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
-          <v-chip v-if="item.status === 2" color="success">
+          <v-chip
+            v-if="item.status === 1"
+            color="grey"
+            class="orders-data-chip"
+          >
+            En attente
+          </v-chip>
+          <v-chip
+            v-if="item.status === 2"
+            color="success"
+            class="orders-data-chip"
+          >
             En préparation
           </v-chip>
-          <v-chip v-if="item.status === 3" color="primary"> Terminée </v-chip>
-          <v-chip v-if="item.status === 4" color="warning"> Annulée </v-chip>
+          <v-chip
+            v-if="item.status === 3"
+            color="primary"
+            class="orders-data-chip"
+          >
+            Terminée
+          </v-chip>
+          <v-chip
+            v-if="item.status === 4"
+            color="warning"
+            class="orders-data-chip"
+          >
+            Annulée
+          </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
           <v-row class="d-flex flex-nowrap" dense>
@@ -169,7 +207,6 @@
   </v-container>
 </template>
 <script>
-import TakeawayChip from '@/components/orders/TakeawayChip'
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
@@ -178,7 +215,6 @@ const {
   getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
 export default {
-  components: { TakeawayChip },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {
@@ -285,6 +321,9 @@ export default {
     if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
   },
   methods: {
+    isTakeawayOrder(item) {
+      return [true, 1, '1'].includes(item && item.is_takeaway)
+    },
     async toggleKitchenClosed(value) {
       this.kitchenToggleLoading = true
       const res = await this.$store.dispatch('shop/updateShopInfo', {
@@ -829,6 +868,21 @@ export default {
   font-size: 22px;
   font-weight: 700;
   color: rgba(0, 0, 0, 0.87);
+}
+
+.order-reference__takeaway-icon {
+  border-radius: 50% !important;
+  height: 22px !important;
+  justify-content: center;
+  margin-left: 3px;
+  min-width: 22px !important;
+  padding: 0 !important;
+  vertical-align: 3px;
+  width: 22px;
+}
+
+.v-chip.orders-data-chip {
+  border-radius: 12px !important;
 }
 
 .order-reference__date {
