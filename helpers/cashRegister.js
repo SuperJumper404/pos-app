@@ -63,12 +63,15 @@ const resolveRetryDueOrderIds = ({
   const normalizedFallbackDueOrderIds = normalizeOrderIds(
     fallbackDueOrderIds
   ).filter((id) => failedOrderIdsSet.has(id))
-
-  if (!refreshSucceeded) {
-    return { reliable: false, dueOrderIds: normalizedFallbackDueOrderIds }
+  const fallback = {
+    reliable: false,
+    orderIds: normalizedFailedOrderIds,
+    dueOrderIds: normalizedFallbackDueOrderIds,
   }
 
-  const refreshedOrdersById = toArray(refreshedOrders).reduce(
+  if (!refreshSucceeded || !Array.isArray(refreshedOrders)) return fallback
+
+  const refreshedOrdersById = refreshedOrders.reduce(
     (ordersById, order) => {
       const orderId = Number(order.id)
       if (Number.isFinite(orderId)) ordersById.set(orderId, order)
@@ -77,13 +80,14 @@ const resolveRetryDueOrderIds = ({
     new Map()
   )
 
-  if (!normalizedFailedOrderIds.every((id) => refreshedOrdersById.has(id))) {
-    return { reliable: false, dueOrderIds: normalizedFallbackDueOrderIds }
-  }
+  const orderIds = normalizedFailedOrderIds.filter((id) =>
+    refreshedOrdersById.has(id)
+  )
 
   return {
     reliable: true,
-    dueOrderIds: normalizedFailedOrderIds.filter(
+    orderIds,
+    dueOrderIds: orderIds.filter(
       (id) => !isCashRegisterOrderPaid(refreshedOrdersById.get(id))
     ),
   }

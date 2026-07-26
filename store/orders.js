@@ -189,11 +189,47 @@ export const actions = {
         }
       )
       .then((response) => {
-        dispatch('set/message', response.data.message)
-        dispatch('notifications/success', 'Commande remboursée.', {
+        const refundStatus = response.data?.data?.refundStatus
+        const outcomeByStatus = {
+          succeeded: {
+            completed: true,
+            notification: 'success',
+            message: 'Commande remboursée.',
+          },
+          pending: {
+            completed: false,
+            notification: 'warning',
+            message:
+              'Demande de remboursement enregistrée. Son traitement est en cours.',
+          },
+          requires_action: {
+            completed: false,
+            notification: 'warning',
+            message:
+              'Le remboursement nécessite une vérification avant sa finalisation.',
+          },
+          failed: {
+            completed: false,
+            notification: 'error',
+            message: 'Le remboursement a échoué. La commande reste payée.',
+          },
+          canceled: {
+            completed: false,
+            notification: 'error',
+            message: 'Le remboursement a été annulé. La commande reste payée.',
+          },
+        }
+        const outcome = outcomeByStatus[refundStatus] || {
+          completed: false,
+          notification: 'warning',
+          message: 'État du remboursement à vérifier.',
+        }
+
+        dispatch('set/message', outcome.message)
+        dispatch(`notifications/${outcome.notification}`, outcome.message, {
           root: true,
         })
-        return true
+        return outcome.completed
       })
       .catch((error) => {
         dispatch('set/message', error.response?.data?.message)

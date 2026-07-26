@@ -133,7 +133,7 @@ assert.deepStrictEqual(
     refreshedOrders: [{ id: 2, payment_status: 'paid' }],
     refreshSucceeded: true,
   }),
-  { reliable: true, dueOrderIds: [] }
+  { reliable: true, orderIds: [2], dueOrderIds: [] }
 )
 assert.deepStrictEqual(
   resolveRetryDueOrderIds({
@@ -142,7 +142,7 @@ assert.deepStrictEqual(
     refreshedOrders: [{ id: 2, payment_status: 'unpaid' }],
     refreshSucceeded: true,
   }),
-  { reliable: true, dueOrderIds: [2] }
+  { reliable: true, orderIds: [2], dueOrderIds: [2] }
 )
 assert.deepStrictEqual(
   resolveRetryDueOrderIds({
@@ -151,7 +151,7 @@ assert.deepStrictEqual(
     refreshedOrders: [{ id: 2, payment_status: 'paid' }],
     refreshSucceeded: false,
   }),
-  { reliable: false, dueOrderIds: [2] }
+  { reliable: false, orderIds: [2], dueOrderIds: [2] }
 )
 assert.deepStrictEqual(
   resolveRetryDueOrderIds({
@@ -160,7 +160,16 @@ assert.deepStrictEqual(
     refreshedOrders: [],
     refreshSucceeded: true,
   }),
-  { reliable: false, dueOrderIds: [2] }
+  { reliable: true, orderIds: [], dueOrderIds: [] }
+)
+assert.deepStrictEqual(
+  resolveRetryDueOrderIds({
+    failedOrderIds: [2],
+    fallbackDueOrderIds: [2],
+    refreshedOrders: null,
+    refreshSucceeded: true,
+  }),
+  { reliable: false, orderIds: [2], dueOrderIds: [2] }
 )
 const runAsyncAssertions = async () => {
   const attemptedOrderIds = []
@@ -192,6 +201,11 @@ const runAsyncAssertions = async () => {
   assert.ok(payoutSource.includes('this.$router.replace'))
   assert.ok(payoutSource.includes('if (!orderIds.length)'))
   assert.ok(payoutSource.includes('resolveRetryDueOrderIds'))
+  assert.ok(
+    payoutSource.includes(
+      'this.ordersToArchive = retryDueResolution.orderIds'
+    )
+  )
   assert.ok(!payoutSource.includes('retryPaymentMethod'))
   assert.ok(payoutSource.includes('retryActive'))
   assert.ok(!payoutSource.includes('retryRequiresPaymentMethod'))

@@ -181,17 +181,6 @@ export default {
           )
           this.retryActive = true
 
-          await Promise.resolve()
-            .then(() =>
-              this.$router.replace({
-                query: {
-                  ...this.$route.query,
-                  orders: archiveSummary.failedOrderIds,
-                },
-              })
-            )
-            .catch(() => {})
-
           let refreshSucceeded = false
           try {
             refreshSucceeded =
@@ -206,11 +195,39 @@ export default {
             refreshedOrders: this.dataOrders,
             refreshSucceeded,
           })
+          this.ordersToArchive = retryDueResolution.orderIds
           this.retryDueOrderIds = retryDueResolution.dueOrderIds
+          this.retryActive = this.ordersToArchive.length > 0
+
+          if (!this.ordersToArchive.length) {
+            this.$store.dispatch(
+              'notifications/success',
+              `${orderIds.length} commande(s) archivée(s) avec succès.`,
+              { root: true }
+            )
+            this.dialog = false
+            if (this.$route.path !== '/cashregister') {
+              await Promise.resolve()
+                .then(() => this.$router.push('/cashregister'))
+                .catch(() => {})
+            }
+            return
+          }
+
+          await Promise.resolve()
+            .then(() =>
+              this.$router.replace({
+                query: {
+                  ...this.$route.query,
+                  orders: this.ordersToArchive,
+                },
+              })
+            )
+            .catch(() => {})
 
           this.$store.dispatch(
             'notifications/error',
-            `${archiveSummary.failedOrderIds.length} commande(s) n'ont pas pu être archivées.`,
+            `${this.ordersToArchive.length} commande(s) n'ont pas pu être archivées.`,
             { root: true }
           )
           return
