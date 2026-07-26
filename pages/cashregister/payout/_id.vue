@@ -53,7 +53,11 @@
             >{{ actionButtonLabel }}
             <v-icon small right>mdi-cash-multiple</v-icon></v-btn
           >
-          <v-btn color="primary" class="text-none" @click="btnNo"
+          <v-btn
+            :disabled="loadingBtn"
+            color="primary"
+            class="text-none"
+            @click="btnNo"
             >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
           >
         </v-card-actions>
@@ -65,6 +69,7 @@
 import price from '@/helpers/price'
 const {
   archiveOrdersSafely,
+  buildRetryPaymentState,
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
 } = require('@/helpers/cashRegister')
@@ -80,8 +85,8 @@ export default {
       loadingBtn: false,
       ordersLoaded: false,
       selectedPaymentMethod: null,
-      retryPaymentMethod: null,
       retryRequiresPaymentMethod: false,
+      retryDueOrderIds: [],
     }
   },
   computed: {
@@ -103,16 +108,12 @@ export default {
     requiresPaymentMethod() {
       return this.retryRequiresPaymentMethod || this.paymentSummary.hasAmountDue
     },
-    paymentMethodToUse() {
-      if (this.retryRequiresPaymentMethod) return this.retryPaymentMethod
-      return this.requiresPaymentMethod ? this.selectedPaymentMethod : null
-    },
     confirmDisabled() {
       return (
         !this.ordersLoaded ||
         this.loadingBtn ||
         !this.ordersToArchive.length ||
-        (this.requiresPaymentMethod && this.paymentMethodToUse === null)
+        (this.requiresPaymentMethod && this.selectedPaymentMethod === null)
       )
     },
     actionTitle() {
@@ -131,16 +132,26 @@ export default {
   },
   methods: {
     btnNo() {
+      if (this.loadingBtn) return
+
       this.dialog = false
-      this.$router.push('/cashregister')
+      Promise.resolve()
+        .then(() => this.$router.push('/cashregister'))
+        .catch(() => {})
     },
     async btnYes() {
       if (this.loadingBtn) return
 
       this.loadingBtn = true
       const orderIds = this.ordersToArchive.slice()
+      const paymentSummary = this.paymentSummary
+      const initialDueOrderIds = paymentSummary.dueOrderIds.length
+        ? paymentSummary.dueOrderIds.slice()
+        : this.retryDueOrderIds.slice()
       const requiresPaymentMethod = this.requiresPaymentMethod
-      const paymentMethod = this.paymentMethodToUse
+      const paymentMethod = requiresPaymentMethod
+        ? this.selectedPaymentMethod
+        : null
 
       try {
         if (!orderIds.length) {
@@ -164,8 +175,15 @@ export default {
 
         if (!archiveSummary.allSucceeded) {
           this.ordersToArchive = archiveSummary.failedOrderIds
-          this.retryPaymentMethod = paymentMethod
-          this.retryRequiresPaymentMethod = requiresPaymentMethod
+          const retryPaymentState = buildRetryPaymentState(
+            archiveSummary.failedOrderIds,
+            initialDueOrderIds
+          )
+          this.retryRequiresPaymentMethod =
+            retryPaymentState.retryRequiresPaymentMethod
+          this.retryDueOrderIds = initialDueOrderIds.filter((orderId) =>
+            archiveSummary.failedOrderIds.includes(orderId)
+          )
 
           await Promise.resolve()
             .then(() =>
@@ -198,8 +216,8 @@ export default {
           })
         } catch (error) {}
 
-        this.retryPaymentMethod = null
         this.retryRequiresPaymentMethod = false
+        this.retryDueOrderIds = []
         this.$store.dispatch(
           'notifications/success',
           `${archiveSummary.successfulOrderIds.length} commande(s) archivée(s) avec succès.`,
@@ -210,7 +228,11 @@ export default {
         this.loadingBtn = false
       }
 
-      this.$router.push('/cashregister')
+      if (this.$route.path !== '/cashregister') {
+        await Promise.resolve()
+          .then(() => this.$router.push('/cashregister'))
+          .catch(() => {})
+      }
     },
   },
 }

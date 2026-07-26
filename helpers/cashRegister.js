@@ -44,6 +44,16 @@ const archiveOrdersSafely = (orderIds, archiveOrder) =>
     )
   ).then((results) => summarizeArchiveResults(orderIds, results))
 
+const buildRetryPaymentState = (failedOrderIds, dueOrderIds) => {
+  const dueOrderIdsSet = new Set(normalizeOrderIds(dueOrderIds))
+
+  return {
+    retryRequiresPaymentMethod: normalizeOrderIds(failedOrderIds).some((id) =>
+      dueOrderIdsSet.has(id)
+    ),
+  }
+}
+
 const toAmount = (value) => {
   const amount = Number(value)
   return Number.isFinite(amount) ? amount : 0
@@ -113,6 +123,7 @@ const buildCashRegisterCustomerRows = (orders = []) => {
 
 module.exports = {
   archiveOrdersSafely,
+  buildRetryPaymentState,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   isCashRegisterOrderPaid,

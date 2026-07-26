@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const {
   archiveOrdersSafely,
+  buildRetryPaymentState,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
@@ -125,6 +126,16 @@ assert.deepStrictEqual(summarizeArchiveResults([], []), {
   allSucceeded: false,
 })
 
+assert.deepStrictEqual(buildRetryPaymentState([2], [2, 3]), {
+  retryRequiresPaymentMethod: true,
+})
+assert.deepStrictEqual(buildRetryPaymentState([1], [2, 3]), {
+  retryRequiresPaymentMethod: false,
+})
+assert.deepStrictEqual(buildRetryPaymentState([1, 2], [2, 3]), {
+  retryRequiresPaymentMethod: true,
+})
+
 const runAsyncAssertions = async () => {
   const attemptedOrderIds = []
   const archiveSummary = await archiveOrdersSafely(
@@ -154,9 +165,16 @@ const runAsyncAssertions = async () => {
   assert.ok(payoutSource.includes('notify: false'))
   assert.ok(payoutSource.includes('this.$router.replace'))
   assert.ok(payoutSource.includes('if (!orderIds.length)'))
-  assert.ok(payoutSource.includes('retryPaymentMethod'))
+  assert.ok(payoutSource.includes('buildRetryPaymentState'))
+  assert.ok(!payoutSource.includes('retryPaymentMethod'))
   assert.ok(payoutSource.includes('retryRequiresPaymentMethod'))
+  assert.ok(payoutSource.includes('initialDueOrderIds'))
+  assert.ok(payoutSource.includes('selectedPaymentMethod'))
+  assert.ok(payoutSource.includes(':disabled="loadingBtn"'))
+  assert.ok(payoutSource.includes('if (this.loadingBtn) return'))
+  assert.ok(payoutSource.includes("this.$route.path !== '/cashregister'"))
   const btnYesSource = payoutSource.slice(payoutSource.indexOf('async btnYes'))
+  assert.ok(btnYesSource.includes('? this.selectedPaymentMethod'))
   assert.ok(
     btnYesSource.indexOf('this.ordersToArchive = archiveSummary.failedOrderIds') <
       btnYesSource.indexOf("dispatch('orders/getAllOrder'")
@@ -173,6 +191,9 @@ const runAsyncAssertions = async () => {
   assert.ok(archiveOrderSource.includes('error.response?.data?.message'))
   assert.ok(archiveOrderSource.includes("Impossible d'archiver la commande."))
   assert.ok(archiveOrderSource.includes('params.notify !== false'))
+  assert.ok(
+    archiveOrderSource.includes('skipGlobalErrorNotification: params.notify === false')
+  )
 
   console.log('cashRegister tests passed')
 }
