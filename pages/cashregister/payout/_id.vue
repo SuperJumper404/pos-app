@@ -69,9 +69,9 @@
 import price from '@/helpers/price'
 const {
   archiveOrdersSafely,
-  buildRetryPaymentState,
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
+  resolveRetryDueOrderIds,
 } = require('@/helpers/cashRegister')
 
 export default {
@@ -85,7 +85,7 @@ export default {
       loadingBtn: false,
       ordersLoaded: false,
       selectedPaymentMethod: null,
-      retryRequiresPaymentMethod: false,
+      retryActive: false,
       retryDueOrderIds: [],
     }
   },
@@ -106,7 +106,8 @@ export default {
       return getCashRegisterPaymentSummary(this.selectedOrders)
     },
     requiresPaymentMethod() {
-      return this.retryRequiresPaymentMethod || this.paymentSummary.hasAmountDue
+      if (this.retryActive) return this.retryDueOrderIds.length > 0
+      return this.paymentSummary.hasAmountDue
     },
     confirmDisabled() {
       return (
@@ -145,9 +146,9 @@ export default {
       this.loadingBtn = true
       const orderIds = this.ordersToArchive.slice()
       const paymentSummary = this.paymentSummary
-      const initialDueOrderIds = paymentSummary.dueOrderIds.length
-        ? paymentSummary.dueOrderIds.slice()
-        : this.retryDueOrderIds.slice()
+      const initialDueOrderIds = this.retryActive
+        ? this.retryDueOrderIds.slice()
+        : paymentSummary.dueOrderIds.slice()
       const requiresPaymentMethod = this.requiresPaymentMethod
       const paymentMethod = requiresPaymentMethod
         ? this.selectedPaymentMethod
@@ -175,15 +176,10 @@ export default {
 
         if (!archiveSummary.allSucceeded) {
           this.ordersToArchive = archiveSummary.failedOrderIds
-          const retryPaymentState = buildRetryPaymentState(
-            archiveSummary.failedOrderIds,
-            initialDueOrderIds
-          )
-          this.retryRequiresPaymentMethod =
-            retryPaymentState.retryRequiresPaymentMethod
           this.retryDueOrderIds = initialDueOrderIds.filter((orderId) =>
             archiveSummary.failedOrderIds.includes(orderId)
           )
+          this.retryActive = true
 
           await Promise.resolve()
             .then(() =>
@@ -196,11 +192,21 @@ export default {
             )
             .catch(() => {})
 
+          let refreshSucceeded = false
           try {
-            await this.$store.dispatch('orders/getAllOrder', {
-              refresh: Date.now(),
-            })
+            refreshSucceeded =
+              (await this.$store.dispatch('orders/getAllOrder', {
+                refresh: Date.now(),
+              })) === true
           } catch (error) {}
+
+          const retryDueResolution = resolveRetryDueOrderIds({
+            failedOrderIds: archiveSummary.failedOrderIds,
+            fallbackDueOrderIds: this.retryDueOrderIds,
+            refreshedOrders: this.dataOrders,
+            refreshSucceeded,
+          })
+          this.retryDueOrderIds = retryDueResolution.dueOrderIds
 
           this.$store.dispatch(
             'notifications/error',
@@ -216,7 +222,7 @@ export default {
           })
         } catch (error) {}
 
-        this.retryRequiresPaymentMethod = false
+        this.retryActive = false
         this.retryDueOrderIds = []
         this.$store.dispatch(
           'notifications/success',

@@ -3,10 +3,10 @@ const fs = require('fs')
 const path = require('path')
 const {
   archiveOrdersSafely,
-  buildRetryPaymentState,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
+  resolveRetryDueOrderIds,
   summarizeArchiveResults,
 } = require('../helpers/cashRegister')
 
@@ -126,16 +126,42 @@ assert.deepStrictEqual(summarizeArchiveResults([], []), {
   allSucceeded: false,
 })
 
-assert.deepStrictEqual(buildRetryPaymentState([2], [2, 3]), {
-  retryRequiresPaymentMethod: true,
-})
-assert.deepStrictEqual(buildRetryPaymentState([1], [2, 3]), {
-  retryRequiresPaymentMethod: false,
-})
-assert.deepStrictEqual(buildRetryPaymentState([1, 2], [2, 3]), {
-  retryRequiresPaymentMethod: true,
-})
-
+assert.deepStrictEqual(
+  resolveRetryDueOrderIds({
+    failedOrderIds: [2],
+    fallbackDueOrderIds: [2],
+    refreshedOrders: [{ id: 2, payment_status: 'paid' }],
+    refreshSucceeded: true,
+  }),
+  { reliable: true, dueOrderIds: [] }
+)
+assert.deepStrictEqual(
+  resolveRetryDueOrderIds({
+    failedOrderIds: [2],
+    fallbackDueOrderIds: [2],
+    refreshedOrders: [{ id: 2, payment_status: 'unpaid' }],
+    refreshSucceeded: true,
+  }),
+  { reliable: true, dueOrderIds: [2] }
+)
+assert.deepStrictEqual(
+  resolveRetryDueOrderIds({
+    failedOrderIds: [2],
+    fallbackDueOrderIds: [2],
+    refreshedOrders: [{ id: 2, payment_status: 'paid' }],
+    refreshSucceeded: false,
+  }),
+  { reliable: false, dueOrderIds: [2] }
+)
+assert.deepStrictEqual(
+  resolveRetryDueOrderIds({
+    failedOrderIds: [2],
+    fallbackDueOrderIds: [2],
+    refreshedOrders: [],
+    refreshSucceeded: true,
+  }),
+  { reliable: false, dueOrderIds: [2] }
+)
 const runAsyncAssertions = async () => {
   const attemptedOrderIds = []
   const archiveSummary = await archiveOrdersSafely(
@@ -165,10 +191,11 @@ const runAsyncAssertions = async () => {
   assert.ok(payoutSource.includes('notify: false'))
   assert.ok(payoutSource.includes('this.$router.replace'))
   assert.ok(payoutSource.includes('if (!orderIds.length)'))
-  assert.ok(payoutSource.includes('buildRetryPaymentState'))
+  assert.ok(payoutSource.includes('resolveRetryDueOrderIds'))
   assert.ok(!payoutSource.includes('retryPaymentMethod'))
-  assert.ok(payoutSource.includes('retryRequiresPaymentMethod'))
-  assert.ok(payoutSource.includes('initialDueOrderIds'))
+  assert.ok(payoutSource.includes('retryActive'))
+  assert.ok(!payoutSource.includes('retryRequiresPaymentMethod'))
+  assert.ok(!payoutSource.includes('paymentSummary.dueOrderIds.length'))
   assert.ok(payoutSource.includes('selectedPaymentMethod'))
   assert.ok(payoutSource.includes(':disabled="loadingBtn"'))
   assert.ok(payoutSource.includes('if (this.loadingBtn) return'))

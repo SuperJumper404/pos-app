@@ -44,16 +44,6 @@ const archiveOrdersSafely = (orderIds, archiveOrder) =>
     )
   ).then((results) => summarizeArchiveResults(orderIds, results))
 
-const buildRetryPaymentState = (failedOrderIds, dueOrderIds) => {
-  const dueOrderIdsSet = new Set(normalizeOrderIds(dueOrderIds))
-
-  return {
-    retryRequiresPaymentMethod: normalizeOrderIds(failedOrderIds).some((id) =>
-      dueOrderIdsSet.has(id)
-    ),
-  }
-}
-
 const toAmount = (value) => {
   const amount = Number(value)
   return Number.isFinite(amount) ? amount : 0
@@ -61,6 +51,43 @@ const toAmount = (value) => {
 
 const isCashRegisterOrderPaid = (order = {}) =>
   order.payment_status === PAID_STATUS
+
+const resolveRetryDueOrderIds = ({
+  failedOrderIds,
+  fallbackDueOrderIds,
+  refreshedOrders,
+  refreshSucceeded,
+}) => {
+  const normalizedFailedOrderIds = normalizeOrderIds(failedOrderIds)
+  const failedOrderIdsSet = new Set(normalizedFailedOrderIds)
+  const normalizedFallbackDueOrderIds = normalizeOrderIds(
+    fallbackDueOrderIds
+  ).filter((id) => failedOrderIdsSet.has(id))
+
+  if (!refreshSucceeded) {
+    return { reliable: false, dueOrderIds: normalizedFallbackDueOrderIds }
+  }
+
+  const refreshedOrdersById = toArray(refreshedOrders).reduce(
+    (ordersById, order) => {
+      const orderId = Number(order.id)
+      if (Number.isFinite(orderId)) ordersById.set(orderId, order)
+      return ordersById
+    },
+    new Map()
+  )
+
+  if (!normalizedFailedOrderIds.every((id) => refreshedOrdersById.has(id))) {
+    return { reliable: false, dueOrderIds: normalizedFallbackDueOrderIds }
+  }
+
+  return {
+    reliable: true,
+    dueOrderIds: normalizedFailedOrderIds.filter(
+      (id) => !isCashRegisterOrderPaid(refreshedOrdersById.get(id))
+    ),
+  }
+}
 
 const getCashRegisterPaymentSummary = (orders = []) =>
   orders.reduce(
@@ -123,10 +150,10 @@ const buildCashRegisterCustomerRows = (orders = []) => {
 
 module.exports = {
   archiveOrdersSafely,
-  buildRetryPaymentState,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   isCashRegisterOrderPaid,
   normalizeOrderIds,
+  resolveRetryDueOrderIds,
   summarizeArchiveResults,
 }
