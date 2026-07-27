@@ -54,6 +54,12 @@
             placeholder="Saisir le prix du produit"
             required
           />
+          <v-radio-group v-model="formeditproduct.vat_rate" label="Taux de TVA" row>
+            <v-radio label="5,5 %" :value="5.5"></v-radio>
+            <v-radio label="10 %" :value="10"></v-radio>
+            <v-radio label="20 %" :value="20"></v-radio>
+          </v-radio-group>
+          <div class="text-caption grey--text mb-4">Le prix saisi est TTC.</div>
           <br />
           <v-select
             v-model="formeditproduct.categoryid"
@@ -131,6 +137,7 @@ export default {
         price: '',
         stock: '',
         image: '',
+        vat_rate: 10,
       },
     }
   },
@@ -172,6 +179,7 @@ export default {
         stock: product.stock,
         description: product.description,
         image: product.image,
+        vat_rate: Number(product.vat_rate || 10),
       }
       this.customizationConfig = (product.customization_steps || []).map(
         (step, stepIndex) => ({
@@ -207,6 +215,7 @@ export default {
         description: this.formeditproduct.description,
         stock: this.formeditproduct.stock,
         price: this.roundPrice(this.formeditproduct.price),
+        vat_rate: this.formeditproduct.vat_rate,
         categoryid: this.formeditproduct.categoryid,
       }
       if (!this.productImg) return data

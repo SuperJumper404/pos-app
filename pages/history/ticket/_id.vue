@@ -59,6 +59,7 @@ import price from '@/helpers/price'
 import moment from 'moment'
 import { jsPDF as JSPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { normalizeVatBreakdown } from '@/helpers/vat'
 
 export default {
   components: { TakeawayChip },
@@ -105,11 +106,8 @@ export default {
     isTvaActive() {
       return [true, 1, '1', 'true'].includes(this.shopInfo.activate_tva)
     },
-    subtotalWithoutTva() {
-      return this.roundPrice(this.totalAmount / 1.2)
-    },
-    tvaAmount() {
-      return this.roundPrice(this.totalAmount - this.subtotalWithoutTva)
+    vatBreakdown() {
+      return normalizeVatBreakdown(this.detailArchivedOrder)
     },
   },
   mounted() {
@@ -248,15 +246,24 @@ export default {
         )
       }
 
+      const vatXml = this.vatBreakdown
+        .map(
+          (item) =>
+            '<text align="right">HT (' +
+            this.formatVatRate(item.vatRate) +
+            ') : ' +
+            this.formatPrice(item.totalHt) +
+            '</text><feed line="1"/>' +
+            '<text align="right">TVA (' +
+            this.formatVatRate(item.vatRate) +
+            ') : ' +
+            this.formatPrice(item.totalVat) +
+            '</text><feed line="1"/>'
+        )
+        .join('')
+
       return (
-        '<text align="right" >Sous-total HT : ' +
-        this.formatPrice(this.subtotalWithoutTva) +
-        '</text>' +
-        '<feed line="1"/>' +
-        '<text>TVA (20%) : ' +
-        this.formatPrice(this.tvaAmount) +
-        '</text>' +
-        '<feed line="1"/>' +
+        vatXml +
         '<text width="2" height="2">TOTAL TTC : ' +
         this.formatPrice(this.totalAmount) +
         '</text>'
@@ -344,21 +351,20 @@ export default {
       // 🧾 TOTAUX
       // ---------------------------------------
       if (this.isTvaActive) {
-        const subtotal = this.formatTicketNumber(this.subtotalWithoutTva)
-        const tva = this.formatTicketNumber(this.tvaAmount)
-
-        push(
-          alignRight(),
-          esc(`Sous-total HT : ${subtotal} `),
-          euroSymbol,
-          esc('\n')
-        )
-        push(
-          alignRight(),
-          esc(`TVA (20%)     : ${tva} `),
-          euroSymbol,
-          esc('\n')
-        )
+        this.vatBreakdown.forEach((item) => {
+          push(
+            alignRight(),
+            esc(`HT (${this.formatVatRate(item.vatRate)}) : ${this.formatTicketNumber(item.totalHt)} `),
+            euroSymbol,
+            esc('\n')
+          )
+          push(
+            alignRight(),
+            esc(`TVA (${this.formatVatRate(item.vatRate)}) : ${this.formatTicketNumber(item.totalVat)} `),
+            euroSymbol,
+            esc('\n')
+          )
+        })
       }
 
       push(alignRight(), boldOn(), doubleOn())
@@ -397,6 +403,10 @@ export default {
 
     formatPrice(value) {
       return this.formatCurrency(value)
+    },
+
+    formatVatRate(value) {
+      return `${String(value).replace('.', ',')} %`
     },
 
     formatTicketNumber(value) {
@@ -483,22 +493,20 @@ export default {
       // doc.line(2, y, 56, y)
       if (this.isTvaActive) {
         doc.setFontSize(8)
-        doc.text(
-          'Sous-total HT: ' + this.formatPrice(this.subtotalWithoutTva),
-          53,
-          (y += bigGap),
-          {
-            align: 'right',
-          }
-        )
-        doc.text(
-          'TVA (20%): ' + this.formatPrice(this.tvaAmount),
-          53,
-          (y += bigGap),
-          {
-            align: 'right',
-          }
-        )
+        this.vatBreakdown.forEach((item) => {
+          doc.text(
+            `HT (${this.formatVatRate(item.vatRate)}): ${this.formatPrice(item.totalHt)}`,
+            53,
+            (y += bigGap),
+            { align: 'right' }
+          )
+          doc.text(
+            `TVA (${this.formatVatRate(item.vatRate)}): ${this.formatPrice(item.totalVat)}`,
+            53,
+            (y += bigGap),
+            { align: 'right' }
+          )
+        })
       }
       doc.setFontSize(10)
       doc.setFont('courier', 'bold')

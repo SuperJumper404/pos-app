@@ -44,6 +44,12 @@
             placeholder="Saisir le prix du produit"
             required
           ></v-text-field>
+          <v-radio-group v-model="formproduct.vat_rate" label="Taux de TVA" row>
+            <v-radio label="5,5 %" :value="5.5"></v-radio>
+            <v-radio label="10 %" :value="10"></v-radio>
+            <v-radio label="20 %" :value="20"></v-radio>
+          </v-radio-group>
+          <div class="text-caption grey--text mb-4">Le prix saisi est TTC.</div>
           <v-select
             v-model="formproduct.categoryid"
             label="Catégorie"
@@ -110,6 +116,7 @@ export default {
       price: '',
       stock: '',
       image: '',
+      vat_rate: 10,
     },
   }),
   computed: {
@@ -161,6 +168,7 @@ export default {
       fd.append('name', this.formproduct.name)
       fd.append('stock', this.formproduct.stock)
       fd.append('price', this.roundPrice(this.formproduct.price))
+      fd.append('vat_rate', this.formproduct.vat_rate)
       fd.append('categoryid', this.formproduct.categoryid)
       fd.append('image', this.formproduct.image)
       fd.append('description', this.formproduct.description)

@@ -114,6 +114,12 @@
           </v-card>
         </div>
       </v-card>
+
+      <VatBreakdown
+        v-if="isTvaActive"
+        :details="detailOrder"
+        class="mt-3"
+      />
     </div>
 
     <v-alert
@@ -186,6 +192,7 @@
 <script>
 import OrderEditModal from '@/components/orders/OrderEditModal'
 import TakeawayChip from '@/components/orders/TakeawayChip'
+import VatBreakdown from '@/components/orders/VatBreakdown'
 import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
@@ -203,6 +210,7 @@ export default {
   components: {
     OrderEditModal,
     TakeawayChip,
+    VatBreakdown,
     CustomizationSummary,
   },
   mixins: [price],
@@ -278,6 +286,11 @@ export default {
         const quantity = Number(item && item.qty)
         return total + (Number.isFinite(quantity) ? quantity : 0)
       }, 0)
+    },
+    isTvaActive() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/activate_tva')
+      )
     },
   },
   watch: {
