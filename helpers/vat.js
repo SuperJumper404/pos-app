@@ -9,10 +9,22 @@ const normalizeVatBreakdown = (details) => {
   const groups = new Map()
 
   ;(Array.isArray(details) ? details : []).forEach((detail) => {
-    const vatRate = toNumber(detail.vat_rate ?? detail.vatRate)
-    const totalHt = toNumber(detail.total_ht ?? detail.totalHt)
-    const totalVat = toNumber(detail.total_vat ?? detail.totalVat)
-    const totalTtc = toNumber(detail.total ?? detail.total_ttc ?? detail.totalTtc)
+    const vatRate = toNumber(
+      detail.vat_rate !== undefined ? detail.vat_rate : detail.vatRate
+    )
+    const totalHt = toNumber(
+      detail.total_ht !== undefined ? detail.total_ht : detail.totalHt
+    )
+    const totalVat = toNumber(
+      detail.total_vat !== undefined ? detail.total_vat : detail.totalVat
+    )
+    const totalTtc = toNumber(
+      detail.total !== undefined
+        ? detail.total
+        : detail.total_ttc !== undefined
+        ? detail.total_ttc
+        : detail.totalTtc
+    )
     if (vatRate === null || totalHt === null || totalVat === null || totalTtc === null) return
 
     const current = groups.get(vatRate) || {
