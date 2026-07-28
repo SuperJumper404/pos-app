@@ -29,14 +29,22 @@
 
         <v-col cols="12" md="6" class="d-flex justify-start mt-3">
           <div v-if="shopInfo.smart_print_app" class="mt-10">
-            <v-btn @click="printReceiptSmartPrint()">
+            <v-btn
+              :disabled="printLoading"
+              :loading="printLoading"
+              @click="printReceiptSmartPrint()"
+            >
               <v-icon class="mr-2">mdi-printer</v-icon>
               Impression avec SmartPrint
             </v-btn>
           </div>
 
           <div v-else class="mt-10">
-            <v-btn @click="printReceiptCloud()">
+            <v-btn
+              :disabled="printLoading"
+              :loading="printLoading"
+              @click="printReceiptCloud()"
+            >
               <v-icon class="mr-2">mdi-printer</v-icon>
               Impression Cloud
             </v-btn>
@@ -69,6 +77,7 @@ export default {
       orderId: this.$route.params.id,
       loadPage: '',
       urlPDF: '',
+      printLoading: false,
     }
   },
   computed: {
@@ -119,122 +128,171 @@ export default {
     this.generateCleanTicketPDF(size)
   },
   methods: {
-    async printReceiptSmartPrint() {
-      const escposBuffer = this.generateEscPos()
-      console.log('ESC/POS BUFFER:', escposBuffer)
-      const dataFormatESCPOS = escposBuffer.toString('base64')
+    lockReceiptPrint() {
+      if (this.printLoading) {
+        this.$store.dispatch('notifications/info', {
+          message: 'Impression déjà en cours.',
+          timeout: 2500,
+        })
+        return false
+      }
 
-      await fetch(`http://${this.shopInfo.shop_printer_ip}:8989/print`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticketType: 'caisse',
-          dataFormatESCPOS,
-          dataFormatXML: null, // ou generateEposXml() si Epson m30
-        }),
+      this.printLoading = true
+      this.$store.dispatch('notifications/info', {
+        message: 'Impression du ticket de caisse en cours.',
+        timeout: 3000,
       })
+      return true
+    },
+    unlockReceiptPrint() {
+      window.setTimeout(() => {
+        this.printLoading = false
+      }, 4000)
+    },
+    async printReceiptSmartPrint() {
+      if (!this.lockReceiptPrint()) return
+      try {
+        const escposBuffer = this.generateEscPos()
+        console.log('ESC/POS BUFFER:', escposBuffer)
+        const dataFormatESCPOS = escposBuffer.toString('base64')
+
+        const response = await fetch(
+          `http://${this.shopInfo.shop_printer_ip}:8989/print`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ticketType: 'caisse',
+              dataFormatESCPOS,
+              dataFormatXML: null, // ou generateEposXml() si Epson m30
+            }),
+          }
+        )
+        if (!response.ok) throw new Error('Smart Print a refusé le ticket.')
+        this.$store.dispatch('notifications/success', 'Impression envoyée.')
+      } catch (error) {
+        this.$store.dispatch('notifications/error', {
+          message: error.message || "L'impression a échoué.",
+          timeout: 4000,
+        })
+      } finally {
+        this.unlockReceiptPrint()
+      }
     },
 
-    printReceiptCloud() {
-      const address = this.shopInfo.shop_adress || ''
-      const addressLines = this.splitByWords(address, 30)
-      const totalsXml = this.generateCloudTotalsXml()
+    async printReceiptCloud() {
+      if (!this.lockReceiptPrint()) return
+      try {
+        const address = this.shopInfo.shop_adress || ''
+        const addressLines = this.splitByWords(address, 30)
+        const totalsXml = this.generateCloudTotalsXml()
 
-      const addressXml = addressLines.reduce((prev, line) => {
-        return (
-          prev +
-          `<text width="1" height="1" align="center">${line}</text><feed line="1"/>\n`
-        )
-      }, '')
-      const req =
-        '<?xml version="1.0" encoding="utf-8" ?>' +
-        '<PrintRequestInfo>' +
-        '<ePOSPrint>' +
-        '<Parameter>' +
-        '<devid>local_printer</devid>' +
-        '<timeout>10000</timeout>' +
-        '</Parameter>' +
-        '<PrintData>' +
-        '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
-        // === En-tête ===
-        '<text smooth="true"></text>' +
-        '<text em="true" align="center" width="2" height="2">' +
-        this.shopInfo.shop_name +
-        '</text>' +
-        '<feed line="1"/>' +
-        '<text width="1" height="1" em="false" align="center">TEL : ' +
-        this.shopInfo.shop_phone +
-        '</text>' +
-        '<feed line="1"/>' +
-        '<text width="1" height="1" em="false" align="center">SIRET : ' +
-        this.shopInfo.shop_siret +
-        '</text>' +
-        '<feed line="1"/>' +
-        addressXml +
-        '<feed line="2"/>' +
-        // === Commande ===
-        '<text em="true" align="left" width="1" height="1">' +
-        this.dataArchivedOrder.username +
-        '</text>' +
-        '<feed line="1"/>' +
-        '<text em="false">Commande n°</text>' +
-        '<text em="true" smooth="true" width="1" height="1">' +
-        this.dataArchivedOrder.ordernumber +
-        '</text>' +
-        '<feed line="1"/>' +
-        '<text em="false" smooth="true" width="1" height="1">Date :</text> ' +
-        '<text em="true" smooth="true" width="1" height="1">' +
-        this.currentDate +
-        '</text>' +
-        '<feed line="2"/>' +
-        '<text> ' +
-        'QTE   PRODUIT                PRIX\n\n' +
-        '</text>' +
-        '<text  em="false">--------------------------------</text>' +
-        '<feed line="1"/>' +
-        // === Produits ===
-        this.detailArchivedOrder
-          .map(
-            (item) =>
-              '<text>' +
-              item.qty +
-              'x '.padEnd(5) +
-              item.name.padEnd(20).slice(0, 20) +
-              this.formatPrice(item.total).padStart(9) +
-              '</text><feed line="1"/>'
+        const addressXml = addressLines.reduce((prev, line) => {
+          return (
+            prev +
+            `<text width="1" height="1" align="center">${line}</text><feed line="1"/>\n`
           )
-          .join('') +
-        '<text>--------------------------------</text>' +
-        '<feed line="1"/>' +
-        // === Totaux ===
-        totalsXml +
-        '<feed line="2"/>' +
-        '<text em="false"  width="1" height="1" >Paiement :' +
-        this.dataArchivedOrder.used_payment_method +
-        '</text>' +
-        '<feed line="1"/>' +
-        '<text>--------------------------------</text>' +
-        '<feed line="2"/>' +
-        // === Pied de ticket ===
-        '<text align="center">À très bientôt !</text>' +
-        '<feed line="1"/>' +
-        '<text align="center">' +
-        this.shopInfo.shop_name +
-        '</text>' +
-        '<feed line="1"/>' +
-        '<text align="center">Made with smarteat.fr</text>' +
-        '<feed line="3"/>' +
-        '<cut/>' +
-        '</epos-print>' +
-        '</PrintData>' +
-        '</ePOSPrint>' +
-        '</PrintRequestInfo>'
+        }, '')
+        const req =
+          '<?xml version="1.0" encoding="utf-8" ?>' +
+          '<PrintRequestInfo>' +
+          '<ePOSPrint>' +
+          '<Parameter>' +
+          '<devid>local_printer</devid>' +
+          '<timeout>10000</timeout>' +
+          '</Parameter>' +
+          '<PrintData>' +
+          '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
+          // === En-tête ===
+          '<text smooth="true"></text>' +
+          '<text em="true" align="center" width="2" height="2">' +
+          this.shopInfo.shop_name +
+          '</text>' +
+          '<feed line="1"/>' +
+          '<text width="1" height="1" em="false" align="center">TEL : ' +
+          this.shopInfo.shop_phone +
+          '</text>' +
+          '<feed line="1"/>' +
+          '<text width="1" height="1" em="false" align="center">SIRET : ' +
+          this.shopInfo.shop_siret +
+          '</text>' +
+          '<feed line="1"/>' +
+          addressXml +
+          '<feed line="2"/>' +
+          // === Commande ===
+          '<text em="true" align="left" width="1" height="1">' +
+          this.dataArchivedOrder.username +
+          '</text>' +
+          '<feed line="1"/>' +
+          '<text em="false">Commande n°</text>' +
+          '<text em="true" smooth="true" width="1" height="1">' +
+          this.dataArchivedOrder.ordernumber +
+          '</text>' +
+          '<feed line="1"/>' +
+          '<text em="false" smooth="true" width="1" height="1">Date :</text> ' +
+          '<text em="true" smooth="true" width="1" height="1">' +
+          this.currentDate +
+          '</text>' +
+          '<feed line="2"/>' +
+          '<text> ' +
+          'QTE   PRODUIT                PRIX\n\n' +
+          '</text>' +
+          '<text  em="false">--------------------------------</text>' +
+          '<feed line="1"/>' +
+          // === Produits ===
+          this.detailArchivedOrder
+            .map(
+              (item) =>
+                '<text>' +
+                item.qty +
+                'x '.padEnd(5) +
+                item.name.padEnd(20).slice(0, 20) +
+                this.formatPrice(item.total).padStart(9) +
+                '</text><feed line="1"/>'
+            )
+            .join('') +
+          '<text>--------------------------------</text>' +
+          '<feed line="1"/>' +
+          // === Totaux ===
+          totalsXml +
+          '<feed line="2"/>' +
+          '<text em="false"  width="1" height="1" >Paiement :' +
+          this.dataArchivedOrder.used_payment_method +
+          '</text>' +
+          '<feed line="1"/>' +
+          '<text>--------------------------------</text>' +
+          '<feed line="2"/>' +
+          // === Pied de ticket ===
+          '<text align="center">À très bientôt !</text>' +
+          '<feed line="1"/>' +
+          '<text align="center">' +
+          this.shopInfo.shop_name +
+          '</text>' +
+          '<feed line="1"/>' +
+          '<text align="center">Made with smarteat.fr</text>' +
+          '<feed line="3"/>' +
+          '<cut/>' +
+          '</epos-print>' +
+          '</PrintData>' +
+          '</ePOSPrint>' +
+          '</PrintRequestInfo>'
 
-      this.$store.dispatch('printing/postPrintingJob', {
-        requete: req,
-        ticketType: 'caisse',
-        orderId: this.orderId,
-      })
+        const printed = await this.$store.dispatch('printing/postPrintingJob', {
+          requete: req,
+          ticketType: 'caisse',
+          orderId: this.orderId,
+        })
+        if (!printed) {
+          throw new Error("Impossible d'envoyer le ticket à l'imprimante.")
+        }
+      } catch (error) {
+        this.$store.dispatch('notifications/error', {
+          message: error.message || "L'impression a échoué.",
+          timeout: 4000,
+        })
+      } finally {
+        this.unlockReceiptPrint()
+      }
     },
 
     generateCloudTotalsXml() {
