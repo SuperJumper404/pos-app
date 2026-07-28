@@ -175,6 +175,8 @@
                 small
                 color="primaryPurple"
                 class="text-none"
+                :disabled="isOrderPrinting(item)"
+                :loading="isOrderPrinting(item)"
                 @click="printOrderDetails(item)"
                 >Imprimer
                 <v-icon small right>mdi-printer-outline</v-icon>
@@ -248,6 +250,7 @@ export default {
       cancelDialog: false,
       cancelLoading: false,
       pendingCancelOrder: null,
+      printingOrderIds: {},
       lastUpdate: moment(new Date()),
       searchFilter: '',
       selectedOrders: [],
@@ -364,6 +367,30 @@ export default {
     if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
   },
   methods: {
+    isOrderPrinting(order) {
+      return Boolean(order && this.printingOrderIds[order.id])
+    },
+    lockOrderPrint(order) {
+      if (this.isOrderPrinting(order)) {
+        this.$store.dispatch('notifications/info', {
+          message: 'Impression déjà en cours.',
+          timeout: 2500,
+        })
+        return false
+      }
+
+      this.$set(this.printingOrderIds, order.id, true)
+      this.$store.dispatch('notifications/info', {
+        message: 'Impression du ticket de commande en cours.',
+        timeout: 3000,
+      })
+      return true
+    },
+    unlockOrderPrint(order) {
+      window.setTimeout(() => {
+        this.$delete(this.printingOrderIds, order.id)
+      }, 4000)
+    },
     isTakeawayOrder(item) {
       return [true, 1, '1'].includes(item && item.is_takeaway)
     },
@@ -383,52 +410,74 @@ export default {
       this.kitchenToggleLoading = false
     },
     async printOrderDetails(order) {
+      if (!this.lockOrderPrint(order)) return
       console.log('Print order details for order', order)
-      await this.$store.dispatch('orders/getDetailOrder', order.id)
-      const orderDetails = await this.$store.get('orders/detailOrder')
-      const orderInfo = {
-        table: order.username,
-        client: order.customer,
-        created: order.created,
-        total: orderDetails.reduce(
-          (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
-          0
-        ),
-        paymentMethod: order.payment,
-        remark: order.remark,
-      }
+      try {
+        await this.$store.dispatch('orders/getDetailOrder', order.id)
+        const orderDetails = await this.$store.get('orders/detailOrder')
+        const orderInfo = {
+          table: order.username,
+          client: order.customer,
+          created: order.created,
+          total: orderDetails.reduce(
+            (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
+            0
+          ),
+          paymentMethod: order.payment,
+          remark: order.remark,
+        }
 
-      if (this.shopInfo.smart_print_app) {
-        // genereate ESC/POS data
-        console.log('Generating ESC/POS data for Smart Print...')
-        const escposBuffer = this.generateEscPos(
-          orderDetails,
-          this.shopInfo,
-          orderInfo
+        if (this.shopInfo.smart_print_app) {
+          // genereate ESC/POS data
+          console.log('Generating ESC/POS data for Smart Print...')
+          const escposBuffer = this.generateEscPos(
+            orderDetails,
+            this.shopInfo,
+            orderInfo
+          )
+          console.log('ESC/POS BUFFER:', escposBuffer)
+          const dataFormatESCPOS = escposBuffer.toString('base64')
+
+          const response = await fetch(
+            `http://${this.shopInfo.shop_printer_ip}:8989/print`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ticketType: 'cuisine',
+                dataFormatESCPOS,
+                dataFormatXML: null,
+              }),
+            }
+          )
+          if (!response.ok) throw new Error('Smart Print a refusé le ticket.')
+          this.$store.dispatch('notifications/success', 'Impression envoyée.')
+        } else {
+          console.log('Printing via Cloud Printing Service...')
+          // Envoie au backend pour impression cloud
+          const printed = await this.printReceiptCloud(
+            orderDetails,
+            this.shopInfo,
+            orderInfo
+          )
+          if (!printed) {
+            throw new Error("Impossible d'envoyer le ticket à l'imprimante.")
+          }
+        }
+        console.log(
+          'printWithSmartPrint',
+          this.shopInfo.shop_printer_ip,
+          'orderDetails',
+          orderDetails
         )
-        console.log('ESC/POS BUFFER:', escposBuffer)
-        const dataFormatESCPOS = escposBuffer.toString('base64')
-
-        await fetch(`http://${this.shopInfo.shop_printer_ip}:8989/print`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ticketType: 'cuisine',
-            dataFormatESCPOS,
-            dataFormatXML: null,
-          }),
+      } catch (error) {
+        this.$store.dispatch('notifications/error', {
+          message: error.message || "L'impression a échoué.",
+          timeout: 4000,
         })
-      } else {
-        console.log('Printing via Cloud Printing Service...')
-        // Envoie au backend pour impression cloud
-        this.printReceiptCloud(orderDetails, this.shopInfo, orderInfo)
+      } finally {
+        this.unlockOrderPrint(order)
       }
-      console.log(
-        'printWithSmartPrint',
-        this.shopInfo.shop_printer_ip,
-        'orderDetails',
-        orderDetails
-      )
     },
     soundNotification() {
       const audio = new Audio(window.location.origin + '/soundnotif.ogg')
@@ -901,7 +950,7 @@ export default {
         '</ePOSPrint>' +
         '</PrintRequestInfo>'
 
-      this.$store.dispatch('printing/postPrintingJob', {
+      return this.$store.dispatch('printing/postPrintingJob', {
         requete: req,
         ticketType: 'commande',
         orderId: this.orderId,
