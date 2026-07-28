@@ -1,4 +1,6 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
+const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
+
 export const state = () => ({
   message: null,
   shop_name: '',
@@ -14,6 +16,7 @@ export const state = () => ({
   shop_status: '',
   shop_printer_ip: '',
   smart_print_app: '',
+  auto_print_order_tickets: false,
   activate_tva: false,
   kitchen_closed: false,
   clickAndCollectTable: '',
@@ -68,6 +71,10 @@ export const actions = {
         )
         dispatch('set/shop_printer_ip', response.data.data[0].shop_printer_ip)
         dispatch('set/smart_print_app', response.data.data[0].smart_print_app)
+        dispatch(
+          'set/auto_print_order_tickets',
+          isEnabled(response.data.data[0].auto_print_order_tickets)
+        )
         dispatch(
           'set/shop_payment_methods',
           JSON.parse(response.data.data[0].shop_payment_methods)
@@ -147,6 +154,10 @@ export const actions = {
         dispatch(
           'set/stripe_charges_enabled',
           response.data.data.stripe_charges_enabled || false
+        )
+        dispatch(
+          'set/auto_print_order_tickets',
+          isEnabled(response.data.data.auto_print_order_tickets)
         )
         return true
       })
