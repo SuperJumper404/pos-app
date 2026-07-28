@@ -373,6 +373,27 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <v-dialog v-model="cancelDialog" max-width="350" persistent>
+      <v-card>
+        <v-card-title>Annulation</v-card-title>
+        <v-card-text>Êtes-vous sûr de vouloir annuler ?</v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text class="text-none" @click="cancelDialog = false">
+            Annuler
+          </v-btn>
+          <v-btn
+            color="red"
+            dark
+            class="text-none"
+            :loading="cancelLoading"
+            @click="confirmCancelCart"
+          >
+            Confirmer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <!-- {{ dataCart }}
     <pre>acces :{{ access }}</pre>
     <pre>current table : {{ selectedTable }}</pre> -->
@@ -485,6 +506,8 @@ export default {
     customizationRecoveryMessage: '',
     checkoutErrorMessage: '',
     repriceDialog: false,
+    cancelDialog: false,
+    cancelLoading: false,
     pendingRepriceFlow: null,
     pendingRepricePaymentMethod: null,
     restoringCheckoutPayload: false,
@@ -1496,29 +1519,39 @@ export default {
       this.$store.dispatch('cart/completeCheckout')
       this.$router.push('/ordersStatuses')
     },
-    async cancelCart() {
+    cancelCart() {
       if (this.isOrderEditActive) {
         if (this.embeddedOrderEdit) {
           this.$emit('request-close')
           return
         }
-        if (!window.confirm('Annuler les modifications de cette commande ?')) {
-          return
-        }
+      }
+      this.cancelDialog = true
+    },
+    async confirmCancelCart() {
+      this.cancelLoading = true
+      if (this.isOrderEditActive) {
         const orderId = this.orderEditId
         this.allowRouteLeave = true
         this.resetStripePaymentElement()
         await this.$store.dispatch('orderEdit/cancel')
+        this.cancelLoading = false
+        this.cancelDialog = false
         this.finishOrderEdit(orderId)
         return
       }
-      if (!(await this.resetCheckoutAttempt())) return
+      if (!(await this.resetCheckoutAttempt())) {
+        this.cancelLoading = false
+        return
+      }
 
       this.allowRouteLeave = true
       this.$store.set('stateDialog', false)
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)
       this.$store.dispatch('cart/setTocart', null)
+      this.cancelLoading = false
+      this.cancelDialog = false
       this.$router.push('/menus')
     },
   },

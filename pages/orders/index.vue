@@ -198,6 +198,27 @@
         </template>
       </v-data-table>
     </v-card>
+    <v-dialog v-model="cancelDialog" max-width="350" persistent>
+      <v-card>
+        <v-card-title>{{ cancelDialogTitle }}</v-card-title>
+        <v-card-text>{{ cancelDialogMessage }}</v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text class="text-none" @click="closeCancelDialog">
+            Annuler
+          </v-btn>
+          <v-btn
+            color="red"
+            dark
+            class="text-none"
+            :loading="cancelLoading"
+            @click="confirmCancelOrder"
+          >
+            Confirmer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <!-- <pre type="json">{{ dataOrders }}</pre> -->
     <!-- <v-btn @click="soundNotification()"
       >Sound <v-icon small right>mdi-close-circle</v-icon>
@@ -224,6 +245,9 @@ export default {
       kitchenToggleLoading: false,
       polling: null,
       errMsg: false,
+      cancelDialog: false,
+      cancelLoading: false,
+      pendingCancelOrder: null,
       lastUpdate: moment(new Date()),
       searchFilter: '',
       selectedOrders: [],
@@ -289,6 +313,22 @@ export default {
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
       }
+    },
+    isPendingCancelRefund() {
+      const item = this.pendingCancelOrder
+      return (
+        item &&
+        item.payment_provider === 'stripe' &&
+        item.payment_status === 'paid'
+      )
+    },
+    cancelDialogTitle() {
+      return this.isPendingCancelRefund ? 'Remboursement' : 'Annulation'
+    },
+    cancelDialogMessage() {
+      return this.isPendingCancelRefund
+        ? 'Êtes-vous sûr de vouloir rembourser ?'
+        : 'Êtes-vous sûr de vouloir annuler ?'
     },
   },
   watch: {
@@ -467,7 +507,19 @@ export default {
         this.errMsg = true
       }
     },
-    async btnCancel(item) {
+    btnCancel(item) {
+      this.pendingCancelOrder = item
+      this.cancelDialog = true
+    },
+    closeCancelDialog() {
+      if (this.cancelLoading) return
+      this.cancelDialog = false
+      this.pendingCancelOrder = null
+    },
+    async confirmCancelOrder() {
+      const item = this.pendingCancelOrder
+      if (!item) return
+      this.cancelLoading = true
       if (
         item.payment_provider === 'stripe' &&
         item.payment_status === 'paid'
@@ -481,6 +533,8 @@ export default {
         if (refunded) {
           this.$store.dispatch('orders/getAllOrder')
         }
+        this.cancelLoading = false
+        this.closeCancelDialog()
         return
       }
 
@@ -498,6 +552,8 @@ export default {
         this.$store.set('orders/message', 'La requête a échoué.')
         this.errMsg = true
       }
+      this.cancelLoading = false
+      this.closeCancelDialog()
     },
     orderHour(time) {
       return moment(new Date(time)).format('HH:mm')
