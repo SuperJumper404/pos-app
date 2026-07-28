@@ -144,7 +144,7 @@
                 small
                 color="success"
                 class="text-none"
-                @click="btnApprove(item.id)"
+                @click="btnApprove(item)"
                 >Valider <v-icon small right>mdi-check-circle</v-icon>
               </v-btn>
             </v-card-actions>
@@ -312,6 +312,9 @@ export default {
         kitchen_closed: this.$store.get('shop/kitchen_closed'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
+        auto_print_order_tickets: this.$store.get(
+          'shop/auto_print_order_tickets'
+        ),
       }
     },
     isPendingCancelRefund() {
@@ -481,13 +484,19 @@ export default {
           this.$store.dispatch('orders/getAllOrder')
         })
     },
-    async btnApprove(id) {
+    async btnApprove(item) {
       const data = {
         operator: this.user.id,
         status: 2,
       }
-      const res = await this.$store.dispatch('orders/updateOrder', { id, data })
+      const res = await this.$store.dispatch('orders/updateOrder', {
+        id: item.id,
+        data,
+      })
       if (res) {
+        if (this.shouldAutoPrintOrderTickets()) {
+          await this.printOrderDetails(item)
+        }
         this.$store.dispatch('orders/getAllOrder')
       } else {
         this.$store.set('orders/message', 'La requête a échoué.')
@@ -617,6 +626,11 @@ export default {
     paymentStatusColor(item) {
       return getPaymentStatusColor(item)
     },
+    shouldAutoPrintOrderTickets() {
+      return [true, 1, '1', 'true'].includes(
+        this.shopInfo.auto_print_order_tickets
+      )
+    },
     generateEscPos(order, shopInfo, orderInfo) {
       console.log('Generating ESC/POS for order:', order, 'shopInfo:', shopInfo)
       // ---------------------------------------
@@ -633,9 +647,7 @@ export default {
 
       const doubleOn = () => Buffer.from([0x1d, 0x21, 0x11])
       const doubleOff = () => Buffer.from([0x1d, 0x21, 0x00])
-
-      const tripleOn = () => Buffer.from([0x1d, 0x21, 0x22]) // Some example values for tripleOn
-      const tripleOff = () => Buffer.from([0x1d, 0x21, 0x00]) // Same as doubleOff (example, modify as needed)
+      const tripleOn = () => Buffer.from([0x1d, 0x21, 0x22])
 
       const line = () => esc('--------------------------------\n')
       const cut = () => Buffer.from([0x1d, 0x56, 0x00])
@@ -662,12 +674,12 @@ export default {
       push(
         alignCenter(),
         boldOn(),
+        doubleOn(),
+        esc('Commande\n'),
         tripleOn(),
-        esc('Commande n° '),
-        boldOn(),
-        esc(order[0].ordernumber + '\n'),
+        esc('#' + order[0].ordernumber + '\n'),
         boldOff(),
-        tripleOff()
+        doubleOff()
       )
       push(
         alignCenter(),

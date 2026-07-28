@@ -196,6 +196,13 @@
               color="success"
             ></v-switch>
           </div>
+          <v-switch
+            v-model="formShop.auto_print_order_tickets"
+            :disabled="!formShop.smart_print_app"
+            class="mt-0"
+            label="Imprimer automatiquement les tickets de commande validés"
+            color="success"
+          ></v-switch>
         </v-col>
 
         <v-col cols="6">
@@ -393,6 +400,7 @@ export default {
       shop_profile_image: '',
       shop_printer_ip: '',
       smart_print_app: '',
+      auto_print_order_tickets: false,
       activate_tva: false,
       qr_payment_mode: 'stripe_before_order',
     },
@@ -451,6 +459,9 @@ export default {
     },
     smart_print_app() {
       return this.$store.get('shop/smart_print_app')
+    },
+    auto_print_order_tickets() {
+      return this.$store.get('shop/auto_print_order_tickets')
     },
     activate_tva() {
       return this.$store.get('shop/activate_tva')
@@ -560,6 +571,8 @@ export default {
         this.formShop.shop_printer_ip = this.shop_printer_ip
         this.formShop.shop_siret = this.shop_siret
         this.formShop.smart_print_app = this.smart_print_app
+        this.formShop.auto_print_order_tickets =
+          this.auto_print_order_tickets
         this.formShop.activate_tva = this.activate_tva
         this.formShop.qr_payment_mode = this.qr_payment_mode
 
