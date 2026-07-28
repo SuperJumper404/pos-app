@@ -145,7 +145,8 @@
                 color="success"
                 class="text-none"
                 @click="btnApprove(item)"
-                >Valider <v-icon small right>mdi-check-circle</v-icon>
+                >
+                Valider <v-icon small right>mdi-check-circle</v-icon>
               </v-btn>
             </v-card-actions>
             <v-card-actions v-if="item.status === 2">
