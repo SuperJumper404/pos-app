@@ -123,6 +123,10 @@
                 <small class="grey--text">
                   {{ choiceType(configuredStep, configuredChoice) }}
                 </small>
+                <small class="d-block grey--text">
+                  Prix par défaut :
+                  {{ defaultChoicePrice(configuredStep, configuredChoice) }} €
+                </small>
               </td>
               <td class="text-center">
                 <v-switch
@@ -262,7 +266,9 @@ export default {
             step_choice_id: Number(choice.step_choice_id),
             position: choiceIndex,
             extra_price:
-              choice.extra_price == null ? '0.00' : choice.extra_price,
+              choice.extra_price == null
+                ? this.defaultChoicePrice(step, choice)
+                : choice.extra_price,
             active: isActive(choice.active),
           })),
         }))
@@ -304,6 +310,14 @@ export default {
       const type =
         (choice && choice.choice_type) || configuredChoice.choice_type
       return type === 'linked_product' ? 'Produit lié' : 'Choix simple'
+    },
+    defaultChoicePrice(configuredStep, configuredChoice) {
+      const choice = this.libraryChoice(configuredStep, configuredChoice)
+      const price =
+        choice && choice.default_extra_price != null
+          ? choice.default_extra_price
+          : configuredChoice.default_extra_price
+      return price == null || price === '' ? '0.00' : String(price)
     },
     errorsForStep(step) {
       const errors = []
@@ -389,7 +403,10 @@ export default {
         choices: (step.choices || []).map((choice, choiceIndex) => ({
           step_choice_id: Number(choice.id),
           position: choiceIndex,
-          extra_price: '0.00',
+          extra_price:
+            choice.default_extra_price == null
+              ? '0.00'
+              : choice.default_extra_price,
           active: choice.active !== false,
         })),
       })

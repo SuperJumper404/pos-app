@@ -154,7 +154,8 @@
                     {{ choice.name || 'Choix sans nom' }}
                   </v-card-title>
                   <v-card-subtitle class="pb-2">
-                    Position {{ index + 1 }}
+                    Position {{ index + 1 }} · Prix par défaut :
+                    {{ choiceDefaultPrice(choice) }} €
                   </v-card-subtitle>
                   <v-spacer></v-spacer>
                   <v-divider></v-divider>
@@ -658,6 +659,8 @@ export default {
     choiceUpdateData(choice, position, active = choice.active) {
       const data = {
         choice_type: choice.choice_type,
+        default_extra_price:
+          choice.default_extra_price == null ? '0.00' : choice.default_extra_price,
         default_position: position,
         active,
       }
@@ -716,6 +719,11 @@ export default {
           ? 'imgproducts'
           : 'imgcustomizations'
       return `${this.staticurl}/api/v1/${directory}/${choice.image}`
+    },
+    choiceDefaultPrice(choice) {
+      return choice && choice.default_extra_price != null
+        ? choice.default_extra_price
+        : '0.00'
     },
   },
 }
