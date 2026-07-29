@@ -31,7 +31,71 @@ export default {
     meta: [
       { charset: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { hid: 'description', name: 'description', content: '' },
+      {
+        hid: 'description',
+        name: 'description',
+        content:
+          'Commandez directement en ligne chez votre restaurant avec Smart Eat.',
+      },
+      { hid: 'og:type', property: 'og:type', content: 'website' },
+      { hid: 'og:site_name', property: 'og:site_name', content: 'Smart Eat' },
+      {
+        hid: 'og:title',
+        property: 'og:title',
+        content: 'Smart Eat - Click & Collect',
+      },
+      {
+        hid: 'og:description',
+        property: 'og:description',
+        content:
+          'Commandez directement en ligne chez votre restaurant avec Smart Eat.',
+      },
+      {
+        hid: 'og:image',
+        property: 'og:image',
+        content: 'https://smarteat.fr/logo.png',
+      },
+      {
+        hid: 'og:image:secure_url',
+        property: 'og:image:secure_url',
+        content: 'https://smarteat.fr/logo.png',
+      },
+      {
+        hid: 'og:image:type',
+        property: 'og:image:type',
+        content: 'image/png',
+      },
+      {
+        hid: 'og:image:width',
+        property: 'og:image:width',
+        content: '120',
+      },
+      {
+        hid: 'og:image:height',
+        property: 'og:image:height',
+        content: '150',
+      },
+      {
+        hid: 'twitter:card',
+        name: 'twitter:card',
+        content: 'summary_large_image',
+      },
+      {
+        hid: 'twitter:title',
+        name: 'twitter:title',
+        content: 'Smart Eat - Click & Collect',
+      },
+      {
+        hid: 'twitter:description',
+        name: 'twitter:description',
+        content:
+          'Commandez directement en ligne chez votre restaurant avec Smart Eat.',
+      },
+      {
+        hid: 'twitter:image',
+        name: 'twitter:image',
+        content: 'https://smarteat.fr/logo.png',
+      },
     ],
     link: [{ rel: 'icon', type: 'image/x-icon', href: '/logo.png' }],
   },
