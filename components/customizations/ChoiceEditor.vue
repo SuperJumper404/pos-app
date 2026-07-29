@@ -75,6 +75,21 @@
       </v-card>
     </template>
 
+    <v-text-field
+      v-model="form.default_extra_price"
+      label="Prix par défaut"
+      type="number"
+      step="0.01"
+      suffix="€"
+      min="0"
+      :rules="[
+        (value) =>
+          value === '' ||
+          Number.isFinite(Number(value)) ||
+          'Le prix par défaut est invalide',
+      ]"
+    ></v-text-field>
+
     <div class="d-flex justify-end mt-4">
       <v-btn text class="text-none mr-2" @click="$emit('cancel')">
         Annuler
@@ -122,6 +137,7 @@ export default {
         choice_type: 'simple',
         name: '',
         linked_product_id: null,
+        default_extra_price: '0.00',
       },
     }
   },
@@ -166,6 +182,10 @@ export default {
           choice_type: (value && value.choice_type) || 'simple',
           name: (value && value.name) || '',
           linked_product_id: (value && value.linked_product_id) || null,
+          default_extra_price:
+            value && value.default_extra_price != null
+              ? value.default_extra_price
+              : '0.00',
         }
       },
     },
@@ -184,6 +204,12 @@ export default {
       if (!this.$refs.form.validate()) return
       const data = new FormData()
       data.append('choice_type', this.form.choice_type)
+      data.append(
+        'default_extra_price',
+        this.form.default_extra_price === ''
+          ? '0.00'
+          : String(this.form.default_extra_price)
+      )
       data.append('active', String(this.persistedActive))
       data.append(
         'default_position',
