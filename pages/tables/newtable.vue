@@ -30,7 +30,7 @@
         autofocus
       ></v-text-field>
       <v-text-field
-        v-model="formtable.email"
+        :value="tableEmail"
         label="E-mail"
         type="text"
         disabled
@@ -70,7 +70,7 @@
   </v-container>
 </template>
 <script>
-import { v4 as uuidv4 } from 'uuid'
+import { buildStableTableEmail } from '@/helpers/tableIdentity'
 export default {
   middleware: 'auth',
   data() {
@@ -84,17 +84,26 @@ export default {
       formtable: {
         name: '',
         clearpass: 'PassworD_1',
-        email: uuidv4() + '@' + this.$store.get('shop/shop_name') + '.com',
       },
     }
   },
 
   computed: {
+    tableEmail() {
+      return buildStableTableEmail({
+        shopId: this.shopId,
+        shopName: this.shopName,
+        tableName: this.formtable.name,
+      })
+    },
     websiteUrl() {
       console.log('Router', this.$router)
       console.log('WindwHostname', window.location.hostname)
 
       return window.location.origin
+    },
+    shopId() {
+      return localStorage.getItem('shopid')
     },
     shopName() {
       const shopName = this.$store.get('shop/shop_name')
@@ -105,13 +114,11 @@ export default {
   methods: {
     async submitTable() {
       this.loadingBtn = true
-      const generatedUUID = uuidv4() // Generate a UUID
-      const email = `${generatedUUID}@${this.shopName}.com` // Combine UUID with shopName
       const params = {
         username: this.formtable.name,
         password: this.formtable.clearpass,
         clearpass: this.formtable.clearpass,
-        email,
+        email: this.tableEmail,
         phone: '000000000000',
         status: 1,
         access: 2,
