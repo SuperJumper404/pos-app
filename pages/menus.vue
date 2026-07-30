@@ -30,7 +30,105 @@
           </v-card-text>
         </v-card>
         <v-card v-else>
-          <v-expansion-panels>
+          <v-card-title
+            v-if="canUseLargeProductView"
+            class="menu-view-toolbar d-flex align-center justify-space-between"
+          >
+            <div>
+              <div class="text-subtitle-1 font-weight-bold">
+                {{ isLargeProductView ? 'Tous les produits' : 'Produits par catégorie' }}
+              </div>
+              <div class="text-caption text--secondary">
+                {{
+                  isLargeProductView
+                    ? 'Vue grand format pour parcourir toute la carte.'
+                    : 'Vue organisée par catégories.'
+                }}
+              </div>
+            </div>
+            <v-btn
+              color="primary"
+              outlined
+              class="text-none"
+              @click="toggleProductViewMode"
+            >
+              <v-icon left>
+                {{ isLargeProductView ? 'mdi-format-list-group' : 'mdi-view-grid-plus' }}
+              </v-icon>
+              {{
+                isLargeProductView
+                  ? 'Vue par catégories'
+                  : 'Vue grand écran'
+              }}
+            </v-btn>
+          </v-card-title>
+
+          <div v-if="isLargeProductView" class="pa-4 pt-2">
+            <div class="product-grid product-grid--large">
+              <div
+                v-for="items in dataProduct"
+                :key="items.id"
+                class="product-grid-col"
+              >
+                <v-card
+                  hover
+                  outlined
+                  class="
+                    d-flex
+                    flex-column
+                    product-card
+                    product-card--compact
+                    product-clickable
+                  "
+                  @click="openProductPreview(items)"
+                >
+                  <v-img
+                    :src="productImageSrc(items.image)"
+                    :aspect-ratio="1"
+                    class="product-card-image rounded-t"
+                    @click.stop="openProductPreview(items)"
+                  />
+
+                  <v-card-title class="product-card-title py-2 pb-0 mb-0">
+                    <div class="product-card-title-text font-weight-bold">
+                      {{ items.name }}
+                    </div>
+                  </v-card-title>
+
+                  <v-card-text class="product-card-content pt-0 mb-0 pb-2">
+                    <div class="text-caption text--secondary mb-1">
+                      {{ items.category }}
+                    </div>
+                    <div
+                      v-if="items.customization_available === false"
+                      class="error--text text-caption mt-1"
+                    >
+                      {{ customizationUnavailableReason(items) }}
+                    </div>
+                  </v-card-text>
+
+                  <v-card-actions class="product-card-actions px-4 pt-1 pb-3">
+                    <v-btn
+                      color="success"
+                      small
+                      block
+                      :disabled="
+                        (isKitchenClosed && !isOrderEditActive) ||
+                        items.customization_available === false
+                      "
+                      class="text-none font-weight-bold"
+                      @click.stop="addToCart(items)"
+                    >
+                      <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
+                      Ajouter
+                    </v-btn>
+                  </v-card-actions>
+                </v-card>
+              </div>
+            </div>
+          </div>
+
+          <v-expansion-panels v-else>
             <v-expansion-panel v-for="(category, i) in categories" :key="i">
               <v-expansion-panel-header
                 ><h3>{{ category }}</h3></v-expansion-panel-header
@@ -472,6 +570,7 @@ export default {
     total: 0,
     idxCart: 0,
     allowRouteLeave: false,
+    productViewMode: 'categories',
   }),
 
   computed: {
@@ -523,6 +622,18 @@ export default {
     },
     orderEditDirty() {
       return this.$store.get('orderEdit/dirty') === true
+    },
+    isAdminView() {
+      const user = this.$store.get('users/user') || {}
+      const storedAccess = process.client ? localStorage.getItem('access') : null
+      const access = user.access === undefined ? storedAccess : user.access
+      return Number(access) === 0
+    },
+    isLargeProductView() {
+      return this.canUseLargeProductView && this.productViewMode === 'all'
+    },
+    canUseLargeProductView() {
+      return this.isAdminView && this.$vuetify.breakpoint.mdAndUp
     },
   },
   async mounted() {
@@ -671,6 +782,9 @@ export default {
     },
     change() {
       this.dialog = this.stateDialog
+    },
+    toggleProductViewMode() {
+      this.productViewMode = this.isLargeProductView ? 'categories' : 'all'
     },
     getProductPerCategorie(category) {
       return this.dataProduct.filter(function (x) {
@@ -871,6 +985,10 @@ export default {
   cursor: pointer;
 }
 
+.menu-view-toolbar {
+  gap: 12px;
+}
+
 .product-grid {
   --product-card-min-width: 200px;
   display: grid;
@@ -879,6 +997,11 @@ export default {
     auto-fill,
     minmax(var(--product-card-min-width), 1fr)
   );
+}
+
+.product-grid--large {
+  --product-card-min-width: 130px;
+  gap: 8px;
 }
 
 .product-grid-col {
@@ -890,6 +1013,46 @@ export default {
   height: 100%;
   min-height: 320px;
   width: 100%;
+}
+
+.product-card--compact {
+  min-height: 188px;
+}
+
+.product-card--compact .product-card-title {
+  min-height: 42px;
+}
+
+.product-card--compact .product-card-title-text {
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.product-card--compact .product-card-content {
+  min-height: 28px;
+}
+
+.product-card--compact ::v-deep .v-card__title {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.product-card--compact ::v-deep .v-card__text {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.product-card--compact ::v-deep .v-card__actions {
+  padding: 0 8px 8px !important;
+}
+
+.product-card--compact ::v-deep .v-btn {
+  height: 26px !important;
+  font-size: 0.72rem !important;
+}
+
+.product-card--compact ::v-deep .v-btn .v-icon {
+  font-size: 15px !important;
 }
 
 .product-card-image {
