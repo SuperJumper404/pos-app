@@ -444,7 +444,7 @@ const loadPageOptions = (source, dependencies, values) => {
     .match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
     .replace(
-      /const \{\s*isCounterPaymentAllowed,\s*isQrClientAccess,\s*\} = require\([^\n]+\)/m,
+      /const \{\s*isCounterPaymentAllowed,\s*isQrClientAccess,\s*isStripePaymentRequired,\s*\} = require\([^\n]+\)/m,
       ''
     )
     .replace(
@@ -724,6 +724,7 @@ const runCartEditContracts = async () => {
         'replaceConfiguredCartLine',
         'isCounterPaymentAllowed',
         'isQrClientAccess',
+        'isStripePaymentRequired',
         'shouldAutoPrepareStripeCheckout',
       ],
       [
@@ -738,6 +739,7 @@ const runCartEditContracts = async () => {
         () => [],
         () => false,
         () => false,
+        (mode) => mode === 'stripe_before_order',
         () => false,
       ]
     )

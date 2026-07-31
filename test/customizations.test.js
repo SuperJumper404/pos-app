@@ -1651,7 +1651,7 @@ const cartExecutable = cartPageSource
   .match(/<script>([\s\S]*?)<\/script>/)[1]
   .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
   .replace(
-    /const \{\s*isCounterPaymentAllowed,\s*isQrClientAccess,\s*\} = require\([^\n]+\)/m,
+    /const \{\s*isCounterPaymentAllowed,\s*isQrClientAccess,\s*isStripePaymentRequired,\s*\} = require\([^\n]+\)/m,
     ''
   )
   .replace(
@@ -1672,6 +1672,7 @@ const cartOptions = new Function(
   'replaceConfiguredCartLine',
   'isCounterPaymentAllowed',
   'isQrClientAccess',
+  'isStripePaymentRequired',
   'buildCheckoutPayloadSignature',
   'shouldAutoPrepareStripeCheckout',
   cartExecutable
@@ -1686,6 +1687,7 @@ const cartOptions = new Function(
   replaceConfiguredCartLine,
   () => false,
   () => false,
+  (mode) => mode === 'stripe_before_order',
   buildCheckoutPayloadSignature,
   () => false
 )
@@ -2703,6 +2705,25 @@ const runReviewRegressionTests = async () => {
     }),
     true,
     'a first checkout may start before a signature is bound'
+  )
+
+  assert.strictEqual(
+    cartOptions.computed.isStripeCheckout.call({
+      isQrClient: true,
+      qrPaymentMode: 'pay_at_counter',
+      selectedCheckoutFlow: null,
+    }),
+    false,
+    'pay-at-counter QR mode must not enter Stripe checkout'
+  )
+  assert.strictEqual(
+    cartOptions.computed.checkoutButtonLabel.call({
+      isOrderEditActive: false,
+      isStripeCheckout: false,
+      stripePaymentReady: false,
+    }),
+    'Commander',
+    'pay-at-counter QR clients must see the normal order action'
   )
 
   const stripeState = cartModule.state()
