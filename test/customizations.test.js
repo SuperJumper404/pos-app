@@ -1647,6 +1647,58 @@ assert.deepStrictEqual(
   }
 )
 
+const sharedStoreCart = [
+  {
+    id: 8,
+    name: 'Produit restauré',
+    qty: 1,
+    price: 6,
+    subtotal: 6,
+    selectedChoiceIds: [],
+  },
+]
+const sharedCartEvents = []
+const sharedCartVm = {
+  isOrderEditActive: false,
+  cartItem: sharedStoreCart,
+  roundPrice: (value) => Math.round(Number(value) * 100) / 100,
+  parsePrice: Number,
+  totalPrice() {},
+  indexCart() {},
+  $store: {
+    dispatch(type, payload) {
+      sharedCartEvents.push([type, payload])
+      return Promise.resolve()
+    },
+  },
+}
+menusOptions.methods.plusBtn.call(sharedCartVm, sharedStoreCart[0], 0)
+assert.strictEqual(
+  sharedStoreCart[0].qty,
+  1,
+  'increasing a restored menu cart line must not mutate the Vuex cart reference directly'
+)
+assert.strictEqual(sharedCartVm.cartItem[0].qty, 2)
+
+const sharedStoreCartForMinus = [
+  {
+    id: 9,
+    name: 'Produit restauré 2',
+    qty: 2,
+    price: 5,
+    subtotal: 10,
+    selectedChoiceIds: [],
+  },
+]
+sharedCartVm.cartItem = sharedStoreCartForMinus
+menusOptions.methods.minusBtn.call(sharedCartVm, sharedStoreCartForMinus[0], 0)
+assert.strictEqual(
+  sharedStoreCartForMinus[0].qty,
+  2,
+  'decreasing a restored menu cart line must not mutate the Vuex cart reference directly'
+)
+assert.strictEqual(sharedCartVm.cartItem[0].qty, 1)
+
 const cartExecutable = cartPageSource
   .match(/<script>([\s\S]*?)<\/script>/)[1]
   .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
