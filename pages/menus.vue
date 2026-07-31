@@ -660,22 +660,35 @@ export default {
       return
     }
 
-    if (
-      ['prewrite_rejected', 'reprice_required'].includes(this.clientOrderStatus)
-    ) {
+    const shouldResetRejectedCheckout = [
+      'prewrite_rejected',
+      'reprice_required',
+    ].includes(this.clientOrderStatus)
+
+    if (shouldResetRejectedCheckout) {
       await this.$store.dispatch('cart/abandonCheckout', { safe: true })
     }
 
-    this.cartItem = []
+    const existingCart = shouldResetRejectedCheckout
+      ? null
+      : this.$store.get('cart/dataCart')
+    if (Array.isArray(existingCart) && existingCart.length > 0) {
+      this.restorePersistedCheckoutCart()
+    } else {
+      this.cartItem = []
+    }
 
     const calls = [
       this.$store.dispatch('products/getProducts'),
       this.$store.dispatch('shop/getCurrentShopInfo'),
-      this.$store.dispatch('cart/setTotal', 0),
-      this.$store.dispatch('cart/setIndex', 0),
-      this.$store.dispatch('cart/setTocart', null),
     ]
-    console.log('result', this.$store.get('products/dataProduct'))
+    if (!Array.isArray(existingCart) || existingCart.length === 0) {
+      calls.push(
+        this.$store.dispatch('cart/setTotal', 0),
+        this.$store.dispatch('cart/setIndex', 0),
+        this.$store.dispatch('cart/setTocart', null)
+      )
+    }
     Promise.all(calls).finally(() => {
       this.loadPage = false
     })

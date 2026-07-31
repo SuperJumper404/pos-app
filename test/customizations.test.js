@@ -3053,6 +3053,59 @@ const runReviewRegressionTests = async () => {
     ['cart/setTocart', safeMenuVm.cartItem],
   ])
 
+  const persistedMenuCart = [
+    {
+      id: 12,
+      name: 'Burger',
+      qty: 2,
+      price: 7,
+      subtotal: 14,
+      selectedChoiceIds: [],
+    },
+  ]
+  const persistedMenuEvents = []
+  const persistedMenuVm = {
+    loadPage: false,
+    cartItem: [],
+    total: 0,
+    idxCart: 0,
+    clientOrderStatus: 'idle',
+    hasUnsafeCheckoutAttempt: false,
+    isOrderEditActive: false,
+    restorePersistedCheckoutCart() {
+      return menusOptions.methods.restorePersistedCheckoutCart.call(this)
+    },
+    $store: {
+      get(pathValue) {
+        const values = {
+          'cart/dataCart': persistedMenuCart,
+          'cart/totalCart': 14,
+          'cart/indexCart': 2,
+          'products/dataProduct': [],
+        }
+        return values[pathValue]
+      },
+      dispatch(type, payload) {
+        persistedMenuEvents.push([type, payload])
+        return Promise.resolve({ ok: true })
+      },
+    },
+  }
+  await menusOptions.mounted.call(persistedMenuVm)
+  assert.deepStrictEqual(
+    persistedMenuVm.cartItem,
+    persistedMenuCart,
+    'returning to the menu must keep the current cart instead of emptying it'
+  )
+  assert.strictEqual(persistedMenuVm.total, 14)
+  assert.strictEqual(persistedMenuVm.idxCart, 2)
+  assert.ok(
+    !persistedMenuEvents.some(
+      ([type, payload]) => type === 'cart/setTocart' && payload === null
+    ),
+    'normal menu remount must not clear a cart that already exists in the store'
+  )
+
   const cancellationCalls = []
   const cancellationResult = await cartModule.actions.cancelStripeCheckout.call(
     {
