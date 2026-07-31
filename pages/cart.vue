@@ -428,6 +428,7 @@ import {
 const {
   isCounterPaymentAllowed,
   isQrClientAccess,
+  isStripePaymentRequired,
 } = require('@/helpers/checkoutAccess')
 const { shouldAutoPrepareStripeCheckout } = require('@/helpers/stripeCheckout')
 export default {
@@ -565,7 +566,11 @@ export default {
       return this.isQrClient && isCounterPaymentAllowed(this.qrPaymentMode)
     },
     isStripeCheckout() {
-      return this.isQrClient && this.selectedCheckoutFlow !== 'counter'
+      return (
+        this.isQrClient &&
+        isStripePaymentRequired(this.qrPaymentMode) &&
+        this.selectedCheckoutFlow !== 'counter'
+      )
     },
     isOrderEditActive() {
       return this.$store.get('orderEdit/active') === true
@@ -648,7 +653,7 @@ export default {
       return 'mdi-silverware-fork-knife'
     },
     currentStripeCheckoutSignature() {
-      const stripe = this.isQrClient
+      const stripe = this.isStripeCheckout
       return buildCheckoutPayloadSignature(
         this.buildOrderPayload(
           stripe ? 'Stripe' : this.formuser.payment,
@@ -1271,7 +1276,7 @@ export default {
         return
       }
 
-      const flow = this.isQrClient ? 'stripe' : 'order'
+      const flow = this.isStripeCheckout ? 'stripe' : 'order'
 
       this.selectedCheckoutFlow = flow
 
