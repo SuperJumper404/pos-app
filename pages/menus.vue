@@ -877,26 +877,41 @@ export default {
       this.indexCart()
     },
     minusBtn(params, index) {
-      console.log('Index Minus Btn', this.cartItem, index, params)
       const item = this.cartItem[index]
       if (!item) return
 
       if (item.qty <= 1) {
-        this.cartItem.splice(index, 1)
+        this.cartItem = this.cartItem.filter((_, itemIndex) => {
+          return itemIndex !== index
+        })
       } else {
-        item.qty -= 1
-        item.subtotal = this.roundPrice(item.qty * this.parsePrice(item.price))
+        const nextQty = Number(item.qty || 0) - 1
+        this.cartItem = this.cartItem.map((cartLine, itemIndex) => {
+          if (itemIndex !== index) return cartLine
+          return {
+            ...cartLine,
+            qty: nextQty,
+            subtotal: this.roundPrice(nextQty * this.parsePrice(cartLine.price)),
+          }
+        })
       }
 
       this.totalPrice()
       this.indexCart()
     },
     plusBtn(params, index) {
-      console.log('Index Plus Btn', index, params)
-      this.cartItem[index].qty += 1
-      this.cartItem[index].subtotal = this.roundPrice(
-        this.cartItem[index].qty * this.parsePrice(this.cartItem[index].price)
-      )
+      const item = this.cartItem[index]
+      if (!item) return
+
+      const nextQty = Number(item.qty || 0) + 1
+      this.cartItem = this.cartItem.map((cartLine, itemIndex) => {
+        if (itemIndex !== index) return cartLine
+        return {
+          ...cartLine,
+          qty: nextQty,
+          subtotal: this.roundPrice(nextQty * this.parsePrice(cartLine.price)),
+        }
+      })
       // this.cartItem.forEach((e) => {
       //   if (e.id === params.id) {
       //     e.qty += 1
