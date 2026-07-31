@@ -1510,6 +1510,7 @@ const menuProduct = {
   customization_available: true,
   customization_steps: [{ product_step_id: 100, choices: [] }],
 }
+const cartFeedbackEvents = []
 const menusVm = {
   isKitchenClosed: false,
   cartItem: [],
@@ -1524,6 +1525,9 @@ const menusVm = {
   indexCart() {},
   showKitchenClosedSnackbar() {},
   showAlert() {},
+  showCartAddFeedback(product) {
+    cartFeedbackEvents.push(product && product.name)
+  },
   customizationUnavailableReason(productValue) {
     return menusOptions.methods.customizationUnavailableReason.call(
       this,
@@ -1554,6 +1558,11 @@ menusOptions.methods.confirmCustomization.call(menusVm, {
 assert.deepStrictEqual(menusVm.cartItem[0].selectedChoiceIds, [10])
 assert.strictEqual(menusVm.cartItem[0].configurationSignature, '5:10')
 assert.strictEqual(menusVm.cartItem[0].subtotal, 9)
+assert.deepStrictEqual(
+  cartFeedbackEvents,
+  ['Menu'],
+  'confirming a customized product must show the add-to-cart feedback'
+)
 
 menusOptions.methods.addToCart.call(menusVm, menuProduct)
 menusOptions.methods.confirmCustomization.call(menusVm, {
@@ -1629,6 +1638,11 @@ menusOptions.methods.addToCart.call(menusVm, {
   customization_available: true,
   customization_steps: [],
 })
+assert.deepStrictEqual(
+  cartFeedbackEvents,
+  ['Menu', 'Menu', 'Produit simple', 'Produit simple'],
+  'successful menu adds must show feedback for customized and simple products'
+)
 assert.deepStrictEqual(
   menusVm.cartItem.find((line) => line.id === 6),
   {

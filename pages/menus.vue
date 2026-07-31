@@ -505,6 +505,18 @@
         </v-btn>
       </template>
     </v-snackbar>
+    <v-snackbar
+      v-model="cartAddSnackbar"
+      color="success"
+      timeout="2200"
+      bottom
+    >
+      <v-icon left>mdi-cart-check</v-icon>
+      {{ cartAddSnackbarText }}
+      <template #action="{ attrs }">
+        <v-btn text v-bind="attrs" @click="openCart">Voir le panier</v-btn>
+      </template>
+    </v-snackbar>
   </v-container>
 </template>
 <script>
@@ -566,6 +578,8 @@ export default {
     kitchenClosedSnackbar: false,
     kitchenClosedMessage:
       'La cuisine est fermée. Aucune nouvelle commande possible.',
+    cartAddSnackbar: false,
+    cartAddSnackbarText: 'Produit ajouté au panier',
     cartItem: [],
     total: 0,
     idxCart: 0,
@@ -782,6 +796,9 @@ export default {
       this.closeCustomizationWizard()
       this.totalPrice()
       this.indexCart()
+      if (!isEditing) {
+        this.showCartAddFeedback(line)
+      }
     },
     customizationUnavailableReason(product) {
       const reason = product && product.customization_unavailable_reason
@@ -839,6 +856,10 @@ export default {
     showKitchenClosedSnackbar() {
       this.kitchenClosedSnackbar = true
     },
+    showCartAddFeedback() {
+      this.cartAddSnackbarText = 'Produit ajouté au panier'
+      this.cartAddSnackbar = true
+    },
     addToCart(params) {
       if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.showKitchenClosedSnackbar()
@@ -875,6 +896,7 @@ export default {
       })
       this.totalPrice()
       this.indexCart()
+      this.showCartAddFeedback(params)
     },
     minusBtn(params, index) {
       const item = this.cartItem[index]
