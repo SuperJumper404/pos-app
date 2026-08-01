@@ -43,19 +43,19 @@
             </div>
           </div>
 
-          <div class="mb-4">
-            <div class="caption text-uppercase grey--text text--darken-1">
-              Mot de passe
-            </div>
-            <div class="body-2">
-              {{ items.clearpass }}
-            </div>
-          </div>
-
           <div class="subtitle-2 font-weight-bold text--darken-1 mb-1">
-            URL de connexion automatique :
+            URL QR table :
           </div>
+          <v-alert
+            v-if="!items.table_access_token"
+            dense
+            outlined
+            type="warning"
+          >
+            QR indisponible pour cette table.
+          </v-alert>
           <v-sheet
+            v-else
             color="grey lighten-4"
             rounded="lg"
             class="mt-3 mb-3 px-3 py-2 d-inline-block"
@@ -63,13 +63,7 @@
           >
             <div class="d-flex align-center">
               <div class="body-2 break-all grey--text text--darken-3">
-                {{
-                  websiteUrl +
-                  '/login?username=' +
-                  items.email +
-                  '&password=' +
-                  items.clearpass
-                }}
+                {{ tableAccessUrl(items) }}
               </div>
               <v-btn icon small class="ml-1" @click="copyTableUrl(items)">
                 <v-icon small>mdi-content-copy</v-icon>
@@ -77,16 +71,12 @@
             </div>
           </v-sheet>
 
-          <div :ref="`qr-${items.id}`" class="qr-code-download-wrapper">
-            <qr-code
-              :text="
-                websiteUrl +
-                '/login?username=' +
-                items.email +
-                '&password=' +
-                items.clearpass
-              "
-            />
+          <div
+            v-if="items.table_access_token"
+            :ref="`qr-${items.id}`"
+            class="qr-code-download-wrapper"
+          >
+            <qr-code :text="tableAccessUrl(items)" />
           </div>
           <!-- <qrcode-vue value="items.email" size="300" level="H" /> -->
         </v-card-text>
@@ -107,6 +97,7 @@
             dark
             class="text-none d-sm-block d-none mb-2 ml-0"
             width="100%"
+            :disabled="!items.table_access_token"
             @click="downloadQrCode(items.id)"
           >
             Télécharger
@@ -131,6 +122,7 @@
             class="text-none d-sm-none d-block ml-0 mb-2"
             width="100%"
             small
+            :disabled="!items.table_access_token"
             @click="downloadQrCode(items.id)"
           >
             Télécharger
@@ -145,6 +137,7 @@
 <script>
 import Loading from '@/components/loading'
 import formatdate from '@/helpers/formatdate'
+import { buildTableAccessUrl } from '@/helpers/tableIdentity'
 import Vue from 'vue'
 import VueQRCodeComponent from 'vue-qrcode-component/src/QRCode.vue'
 
@@ -189,16 +182,14 @@ export default {
     })
   },
   methods: {
+    tableAccessUrl(item) {
+      return buildTableAccessUrl(this.websiteUrl, item.table_access_token)
+    },
     searchData() {
       this.$store.dispatch('tables/getAllTables')
     },
     async copyTableUrl(item) {
-      const url =
-        this.websiteUrl +
-        '/login?username=' +
-        item.email +
-        '&password=' +
-        item.clearpass
+      const url = this.tableAccessUrl(item)
 
       try {
         await navigator.clipboard.writeText(url)
