@@ -155,8 +155,6 @@ export default {
   data() {
     return {
       loadPage: false,
-      // http://localhost:3000/login?username=admin%40gmail.com&password=PassworD_1
-      // This is an example to generate a Automatic connection Qr code
     }
   },
   head() {
