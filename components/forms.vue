@@ -184,13 +184,6 @@ export default {
       return this.$store.get('users/alertError')
     },
   },
-  async mounted() {
-    if (this.$route.query.username && this.$route.query.password) {
-      this.formsdata.email = this.$route.query.username
-      this.formsdata.password = this.$route.query.password
-      await this.sumitforms()
-    }
-  },
   methods: {
     async sumitforms() {
       this.loadingBtn = true
