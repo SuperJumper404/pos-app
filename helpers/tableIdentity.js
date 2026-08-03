@@ -30,9 +30,17 @@ const buildStableTableDomain = (shopName) => {
 const buildStableTableEmail = ({ shopId, shopName, tableName }) =>
   `${buildStableTableLogin({ shopId, shopName, tableName })}@${buildStableTableDomain(shopName)}`
 
+const buildTableAccessPath = (token) =>
+  `/table-access/${encodeURIComponent(token || '')}`
+
+const buildTableAccessUrl = (origin, token) =>
+  `${String(origin || '').replace(/\/$/, '')}${buildTableAccessPath(token)}`
+
 module.exports = {
   buildStableTableDomain,
   buildStableTableEmail,
   buildStableTableLogin,
+  buildTableAccessPath,
+  buildTableAccessUrl,
   normalizeIdentityPart,
 }

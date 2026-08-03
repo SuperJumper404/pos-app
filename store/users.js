@@ -21,6 +21,19 @@ export const mutations = {
   },
 }
 export const plugins = [EasyAccess()]
+const persistAuthenticatedUser = (dispatch, response) => {
+  const user = response.data.data[0]
+  localStorage.setItem('idUser', user.id)
+  localStorage.setItem('access', user.access)
+  localStorage.setItem('token', user.token)
+  localStorage.setItem('shopid', user.shopid)
+  dispatch('set/user.id', user.id)
+  dispatch('set/user.access', user.access)
+  dispatch('set/user.token', user.token)
+  dispatch('set/user.shopid', user.shopid)
+  dispatch('setAuthentication', true, { root: true })
+  return user
+}
 export const actions = {
   postRegister({ dispatch }, params) {
     params.shopid = localStorage.getItem('shopid')
@@ -40,16 +53,8 @@ export const actions = {
     return this.$axios
       .post('/baseurl/api/v1/login', params)
       .then((response) => {
-        localStorage.setItem('idUser', response.data.data[0].id)
-        localStorage.setItem('access', response.data.data[0].access)
-        localStorage.setItem('token', response.data.data[0].token)
-        localStorage.setItem('shopid', response.data.data[0].shopid)
         console.log('REspondse DAta', response.data.data)
-        dispatch('set/user.id', response.data.data[0].id)
-        dispatch('set/user.access', response.data.data[0].access)
-        dispatch('set/user.token', response.data.data[0].token)
-        dispatch('set/user.shopid', response.data.data[0].shopid)
-        dispatch('setAuthentication', true, { root: true })
+        persistAuthenticatedUser(dispatch, response)
         dispatch('set/message', response.data.message)
         dispatch('notifications/success', response.data.message, { root: true })
         return true
@@ -57,6 +62,27 @@ export const actions = {
       .catch((error) => {
         console.log('RR', error.response)
         dispatch('set/message', error.response.data.message)
+        return false
+      })
+  },
+  postTableAccess({ dispatch }, token) {
+    return this.$axios
+      .post('/baseurl/api/v1/table-access', { token })
+      .then((response) => {
+        persistAuthenticatedUser(dispatch, response)
+        dispatch('set/message', response.data.message)
+        dispatch('notifications/success', response.data.message, {
+          root: true,
+        })
+        return true
+      })
+      .catch((error) => {
+        const message =
+          error.response && error.response.data
+            ? error.response.data.message
+            : 'Token QR invalide.'
+        dispatch('set/message', message)
+        dispatch('set/alertError', true)
         return false
       })
   },

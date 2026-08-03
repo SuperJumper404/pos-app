@@ -136,8 +136,8 @@
               <v-btn
                 v-if="
                   clickAndCollectTable &&
-                  clickAndCollectTable.email &&
-                  clickAndCollectTable.clearpass
+                  clickAndCollectTable &&
+                  clickAndCollectTable.table_access_token
                 "
                 color="primary"
                 class="mt-2"
@@ -145,7 +145,7 @@
                 :href="
                   isKitchenClosed
                     ? undefined
-                    : `/login?username=${clickAndCollectTable.email}&password=${clickAndCollectTable.clearpass}`
+                    : tableAccessUrl(clickAndCollectTable)
                 "
                 target="_blank"
                 @click="goToClickAndCollect"
@@ -312,6 +312,8 @@
   </v-container>
 </template>
 <script>
+import { buildTableAccessUrl } from '@/helpers/tableIdentity'
+
 export default {
   layout: 'empty',
   data() {
@@ -405,6 +407,9 @@ export default {
     //   })
   },
   methods: {
+    tableAccessUrl(item) {
+      return buildTableAccessUrl(window.location.origin, item.table_access_token)
+    },
     goToClickAndCollect(event) {
       if (!this.isKitchenClosed) return
 

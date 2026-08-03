@@ -3,6 +3,8 @@ const {
   buildStableTableDomain,
   buildStableTableEmail,
   buildStableTableLogin,
+  buildTableAccessPath,
+  buildTableAccessUrl,
   normalizeIdentityPart,
 } = require('../helpers/tableIdentity')
 
@@ -33,6 +35,29 @@ assert.notStrictEqual(
 assert.strictEqual(
   buildStableTableEmail({ shopName: 'Boutique Maroc', tableName: 'Terrasse 2' }),
   'terrasse-2-boutique-maroc@boutique-maroc.com'
+)
+
+assert.strictEqual(
+  buildTableAccessPath('signed.token.value'),
+  '/table-access/signed.token.value'
+)
+
+assert.strictEqual(
+  buildTableAccessUrl('https://app.smarteat.fr', 'signed.token.value'),
+  'https://app.smarteat.fr/table-access/signed.token.value'
+)
+
+assert.ok(
+  !buildTableAccessUrl(
+    'https://app.smarteat.fr',
+    'signed.token.value'
+  ).includes('password=')
+)
+assert.ok(
+  !buildTableAccessUrl(
+    'https://app.smarteat.fr',
+    'signed.token.value'
+  ).includes('username=')
 )
 
 console.log('tableIdentity tests passed')
