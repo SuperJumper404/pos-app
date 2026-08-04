@@ -466,11 +466,27 @@ export default {
 }
 </script>
 
+<style>
+.customization-dialog {
+  display: flex;
+  max-height: 92vh;
+  overflow: hidden;
+}
+
+.customization-dialog__content {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+</style>
+
 <style scoped>
 .customization-wizard {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   max-height: 92vh;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -481,7 +497,7 @@ export default {
 
 .customization-wizard__body {
   flex: 1 1 auto;
-  min-height: 360px;
+  min-height: 0;
   overflow-y: auto;
   padding-top: 24px;
 }
@@ -494,7 +510,6 @@ export default {
 
 @media (max-width: 599px) {
   .customization-wizard__body {
-    min-height: 300px;
     padding-left: 12px;
     padding-right: 12px;
   }

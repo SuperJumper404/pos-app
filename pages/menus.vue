@@ -591,7 +591,12 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="customizationDialog" max-width="920" persistent>
+    <v-dialog
+      v-model="customizationDialog"
+      content-class="customization-dialog"
+      max-width="920"
+      persistent
+    >
       <ProductCustomizationWizard
         v-if="selectedItem"
         v-model="selectedChoiceIds"

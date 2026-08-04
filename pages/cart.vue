@@ -336,8 +336,13 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-dialog v-model="customizationDialog" max-width="920" persistent>
-      <div v-if="editingProduct">
+    <v-dialog
+      v-model="customizationDialog"
+      content-class="customization-dialog"
+      max-width="920"
+      persistent
+    >
+      <div v-if="editingProduct" class="customization-dialog__content">
         <v-alert
           v-if="customizationRecoveryMessage"
           type="warning"
