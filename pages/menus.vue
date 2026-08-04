@@ -135,8 +135,12 @@
                   v-for="category in categories"
                   :key="category"
                   class="mobile-category-chip"
-                  :color="category === activeMobileCategory ? 'primary' : undefined"
-                  :outlined="category !== activeMobileCategory"
+                  :class="{
+                    'mobile-category-chip--active':
+                      category === activeMobileCategory,
+                  }"
+                  :color="undefined"
+                  :outlined="category === activeMobileCategory"
                   text-color="black"
                   label
                   small
@@ -1381,13 +1385,12 @@ export default {
 }
 
 .mobile-category-view {
-  background: #fafafa;
+  background: transparent;
 }
 
 .mobile-category-bar {
   align-items: center;
-  background: #fff;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: transparent;
   display: flex;
   gap: 8px;
   justify-content: flex-start;
@@ -1406,18 +1409,19 @@ export default {
 }
 
 .mobile-category-chip {
-  border-color: #000 !important;
   border-radius: 12px !important;
   flex: 0 0 auto;
+  font-size: 1rem !important;
   font-weight: 600;
+  height: 32px !important;
+  padding: 0 12px !important;
 }
 
-.mobile-category-chip ::v-deep .v-chip {
+.mobile-category-chip--active ::v-deep .v-chip {
   border-color: #000 !important;
 }
 
 .mobile-category-products {
-  background: #fafafa;
   padding: 12px;
 }
 
