@@ -83,10 +83,20 @@ assert.match(
   /\.mobile-category-chip--active\s*::v-deep\s*\.v-chip\s*\{[\s\S]*?border-color:\s*#000\s*!important/,
   'only the selected category chip must use a black outline'
 )
+assert.doesNotMatch(
+  menusSource,
+  /\.mobile-category-bar\s*\{[\s\S]*?position:\s*sticky/,
+  'mobile category bar must not stick to the top of the viewport'
+)
 assert.match(
   menusSource,
-  /\.mobile-category-bar\s*\{[\s\S]*?position:\s*sticky[\s\S]*?top:\s*0[\s\S]*?z-index:\s*10/,
-  'mobile category bar must stay sticky and visible while scrolling'
+  /\.mobile-category-view\s*\{[\s\S]*?display:\s*flex[\s\S]*?flex-direction:\s*column/,
+  'mobile menu must keep tabs and category bar in place above the product scroller'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-products\s*\{[\s\S]*?overflow-y:\s*auto/,
+  'mobile products must scroll inside their own container'
 )
 assert.match(
   menusSource,

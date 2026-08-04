@@ -1386,6 +1386,10 @@ export default {
 
 .mobile-category-view {
   background: transparent;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 56px);
+  min-height: 0;
 }
 
 .mobile-category-bar {
@@ -1396,10 +1400,7 @@ export default {
   justify-content: flex-start;
   overflow-x: auto;
   padding: 8px 12px;
-  position: sticky;
-  top: 0;
   white-space: nowrap;
-  z-index: 10;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -1422,6 +1423,9 @@ export default {
 }
 
 .mobile-category-products {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 12px;
 }
 
