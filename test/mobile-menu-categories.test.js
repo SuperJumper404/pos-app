@@ -55,6 +55,26 @@ assert.match(
 )
 assert.match(
   menusSource,
+  /text-color="black"/,
+  'category chips must use black text'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-chip\s*\{[\s\S]*?border-radius:\s*12px\s*!important/,
+  'category chips must use a 12px radius'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-chip\s*::v-deep\s*\.v-chip\s*\{[\s\S]*?border-color:\s*#000\s*!important/,
+  'outlined category chips must use a black outline'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-bar\s*\{[\s\S]*?position:\s*sticky[\s\S]*?top:\s*0[\s\S]*?z-index:\s*10/,
+  'mobile category bar must stay sticky and visible while scrolling'
+)
+assert.match(
+  menusSource,
   /class="menu-content-row mt-5"/,
   'menu content row must be targetable for mobile spacing'
 )
