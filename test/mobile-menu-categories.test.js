@@ -25,8 +25,18 @@ assert.match(
 )
 assert.match(
   menusSource,
+  /mobile-category-section/,
+  'mobile menus must keep category sections available below the horizontal bar'
+)
+assert.doesNotMatch(
+  menusSource,
   /getProductPerCategorie\(activeMobileCategory\)/,
-  'mobile menus must render products from the active category'
+  'mobile category tabs must not filter the menu content'
+)
+assert.match(
+  menusSource,
+  /scrollToMobileCategory\(category\)/,
+  'mobile category tabs must scroll to the selected category section'
 )
 assert.match(packageJson.scripts.test, /test\/mobile-menu-categories\.test\.js/)
 

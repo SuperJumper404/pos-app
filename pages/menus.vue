@@ -140,16 +140,25 @@
                     'mobile-category-tab--active':
                       category === activeMobileCategory,
                   }"
-                  @click="setActiveMobileCategory(category)"
+                  @click="scrollToMobileCategory(category)"
                 >
                   {{ category }}
                 </button>
               </div>
 
-              <div class="mobile-category-products pa-3">
-                <div class="product-grid">
+              <div class="mobile-category-products">
+                <section
+                  v-for="category in categories"
+                  :key="category"
+                  :ref="`mobileCategory-${category}`"
+                  class="mobile-category-section"
+                >
+                  <h3 class="mobile-category-title">
+                    {{ category }}
+                  </h3>
+                  <div class="product-grid">
                   <div
-                    v-for="items in getProductPerCategorie(activeMobileCategory)"
+                    v-for="items in getProductPerCategorie(category)"
                     :key="items.id"
                     class="product-grid-col"
                   >
@@ -224,7 +233,8 @@
                       </v-card-actions>
                     </v-card>
                   </div>
-                </div>
+                  </div>
+                </section>
               </div>
             </div>
 
@@ -836,6 +846,16 @@ export default {
     setActiveMobileCategory(category) {
       this.activeMobileCategory = category
     },
+    scrollToMobileCategory(category) {
+      this.setActiveMobileCategory(category)
+      this.$nextTick(() => {
+        const target = this.$refs[`mobileCategory-${category}`]
+        const element = Array.isArray(target) ? target[0] : target
+        if (element && typeof element.scrollIntoView === 'function') {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
+    },
     restorePersistedCheckoutCart() {
       const payload = this.$store.get('cart/clientOrderPayload') || {}
       const persistedCart = Array.isArray(payload.dataCart)
@@ -1356,18 +1376,17 @@ export default {
 }
 
 .mobile-category-view {
-  background: #fff;
+  background: #fafafa;
 }
 
 .mobile-category-bar {
   align-items: center;
   background: #fff;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
-  gap: 18px;
+  gap: 8px;
   overflow-x: auto;
-  padding: 14px 16px;
+  padding: 10px 12px;
   position: sticky;
   top: 0;
   white-space: nowrap;
@@ -1382,26 +1401,42 @@ export default {
 
 .mobile-category-tab {
   background: transparent;
-  border: 0;
-  border-radius: 999px;
-  color: #13bfb5;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--v-primary-base);
   cursor: pointer;
   flex: 0 0 auto;
-  font-size: 0.96rem;
+  font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.2;
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 12px;
 }
 
 .mobile-category-tab--active {
-  background: #13c9bd;
+  background: var(--v-primary-base);
   color: #fff;
-  padding: 0 22px;
 }
 
 .mobile-category-products {
   background: #fafafa;
+  padding: 12px;
+}
+
+.mobile-category-section {
+  scroll-margin-top: 64px;
+}
+
+.mobile-category-section + .mobile-category-section {
+  margin-top: 18px;
+}
+
+.mobile-category-title {
+  color: rgba(0, 0, 0, 0.78);
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 2px 0 10px;
 }
 
 @media (min-width: 600px) and (max-width: 1263px) {

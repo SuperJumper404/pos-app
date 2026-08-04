@@ -1,6 +1,6 @@
 <template>
   <v-card class="customization-wizard">
-    <v-card-title class="d-flex align-center">
+    <v-card-title class="customization-wizard__header d-flex align-center">
       <div>
         <div class="text-h6">{{ product.name || 'Personnalisation' }}</div>
         <div v-if="!isSummary" class="text-caption grey--text">
@@ -68,7 +68,7 @@
     </v-card-text>
 
     <v-divider></v-divider>
-    <v-card-actions class="pa-4">
+    <v-card-actions class="customization-wizard__footer pa-4">
       <v-btn text class="text-none" @click="goBack">
         <v-icon left>mdi-arrow-left</v-icon>
         {{ backButtonLabel }}
@@ -468,12 +468,21 @@ export default {
 
 <style scoped>
 .customization-wizard {
+  display: flex;
+  flex-direction: column;
   max-height: 92vh;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.customization-wizard__header,
+.customization-wizard__footer {
+  flex: 0 0 auto;
 }
 
 .customization-wizard__body {
+  flex: 1 1 auto;
   min-height: 360px;
+  overflow-y: auto;
   padding-top: 24px;
 }
 
