@@ -38,6 +38,31 @@ assert.match(
   /scrollToMobileCategory\(category\)/,
   'mobile category tabs must scroll to the selected category section'
 )
+assert.match(
+  menusSource,
+  /<v-chip[\s\S]*?mobile-category-chip/,
+  'mobile category tabs must use Vuetify chips'
+)
+assert.match(
+  menusSource,
+  /:outlined="category !== activeMobileCategory"/,
+  'inactive category chips must be outlined'
+)
+assert.match(
+  menusSource,
+  /:color="category === activeMobileCategory \? 'primary' : undefined"/,
+  'active category chip must be filled with the primary color'
+)
+assert.match(
+  menusSource,
+  /class="menu-content-row mt-5"/,
+  'menu content row must be targetable for mobile spacing'
+)
+assert.match(
+  menusSource,
+  /\.menu-content-row\s*\{[\s\S]*?margin-top:\s*0\s*!important/,
+  'mobile menu must remove the empty top spacing'
+)
 assert.match(packageJson.scripts.test, /test\/mobile-menu-categories\.test\.js/)
 
 console.log('mobile menu categories tests passed')

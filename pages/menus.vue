@@ -11,7 +11,7 @@
     >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
-    <v-row class="mt-5">
+    <v-row class="menu-content-row mt-5">
       <v-col v-if="loadPage" md="8" cols="12">
         <v-card outlined height="425px" class="overflow-y-auto">
           <Loading />
@@ -131,19 +131,21 @@
           <template v-else>
             <div class="mobile-category-view d-sm-none">
               <div class="mobile-category-bar">
-                <button
+                <v-chip
                   v-for="category in categories"
                   :key="category"
-                  type="button"
-                  class="mobile-category-tab"
-                  :class="{
-                    'mobile-category-tab--active':
-                      category === activeMobileCategory,
-                  }"
+                  class="mobile-category-chip"
+                  :color="category === activeMobileCategory ? 'primary' : undefined"
+                  :outlined="category !== activeMobileCategory"
+                  :text-color="
+                    category === activeMobileCategory ? 'white' : 'primary'
+                  "
+                  label
+                  small
                   @click="scrollToMobileCategory(category)"
                 >
                   {{ category }}
-                </button>
+                </v-chip>
               </div>
 
               <div class="mobile-category-products">
@@ -1390,8 +1392,9 @@ export default {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
   gap: 8px;
+  justify-content: flex-start;
   overflow-x: auto;
-  padding: 10px 12px;
+  padding: 8px 12px;
   position: sticky;
   top: 0;
   white-space: nowrap;
@@ -1404,23 +1407,9 @@ export default {
   display: none;
 }
 
-.mobile-category-tab {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: var(--v-primary-base);
-  cursor: pointer;
+.mobile-category-chip {
   flex: 0 0 auto;
-  font-size: 0.88rem;
   font-weight: 600;
-  line-height: 1.2;
-  min-height: 34px;
-  padding: 0 12px;
-}
-
-.mobile-category-tab--active {
-  background: var(--v-primary-base);
-  color: #fff;
 }
 
 .mobile-category-products {
@@ -1542,6 +1531,10 @@ export default {
 }
 
 @media (max-width: 599px) {
+  .menu-content-row {
+    margin-top: 0 !important;
+  }
+
   .product-grid {
     --product-card-min-width: 145px;
     gap: 8px;
