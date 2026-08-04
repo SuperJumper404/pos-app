@@ -128,15 +128,28 @@
             </div>
           </div>
 
-          <v-expansion-panels v-else>
-            <v-expansion-panel v-for="(category, i) in categories" :key="i">
-              <v-expansion-panel-header
-                ><h3>{{ category }}</h3></v-expansion-panel-header
-              >
-              <v-expansion-panel-content>
+          <template v-else>
+            <div class="mobile-category-view d-sm-none">
+              <div class="mobile-category-bar">
+                <button
+                  v-for="category in categories"
+                  :key="category"
+                  type="button"
+                  class="mobile-category-tab"
+                  :class="{
+                    'mobile-category-tab--active':
+                      category === activeMobileCategory,
+                  }"
+                  @click="setActiveMobileCategory(category)"
+                >
+                  {{ category }}
+                </button>
+              </div>
+
+              <div class="mobile-category-products pa-3">
                 <div class="product-grid">
                   <div
-                    v-for="items in getProductPerCategorie(category)"
+                    v-for="items in getProductPerCategorie(activeMobileCategory)"
                     :key="items.id"
                     class="product-grid-col"
                   >
@@ -212,9 +225,99 @@
                     </v-card>
                   </div>
                 </div>
-              </v-expansion-panel-content>
-            </v-expansion-panel>
-          </v-expansion-panels>
+              </div>
+            </div>
+
+            <v-expansion-panels class="d-none d-sm-block">
+              <v-expansion-panel v-for="(category, i) in categories" :key="i">
+                <v-expansion-panel-header
+                  ><h3>{{ category }}</h3></v-expansion-panel-header
+                >
+                <v-expansion-panel-content>
+                  <div class="product-grid">
+                    <div
+                      v-for="items in getProductPerCategorie(category)"
+                      :key="items.id"
+                      class="product-grid-col"
+                    >
+                      <v-card
+                        hover
+                        outlined
+                        class="d-flex flex-column product-card product-clickable"
+                        @click="openProductPreview(items)"
+                      >
+                        <!-- Image -->
+                        <v-img
+                          :src="productImageSrc(items.image)"
+                          :aspect-ratio="4 / 3"
+                          class="product-card-image rounded-t"
+                          @click.stop="openProductPreview(items)"
+                        />
+
+                        <!-- Title -->
+                        <v-card-title class="product-card-title py-2 pb-0 mb-0">
+                          <div class="product-card-title-text font-weight-bold">
+                            {{ items.name }}
+                          </div>
+                        </v-card-title>
+
+                        <!-- Text -->
+                        <v-card-text class="product-card-content pt-0 mb-0 pb-1">
+                          <div class="text--secondary line-clamp-2">
+                            {{ items.description }}
+                          </div>
+
+                          <div class="product-card-price font-weight-bold">
+                            <span
+                              v-if="
+                                items.minimum_commandable_price != null &&
+                                parsePrice(items.minimum_commandable_price) >
+                                  parsePrice(items.price)
+                              "
+                            >
+                              À partir de
+                              {{
+                                formatCurrency(items.minimum_commandable_price)
+                              }}
+                            </span>
+                            <span v-else>{{
+                              formatCurrency(items.price)
+                            }}</span>
+                          </div>
+                          <div
+                            v-if="items.customization_available === false"
+                            class="error--text text-caption mt-1"
+                          >
+                            {{ customizationUnavailableReason(items) }}
+                          </div>
+                        </v-card-text>
+
+                        <!-- Actions always bottom -->
+                        <v-card-actions
+                          class="product-card-actions px-4 pt-1 pb-3"
+                        >
+                          <v-btn
+                            color="success"
+                            small
+                            block
+                            :disabled="
+                              (isKitchenClosed && !isOrderEditActive) ||
+                              items.customization_available === false
+                            "
+                            class="text-none font-weight-bold"
+                            @click.stop="addToCart(items)"
+                          >
+                            <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
+                            Ajouter
+                          </v-btn>
+                        </v-card-actions>
+                      </v-card>
+                    </div>
+                  </div>
+                </v-expansion-panel-content>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </template>
         </v-card>
         <!-- <pre type="json">{{ dataProduct }}</pre> -->
         <!-- <v-card outlined max-height="150px;">
@@ -585,6 +688,7 @@ export default {
     idxCart: 0,
     allowRouteLeave: false,
     productViewMode: 'categories',
+    activeMobileCategory: null,
   }),
 
   computed: {
@@ -650,6 +754,11 @@ export default {
       return this.isAdminView && this.$vuetify.breakpoint.mdAndUp
     },
   },
+  watch: {
+    categories() {
+      this.ensureActiveMobileCategory()
+    },
+  },
   async mounted() {
     this.loadPage = true
 
@@ -663,6 +772,9 @@ export default {
         this.$store.dispatch('products/getProducts'),
         this.$store.dispatch('shop/getCurrentShopInfo'),
       ])
+      if (typeof this.ensureActiveMobileCategory === 'function') {
+        this.ensureActiveMobileCategory()
+      }
       this.loadPage = false
       return
     }
@@ -704,11 +816,26 @@ export default {
       )
     }
     Promise.all(calls).finally(() => {
+      if (typeof this.ensureActiveMobileCategory === 'function') {
+        this.ensureActiveMobileCategory()
+      }
       this.loadPage = false
     })
   },
 
   methods: {
+    ensureActiveMobileCategory() {
+      if (!this.categories.length) {
+        this.activeMobileCategory = null
+        return
+      }
+      if (!this.categories.includes(this.activeMobileCategory)) {
+        this.activeMobileCategory = this.categories[0]
+      }
+    },
+    setActiveMobileCategory(category) {
+      this.activeMobileCategory = category
+    },
     restorePersistedCheckoutCart() {
       const payload = this.$store.get('cart/clientOrderPayload') || {}
       const persistedCart = Array.isArray(payload.dataCart)
@@ -1226,6 +1353,55 @@ export default {
 .cart-order-btn ::v-deep .v-btn__content {
   min-width: 0;
   white-space: nowrap;
+}
+
+.mobile-category-view {
+  background: #fff;
+}
+
+.mobile-category-bar {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  padding: 14px 16px;
+  position: sticky;
+  top: 0;
+  white-space: nowrap;
+  z-index: 3;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.mobile-category-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-category-tab {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: #13bfb5;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 0.96rem;
+  font-weight: 600;
+  line-height: 1.2;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.mobile-category-tab--active {
+  background: #13c9bd;
+  color: #fff;
+  padding: 0 22px;
+}
+
+.mobile-category-products {
+  background: #fafafa;
 }
 
 @media (min-width: 600px) and (max-width: 1263px) {
