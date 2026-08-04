@@ -46,6 +46,11 @@ assert.deepStrictEqual(
 )
 
 assert.deepStrictEqual(
+  run({ authenticated: true, access: 2, path: '/menus/', name: 'menus' }),
+  []
+)
+
+assert.deepStrictEqual(
   run({ authenticated: true, access: 3, path: '/tables', name: 'tables' }),
   ['/menus']
 )
