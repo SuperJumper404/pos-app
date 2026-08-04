@@ -137,9 +137,7 @@
                   class="mobile-category-chip"
                   :color="category === activeMobileCategory ? 'primary' : undefined"
                   :outlined="category !== activeMobileCategory"
-                  :text-color="
-                    category === activeMobileCategory ? 'white' : 'primary'
-                  "
+                  text-color="black"
                   label
                   small
                   @click="scrollToMobileCategory(category)"
@@ -1398,7 +1396,7 @@ export default {
   position: sticky;
   top: 0;
   white-space: nowrap;
-  z-index: 3;
+  z-index: 10;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -1408,8 +1406,14 @@ export default {
 }
 
 .mobile-category-chip {
+  border-color: #000 !important;
+  border-radius: 12px !important;
   flex: 0 0 auto;
   font-weight: 600;
+}
+
+.mobile-category-chip ::v-deep .v-chip {
+  border-color: #000 !important;
 }
 
 .mobile-category-products {
