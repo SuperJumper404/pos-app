@@ -487,6 +487,26 @@ assert.ok(
     customizationSummarySource.includes('Total'),
   'the shared summary must expose independent edit and total modes'
 )
+assert.match(
+  wizardSource,
+  /<v-card-title class="customization-wizard__header/,
+  'wizard header must remain outside the scrollable content'
+)
+assert.match(
+  wizardSource,
+  /<v-card-actions class="customization-wizard__footer/,
+  'wizard footer must remain outside the scrollable content'
+)
+assert.match(
+  wizardSource,
+  /\.customization-wizard\s*\{[\s\S]*?overflow:\s*hidden/,
+  'wizard card must not scroll as a whole'
+)
+assert.match(
+  wizardSource,
+  /\.customization-wizard__body\s*\{[\s\S]*?overflow-y:\s*auto/,
+  'wizard body must be the only vertical scroll area'
+)
 
 const loadComponentOptions = (source, dependencyNames, dependencies) => {
   const scriptMatch = source.match(/<script>([\s\S]*?)<\/script>/)
