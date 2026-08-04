@@ -45,13 +45,13 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /:outlined="category !== activeMobileCategory"/,
-  'inactive category chips must be outlined'
+  /:outlined="category === activeMobileCategory"/,
+  'only the active category chip must be outlined'
 )
 assert.match(
   menusSource,
-  /:color="category === activeMobileCategory \? 'primary' : undefined"/,
-  'active category chip must be filled with the primary color'
+  /:color="undefined"/,
+  'category chips must not use filled colors'
 )
 assert.match(
   menusSource,
@@ -65,8 +65,23 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip\s*::v-deep\s*\.v-chip\s*\{[\s\S]*?border-color:\s*#000\s*!important/,
-  'outlined category chips must use a black outline'
+  /\.mobile-category-chip\s*\{[\s\S]*?font-size:\s*1rem\s*!important/,
+  'category chip text must be larger'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-chip\s*\{[\s\S]*?height:\s*32px\s*!important/,
+  'category chips must be 32px high'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-chip\s*\{[\s\S]*?padding:\s*0 12px\s*!important/,
+  'category chips must use 12px horizontal padding'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-chip--active\s*::v-deep\s*\.v-chip\s*\{[\s\S]*?border-color:\s*#000\s*!important/,
+  'only the selected category chip must use a black outline'
 )
 assert.match(
   menusSource,
@@ -82,6 +97,16 @@ assert.match(
   menusSource,
   /\.menu-content-row\s*\{[\s\S]*?margin-top:\s*0\s*!important/,
   'mobile menu must remove the empty top spacing'
+)
+assert.doesNotMatch(
+  menusSource,
+  /#fafafa/,
+  'mobile menu must not use the grey #fafafa background'
+)
+assert.doesNotMatch(
+  menusSource,
+  /border-bottom:\s*1px solid rgba\(0,\s*0,\s*0,\s*0\.08\)/,
+  'mobile category bar must not render an extra card-like border'
 )
 assert.match(packageJson.scripts.test, /test\/mobile-menu-categories\.test\.js/)
 
