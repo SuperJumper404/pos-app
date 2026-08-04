@@ -150,7 +150,7 @@
                 </v-chip>
               </div>
 
-              <div class="mobile-category-products">
+              <div ref="mobileCategoryProducts" class="mobile-category-products">
                 <section
                   v-for="category in categories"
                   :key="category"
@@ -860,9 +860,19 @@ export default {
       this.$nextTick(() => {
         const target = this.$refs[`mobileCategory-${category}`]
         const element = Array.isArray(target) ? target[0] : target
-        if (element && typeof element.scrollIntoView === 'function') {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const scroller = this.$refs.mobileCategoryProducts
+        if (!element || !scroller) {
+          return
         }
+        const top =
+          element.getBoundingClientRect().top -
+          scroller.getBoundingClientRect().top +
+          scroller.scrollTop
+        if (typeof scroller.scrollTo === 'function') {
+          scroller.scrollTo({ top, behavior: 'smooth' })
+          return
+        }
+        scroller.scrollTop = top
       })
     },
     restorePersistedCheckoutCart() {
@@ -1388,7 +1398,7 @@ export default {
   background: transparent;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 56px);
+  height: calc(100vh - 56px);
   min-height: 0;
 }
 
@@ -1396,10 +1406,11 @@ export default {
   align-items: center;
   background: transparent;
   display: flex;
-  gap: 8px;
+  flex: 0 0 auto;
+  gap: 18px;
   justify-content: flex-start;
   overflow-x: auto;
-  padding: 8px 12px;
+  padding: 14px 16px;
   white-space: nowrap;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -1414,7 +1425,7 @@ export default {
   flex: 0 0 auto;
   font-size: 1rem !important;
   font-weight: 600;
-  height: 32px !important;
+  min-height: 32px !important;
   padding: 0 12px !important;
 }
 

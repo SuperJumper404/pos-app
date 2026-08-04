@@ -38,6 +38,16 @@ assert.match(
   /scrollToMobileCategory\(category\)/,
   'mobile category tabs must scroll to the selected category section'
 )
+assert.doesNotMatch(
+  menusSource,
+  /scrollIntoView/,
+  'mobile category navigation must not scroll the whole page'
+)
+assert.match(
+  menusSource,
+  /ref="mobileCategoryProducts"/,
+  'mobile products scroller must be addressable for category navigation'
+)
 assert.match(
   menusSource,
   /<v-chip[\s\S]*?mobile-category-chip/,
@@ -70,8 +80,23 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip\s*\{[\s\S]*?height:\s*32px\s*!important/,
-  'category chips must be 32px high'
+  /\.mobile-category-bar\s*\{[\s\S]*?flex:\s*0 0 auto/,
+  'mobile category bar must remain fixed above the product scroller'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-bar\s*\{[\s\S]*?padding:\s*14px 16px/,
+  'mobile category bar must keep spacious padding'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-bar\s*\{[\s\S]*?gap:\s*18px/,
+  'mobile category bar must keep spacious chip gaps'
+)
+assert.match(
+  menusSource,
+  /\.mobile-category-chip\s*\{[\s\S]*?min-height:\s*32px\s*!important/,
+  'category chips must be at least 32px high'
 )
 assert.match(
   menusSource,
