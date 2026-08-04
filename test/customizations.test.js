@@ -448,6 +448,14 @@ const customizationSummarySource = fs.readFileSync(
   customizationSummaryPath,
   'utf8'
 )
+const menusPageSource = fs.readFileSync(
+  path.join(__dirname, '..', 'pages', 'menus.vue'),
+  'utf8'
+)
+const cartPageSource = fs.readFileSync(
+  path.join(__dirname, '..', 'pages', 'cart.vue'),
+  'utf8'
+)
 
 assert.ok(
   choiceCardSource.includes("this.$emit('toggle', this.choiceId)"),
@@ -506,6 +514,21 @@ assert.match(
   wizardSource,
   /\.customization-wizard__body\s*\{[\s\S]*?overflow-y:\s*auto/,
   'wizard body must be the only vertical scroll area'
+)
+assert.match(
+  menusPageSource,
+  /content-class="customization-dialog"/,
+  'menu customization dialog must use the fixed wizard dialog container'
+)
+assert.match(
+  cartPageSource,
+  /content-class="customization-dialog"/,
+  'cart customization dialog must use the fixed wizard dialog container'
+)
+assert.match(
+  wizardSource,
+  /\.customization-dialog\s*\{[\s\S]*?overflow:\s*hidden/,
+  'wizard dialog container must not scroll'
 )
 
 const loadComponentOptions = (source, dependencyNames, dependencies) => {
@@ -1404,14 +1427,6 @@ const applyCartStateDispatch = (state, type, payload) => {
   state[type.slice(4)] = payload
 }
 
-const menusPageSource = fs.readFileSync(
-  path.join(__dirname, '../pages/menus.vue'),
-  'utf8'
-)
-const cartPageSource = fs.readFileSync(
-  path.join(__dirname, '../pages/cart.vue'),
-  'utf8'
-)
 const axiosPluginSource = fs.readFileSync(
   path.join(__dirname, '../plugins/axios.js'),
   'utf8'
