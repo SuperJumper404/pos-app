@@ -1,10 +1,9 @@
 import colors from 'vuetify/es5/util/colors'
-const config = require('./config/config.json')
-console.log(config)
+import config from './config/config.json'
+
 function getHost() {
   const env = process.env.ENV
-  let currentEnvConfig = config.environments[env]
-  console.log(currentEnvConfig)
+  const currentEnvConfig = config.environments[env]
   return currentEnvConfig
 }
 
@@ -14,13 +13,13 @@ export default {
   server: {
     host: getHost().frontEndPoint,
     port: 8083, // default: localhost or IP_ADRESSE 192.168.1.139
-    //host: '192.168.1.139', // default: localhost or IP_ADRESSE 192.168.1.139
-    //  host: '127.0.0.1' // default: localhost or IP_ADRESSE 192.168.1.139
+    // host: '192.168.1.139', // default: localhost or IP_ADRESSE 192.168.1.139
+    // host: '127.0.0.1' // default: localhost or IP_ADRESSE 192.168.1.139
   },
   ssr: false,
   target: 'static',
   generate: {
-    //subFolders: false
+    // subFolders: false
   },
   head: {
     titleTemplate: 'Smart Eat',
@@ -105,6 +104,7 @@ export default {
     'vue-advanced-cropper/dist/style.css',
   ],
   plugins: [
+    { src: '~/plugins/consoleLogs.client.js', ssr: false },
     { src: '~/plugins/persistedState.client.js', srr: false },
     { src: '~/plugins/axios.js' },
   ],
@@ -119,12 +119,12 @@ export default {
     proxy: false,
     baseURL: `${getHost().backEndPoint}`,
   },
-  /*proxy: {
+  /* proxy: {
     '/baseurl': {
       target: `${getHost().backEndPoint}`,
       pathRewrite: { '^/baseurl': '' },
     },
-  },*/
+  }, */
   vuetify: {
     // customVariables: ['~/assets/variables.scss'],
     theme: {
@@ -156,11 +156,5 @@ export default {
       },
     },
   },
-  build: {
-    splitChunks: {
-      layouts: false,
-      pages: false,
-      commons: false,
-    },
-  },
+  build: {},
 }
