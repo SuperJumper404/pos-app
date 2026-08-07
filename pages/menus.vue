@@ -162,7 +162,7 @@
                   </h3>
                   <div class="product-grid">
                   <div
-                    v-for="items in getProductPerCategorie(category)"
+                    v-for="items in productsByCategory[category] || []"
                     :key="items.id"
                     class="product-grid-col"
                   >
@@ -250,7 +250,7 @@
                 <v-expansion-panel-content>
                   <div class="product-grid">
                     <div
-                      v-for="items in getProductPerCategorie(category)"
+                      v-for="items in productsByCategory[category] || []"
                       :key="items.id"
                       class="product-grid-col"
                     >
@@ -712,22 +712,24 @@ export default {
 
   computed: {
     categories() {
-      console.log('dataProduct', this.$store.get('products/dataProduct'))
       const items = this.dataProduct.map((x) => x.category)
       return [...new Set(items)]
     },
     staticURL() {
-      console.log(
-        'Static URL',
-        this.$store.get('staticURL').replace(/\/+$/, '')
-      )
-      console.log('Static URL', this.$store)
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
     dataProduct() {
       return this.$store
         .get('products/dataProduct')
         .filter((x) => x.archived === 0 && !this.isProductHidden(x))
+    },
+    productsByCategory() {
+      return this.dataProduct.reduce((groups, product) => {
+        const category = product.category
+        if (!groups[category]) groups[category] = []
+        groups[category].push(product)
+        return groups
+      }, {})
     },
     totalPage() {
       return this.$store.get('products/totalPage')
@@ -981,11 +983,6 @@ export default {
     },
     toggleProductViewMode() {
       this.productViewMode = this.isLargeProductView ? 'categories' : 'all'
-    },
-    getProductPerCategorie(category) {
-      return this.dataProduct.filter(function (x) {
-        return x.category === category
-      })
     },
     isProductHidden(product) {
       return [true, 1, '1'].includes(product.is_hidden)

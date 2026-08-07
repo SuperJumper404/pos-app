@@ -29,11 +29,11 @@
           <v-list-item-action>
             <v-icon>{{ item.icon }}</v-icon>
           </v-list-item-action>
-          <v-list-item-content>
+          <v-list-item-content v-if="!miniVariant">
             <v-list-item-title class="d-flex align-center">
               <span>{{ item.title }}</span>
               <v-avatar
-                v-if="item.routeName === 'orders' && pendingOrderCount > 0"
+                v-if="!miniVariant && item.routeName === 'orders' && pendingOrderCount > 0"
                 color="primary"
                 size="26"
                 class="ml-3 flex-shrink-0"
@@ -65,8 +65,12 @@
       <v-btn v-if="idUser.access === 0" icon @click="previousPage()">
         <v-icon>mdi-chevron-left</v-icon>
       </v-btn>
-      <v-btn v-if="idUser.access === 0" icon @click.stop="clipped = !clipped">
-        <v-icon>{{ currentPage.icon }}</v-icon>
+      <v-btn
+        v-if="idUser.access === 0"
+        icon
+        @click.stop="miniVariant = !miniVariant"
+      >
+        <v-icon>{{ miniVariant ? 'mdi-menu-open' : currentPage.icon }}</v-icon>
       </v-btn>
 
       <v-toolbar-title>{{ currentPage.title }}</v-toolbar-title>
