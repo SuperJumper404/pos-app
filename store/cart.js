@@ -9,6 +9,9 @@ const {
   buildCheckoutItems,
   buildCheckoutPayloadSignature,
 } = require('../helpers/customizations')
+const {
+  buildCounterPayBeforePayment,
+} = require('../helpers/counterCheckout')
 const { roundPrice } = require('../helpers/price-functions')
 
 const readStoredOrdersSent = () => {
@@ -260,6 +263,13 @@ export const actions = {
       dispatch('set/message', checkoutError.message)
       return { ok: false, data: null, error: checkoutError }
     }
+  },
+  checkoutCounterPayBefore({ dispatch }, params = {}) {
+    return dispatch('checkoutOrder', {
+      ...params,
+      payment: buildCounterPayBeforePayment(params.payment),
+      stripe: false,
+    })
   },
   abandonCheckout({ state, dispatch }, options = {}) {
     if (

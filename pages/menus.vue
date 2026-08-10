@@ -1,5 +1,5 @@
 <template>
-  <v-container>
+  <v-container :class="{ 'menu-page-container--express': isLargeProductView }">
     <v-alert :value="alert" :type="alertType" dismissible>{{
       alertText
     }}</v-alert>
@@ -11,13 +11,16 @@
     >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
-    <v-row class="menu-content-row mt-5">
-      <v-col v-if="loadPage" md="8" cols="12">
+    <v-row
+      class="menu-content-row mt-5"
+      :class="{ 'menu-content-row--express': isLargeProductView }"
+    >
+      <v-col v-if="loadPage" sm="7" md="8" cols="12">
         <v-card outlined height="425px" class="overflow-y-auto">
           <Loading />
         </v-card>
       </v-col>
-      <v-col v-else md="8" cols="12">
+      <v-col v-else sm="7" md="8" cols="12">
         <v-card
           v-if="dataProduct.length === 0"
           outlined
@@ -36,12 +39,12 @@
           >
             <div>
               <div class="text-subtitle-1 font-weight-bold">
-                {{ isLargeProductView ? 'Tous les produits' : 'Produits par catégorie' }}
+                {{ isLargeProductView ? 'Vue express' : 'Produits par catégorie' }}
               </div>
               <div class="text-caption text--secondary">
                 {{
                   isLargeProductView
-                    ? 'Vue grand format pour parcourir toute la carte.'
+                    ? 'Prise de commande et encaissement sur le même écran.'
                     : 'Vue organisée par catégories.'
                 }}
               </div>
@@ -53,77 +56,89 @@
               @click="toggleProductViewMode"
             >
               <v-icon left>
-                {{ isLargeProductView ? 'mdi-format-list-group' : 'mdi-view-grid-plus' }}
+                {{ isLargeProductView ? 'mdi-format-list-group' : 'mdi-lightning-bolt' }}
               </v-icon>
               {{
                 isLargeProductView
-                  ? 'Vue par catégories'
-                  : 'Vue grand écran'
+                  ? 'Vue classique'
+                  : 'Vue express'
               }}
             </v-btn>
           </v-card-title>
 
-          <div v-if="isLargeProductView" class="pa-4 pt-2">
-            <div class="product-grid product-grid--large">
-              <div
-                v-for="items in dataProduct"
-                :key="items.id"
-                class="product-grid-col"
+          <div v-if="isLargeProductView" class="express-workspace">
+            <div class="express-category-bar">
+              <v-btn
+                v-for="category in categories"
+                :key="category"
+                depressed
+                class="express-category-btn text-none"
+                :color="
+                  category === activeExpressCategory
+                    ? 'primary'
+                    : 'grey lighten-3'
+                "
+                :dark="category === activeExpressCategory"
+                @click="setExpressCategory(category)"
               >
-                <v-card
-                  hover
-                  outlined
-                  class="
-                    d-flex
-                    flex-column
-                    product-card
-                    product-card--compact
-                    product-clickable
-                  "
-                  @click="openProductPreview(items)"
+                {{ category }}
+              </v-btn>
+            </div>
+            <div class="express-products-scroll">
+              <div class="product-grid product-grid--large">
+                <div
+                  v-for="items in expressProducts"
+                  :key="items.id"
+                  class="product-grid-col"
                 >
-                  <v-img
-                    :src="productImageSrc(items.image)"
-                    :aspect-ratio="1"
-                    class="product-card-image rounded-t"
-                    @click.stop="openProductPreview(items)"
-                  />
-
-                  <v-card-title class="product-card-title py-2 pb-0 mb-0">
-                    <div class="product-card-title-text font-weight-bold">
-                      {{ items.name }}
-                    </div>
-                  </v-card-title>
-
-                  <v-card-text class="product-card-content pt-0 mb-0 pb-2">
-                    <div class="text-caption text--secondary mb-1">
-                      {{ items.category }}
-                    </div>
-                    <div
-                      v-if="items.customization_available === false"
-                      class="error--text text-caption mt-1"
-                    >
-                      {{ customizationUnavailableReason(items) }}
-                    </div>
-                  </v-card-text>
-
-                  <v-card-actions class="product-card-actions px-4 pt-1 pb-3">
-                    <v-btn
-                      color="success"
-                      small
-                      block
-                      :disabled="
-                        (isKitchenClosed && !isOrderEditActive) ||
-                        items.customization_available === false
-                      "
-                      class="text-none font-weight-bold"
+                  <v-card
+                    hover
+                    outlined
+                    class="
+                      d-flex
+                      flex-column
+                      product-card
+                      product-card--compact
+                      product-clickable
+                    "
+                    @click="addToCart(items)"
+                  >
+                    <v-img
+                      :src="productImageSrc(items.image)"
+                      :aspect-ratio="1"
+                      class="product-card-image rounded-t"
                       @click.stop="addToCart(items)"
-                    >
-                      <v-icon class="mr-1">mdi-plus-circle-outline</v-icon>
-                      Ajouter
-                    </v-btn>
-                  </v-card-actions>
-                </v-card>
+                    />
+
+                    <v-card-title class="product-card-title py-2 pb-0 mb-0">
+                      <div class="product-card-title-text font-weight-bold">
+                        {{ items.name }}
+                      </div>
+                    </v-card-title>
+
+                    <v-card-text class="product-card-content pt-0 mb-0 pb-2">
+                      <div class="product-card-price font-weight-bold">
+                        <span
+                          v-if="
+                            items.minimum_commandable_price != null &&
+                            parsePrice(items.minimum_commandable_price) >
+                              parsePrice(items.price)
+                          "
+                        >
+                          À partir de
+                          {{ formatCurrency(items.minimum_commandable_price) }}
+                        </span>
+                        <span v-else>{{ formatCurrency(items.price) }}</span>
+                      </div>
+                      <div
+                        v-if="items.customization_available === false"
+                        class="error--text text-caption mt-1"
+                      >
+                        {{ customizationUnavailableReason(items) }}
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </div>
               </div>
             </div>
           </div>
@@ -384,19 +399,24 @@
           
         </v-card> -->
       </v-col>
-      <v-col md="4" cols="12">
+      <v-col sm="5" md="4" cols="12">
         <!-- <v-col md="4" class="d-none d-sm-none d-md-block"> -->
         <v-card v-if="loadPage" outlined height="425px">
           <Loading />
         </v-card>
         <div v-else>
-          <v-card outlined height="100%" class="pa-2">
+          <v-card
+            outlined
+            height="100%"
+            class="pa-2"
+            :class="{ 'express-cart-card': isLargeProductView }"
+          >
+            <div class="express-cart-items-scroll">
             <div
               v-if="cartItem.length === 0"
-              class="text-center"
-              style="height: 300px"
+              class="express-empty-cart text-center"
             >
-              <div style="margin-top: 30px">
+              <div>
                 <v-icon size="90">mdi-room-service-outline</v-icon>
                 <p class="font-weight-bold">Votre assiette est vide !</p>
               </div>
@@ -517,8 +537,85 @@
                 </v-col>
               </v-card>
             </div>
+            </div>
+            <div
+              v-if="isLargeProductView && cartItem.length > 0"
+              class="express-checkout"
+            >
+              <div class="express-table-service-row">
+                <v-btn
+                  class="express-table-button text-none justify-start"
+                  color="grey lighten-3"
+                  depressed
+                  @click="openExpressTableDialog"
+                >
+                  <v-icon left>mdi-table-chair</v-icon>
+                  {{ selectedExpressTableName }}
+                </v-btn>
+                <v-btn
+                  class="express-service-button text-none justify-start"
+                  color="grey lighten-3"
+                  depressed
+                  @click="openExpressServiceDialog"
+                >
+                  <v-icon left>
+                    {{
+                      expressIsTakeaway
+                        ? 'mdi-shopping-outline'
+                        : 'mdi-storefront-outline'
+                    }}
+                  </v-icon>
+                  {{ expressSelectedServiceLabel }}
+                </v-btn>
+              </div>
+              <div class="express-customer-fields">
+                <v-text-field
+                  v-model="expressCustomer"
+                  dense
+                  outlined
+                  hide-details
+                  label="Client"
+                  placeholder="Optionnel"
+                  prepend-inner-icon="mdi-account-outline"
+                />
+                <v-text-field
+                  v-model="expressPhone"
+                  dense
+                  outlined
+                  hide-details
+                  label="Téléphone"
+                  placeholder="Optionnel"
+                  prepend-inner-icon="mdi-phone-outline"
+                />
+              </div>
+              <v-textarea
+                v-model="expressRemark"
+                dense
+                outlined
+                hide-details
+                rows="2"
+                auto-grow
+                label="Note commande"
+                placeholder="Optionnel"
+                prepend-inner-icon="mdi-note-text-outline"
+              />
+              <div class="express-total-row">
+                <span>Total</span>
+                <strong>{{ formatCurrency(total) }}</strong>
+              </div>
+              <v-btn
+                color="success"
+                class="express-cashout-button text-none font-weight-bold"
+                :disabled="expressSubmitDisabled"
+                depressed
+                @click="openExpressPaymentDialog"
+              >
+                <v-icon left>mdi-cash-register</v-icon>
+                Encaisser
+              </v-btn>
+            </div>
             <v-card-actions
-              v-if="cartItem.length > 0"
+              v-if="cartItem.length > 0 && !isLargeProductView"
               class="cart-order-actions"
             >
               <v-btn
@@ -595,6 +692,180 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="expressPaymentDialog" max-width="640">
+      <v-card>
+        <v-card-title>Encaisser</v-card-title>
+        <v-card-text>
+          <div class="express-payment-grid">
+            <v-btn
+              color="success"
+              class="express-payment-tile text-none font-weight-bold"
+              :disabled="expressSubmitDisabled"
+              :loading="expressPaymentLoading === 'Carte bancaire'"
+              depressed
+              @click="submitExpressPayment('Carte bancaire')"
+            >
+              <v-icon class="mb-2">mdi-credit-card-outline</v-icon>
+              <span>Carte</span>
+            </v-btn>
+            <v-btn
+              color="success"
+              class="express-payment-tile text-none font-weight-bold"
+              :disabled="expressSubmitDisabled"
+              :loading="expressPaymentLoading === 'Chèque'"
+              depressed
+              @click="submitExpressPayment('Chèque')"
+            >
+              <v-icon class="mb-2">mdi-file-document-outline</v-icon>
+              <span>Chèque</span>
+            </v-btn>
+            <v-btn
+              color="success"
+              class="express-payment-tile text-none font-weight-bold"
+              :disabled="expressSubmitDisabled"
+              :loading="expressPaymentLoading === 'Espèces'"
+              depressed
+              @click="submitExpressPayment('Espèces')"
+            >
+              <v-icon class="mb-2">mdi-cash</v-icon>
+              <span>Espèces</span>
+            </v-btn>
+            <v-btn
+              color="primary"
+              class="express-payment-tile text-none font-weight-bold"
+              :disabled="expressSubmitDisabled"
+              :loading="expressPaymentLoading === 'Paiement au comptoir'"
+              depressed
+              @click="submitExpressPayLater"
+            >
+              <v-icon class="mb-2">mdi-clock-outline</v-icon>
+              <span>Payer plus tard</span>
+            </v-btn>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pt-0">
+          <v-spacer />
+          <v-btn text class="text-none" @click="expressPaymentDialog = false">
+            Retour
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="expressReceiptDialog" max-width="560" persistent>
+      <v-card>
+        <v-card-title>Ticket de caisse</v-card-title>
+        <v-card-text>
+          <div class="express-receipt-grid">
+            <v-btn
+              class="express-receipt-tile text-none"
+              color="primary"
+              :disabled="expressReceiptPrinting"
+              depressed
+              dark
+              @click="confirmExpressReceipt(true)"
+            >
+              <template v-if="expressReceiptPrinting">
+                <v-icon class="mb-2 mdi-spin">mdi-loading</v-icon>
+                <span>Impression...</span>
+              </template>
+              <template v-else>
+                <v-icon class="mb-2">mdi-printer-outline</v-icon>
+                <span>Imprimer ticket</span>
+              </template>
+            </v-btn>
+            <v-btn
+              class="express-receipt-tile text-none"
+              color="grey lighten-3"
+              depressed
+              @click="confirmExpressReceipt(false)"
+            >
+              <v-icon class="mb-2">mdi-receipt-text-remove-outline</v-icon>
+              <span>Pas de ticket</span>
+            </v-btn>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pt-0">
+          <v-spacer />
+          <v-btn
+            text
+            class="text-none"
+            @click="expressReceiptDialog = false"
+          >
+            Retour
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="expressTableDialog" max-width="720">
+      <v-card>
+        <v-card-title>Choisir la table</v-card-title>
+        <v-card-text>
+          <div class="express-table-grid">
+            <v-btn
+              v-for="table in dataTables"
+              :key="table.id"
+              class="express-table-tile text-none"
+              :color="
+                String(expressSelectedTable) === String(table.id)
+                  ? 'primary'
+                  : 'grey lighten-3'
+              "
+              :dark="String(expressSelectedTable) === String(table.id)"
+              depressed
+              @click="selectExpressTable(table)"
+            >
+              <v-icon class="mb-2">mdi-table-chair</v-icon>
+              <span>{{ table.username }}</span>
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="expressServiceDialog" max-width="560">
+      <v-card>
+        <v-card-title>Sur place ou à emporter</v-card-title>
+        <v-card-text>
+          <div class="express-service-grid">
+            <v-btn
+              class="express-service-tile text-none"
+              :class="{ 'express-service-tile--active': !expressIsTakeaway }"
+              :color="!expressIsTakeaway ? 'primary' : 'grey lighten-3'"
+              :dark="!expressIsTakeaway"
+              depressed
+              @click="selectExpressService(false)"
+            >
+              <v-icon class="mb-2">mdi-storefront-outline</v-icon>
+              <span>
+                Sur place
+                <small v-if="!expressIsTakeaway" class="express-choice-state">
+                  Choisi
+                </small>
+              </span>
+            </v-btn>
+            <v-btn
+              class="express-service-tile text-none"
+              :class="{ 'express-service-tile--active': expressIsTakeaway }"
+              :color="expressIsTakeaway ? 'primary' : 'grey lighten-3'"
+              :dark="expressIsTakeaway"
+              depressed
+              @click="selectExpressService(true)"
+            >
+              <v-icon class="mb-2">mdi-shopping-outline</v-icon>
+              <span>
+                À emporter
+                <small v-if="expressIsTakeaway" class="express-choice-state">
+                  Choisi
+                </small>
+              </span>
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
     <v-dialog
       v-model="customizationDialog"
       content-class="customization-dialog"
@@ -649,6 +920,10 @@ import {
   mergeConfiguredCartLine,
   replaceConfiguredCartLine,
 } from '@/helpers/customizations'
+import {
+  buildCashierReceiptPayload,
+  sendCashierReceipt,
+} from '@/helpers/cashierReceipt'
 // import * as config from '@/nuxt.config'
 export default {
   components: {
@@ -708,6 +983,19 @@ export default {
     allowRouteLeave: false,
     productViewMode: 'categories',
     activeMobileCategory: null,
+    activeExpressCategory: null,
+    expressSelectedTable: parseInt(localStorage.getItem('idUser')),
+    expressCustomer: '',
+    expressPhone: '',
+    expressRemark: '',
+    expressIsTakeaway: false,
+    expressPaymentLoading: null,
+    expressPaymentDialog: false,
+    expressReceiptDialog: false,
+    expressReceiptPrinting: false,
+    expressTableDialog: false,
+    expressServiceDialog: false,
+    pendingExpressPaymentMethod: null,
   }),
 
   computed: {
@@ -722,6 +1010,9 @@ export default {
       return this.$store
         .get('products/dataProduct')
         .filter((x) => x.archived === 0 && !this.isProductHidden(x))
+    },
+    dataTables() {
+      return this.$store.get('tables/dataTables') || []
     },
     productsByCategory() {
       return this.dataProduct.reduce((groups, product) => {
@@ -741,6 +1032,17 @@ export default {
       return [true, 1, '1', 'true'].includes(
         this.$store.get('shop/kitchen_closed')
       )
+    },
+    shopInfo() {
+      return {
+        shop_name: this.$store.get('shop/shop_name'),
+        shop_adress: this.$store.get('shop/shop_adress'),
+        shop_siret: this.$store.get('shop/shop_siret'),
+        shop_phone: this.$store.get('shop/shop_phone'),
+        shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
+        smart_print_app: this.$store.get('shop/smart_print_app'),
+        activate_tva: this.$store.get('shop/activate_tva'),
+      }
     },
     clientOrderStatus() {
       return this.$store.get('cart/clientOrderStatus') || 'idle'
@@ -774,10 +1076,41 @@ export default {
     canUseLargeProductView() {
       return this.isAdminView && this.$vuetify.breakpoint.mdAndUp
     },
+    expressProducts() {
+      if (!this.activeExpressCategory) return this.dataProduct
+      return this.dataProduct.filter(
+        (product) => product.category === this.activeExpressCategory
+      )
+    },
+    selectedExpressTable() {
+      return (
+        this.dataTables.find((table) => {
+          return String(table.id) === String(this.expressSelectedTable)
+        }) || null
+      )
+    },
+    selectedExpressTableName() {
+      if (this.selectedExpressTable) return this.selectedExpressTable.username
+      return 'Choisir une table'
+    },
+    expressSelectedServiceLabel() {
+      return this.expressIsTakeaway ? 'À emporter' : 'Sur place'
+    },
+    expressSubmitDisabled() {
+      return (
+        this.isKitchenClosed ||
+        this.expressPaymentLoading !== null ||
+        this.cartItem.length === 0 ||
+        !this.expressSelectedTable
+      )
+    },
   },
   watch: {
     categories() {
       this.ensureActiveMobileCategory()
+      if (typeof this.ensureActiveExpressCategory === 'function') {
+        this.ensureActiveExpressCategory()
+      }
     },
   },
   async mounted() {
@@ -792,9 +1125,13 @@ export default {
       await Promise.all([
         this.$store.dispatch('products/getProducts'),
         this.$store.dispatch('shop/getCurrentShopInfo'),
+        this.$store.dispatch('tables/getAllTables'),
       ])
       if (typeof this.ensureActiveMobileCategory === 'function') {
         this.ensureActiveMobileCategory()
+      }
+      if (typeof this.ensureActiveExpressCategory === 'function') {
+        this.ensureActiveExpressCategory()
       }
       this.loadPage = false
       return
@@ -828,6 +1165,7 @@ export default {
     const calls = [
       this.$store.dispatch('products/getProducts'),
       this.$store.dispatch('shop/getCurrentShopInfo'),
+      this.$store.dispatch('tables/getAllTables'),
     ]
     if (!Array.isArray(existingCart) || existingCart.length === 0) {
       calls.push(
@@ -839,6 +1177,9 @@ export default {
     Promise.all(calls).finally(() => {
       if (typeof this.ensureActiveMobileCategory === 'function') {
         this.ensureActiveMobileCategory()
+      }
+      if (typeof this.ensureActiveExpressCategory === 'function') {
+        this.ensureActiveExpressCategory()
       }
       this.loadPage = false
     })
@@ -983,6 +1324,40 @@ export default {
     },
     toggleProductViewMode() {
       this.productViewMode = this.isLargeProductView ? 'categories' : 'all'
+    },
+    ensureActiveExpressCategory() {
+      if (!this.categories.length) {
+        this.activeExpressCategory = null
+        return
+      }
+      if (!this.categories.includes(this.activeExpressCategory)) {
+        this.activeExpressCategory = this.categories[0]
+      }
+    },
+    setExpressCategory(category) {
+      this.activeExpressCategory = category
+    },
+    openExpressTableDialog() {
+      this.expressTableDialog = true
+    },
+    openExpressServiceDialog() {
+      this.expressServiceDialog = true
+    },
+    openExpressPaymentDialog() {
+      if (this.expressSubmitDisabled) return
+      this.expressPaymentDialog = true
+    },
+    selectExpressTable(table) {
+      if (!table) return
+      this.expressSelectedTable = table.id
+      this.expressTableDialog = false
+    },
+    selectExpressService(value) {
+      this.setExpressTakeaway(value)
+      this.expressServiceDialog = false
+    },
+    setExpressTakeaway(value) {
+      this.expressIsTakeaway = value === true
     },
     isProductHidden(product) {
       return [true, 1, '1'].includes(product.is_hidden)
@@ -1154,6 +1529,145 @@ export default {
       this.allowRouteLeave = true
       this.openCart()
     },
+    clearMenuCart() {
+      this.cartItem = []
+      this.total = 0
+      this.idxCart = 0
+      this.$store.dispatch('cart/setTotal', 0)
+      this.$store.dispatch('cart/setIndex', 0)
+      this.$store.dispatch('cart/setTocart', null)
+    },
+    submitExpressPayment(paymentMethod) {
+      if (this.expressSubmitDisabled) return
+      this.pendingExpressPaymentMethod = paymentMethod
+      this.expressPaymentDialog = false
+      this.expressReceiptDialog = true
+    },
+    async submitExpressPayLater() {
+      if (this.expressSubmitDisabled) return
+      const paymentMethod = 'Paiement au comptoir'
+      this.expressPaymentDialog = false
+      this.expressPaymentLoading = paymentMethod
+      const result = await this.$store.dispatch('cart/checkoutOrder', {
+        customer: String(this.expressCustomer || '').trim() || 'Client comptoir',
+        customerID: this.expressSelectedTable,
+        total: this.roundPrice(this.total),
+        payment: 'Paiement au comptoir',
+        remark: this.buildExpressRemark(),
+        phone: String(this.expressPhone || '').trim(),
+        isTakeaway: this.expressIsTakeaway,
+        dataCart: this.cartItem,
+        stripe: false,
+      })
+      this.expressPaymentLoading = null
+      if (!result || !result.ok) {
+        const message =
+          result && result.error && result.error.message
+            ? result.error.message
+            : 'Impossible d’envoyer la commande.'
+        this.showAlert(message, 'error')
+        return
+      }
+      this.clearMenuCart()
+      this.expressCustomer = ''
+      this.expressPhone = ''
+      this.expressRemark = ''
+      this.expressIsTakeaway = false
+      this.$store.dispatch(
+        'notifications/success',
+        'Commande envoyée, paiement à encaisser plus tard.'
+      )
+    },
+    buildExpressRemark() {
+      const remarks = []
+      const orderNote = String(this.expressRemark || '').trim()
+      if (orderNote) remarks.push(orderNote)
+      return remarks.join('\n')
+    },
+    async printExpressReceipt(result, paymentMethod) {
+      const orderId = result && result.data && result.data.orderId
+      if (!orderId) {
+        throw new Error('La commande est introuvable pour l’impression.')
+      }
+
+      const [orderLoaded, detailsLoaded] = await Promise.all([
+        this.$store.dispatch('orders/getAllOrder'),
+        this.$store.dispatch('orders/getDetailOrder', orderId),
+      ])
+      if (!orderLoaded || !detailsLoaded) {
+        throw new Error('Impossible de récupérer les données du ticket.')
+      }
+
+      const orders = this.$store.get('orders/dataOrders') || []
+      const order = orders.find((item) => String(item.id) === String(orderId))
+      if (!order) {
+        throw new Error('La commande créée est introuvable.')
+      }
+
+      const payload = buildCashierReceiptPayload({
+        order,
+        details: this.$store.get('orders/detailOrder') || [],
+        shopInfo: this.shopInfo,
+        fallbackPaymentMethod: paymentMethod,
+        fallbackCustomer:
+          String(this.expressCustomer || '').trim() || 'Client comptoir',
+        fallbackTable: this.selectedExpressTableName,
+        fallbackRemark: this.expressRemark,
+      })
+
+      return sendCashierReceipt({
+        payload,
+        smartPrint: this.shopInfo.smart_print_app,
+        printerIp: this.shopInfo.shop_printer_ip,
+        dispatch: this.$store.dispatch,
+      })
+    },
+    async confirmExpressReceipt(wantsReceipt) {
+      if (this.expressReceiptPrinting) return
+      const paymentMethod = this.pendingExpressPaymentMethod
+      if (wantsReceipt) {
+        this.expressReceiptPrinting = true
+      }
+      this.expressReceiptDialog = false
+      this.pendingExpressPaymentMethod = null
+      if (!paymentMethod || this.expressSubmitDisabled) {
+        this.expressReceiptPrinting = false
+        return
+      }
+      this.expressPaymentLoading = paymentMethod
+      const result = await this.$store.dispatch('cart/checkoutCounterPayBefore', {
+        customer: String(this.expressCustomer || '').trim() || 'Client comptoir',
+        customerID: this.expressSelectedTable,
+        total: this.roundPrice(this.total),
+        payment: paymentMethod,
+        remark: this.buildExpressRemark(),
+        phone: String(this.expressPhone || '').trim(),
+        isTakeaway: this.expressIsTakeaway,
+        dataCart: this.cartItem,
+      })
+      if (result && result.ok && wantsReceipt) {
+        this.printExpressReceipt(result, paymentMethod).catch(() => {})
+      }
+      this.expressPaymentLoading = null
+      this.expressReceiptPrinting = false
+      if (!result || !result.ok) {
+        const message =
+          result && result.error && result.error.message
+            ? result.error.message
+            : 'Impossible d’envoyer la commande.'
+        this.showAlert(message, 'error')
+        return
+      }
+      this.clearMenuCart()
+      this.expressCustomer = ''
+      this.expressPhone = ''
+      this.expressRemark = ''
+      this.expressIsTakeaway = false
+      this.$store.dispatch(
+        'notifications/success',
+        'Commande encaissée et envoyée en attente.'
+      )
+    },
     async btnCancel() {
       if (this.isOrderEditActive) {
         if (this.embeddedOrderEdit) {
@@ -1169,9 +1683,7 @@ export default {
         this.$router.push(`/orders/detail/${orderId}`)
         return
       }
-      this.cartItem = []
-      this.$store.dispatch('cart/setTotal', 0)
-      this.$store.dispatch('cart/setIndex', 0)
+      this.clearMenuCart()
     },
     pageProduct() {
       this.$store.dispatch('products/getProducts')
@@ -1215,6 +1727,50 @@ export default {
 .product-grid--large {
   --product-card-min-width: 130px;
   gap: 8px;
+}
+
+.menu-page-container--express {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.menu-content-row--express {
+  margin-top: 0 !important;
+}
+
+.express-workspace {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 126px);
+  min-height: 520px;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.express-category-bar {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 14px;
+  white-space: nowrap;
+}
+
+.express-products-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.express-category-btn {
+  border-radius: 8px !important;
+  flex: 0 0 auto;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  min-height: 48px !important;
+  padding-left: 18px !important;
+  padding-right: 18px !important;
 }
 
 .product-grid-col {
@@ -1368,6 +1924,29 @@ export default {
   width: 34px !important;
 }
 
+.express-empty-cart {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 360px;
+  padding: 28px 12px;
+}
+
+.express-cart-card {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 126px) !important;
+  min-height: 520px;
+  overflow: hidden;
+}
+
+.express-cart-items-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
 .cart-order-actions {
   display: flex;
   gap: 8px;
@@ -1389,6 +1968,190 @@ export default {
 .cart-order-btn ::v-deep .v-btn__content {
   min-width: 0;
   white-space: nowrap;
+}
+
+.express-checkout {
+  border-top: 1px solid #eeeeee;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 14px;
+  padding: 16px 8px 8px;
+}
+
+.express-table-button {
+  flex: 1 1 0;
+  min-height: 58px !important;
+  min-width: 0 !important;
+}
+
+.express-service-button {
+  flex: 1 1 0;
+  min-height: 58px !important;
+  min-width: 0 !important;
+}
+
+.express-table-service-row {
+  display: flex;
+  gap: 12px;
+}
+
+.express-customer-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.express-choice-row,
+.express-payment-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.express-choice-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.express-choice-row--modal {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.express-payment-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.express-choice-btn {
+  min-height: 58px !important;
+  min-width: 0 !important;
+}
+
+.express-choice-btn--active {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.42) !important;
+}
+
+.express-choice-state {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+
+.express-total-row {
+  align-items: center;
+  background: #f5f5f5;
+  border-radius: 8px;
+  display: flex;
+  font-size: 1rem;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 0 14px;
+}
+
+.express-total-row strong {
+  font-size: 1.25rem;
+}
+
+.express-payment-grid ::v-deep .v-btn {
+  min-height: 62px !important;
+  min-width: 0 !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.express-cashout-button {
+  min-height: 64px !important;
+  min-width: 0 !important;
+}
+
+.express-payment-tile {
+  border-radius: 8px !important;
+  flex-direction: column;
+  font-size: 1.05rem !important;
+  height: 112px !important;
+  min-width: 0 !important;
+}
+
+.express-payment-tile ::v-deep .v-btn__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  white-space: normal;
+}
+
+.express-payment-grid ::v-deep .v-btn__content,
+.express-choice-btn ::v-deep .v-btn__content,
+.express-service-tile ::v-deep .v-btn__content {
+  min-width: 0;
+  white-space: normal;
+}
+
+.express-table-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+}
+
+.express-service-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.express-service-tile {
+  border-radius: 8px !important;
+  flex-direction: column;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  height: 118px !important;
+  min-width: 0 !important;
+}
+
+.express-service-tile--active {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.42) !important;
+}
+
+.express-service-tile ::v-deep .v-btn__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.express-table-tile {
+  border-radius: 8px !important;
+  flex-direction: column;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  height: 112px !important;
+  min-width: 0 !important;
+}
+
+.express-table-tile ::v-deep .v-btn__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  white-space: normal;
+}
+
+.express-receipt-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.express-receipt-tile {
+  border-radius: 8px !important;
+  flex-direction: column;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  height: 118px !important;
+  min-width: 0 !important;
+}
+
+.express-receipt-tile ::v-deep .v-btn__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  white-space: normal;
 }
 
 .mobile-category-view {
@@ -1597,6 +2360,11 @@ export default {
 
   .cart-order-btn {
     width: 100%;
+  }
+
+  .express-choice-row,
+  .express-payment-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -25,7 +25,7 @@ const listdashboard = {
           title: 'Catégories',
           routeName: 'categories',
           to: '/categories',
-          isAdmin: true,
+          isAdmin: false,
         },
         {
           icon: 'mdi-shape-plus',

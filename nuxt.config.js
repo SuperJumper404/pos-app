@@ -156,5 +156,11 @@ export default {
       },
     },
   },
-  build: {},
+  build: {
+    splitChunks: {
+      layouts: false,
+      pages: false,
+      commons: false,
+    },
+  },
 }

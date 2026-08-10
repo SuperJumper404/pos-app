@@ -42,3 +42,17 @@ yarn dev
 ```
 
 ---
+
+### Regle d'impression : non bloquante
+
+Cette regle s'applique a tous les tickets, aussi bien les tickets de caisse
+que les tickets de commande :
+
+- L'application envoie la demande au service d'impression et affiche uniquement
+  une notification indiquant que l'impression a ete envoyee.
+- L'interface ne doit pas attendre la reponse finale de l'imprimante, ni
+  remonter son statut, son erreur ou son resultat a l'utilisateur.
+- L'impression est un envoi fire-and-forget : elle ne doit jamais bloquer
+  l'encaissement, l'envoi de commande ou la suite du parcours.
+- Le bouton doit etre protege contre le spam pendant l'envoi, mais il ne doit
+  pas rester bloque en attendant que le ticket sorte physiquement.

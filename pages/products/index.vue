@@ -17,6 +17,15 @@
             outlined
             color="primaryPurple lighten-1"
             class="text-none"
+            @click="openNewCategory"
+          >
+            <v-icon left>mdi-shape-plus</v-icon>
+            Ajouter catégorie
+          </v-btn>
+          <v-btn
+            outlined
+            color="primaryPurple lighten-1"
+            class="text-none"
             @click="openCustomizationSteps"
           >
             <v-icon left>mdi-tune-variant</v-icon>
@@ -260,6 +269,9 @@ export default {
     if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
   },
   methods: {
+    openNewCategory() {
+      this.$router.push('/categories/newcategory')
+    },
     openCustomizationSteps() {
       this.$router.push('/customizations')
     },

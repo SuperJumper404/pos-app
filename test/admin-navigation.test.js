@@ -18,6 +18,22 @@ const defaultLayoutSource = fs.readFileSync(
 const packageJson = require('../package.json')
 
 assert.match(
+  productsSource,
+  /(?:Ajouter catégorie|Ajouter catÃ©gorie)/,
+  'la page Produits doit proposer le bouton Ajouter catÃ©gorie'
+)
+assert.match(
+  productsSource,
+  /openNewCategory\(\)[\s\S]*?this\.\$router\.push\(['"]\/categories\/newcategory['"]\)/,
+  'le bouton Ajouter catÃ©gorie doit ouvrir la crÃ©ation de catÃ©gorie'
+)
+assert.match(
+  dashboardSource,
+  /title:\s*['"](?:Catégories|CatÃ©gories)['"][\s\S]*?routeName:\s*['"]categories['"][\s\S]*?isAdmin:\s*false/,
+  'CatÃ©gories doit rester accessible sans prendre une entrÃ©e admin latÃ©rale'
+)
+
+assert.match(
   dashboardSource,
   /title:\s*['"](?:Étapes produits|Ã‰tapes produits)['"][\s\S]*?routeName:\s*['"]customizations['"][\s\S]*?isAdmin:\s*false/,
   'Étapes produits doit rester connu du layout sans apparaître dans le menu'
@@ -34,10 +50,15 @@ assert.match(
 )
 assert.match(packageJson.scripts.test, /test\/admin-navigation\.test\.js/)
 assert.match(packageJson.scripts.test, /test\/order-notifications\.test\.js/)
+assert.doesNotMatch(
+  dashboardSource,
+  /Comptoir express/,
+  'Comptoir express doit rester un mode de Menus, pas une entrée séparée'
+)
 assert.match(
   defaultLayoutSource,
-  /@click\.stop="miniVariant = !miniVariant"/,
-  'the drawer toggle must collapse the sidebar to mini icon mode'
+  /<v-app-bar-nav-icon[\s\S]*?v-if="idUser\.access === 0"/,
+  'admin users must keep an app bar navigation icon'
 )
 assert.match(
   defaultLayoutSource,
@@ -46,7 +67,7 @@ assert.match(
 )
 assert.match(
   defaultLayoutSource,
-  /v-if="!miniVariant && item\.routeName === 'orders' && pendingOrderCount > 0"/,
+  /v-if="[\s\S]*?!miniVariant[\s\S]*?item\.routeName === 'orders'[\s\S]*?pendingOrderCount > 0[\s\S]*?"/,
   'mini sidebar mode must hide the text badge area and keep only icons'
 )
 

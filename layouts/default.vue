@@ -33,7 +33,11 @@
             <v-list-item-title class="d-flex align-center">
               <span>{{ item.title }}</span>
               <v-avatar
-                v-if="!miniVariant && item.routeName === 'orders' && pendingOrderCount > 0"
+                v-if="
+                  !miniVariant &&
+                  item.routeName === 'orders' &&
+                  pendingOrderCount > 0
+                "
                 color="primary"
                 size="26"
                 class="ml-3 flex-shrink-0"
