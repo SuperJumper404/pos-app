@@ -18,6 +18,7 @@ const listdashboard = {
           title: 'Accueil',
           routeName: 'index',
           to: '/',
+          moduleKey: 'home',
           isAdmin: true,
         },
         {
@@ -38,6 +39,7 @@ const listdashboard = {
           title: 'Produits',
           routeName: 'products',
           to: '/products',
+          moduleKey: 'products',
           isAdmin: true,
         },
         {
@@ -69,18 +71,21 @@ const listdashboard = {
           title: 'Menus',
           routeName: 'menus',
           to: '/menus',
+          moduleKey: 'menus',
           isAdmin: true,
         },
         {
           icon: 'mdi-basket-check',
           title: 'Commande',
           routeName: 'cart',
+          moduleKey: 'cart',
         },
         {
           icon: 'mdi-order-bool-descending',
           title: 'Commandes',
           routeName: 'orders',
           to: '/orders',
+          moduleKey: 'orders',
           isAdmin: true,
         },
         {
@@ -93,6 +98,7 @@ const listdashboard = {
           title: 'Tiroir-caisse',
           routeName: 'cashregister',
           to: '/cashregister',
+          moduleKey: 'cashregister',
           isAdmin: true,
         },
         {
@@ -110,6 +116,7 @@ const listdashboard = {
           title: 'Historique',
           routeName: 'history',
           to: '/history',
+          moduleKey: 'history',
           isAdmin: true,
         },
         {
@@ -132,10 +139,19 @@ const listdashboard = {
           isAdmin: false,
         },
         {
+          icon: 'mdi-account-group',
+          title: 'Staff / Equipe',
+          routeName: 'staff',
+          to: '/staff',
+          moduleKey: 'staff',
+          isAdmin: true,
+        },
+        {
           icon: 'mdi-table-chair',
           title: 'Tables',
           routeName: 'tables',
           to: '/tables',
+          moduleKey: 'tables',
           isAdmin: true,
         },
         {
@@ -153,6 +169,7 @@ const listdashboard = {
           title: 'Réglages',
           routeName: 'settings',
           to: '/settings',
+          moduleKey: 'settings',
           isAdmin: true,
         },
 
@@ -163,6 +180,7 @@ const listdashboard = {
             shopId && shopName
               ? `/click-and-collect/${shopId}/${shopName}`
               : '/click-and-collect',
+          moduleKey: 'website',
           isAdmin: true,
         },
 

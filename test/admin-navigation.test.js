@@ -57,8 +57,8 @@ assert.doesNotMatch(
 )
 assert.match(
   defaultLayoutSource,
-  /<v-app-bar-nav-icon[\s\S]*?v-if="idUser\.access === 0"/,
-  'admin users must keep an app bar navigation icon'
+  /<v-app-bar-nav-icon[\s\S]*?v-if="isStaffUser"/,
+  'staff users must receive an app bar navigation icon'
 )
 assert.match(
   defaultLayoutSource,

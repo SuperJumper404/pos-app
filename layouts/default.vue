@@ -6,7 +6,7 @@
         $route.path != '/login' &&
         $route.name != 'activation-token-email-position-access' &&
         $route.name != null &&
-        idUser.access === 0
+        isStaffUser
       "
       v-model="drawer"
       :mini-variant="miniVariant"
@@ -17,7 +17,7 @@
       <!-- active-class="deep-purple--text text--accent-4" -->
       <v-list nav>
         <v-list-item
-          v-for="(item, i) in navigationAdminItems"
+          v-for="(item, i) in navigationItems"
           :key="i"
           :to="item.to ? item.to : ''"
           router
@@ -63,14 +63,14 @@
       app
     >
       <v-app-bar-nav-icon
-        v-if="idUser.access === 0"
+        v-if="isStaffUser"
         @click.stop="drawer = !drawer"
       />
-      <v-btn v-if="idUser.access === 0" icon @click="previousPage()">
+      <v-btn v-if="isStaffUser" icon @click="previousPage()">
         <v-icon>mdi-chevron-left</v-icon>
       </v-btn>
       <v-btn
-        v-if="idUser.access === 0"
+        v-if="isStaffUser"
         icon
         @click.stop="miniVariant = !miniVariant"
       >
@@ -80,7 +80,7 @@
       <v-toolbar-title>{{ currentPage.title }}</v-toolbar-title>
       <v-spacer />
       <v-btn
-        v-if="idUser.access !== 0 && idUser.access !== 2"
+        v-if="!isStaffUser && canAccessModule(userAccess, 'orders')"
         icon
         @click="$router.push('/orders')"
       >
@@ -88,7 +88,7 @@
       </v-btn>
       <!-- md -->
       <v-btn
-        v-if="idUser.access !== 0"
+        v-if="canAccessModule(userAccess, 'cart')"
         icon
         disabled
         class="d-md-block d-sm-none d-none"
@@ -99,7 +99,7 @@
       </v-btn>
       <!-- sm to xs -->
       <v-btn
-        v-if="idUser.access !== 0"
+        v-if="canAccessModule(userAccess, 'cart')"
         icon
         class="d-md-none d-sm-block d-block"
         @click="cartBtn"
@@ -108,7 +108,7 @@
           ><v-icon color="success">mdi-cart-minus</v-icon></v-badge
         >
       </v-btn>
-      <v-btn v-if="idUser.access !== 0" icon @click="logout">
+      <v-btn v-if="!isStaffUser" icon @click="logout">
         <v-icon color="red lighten-2">mdi-logout</v-icon>
       </v-btn>
     </v-app-bar>
@@ -122,6 +122,11 @@
 </template>
 <script>
 import listdashboard from '@/helpers/listdashboard'
+const {
+  canAccessModule: canUseModule,
+  getAccessibleNavigationItems,
+  isStaffAccess,
+} = require('@/helpers/staffRoles')
 const {
   countPendingOrders,
   formatPendingOrderBadge,
@@ -144,8 +149,8 @@ export default {
     }
   },
   computed: {
-    navigationAdminItems() {
-      return this.list.filter((item) => item.isAdmin === true)
+    navigationItems() {
+      return getAccessibleNavigationItems(this.userAccess, this.list)
     },
     idUser() {
       return this.$store.get('users/user')
@@ -153,6 +158,9 @@ export default {
     userAccess() {
       const access = this.idUser && this.idUser.access
       return access === undefined || access === null ? null : Number(access)
+    },
+    isStaffUser() {
+      return isStaffAccess(this.userAccess)
     },
     indexCart() {
       return this.$store.get('cart/indexCart')
@@ -194,6 +202,9 @@ export default {
     this.stopOrdersPolling()
   },
   methods: {
+    canAccessModule(access, moduleKey) {
+      return canUseModule(access, moduleKey)
+    },
     async refreshPendingOrders() {
       const isAdmin = Number(this.idUser && this.idUser.access) === 0
       if (!isAdmin || this.$route.path === '/orders') return false
