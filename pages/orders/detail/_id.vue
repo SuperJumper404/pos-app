@@ -25,6 +25,14 @@
               <span class="order-detail-header__label">Client</span>
               <strong>{{ orderSummary.customer || '—' }}</strong>
             </div>
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Prise par</span>
+              <strong>{{ orderSummary.taken_by_name || 'Non attribuee' }}</strong>
+            </div>
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Preparee par</span>
+              <strong>{{ orderSummary.prepared_by_name || 'Non attribuee' }}</strong>
+            </div>
             <div
               v-if="orderPaymentStatus"
               class="order-detail-header__field"

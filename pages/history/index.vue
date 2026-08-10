@@ -194,6 +194,12 @@
         <template #[`item.subtotal`]="{ item }">
           <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
+        <template #[`item.taken_by_name`]="{ item }">
+          {{ item.taken_by_name || 'Non attribuee' }}
+        </template>
+        <template #[`item.prepared_by_name`]="{ item }">
+          {{ item.prepared_by_name || 'Non attribuee' }}
+        </template>
         <template #[`item.payment_status`]="{ item }">
           <v-chip small dark :color="paymentStatusColor(item)">
             {{ paymentStatusText(item) }}
@@ -267,6 +273,8 @@ export default {
         },
         { text: 'Table', value: 'username', filterable: true },
         { text: 'Client', value: 'customer', filterable: true },
+        { text: 'Prise par', value: 'taken_by_name', filterable: true },
+        { text: 'Preparee par', value: 'prepared_by_name', filterable: true },
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true },
         { text: 'Paiement', value: 'payment_status', filterable: true },
