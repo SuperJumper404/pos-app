@@ -60,7 +60,7 @@ Two distinct attributions are needed because an order can be taken by one person
 
 Client-originated QR Table and Click-and-Collect orders have no staff member at creation, so `taken_by_user_id` remains empty unless a later staff workflow explicitly assigns it. An order prepared by staff receives `prepared_by_user_id` regardless of its origin.
 
-The command detail and history display `Prise par` and `Preparee par` with the staff member name when available, otherwise `Non attribuee`. The normal command list stays compact; it can expose these values in the detail view rather than adding unnecessary permanent columns.
+The command detail, the active `Commandes` list, and the `Historique` list display `Prise par` and `Preparee par` with the staff member name when available, otherwise `Non attribuee`.
 
 The legacy `orders.operator` field is currently overwritten during status changes. It remains untouched for compatibility, but it is not used as the source of truth for either attribution.
 
@@ -70,9 +70,9 @@ The legacy `orders.operator` field is currently overwritten during status change
 - Extend the dashboard navigation filtering to use the connected user `access` value, rather than the current admin/non-admin split alone.
 - Add a Vuex staff-facing data flow that reuses the current user endpoints while filtering records by the role groups above.
 - Keep Table QR handling in the existing tables area, filtered to `access = 2`.
-- Add a focused SQL migration for nullable `taken_by_user_id`, `prepared_by_user_id`, `taken_by_name`, and `prepared_by_name` fields on `orders`, with indexes on the user ids for later reporting. Historical orders remain valid with empty values.
+- Add a focused SQL migration for nullable `taken_by_user_id`, `prepared_by_user_id`, `taken_by_name`, and `prepared_by_name` fields on both `orders` and `archives`, with indexes on the active-order user ids for later reporting. Historical orders remain valid with empty values.
 - Pass the authenticated user id into the internal counter checkout and order-status transition flows so the backend, not the browser, records each attribution.
-- Enrich order reads with the two staff display names for the command detail and history.
+- Copy the attribution fields when an active order is archived so order history keeps the same names after the active record is removed.
 - Keep backend authentication and existing user APIs unchanged except for accepting and returning the two new access values, which the current integer field supports.
 
 ## Boundaries
