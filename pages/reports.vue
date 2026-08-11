@@ -200,12 +200,67 @@
           <div>
             Periode : {{ formatClosurePeriod(selectedClosureDetail) }}
           </div>
+          <div>
+            Date de cloture :
+            {{ formatClosureDate(selectedClosureDetail.closed_at) }}
+          </div>
+          <div>
+            Operateur : {{ formatClosureOperator(selectedClosureDetail) }}
+          </div>
           <div>Commandes : {{ selectedClosureDetail.orders_count || 0 }}</div>
           <div>
             Total : {{ formatCurrency(selectedClosureDetail.total_revenue || 0) }}
           </div>
+          <v-divider class="my-4"></v-divider>
+          <div class="font-weight-medium">Paiements</div>
+          <v-simple-table dense>
+            <thead>
+              <tr>
+                <th>Methode</th>
+                <th class="text-right">Commandes</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in selectedClosureDetail.payments_summary || []"
+                :key="item.payment"
+              >
+                <td>{{ item.payment }}</td>
+                <td class="text-right">{{ item.orders_count }}</td>
+                <td class="text-right">{{ formatCurrency(item.total) }}</td>
+              </tr>
+            </tbody>
+          </v-simple-table>
+          <v-divider class="my-4"></v-divider>
+          <div class="font-weight-medium">TVA</div>
+          <v-simple-table dense>
+            <thead>
+              <tr>
+                <th>Taux</th>
+                <th class="text-right">HT</th>
+                <th class="text-right">TVA</th>
+                <th class="text-right">TTC</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in selectedClosureDetail.vat_summary || []"
+                :key="item.vat_rate"
+              >
+                <td>{{ item.vat_rate }}</td>
+                <td class="text-right">{{ formatCurrency(item.total_ht) }}</td>
+                <td class="text-right">{{ formatCurrency(item.total_vat) }}</td>
+                <td class="text-right">{{ formatCurrency(item.total_ttc) }}</td>
+              </tr>
+            </tbody>
+          </v-simple-table>
         </v-card-text>
         <v-card-actions>
+          <v-btn text class="text-none" @click="printClosureDetail">
+            <v-icon small left>mdi-printer</v-icon>
+            Imprimer
+          </v-btn>
           <v-spacer></v-spacer>
           <v-btn text class="text-none" @click="closureDetailDialog = false">
             Fermer
@@ -284,6 +339,12 @@ export default {
     formatClosurePeriod(closure) {
       if (!closure || !closure.opened_at) return 'Aucune commande à clôturer'
       return `${this.formatClosureDate(closure.opened_at)} - ${this.formatClosureDate(closure.closed_at)}`
+    },
+    formatClosureOperator(closure) {
+      return closure.closed_by_name || closure.closed_by_user_id || '-'
+    },
+    printClosureDetail() {
+      if (process.client) window.print()
     },
     async showClosureDetail(closure) {
       this.loadingClosureDetail = closure.id

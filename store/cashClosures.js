@@ -40,6 +40,7 @@ export const actions = {
         {},
         {
           headers: authHeaders(),
+          skipGlobalErrorNotification: true,
         }
       )
       .then((response) => {

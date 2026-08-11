@@ -21,6 +21,7 @@ assert.ok(source.includes('getDetail'))
 assert.ok(source.includes('/baseurl/api/v1/reports/z/${params}'))
 assert.ok(source.includes('notifications/success'))
 assert.ok(source.includes('notifications/error'))
+assert.ok(source.includes('skipGlobalErrorNotification: true'))
 
 // eslint-disable-next-line no-console
 console.log('cash closures store tests passed')
