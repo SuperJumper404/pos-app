@@ -151,6 +151,17 @@
               <template #[`item.total_revenue`]="{ item }">
                 {{ formatCurrency(item.total_revenue) }}
               </template>
+              <template #[`item.actions`]="{ item }">
+                <v-btn
+                  icon
+                  small
+                  title="Voir le Ticket Z"
+                  :loading="loadingClosureDetail === item.id"
+                  @click="showClosureDetail(item)"
+                >
+                  <v-icon small>mdi-eye</v-icon>
+                </v-btn>
+              </template>
             </v-data-table>
           </v-card-text>
         </v-tab-item>
@@ -179,6 +190,29 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="closureDetailDialog" max-width="520">
+      <v-card>
+        <v-card-title>
+          Ticket Z #{{ selectedClosureDetail.closure_number || '-' }}
+        </v-card-title>
+        <v-card-text>
+          <div>
+            Periode : {{ formatClosurePeriod(selectedClosureDetail) }}
+          </div>
+          <div>Commandes : {{ selectedClosureDetail.orders_count || 0 }}</div>
+          <div>
+            Total : {{ formatCurrency(selectedClosureDetail.total_revenue || 0) }}
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text class="text-none" @click="closureDetailDialog = false">
+            Fermer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 <script>
@@ -193,11 +227,15 @@ export default {
       activeTab: 0,
       closeClosureDialog: false,
       closingClosure: false,
+      closureDetailDialog: false,
+      loadingClosureDetail: null,
+      selectedClosureDetail: {},
       closureHeaders: [
         { text: 'Numero', value: 'closure_number' },
         { text: 'Date', value: 'closed_at' },
         { text: 'Commandes', value: 'orders_count' },
         { text: 'Total', value: 'total_revenue' },
+        { text: '', value: 'actions', sortable: false },
       ],
     }
   },
@@ -217,6 +255,9 @@ export default {
     },
     closureHistory() {
       return this.$store.get('cashClosures/history') || []
+    },
+    closureDetail() {
+      return this.$store.get('cashClosures/detail') || {}
     },
     canCloseClosure() {
       return Number(this.currentClosure.orders_count || 0) > 0
@@ -243,6 +284,15 @@ export default {
     formatClosurePeriod(closure) {
       if (!closure || !closure.opened_at) return 'Aucune commande a cloturer'
       return `${this.formatClosureDate(closure.opened_at)} - ${this.formatClosureDate(closure.closed_at)}`
+    },
+    async showClosureDetail(closure) {
+      this.loadingClosureDetail = closure.id
+      const ok = await this.$store.dispatch('cashClosures/getDetail', closure.id)
+      if (ok) {
+        this.selectedClosureDetail = this.closureDetail
+        this.closureDetailDialog = true
+      }
+      this.loadingClosureDetail = null
     },
     async confirmCloseClosure() {
       if (this.closingClosure || !this.canCloseClosure) return
