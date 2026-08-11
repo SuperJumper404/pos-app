@@ -40,7 +40,7 @@ export const actions = {
         headers: authHeaders(),
       })
       dispatch('notifications/success', response.data.message, { root: true })
-      return true
+      return response.data.data || true
     } catch (error) {
       const message = errorMessage(error)
       dispatch('set/message', message)
@@ -56,6 +56,23 @@ export const actions = {
       })
       dispatch('notifications/success', response.data.message, { root: true })
       return true
+    } catch (error) {
+      const message = errorMessage(error)
+      dispatch('set/message', message)
+      dispatch('notifications/error', message, { root: true })
+      return false
+    }
+  },
+
+  async provisionCredentials({ dispatch }, { id, pin, regenerateLoginId }) {
+    try {
+      const response = await this.$axios.patch(
+        `/baseurl/api/v1/user/${id}/staff-credentials`,
+        { pin, regenerate_login_id: regenerateLoginId },
+        { headers: authHeaders() }
+      )
+      dispatch('notifications/success', response.data.message, { root: true })
+      return response.data.data
     } catch (error) {
       const message = errorMessage(error)
       dispatch('set/message', message)

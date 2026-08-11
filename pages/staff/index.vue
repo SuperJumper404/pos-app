@@ -26,6 +26,9 @@
           {{ Number(item.status) === 1 ? 'Actif' : 'Desactive' }}
         </v-chip>
       </template>
+      <template #[`item.staff_login_id`]="{ item }">
+        {{ item.staff_login_id || 'A creer' }}
+      </template>
       <template #[`item.actions`]="{ item }">
         <v-tooltip top>
           <template #activator="{ on, attrs }">
@@ -34,6 +37,14 @@
             </v-btn>
           </template>
           Modifier
+        </v-tooltip>
+        <v-tooltip top>
+          <template #activator="{ on, attrs }">
+            <v-btn icon small v-bind="attrs" v-on="on" @click="openCredentials(item)">
+              <v-icon small>mdi-key-variant</v-icon>
+            </v-btn>
+          </template>
+          Identifiants caisse
         </v-tooltip>
         <v-tooltip top>
           <template #activator="{ on, attrs }">
@@ -67,10 +78,18 @@
             <v-text-field v-model.trim="form.phone" label="Telephone" />
             <v-text-field
               v-if="!isEditing"
-              v-model="form.password"
-              label="Mot de passe"
+              v-model="form.pin"
+              label="PIN a 4 chiffres"
               type="password"
-              :rules="requiredRules"
+              inputmode="numeric"
+              maxlength="4"
+              :rules="pinRules"
+            />
+            <v-text-field
+              v-if="!isEditing && Number(form.access) === 0"
+              v-model="form.password"
+              label="Mot de passe e-mail"
+              type="password"
             />
             <v-select
               v-model="form.access"
@@ -88,6 +107,57 @@
           <v-btn text class="text-none" @click="closeForm">Annuler</v-btn>
           <v-btn color="primary" class="text-none" :loading="submitting" @click="submit">
             Enregistrer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="credentialsDialog" max-width="420" persistent>
+      <v-card>
+        <v-card-title>Identifiants caisse</v-card-title>
+        <v-card-text>
+          <v-form ref="credentialsForm" v-model="credentialsValid" @submit.prevent="saveCredentials">
+            <v-text-field
+              v-if="credentialResult"
+              :value="credentialResult.staff_login_id"
+              label="ID caisse"
+              readonly
+            />
+            <v-text-field
+              v-model="credentialsPin"
+              label="PIN a 4 chiffres"
+              type="password"
+              inputmode="numeric"
+              maxlength="4"
+              :rules="pinRules"
+            />
+            <v-switch v-model="regenerateLoginId" label="Regenerer ID caisse" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn text class="text-none" @click="closeCredentials">Annuler</v-btn>
+          <v-btn color="primary" class="text-none" :loading="credentialLoading" @click="saveCredentials">
+            Enregistrer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="createdCredentialsDialog" max-width="420">
+      <v-card>
+        <v-card-title>Identifiants caisse</v-card-title>
+        <v-card-text>
+          <v-text-field
+            :value="createdCredentials.staff_login_id"
+            label="ID caisse"
+            readonly
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="primary" class="text-none" @click="createdCredentialsDialog = false">
+            Fermer
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -120,6 +190,7 @@ const emptyForm = () => ({
   email: '',
   phone: '',
   password: '',
+  pin: '',
   access: null,
   active: true,
 })
@@ -133,21 +204,33 @@ export default {
       submitting: false,
       removing: false,
       formDialog: false,
+      credentialsDialog: false,
+      createdCredentialsDialog: false,
       removeDialog: false,
       formValid: false,
+      credentialsValid: false,
+      credentialLoading: false,
       form: emptyForm(),
+      credentialUser: null,
+      credentialResult: null,
+      createdCredentials: {},
+      credentialsPin: '',
+      regenerateLoginId: false,
       removeTarget: null,
       headers: [
         { text: 'Nom', value: 'username' },
         { text: 'E-mail', value: 'email' },
+        { text: 'ID caisse', value: 'staff_login_id' },
         { text: 'Role', value: 'access' },
         { text: 'Statut', value: 'status' },
         { text: 'Actions', value: 'actions', sortable: false },
       ],
       requiredRules: [(value) => !!value || 'Champ requis'],
       emailRules: [
-        (value) => !!value || 'E-mail requis',
-        (value) => /.+@.+\..+/.test(value) || 'E-mail invalide',
+        (value) => !value || /.+@.+\..+/.test(value) || 'E-mail invalide',
+      ],
+      pinRules: [
+        (value) => /^\d{4}$/.test(value || '') || 'PIN a 4 chiffres requis',
       ],
       accessRules: [(value) => value !== null || 'Acces requis'],
     }
@@ -191,6 +274,7 @@ export default {
         email: user.email || '',
         phone: user.phone || '',
         password: '',
+        pin: '',
         access: Number(user.access),
         active: Number(user.status) === 1,
       }
@@ -203,6 +287,7 @@ export default {
     },
     async submit() {
       if (!this.$refs.form.validate()) return
+      const isCreating = !this.isEditing
       this.submitting = true
       const data = {
         username: this.form.username,
@@ -215,12 +300,48 @@ export default {
         : await this.$store.dispatch('staff/create', {
           ...data,
           email: this.form.email,
+          pin: this.form.pin,
           password: this.form.password,
-          clearpass: this.form.password,
         })
       this.submitting = false
       if (!result) return
       this.closeForm()
+      await this.refresh()
+      if (isCreating && result.staff_login_id) {
+        this.createdCredentials = result
+        this.createdCredentialsDialog = true
+      }
+    },
+    openCredentials(user) {
+      this.credentialUser = user
+      this.credentialResult = user.staff_login_id
+        ? { staff_login_id: user.staff_login_id }
+        : null
+      this.credentialsPin = ''
+      this.regenerateLoginId = false
+      this.credentialsDialog = true
+    },
+    closeCredentials() {
+      this.credentialsDialog = false
+      this.credentialUser = null
+      this.credentialResult = null
+      this.credentialsPin = ''
+      this.regenerateLoginId = false
+      if (this.$refs.credentialsForm) this.$refs.credentialsForm.resetValidation()
+    },
+    async saveCredentials() {
+      if (!this.credentialUser || !this.$refs.credentialsForm.validate()) return
+      this.credentialLoading = true
+      const result = await this.$store.dispatch('staff/provisionCredentials', {
+        id: this.credentialUser.id,
+        pin: this.credentialsPin,
+        regenerateLoginId: this.regenerateLoginId,
+      })
+      this.credentialLoading = false
+      if (!result) return
+      this.credentialResult = result
+      this.credentialsPin = ''
+      this.regenerateLoginId = false
       await this.refresh()
     },
     confirmRemove(user) {
