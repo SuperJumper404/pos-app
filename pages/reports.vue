@@ -12,7 +12,7 @@
     <v-card v-else outlined class="mt-5">
       <v-tabs v-model="activeTab" background-color="grey lighten-4">
         <v-tab class="text-none">Commandes</v-tab>
-        <v-tab class="text-none">Cloture Z</v-tab>
+        <v-tab class="text-none">Clôture Z</v-tab>
         <v-tab class="text-none">Historique Z</v-tab>
       </v-tabs>
 
@@ -91,7 +91,7 @@
                       :disabled="closingClosure || !canCloseClosure"
                       @click="closeClosureDialog = true"
                     >
-                      Cloturer la caisse
+                      Clôturer la caisse
                       <v-icon small right>mdi-lock-check</v-icon>
                     </v-btn>
                   </v-card-actions>
@@ -170,7 +170,7 @@
 
     <v-dialog v-model="closeClosureDialog" max-width="520">
       <v-card>
-        <v-card-title>Cloturer la caisse</v-card-title>
+        <v-card-title>Clôturer la caisse</v-card-title>
         <v-card-text>
           Cette action va creer un Ticket Z fige pour la periode courante.
         </v-card-text>
@@ -282,7 +282,7 @@ export default {
       return new Date(value).toLocaleString('fr-FR')
     },
     formatClosurePeriod(closure) {
-      if (!closure || !closure.opened_at) return 'Aucune commande a cloturer'
+      if (!closure || !closure.opened_at) return 'Aucune commande à clôturer'
       return `${this.formatClosureDate(closure.opened_at)} - ${this.formatClosureDate(closure.closed_at)}`
     },
     async showClosureDetail(closure) {
