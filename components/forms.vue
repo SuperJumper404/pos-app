@@ -47,6 +47,16 @@
       :class="formprops.access !== 1 ? 'mt-5 mb-5' : 'mt-5 mb-5'"
       @submit.prevent="sumitforms"
     >
+      <v-btn-toggle
+        v-if="formprops.access === 1"
+        v-model="loginMode"
+        mandatory
+        color="primaryPurple"
+        class="mb-5 d-flex"
+      >
+        <v-btn value="staff" class="flex-grow-1 text-none">Connexion caisse</v-btn>
+        <v-btn value="admin" class="flex-grow-1 text-none">Connexion admin</v-btn>
+      </v-btn-toggle>
       <v-text-field
         v-if="formprops.access !== 1"
         v-model="formsdata.username"
@@ -72,6 +82,27 @@
       >
       </v-text-field>
       <v-text-field
+        v-if="formprops.access === 1 && loginMode === 'staff'"
+        v-model.trim="formsdata.staff_login_id"
+        label="ID caisse"
+        type="text"
+        :rules="staffLoginIdRules"
+        autofocus
+        required
+      ></v-text-field>
+      <v-text-field
+        v-if="formprops.access === 1 && loginMode === 'staff'"
+        v-model="formsdata.pin"
+        label="PIN a 4 chiffres"
+        type="password"
+        inputmode="numeric"
+        maxlength="4"
+        :rules="pinRules"
+        required
+        class="mb-4"
+      ></v-text-field>
+      <v-text-field
+        v-if="formprops.access !== 1 || loginMode === 'admin'"
         v-model="formsdata.email"
         label="E-mail de connexion"
         type="email"
@@ -81,6 +112,7 @@
         :autofocus="formprops.access !== 2 ? true : false"
       ></v-text-field>
       <v-text-field
+        v-if="formprops.access !== 1 || loginMode === 'admin'"
         v-model="formsdata.password"
         label="Mot de passe"
         :type="statePass ? 'text' : 'password'"
@@ -92,7 +124,7 @@
         @click:append="statePass = !statePass"
       >
       </v-text-field>
-      <div v-if="formprops.access === 1" class="mb-8 float-end f-secondary">
+      <div v-if="formprops.access === 1 && loginMode === 'admin'" class="mb-8 float-end f-secondary">
         <nuxt-link to="/forgotpassword">Mot de passe oublié ?</nuxt-link>
       </div>
       <v-hover v-slot="{ hover }">
@@ -140,6 +172,7 @@ export default {
   data() {
     return {
       isValue: false,
+      loginMode: 'staff',
       statePass: false,
       stsMsg: false,
       loadingBtn: false,
@@ -148,6 +181,8 @@ export default {
         phone: '',
         email: '',
         password: '',
+        staff_login_id: '',
+        pin: '',
       },
       usernameRules: [
         (v) => !!v || "Nom d'utilisateur requis",
@@ -171,6 +206,8 @@ export default {
         //   ) ||
         //   'Utiliser au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial (@,#,_)',
       ],
+      staffLoginIdRules: [(v) => !!v || 'ID caisse requis'],
+      pinRules: [(v) => /^\d{4}$/.test(v || '') || 'PIN a 4 chiffres requis'],
     }
   },
   computed: {
@@ -190,7 +227,15 @@ export default {
       if (this.formprops.access === 1) {
         const res = await this.$store.dispatch(
           'users/postLogin',
-          this.formsdata
+          this.loginMode === 'staff'
+            ? {
+              staff_login_id: this.formsdata.staff_login_id,
+              pin: this.formsdata.pin,
+            }
+            : {
+              email: this.formsdata.email,
+              password: this.formsdata.password,
+            }
         )
         if (res) {
           this.loadingBtn = false
