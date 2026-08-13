@@ -7,6 +7,10 @@ const dashboardSource = fs.readFileSync(
   path.join(root, 'helpers', 'listdashboard.js'),
   'utf8'
 )
+const staffRolesSource = fs.readFileSync(
+  path.join(root, 'helpers', 'staffRoles.js'),
+  'utf8'
+)
 const productsSource = fs.readFileSync(
   path.join(root, 'pages', 'products', 'index.vue'),
   'utf8'
@@ -16,6 +20,27 @@ const defaultLayoutSource = fs.readFileSync(
   'utf8'
 )
 const packageJson = require('../package.json')
+
+assert.match(
+  dashboardSource,
+  /routeName:\s*['"]categories['"][\s\S]*?hiddenFromMainNavigation:\s*true/,
+  'Categories ne doit pas apparaitre dans le menu lateral ni sur l accueil'
+)
+assert.match(
+  dashboardSource,
+  /routeName:\s*['"]customizations['"][\s\S]*?hiddenFromMainNavigation:\s*true/,
+  'Etapes produits ne doit pas apparaitre dans le menu lateral ni sur l accueil'
+)
+assert.match(
+  dashboardSource,
+  /routeName:\s*['"]stocks['"][\s\S]*?hiddenFromMainNavigation:\s*true/,
+  'Stock ne doit pas apparaitre dans le menu lateral ni sur l accueil'
+)
+assert.match(
+  staffRolesSource,
+  /getAccessibleNavigationItems[\s\S]*?!item\.hiddenFromMainNavigation/,
+  'la navigation principale doit filtrer les modules masques'
+)
 
 assert.match(
   productsSource,

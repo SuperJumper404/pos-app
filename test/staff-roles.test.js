@@ -34,5 +34,35 @@ assert.deepStrictEqual(
   ['Menus', 'Commandes', 'Caisse', 'Deconnexion'],
   'a cashier must only receive its modules and logout in the sidebar'
 )
+assert.deepStrictEqual(
+  getAccessibleNavigationItems(0, [
+    {
+      title: 'Produits',
+      to: '/products',
+      moduleKey: 'catalog',
+      legacyModuleKey: 'products',
+    },
+  ]).map((item) => item.title),
+  ['Produits'],
+  'a legacy secondary admin must retain product navigation'
+)
+assert.deepStrictEqual(
+  getAccessibleNavigationItems(2, [
+    {
+      title: 'Menus',
+      to: '/menus',
+      moduleKey: 'orders',
+      legacyModuleKey: 'menus',
+    },
+    {
+      title: 'Commandes',
+      to: '/orders',
+      moduleKey: 'orders',
+      legacyModuleKey: 'orders',
+    },
+  ]).map((item) => item.title),
+  ['Menus'],
+  'legacy table accounts must keep their menu-only navigation'
+)
 
 console.log('staff role tests passed')

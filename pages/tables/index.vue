@@ -31,7 +31,7 @@
       >
         <v-card-text class="d-block justify-space-between py-4">
           <div class="text-h6 font-weight-bold mb-4">
-            {{ items.username }}
+            {{ items.name }}
           </div>
 
           <div class="mb-3">
@@ -166,8 +166,7 @@ export default {
   },
   computed: {
     dataTables() {
-      const result = this.$store.get('tables/dataTables') || []
-      return result.filter((x) => Number(x.access) === 2)
+      return this.$store.get('tables/dataTables') || []
     },
     websiteUrl() {
       return window.location.origin

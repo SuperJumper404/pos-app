@@ -1,4 +1,8 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
+import {
+  DEFAULT_DISCOUNT_PERCENTAGES,
+  normalizeDiscountPercentages,
+} from '../helpers/discount'
 const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 
 export const state = () => ({
@@ -12,6 +16,7 @@ export const state = () => ({
   shop_hours: '',
   shop_social_media: '',
   shop_payment_methods: '',
+  shop_discount_percentages: DEFAULT_DISCOUNT_PERCENTAGES,
   shop_profile_image: '',
   shop_status: '',
   shop_printer_ip: '',
@@ -19,7 +24,7 @@ export const state = () => ({
   auto_print_order_tickets: false,
   activate_tva: false,
   kitchen_closed: false,
-  clickAndCollectTable: '',
+  clickAndCollectServicePoint: null,
   qr_payment_mode: 'stripe_before_order',
   stripe_connected: false,
   stripe_onboarding_complete: false,
@@ -80,6 +85,14 @@ export const actions = {
           JSON.parse(response.data.data[0].shop_payment_methods)
         )
         dispatch(
+          'set/shop_discount_percentages',
+          normalizeDiscountPercentages(
+            response.data.data[0].discount_percentages
+              ? JSON.parse(response.data.data[0].discount_percentages)
+              : DEFAULT_DISCOUNT_PERCENTAGES
+          )
+        )
+        dispatch(
           'set/shop_profile_image',
           response.data.data[0].shop_profile_image
         )
@@ -88,8 +101,8 @@ export const actions = {
           response.data.data[0].qr_payment_mode || 'stripe_before_order'
         )
         dispatch(
-          'set/clickAndCollectTable',
-          response.data.data[0].clickAndCollectTable
+          'set/clickAndCollectServicePoint',
+          response.data.data[0].clickAndCollectServicePoint
         )
         dispatch(
           'set/stripe_account_id',
@@ -136,6 +149,14 @@ export const actions = {
           JSON.parse(response.data.data.shop_payment_methods)
         )
         dispatch(
+          'set/shop_discount_percentages',
+          normalizeDiscountPercentages(
+            response.data.data.discount_percentages
+              ? JSON.parse(response.data.data.discount_percentages)
+              : DEFAULT_DISCOUNT_PERCENTAGES
+          )
+        )
+        dispatch(
           'set/shop_profile_image',
           response.data.data.shop_profile_image
         )
@@ -144,8 +165,8 @@ export const actions = {
           response.data.data.qr_payment_mode || 'stripe_before_order'
         )
         dispatch(
-          'set/clickAndCollectTable',
-          response.data.data.clickAndCollectTable
+          'set/clickAndCollectServicePoint',
+          response.data.data.clickAndCollectServicePoint
         )
         dispatch(
           'set/shop_social_media',

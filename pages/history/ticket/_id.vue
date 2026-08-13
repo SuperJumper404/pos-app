@@ -86,6 +86,7 @@ export default {
   },
   computed: {
     currentDate() {
+      if (!this.dataArchivedOrder) return '-'
       return moment(this.dataArchivedOrder.created)
         .local()
         .format('DD/MM/YYYY à HH:mm')
@@ -94,8 +95,7 @@ export default {
       return this.$store.get('history/detailArchivedOrder')
     },
     dataArchivedOrder() {
-      console.log('store temp ', this.$store.get('history/dataArchivedOrders'))
-      return this.$store.get('history/dataArchivedOrders').filter((x) => {
+      return (this.$store.get('history/dataArchivedOrders') || []).filter((x) => {
         return String(x.id) === String(this.$route.params.id)
       })[0]
     },
@@ -111,9 +111,26 @@ export default {
       }
     },
     totalAmount() {
+      if (this.dataArchivedOrder && this.dataArchivedOrder.subtotal != null) {
+        return this.roundPrice(this.dataArchivedOrder.subtotal)
+      }
       return this.detailArchivedOrder.reduce(
         (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
         0
+      )
+    },
+    subtotalBeforeDiscount() {
+      return this.roundPrice(
+        this.dataArchivedOrder && this.dataArchivedOrder.subtotal_before_discount != null
+          ? this.dataArchivedOrder.subtotal_before_discount
+          : this.totalAmount
+      )
+    },
+    discountAmount() {
+      return this.roundPrice(
+        this.dataArchivedOrder && this.dataArchivedOrder.discount_amount != null
+          ? this.dataArchivedOrder.discount_amount
+          : Math.max(0, this.subtotalBeforeDiscount - this.totalAmount)
       )
     },
     isTvaActive() {
@@ -131,14 +148,30 @@ export default {
     },
   },
   mounted() {
-    this.loadPage = true
-    this.$store.dispatch('history/getAllArchivedOrders').finally(() => {
-      this.loadPage = false
-    })
-    const size = this.generateCleanTicketPDF(0)
-    this.generateCleanTicketPDF(size)
+    this.loadReceiptData()
   },
   methods: {
+    async loadReceiptData() {
+      this.loadPage = true
+      try {
+        await Promise.all([
+          this.$store.dispatch('history/getAllArchivedOrders'),
+          this.$store.dispatch(
+            'history/getDetailArchivedOrder',
+            this.$route.params.id
+          ),
+        ])
+        this.generateReceiptPdf()
+      } finally {
+        this.loadPage = false
+      }
+    },
+    generateReceiptPdf() {
+      if (!this.dataArchivedOrder) return
+      if (!this.detailArchivedOrder.length) return
+      const size = this.generateCleanTicketPDF(0)
+      this.generateCleanTicketPDF(size)
+    },
     lockReceiptPrint() {
       if (this.printLoading) {
         this.$store.dispatch('notifications/info', {
@@ -186,6 +219,7 @@ export default {
     },
 
     generateEscPos() {
+      if (!this.dataArchivedOrder) return Buffer.from([])
       // ---------------------------------------
       // FONCTIONS INTERNES UTILITAIRES
       // ---------------------------------------
@@ -281,6 +315,18 @@ export default {
           )
         })
       }
+      if (this.discountAmount > 0) {
+        push(
+          alignRight(),
+          esc(`SOUS-TOTAL : ${this.formatTicketNumber(this.subtotalBeforeDiscount)} `),
+          euroSymbol,
+          esc('\n'),
+          alignRight(),
+          esc(`REMISE : -${this.formatTicketNumber(this.discountAmount)} `),
+          euroSymbol,
+          esc('\n')
+        )
+      }
 
       push(alignRight(), boldOn(), doubleOn())
       push(
@@ -328,7 +374,13 @@ export default {
       return this.formatPrice(value).replace(' €', '')
     },
 
+    safePdfText(value, fallback = '') {
+      if (value === undefined || value === null) return fallback
+      return String(value)
+    },
+
     generateCleanTicketPDF(size) {
+      if (!this.dataArchivedOrder) return 0
       const doc = new JSPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -342,14 +394,21 @@ export default {
 
       doc.setFontSize(10)
       doc.setFont('courier', 'bold')
-      doc.text(this.shopInfo.shop_name, center, (y += gap), { align: 'center' })
+      doc.text(this.safePdfText(this.shopInfo.shop_name), center, (y += gap), {
+        align: 'center',
+      })
       doc.setFont('courier', 'normal')
       doc.setFontSize(8)
 
-      doc.text('TEL:' + this.shopInfo.shop_phone, center, (y += gap), {
-        align: 'center',
-      })
-      const address = this.shopInfo.shop_adress
+      doc.text(
+        'TEL:' + this.safePdfText(this.shopInfo.shop_phone),
+        center,
+        (y += gap),
+        {
+          align: 'center',
+        }
+      )
+      const address = this.safePdfText(this.shopInfo.shop_adress)
       const maxWidth = 50 // largeur max en mm
       const lines = doc.splitTextToSize(address, maxWidth)
 
@@ -362,14 +421,14 @@ export default {
       this.textWithBoldPart(
         doc,
         '',
-        this.dataArchivedOrder.username,
+        this.safePdfText(this.dataArchivedOrder.username),
         5,
         (y += bigGap)
       )
       this.textWithBoldPart(
         doc,
         'Commande n°',
-        this.dataArchivedOrder.ordernumber,
+        this.safePdfText(this.dataArchivedOrder.ordernumber),
         5,
         (y += bigGap)
       )
@@ -390,8 +449,8 @@ export default {
         },
         head: [['QTE', 'PRODUIT', 'PRIX']],
         body: items.map((order) => [
-          order.qty.toString(),
-          order.name,
+          this.safePdfText(order.qty),
+          this.safePdfText(order.name),
           this.formatPrice(order.total),
         ]),
         columnStyles: {
@@ -423,6 +482,20 @@ export default {
           )
         })
       }
+      if (this.discountAmount > 0) {
+        doc.text(
+          `SOUS-TOTAL: ${this.formatPrice(this.subtotalBeforeDiscount)}`,
+          53,
+          (y += bigGap),
+          { align: 'right' }
+        )
+        doc.text(
+          `REMISE: -${this.formatPrice(this.discountAmount)}`,
+          53,
+          (y += bigGap),
+          { align: 'right' }
+        )
+      }
       doc.setFontSize(10)
       doc.setFont('courier', 'bold')
 
@@ -437,10 +510,11 @@ export default {
       )
       doc.setFont('courier', 'normal')
 
-      const text = 'Paiement : ' + this.dataArchivedOrder.used_payment_method
+      const text =
+        'Paiement : ' +
+        this.safePdfText(this.dataArchivedOrder.used_payment_method, '-')
 
       const paymentLines = this.splitByWords(text, 20)
-      console.log('Payment lines :', paymentLines)
       doc.text(paymentLines, 53, (y += bigGap), {
         align: 'right',
       })
@@ -450,7 +524,7 @@ export default {
       doc.text('À très bientôt ', center, (y += bigGap), {
         align: 'center',
       })
-      doc.text(this.shopInfo.shop_name, center, (y += bigGap), {
+      doc.text(this.safePdfText(this.shopInfo.shop_name), center, (y += bigGap), {
         align: 'center',
       })
       doc.text('Made with smarteat.fr ', center, (y += bigGap), {
@@ -475,27 +549,29 @@ export default {
       return y
     },
     textWithBoldPart(doc, normalText, boldText, x, y, options = {}) {
+      const safeNormalText = this.safePdfText(normalText)
+      const safeBoldText = this.safePdfText(boldText)
       const defaultOptions = { align: 'left' }
       const align = options.align || defaultOptions.align
 
       // Choisir le point de départ selon l’alignement
       let offsetX = x
       if (align === 'center') {
-        const totalWidth = doc.getTextWidth(normalText + boldText)
+        const totalWidth = doc.getTextWidth(safeNormalText + safeBoldText)
         offsetX = x - totalWidth / 2
       } else if (align === 'right') {
-        const totalWidth = doc.getTextWidth(normalText + boldText)
+        const totalWidth = doc.getTextWidth(safeNormalText + safeBoldText)
         offsetX = x - totalWidth
       }
 
       // Partie normale
       doc.setFont('courier', 'normal')
-      doc.text(normalText, offsetX, y)
+      doc.text(safeNormalText, offsetX, y)
 
       // Partie en gras
-      const normalWidth = doc.getTextWidth(normalText)
+      const normalWidth = doc.getTextWidth(safeNormalText)
       doc.setFont('courier', 'bold')
-      doc.text(boldText, offsetX + normalWidth + 0.5, y) // +0.5mm d’espace
+      doc.text(safeBoldText, offsetX + normalWidth + 0.5, y) // +0.5mm d’espace
     },
     drawDashLine(
       doc,
@@ -518,7 +594,7 @@ export default {
     },
 
     splitByWords(text, maxLen = 30) {
-      const words = text.split(' ')
+      const words = this.safePdfText(text).split(' ')
       const lines = []
       let current = ''
 

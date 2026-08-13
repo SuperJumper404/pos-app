@@ -696,39 +696,34 @@
       <v-card>
         <v-card-title>Encaisser</v-card-title>
         <v-card-text>
+          <div class="express-payment-total mb-4">
+            <div class="d-flex justify-space-between">
+              <span>Total à payer</span>
+              <strong>{{ formatCurrency(expressCheckoutTotal) }}</strong>
+            </div>
+            <div
+              v-if="expressDiscountType !== 'none'"
+              class="d-flex justify-space-between warning--text"
+            >
+              <span>Remise appliquée</span>
+              <strong>
+                - {{ formatCurrency(total - expressCheckoutTotal) }}
+              </strong>
+            </div>
+          </div>
           <div class="express-payment-grid">
             <v-btn
+              v-for="method in expressPaymentMethods"
+              :key="method.value"
               color="success"
               class="express-payment-tile text-none font-weight-bold"
               :disabled="expressSubmitDisabled"
-              :loading="expressPaymentLoading === 'Carte bancaire'"
+              :loading="expressPaymentLoading === method.value"
               depressed
-              @click="submitExpressPayment('Carte bancaire')"
+              @click="submitExpressPayment(method.value)"
             >
-              <v-icon class="mb-2">mdi-credit-card-outline</v-icon>
-              <span>Carte</span>
-            </v-btn>
-            <v-btn
-              color="success"
-              class="express-payment-tile text-none font-weight-bold"
-              :disabled="expressSubmitDisabled"
-              :loading="expressPaymentLoading === 'Chèque'"
-              depressed
-              @click="submitExpressPayment('Chèque')"
-            >
-              <v-icon class="mb-2">mdi-file-document-outline</v-icon>
-              <span>Chèque</span>
-            </v-btn>
-            <v-btn
-              color="success"
-              class="express-payment-tile text-none font-weight-bold"
-              :disabled="expressSubmitDisabled"
-              :loading="expressPaymentLoading === 'Espèces'"
-              depressed
-              @click="submitExpressPayment('Espèces')"
-            >
-              <v-icon class="mb-2">mdi-cash</v-icon>
-              <span>Espèces</span>
+              <v-icon class="mb-2">{{ method.icon }}</v-icon>
+              <span>{{ method.text }}</span>
             </v-btn>
             <v-btn
               color="primary"
@@ -741,12 +736,98 @@
               <v-icon class="mb-2">mdi-clock-outline</v-icon>
               <span>Payer plus tard</span>
             </v-btn>
+            <v-btn
+              color="warning"
+              class="express-payment-tile text-none font-weight-bold"
+              :disabled="expressSubmitDisabled"
+              depressed
+              @click="openExpressDiscountDialog"
+            >
+              <v-icon class="mb-2">mdi-tag-percent-outline</v-icon>
+              <span>{{ expressDiscountLabel }}</span>
+            </v-btn>
           </div>
         </v-card-text>
         <v-card-actions class="pt-0">
           <v-spacer />
           <v-btn text class="text-none" @click="expressPaymentDialog = false">
             Retour
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="expressDiscountDialog" max-width="520">
+      <v-card>
+        <v-card-title>Remise globale</v-card-title>
+        <v-card-text>
+          <div class="text-body-2 mb-3">
+            La remise s'applique à toute la commande.
+          </div>
+          <v-btn-toggle
+            v-model="expressDiscountDraftType"
+            mandatory
+            color="primary"
+            class="d-flex mb-4"
+          >
+            <v-btn value="percent" class="flex-grow-1 text-none">
+              Pourcentage
+            </v-btn>
+            <v-btn value="amount" class="flex-grow-1 text-none">
+              Montant en euros
+            </v-btn>
+          </v-btn-toggle>
+          <div v-if="expressDiscountDraftType === 'percent'" class="d-flex flex-wrap">
+            <v-btn
+              v-for="percentage in expressDiscountPercentages"
+              :key="percentage"
+              outlined
+              color="primary"
+              class="mr-2 mb-2 text-none"
+              @click="expressDiscountDraftValue = percentage"
+            >
+              {{ percentage }} %
+            </v-btn>
+          </div>
+          <v-text-field
+            v-model="expressDiscountDraftValue"
+            :label="expressDiscountDraftType === 'percent' ? 'Pourcentage' : 'Montant de la remise'"
+            :suffix="expressDiscountDraftType === 'percent' ? '%' : '€'"
+            type="number"
+            min="0"
+            step="0.01"
+            outlined
+            autofocus
+          ></v-text-field>
+          <div class="express-discount-preview">
+            <div class="d-flex justify-space-between">
+              <span>Total avant remise</span>
+              <strong>{{ formatCurrency(total) }}</strong>
+            </div>
+            <div class="d-flex justify-space-between warning--text">
+              <span>Remise</span>
+              <strong>- {{ formatCurrency(expressDiscountPreview.amount) }}</strong>
+            </div>
+            <div class="d-flex justify-space-between text-h6 mt-2">
+              <span>Total à payer</span>
+              <strong>{{ formatCurrency(expressDiscountPreview.total) }}</strong>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn text class="text-none" @click="clearExpressDiscount">
+            Supprimer
+          </v-btn>
+          <v-spacer />
+          <v-btn
+            text
+            class="text-none"
+            @click="expressPaymentDialog = true; expressDiscountDialog = false"
+          >
+            Annuler
+          </v-btn>
+          <v-btn color="primary" class="text-none" @click="applyExpressDiscount">
+            Appliquer
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -817,7 +898,7 @@
               @click="selectExpressTable(table)"
             >
               <v-icon class="mb-2">mdi-table-chair</v-icon>
-              <span>{{ table.username }}</span>
+              <span>{{ table.name }}</span>
             </v-btn>
           </div>
         </v-card-text>
@@ -924,6 +1005,8 @@ import {
   buildCashierReceiptPayload,
   sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
+import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
+import { calculateDiscount } from '@/helpers/discount'
 // import * as config from '@/nuxt.config'
 export default {
   components: {
@@ -984,13 +1067,18 @@ export default {
     productViewMode: 'categories',
     activeMobileCategory: null,
     activeExpressCategory: null,
-    expressSelectedTable: parseInt(localStorage.getItem('idUser')),
+    expressSelectedTable: parseInt(localStorage.getItem('service_point_id')) || null,
     expressCustomer: '',
     expressPhone: '',
     expressRemark: '',
     expressIsTakeaway: false,
     expressPaymentLoading: null,
     expressPaymentDialog: false,
+    expressDiscountDialog: false,
+    expressDiscountType: 'none',
+    expressDiscountValue: 0,
+    expressDiscountDraftType: 'percent',
+    expressDiscountDraftValue: 0,
     expressReceiptDialog: false,
     expressReceiptPrinting: false,
     expressTableDialog: false,
@@ -1012,7 +1100,7 @@ export default {
         .filter((x) => x.archived === 0 && !this.isProductHidden(x))
     },
     dataTables() {
-      return this.$store.get('tables/dataTables') || []
+      return this.$store.get('servicePoints/items') || []
     },
     productsByCategory() {
       return this.dataProduct.reduce((groups, product) => {
@@ -1090,11 +1178,44 @@ export default {
       )
     },
     selectedExpressTableName() {
-      if (this.selectedExpressTable) return this.selectedExpressTable.username
-      return 'Choisir une table'
+      if (this.selectedExpressTable) return this.selectedExpressTable.name
+      return 'Choisir une destination'
     },
     expressSelectedServiceLabel() {
       return this.expressIsTakeaway ? 'À emporter' : 'Sur place'
+    },
+    expressPaymentMethods() {
+      return getPaymentMethodOptions(
+        this.$store.get('shop/shop_payment_methods')
+      )
+    },
+    expressDiscountPercentages() {
+      return (
+        this.$store.get('shop/shop_discount_percentages') || [5, 10, 15, 20]
+      )
+    },
+    expressDiscountPreview() {
+      return calculateDiscount({
+        subtotal: this.total,
+        type: this.expressDiscountDraftType,
+        value: this.expressDiscountDraftValue,
+      })
+    },
+    expressCheckoutTotal() {
+      return calculateDiscount({
+        subtotal: this.total,
+        type: this.expressDiscountType,
+        value: this.expressDiscountValue,
+      }).total
+    },
+    expressDiscountLabel() {
+      if (this.expressDiscountType === 'percent') {
+        return `Remise ${this.expressDiscountValue} %`
+      }
+      if (this.expressDiscountType === 'amount') {
+        return `Remise ${this.formatCurrency(this.expressDiscountValue)}`
+      }
+      return 'Remise'
     },
     expressSubmitDisabled() {
       return (
@@ -1106,6 +1227,12 @@ export default {
     },
   },
   watch: {
+    dataTables(points) {
+      if (!this.expressSelectedTable && Array.isArray(points)) {
+        const counter = points.find((point) => point.system_key === 'counter')
+        if (counter) this.expressSelectedTable = counter.id
+      }
+    },
     categories() {
       this.ensureActiveMobileCategory()
       if (typeof this.ensureActiveExpressCategory === 'function') {
@@ -1125,7 +1252,7 @@ export default {
       await Promise.all([
         this.$store.dispatch('products/getProducts'),
         this.$store.dispatch('shop/getCurrentShopInfo'),
-        this.$store.dispatch('tables/getAllTables'),
+        this.$store.dispatch('servicePoints/getAll'),
       ])
       if (typeof this.ensureActiveMobileCategory === 'function') {
         this.ensureActiveMobileCategory()
@@ -1165,7 +1292,7 @@ export default {
     const calls = [
       this.$store.dispatch('products/getProducts'),
       this.$store.dispatch('shop/getCurrentShopInfo'),
-      this.$store.dispatch('tables/getAllTables'),
+      this.$store.dispatch('servicePoints/getAll'),
     ]
     if (!Array.isArray(existingCart) || existingCart.length === 0) {
       calls.push(
@@ -1346,6 +1473,34 @@ export default {
     openExpressPaymentDialog() {
       if (this.expressSubmitDisabled) return
       this.expressPaymentDialog = true
+    },
+    openExpressDiscountDialog() {
+      this.expressDiscountDraftType =
+        this.expressDiscountType === 'none'
+          ? 'percent'
+          : this.expressDiscountType
+      this.expressDiscountDraftValue =
+        this.expressDiscountType === 'none' ? 0 : this.expressDiscountValue
+      this.expressPaymentDialog = false
+      this.expressDiscountDialog = true
+    },
+    applyExpressDiscount() {
+      const preview = this.expressDiscountPreview
+      if (!preview.value || !preview.amount) {
+        this.clearExpressDiscount()
+        return
+      }
+      this.expressDiscountType = preview.type
+      this.expressDiscountValue = preview.value
+      this.expressDiscountDialog = false
+      this.expressPaymentDialog = true
+    },
+    clearExpressDiscount({ reopenPaymentDialog = true } = {}) {
+      this.expressDiscountType = 'none'
+      this.expressDiscountValue = 0
+      this.expressDiscountDraftValue = 0
+      this.expressDiscountDialog = false
+      if (reopenPaymentDialog) this.expressPaymentDialog = true
     },
     selectExpressTable(table) {
       if (!table) return
@@ -1550,8 +1705,10 @@ export default {
       this.expressPaymentLoading = paymentMethod
       const result = await this.$store.dispatch('cart/checkoutOrder', {
         customer: String(this.expressCustomer || '').trim() || 'Client comptoir',
-        customerID: this.expressSelectedTable,
-        total: this.roundPrice(this.total),
+        servicePointId: this.expressSelectedTable,
+        total: this.roundPrice(this.expressCheckoutTotal),
+        discountType: this.expressDiscountType,
+        discountValue: this.expressDiscountValue,
         payment: 'Paiement au comptoir',
         remark: this.buildExpressRemark(),
         phone: String(this.expressPhone || '').trim(),
@@ -1572,6 +1729,7 @@ export default {
       this.expressCustomer = ''
       this.expressPhone = ''
       this.expressRemark = ''
+      this.clearExpressDiscount({ reopenPaymentDialog: false })
       this.expressIsTakeaway = false
       this.$store.dispatch(
         'notifications/success',
@@ -1637,8 +1795,10 @@ export default {
       this.expressPaymentLoading = paymentMethod
       const result = await this.$store.dispatch('cart/checkoutCounterPayBefore', {
         customer: String(this.expressCustomer || '').trim() || 'Client comptoir',
-        customerID: this.expressSelectedTable,
-        total: this.roundPrice(this.total),
+        servicePointId: this.expressSelectedTable,
+        total: this.roundPrice(this.expressCheckoutTotal),
+        discountType: this.expressDiscountType,
+        discountValue: this.expressDiscountValue,
         payment: paymentMethod,
         remark: this.buildExpressRemark(),
         phone: String(this.expressPhone || '').trim(),
@@ -1662,6 +1822,7 @@ export default {
       this.expressCustomer = ''
       this.expressPhone = ''
       this.expressRemark = ''
+      this.clearExpressDiscount({ reopenPaymentDialog: false })
       this.expressIsTakeaway = false
       this.$store.dispatch(
         'notifications/success',

@@ -39,7 +39,7 @@ export const actions = {
   },
   getOrdersByUserId({ dispatch }, params) {
     return this.$axios
-      .get(`/baseurl/api/v1/ordersbyUserId?userId=${params.userId}`, {
+      .get(`/baseurl/api/v1/ordersbyUserId?servicePointId=${params.servicePointId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },

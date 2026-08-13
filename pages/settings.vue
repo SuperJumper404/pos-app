@@ -150,10 +150,26 @@
         <v-col cols="6">
           <v-combobox
             v-model="formShop.shop_payment_methods"
-            :items="AllPaymentsMethods"
+            :items="PAYMENT_METHOD_OPTIONS"
+            item-text="text"
+            item-value="value"
             label="Sélectionner les moyens de paiement disponibles"
             multiple
             chips
+          ></v-combobox>
+        </v-col>
+        <v-col cols="6">
+          <v-combobox
+            v-model="formShop.discount_percentages"
+            :items="DISCOUNT_PERCENTAGE_OPTIONS"
+            label="Remises en pourcentage disponibles"
+            suffix="%"
+            type="number"
+            multiple
+            chips
+            small-chips
+            hint="Ces remises seront proposées au moment de l'encaissement."
+            persistent-hint
           ></v-combobox>
         </v-col>
         <v-col cols="6">
@@ -350,6 +366,15 @@
 <script>
 import Loading from '@/components/loading'
 import formatdate from '@/helpers/formatdate'
+import {
+  PAYMENT_METHOD_OPTIONS,
+  normalizePaymentMethods,
+} from '@/helpers/paymentMethods'
+import {
+  DEFAULT_DISCOUNT_PERCENTAGES,
+  DISCOUNT_PERCENTAGE_OPTIONS,
+  normalizeDiscountPercentages,
+} from '@/helpers/discount'
 import Vue from 'vue'
 import VueQRCodeComponent from 'vue-qrcode-component/src/QRCode.vue'
 
@@ -380,6 +405,9 @@ export default {
     formReady: false,
     loadingBtn: false,
     shopId: localStorage.getItem('shopid'),
+    PAYMENT_METHOD_OPTIONS,
+    DISCOUNT_PERCENTAGE_OPTIONS,
+    DEFAULT_DISCOUNT_PERCENTAGES,
     AllPaymentsMethods: ['Chèque', 'Espèces ', 'Tickets Restaurants'],
     shopImg: null,
     imageUrl: null,
@@ -390,6 +418,7 @@ export default {
       shop_status: '',
       shop_hours: [],
       shop_payment_methods: [],
+      discount_percentages: [...DEFAULT_DISCOUNT_PERCENTAGES],
       shop_social_media: {
         instagram: '',
         snapchat: '',
@@ -444,6 +473,9 @@ export default {
     },
     shop_payment_methods() {
       return this.$store.get('shop/shop_payment_methods')
+    },
+    shop_discount_percentages() {
+      return this.$store.get('shop/shop_discount_percentages')
     },
     shop_profile_image() {
       return this.$store.get('shop/shop_profile_image')
@@ -555,8 +587,11 @@ export default {
         this.formShop.shop_phone = this.shop_phone
         this.formShop.shop_status = this.shop_status
         this.formShop.shop_description = this.shop_description
-        this.formShop.shop_payment_methods = JSON.parse(
-          JSON.stringify(this.shop_payment_methods)
+        this.formShop.shop_payment_methods = normalizePaymentMethods(
+          this.shop_payment_methods
+        )
+        this.formShop.discount_percentages = normalizeDiscountPercentages(
+          this.shop_discount_percentages
         )
         console.log(
           ' shop_hours',
@@ -601,6 +636,12 @@ export default {
     async submitShopEdit() {
       if (this.isValue) {
         this.loadingBtn = true
+        this.formShop.shop_payment_methods = normalizePaymentMethods(
+          this.formShop.shop_payment_methods
+        )
+        this.formShop.discount_percentages = normalizeDiscountPercentages(
+          this.formShop.discount_percentages
+        )
         const res = await this.$store.dispatch('shop/updateShopInfo', {
           id: this.id,
           data: this.formShop,

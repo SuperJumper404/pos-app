@@ -25,14 +25,6 @@
               <span class="order-detail-header__label">Client</span>
               <strong>{{ orderSummary.customer || '—' }}</strong>
             </div>
-            <div class="order-detail-header__field">
-              <span class="order-detail-header__label">Prise par</span>
-              <strong>{{ orderSummary.taken_by_name || 'Non attribuee' }}</strong>
-            </div>
-            <div class="order-detail-header__field">
-              <span class="order-detail-header__label">Preparee par</span>
-              <strong>{{ orderSummary.prepared_by_name || 'Non attribuee' }}</strong>
-            </div>
             <div
               v-if="orderPaymentStatus"
               class="order-detail-header__field"
@@ -128,6 +120,19 @@
         :details="detailOrder"
         class="mt-3"
       />
+
+      <v-card v-if="orderSummary" outlined class="order-detail-attribution mt-3">
+        <v-card-text class="order-detail-attribution__grid">
+          <div class="order-detail-attribution__field">
+            <span class="order-detail-attribution__label">Prise par</span>
+            <strong>{{ orderSummary.taken_by_name || 'Non attribuee' }}</strong>
+          </div>
+          <div class="order-detail-attribution__field">
+            <span class="order-detail-attribution__label">Preparee par</span>
+            <strong>{{ orderSummary.prepared_by_name || 'Non attribuee' }}</strong>
+          </div>
+        </v-card-text>
+      </v-card>
     </div>
 
     <v-alert
@@ -487,7 +492,8 @@ export default {
 }
 
 .order-detail-header-card,
-.order-detail-list-card {
+.order-detail-list-card,
+.order-detail-attribution {
   border-radius: 12px !important;
 }
 
@@ -544,6 +550,35 @@ export default {
   color: rgba(0, 0, 0, 0.87);
   font-size: 12px;
   line-height: 1.2;
+}
+
+.order-detail-attribution__grid {
+  display: grid;
+  gap: 12px 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 14px 20px;
+}
+
+.order-detail-attribution__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-detail-attribution__label {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.order-detail-attribution__field strong {
+  color: rgba(0, 0, 0, 0.87);
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .order-detail-list {
@@ -752,6 +787,10 @@ export default {
   .order-detail-header__identity {
     gap: 12px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .order-detail-attribution__grid {
+    grid-template-columns: 1fr;
   }
 
   .order-detail-list {

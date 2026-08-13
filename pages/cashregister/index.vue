@@ -220,10 +220,7 @@ export default {
   },
   computed: {
     dataTables() {
-      const result = this.$store.get('tables/dataTables') || []
-      return result.filter(
-        (x) => x.access === 2 || x.access === 0 || x.access === 3
-      )
+      return this.$store.get('servicePoints/items') || []
     },
 
     getAllOrders() {
@@ -240,23 +237,33 @@ export default {
     this.$root.$on('modalClosed', () => {
       this.loadTableData()
     })
-    this.$store.dispatch('orders/getAllOrder').then(() => {
+    Promise.all([
+      this.$store.dispatch('orders/getAllOrder'),
+      this.$store.dispatch('servicePoints/getAll'),
+    ]).then(() => {
       this.loadTableData()
     })
   },
   methods: {
+    tableDisplayName(table) {
+      return table.name || table.username || table.tableName || 'Table'
+    },
+    tableServicePointId(table) {
+      return table.service_point_id || table.id
+    },
     buildTableGlobalData() {
       return this.dataTables.map((table) => {
+        const tableId = this.tableServicePointId(table)
         const tableOrders = this.getAllOrders.filter(
-          (x) => x.customerID === table.id
+          (x) => Number(x.service_point_id || x.customerID) === Number(tableId)
         )
         const finishedOrders = tableOrders.filter((x) => x.status === 3)
         const customerTotalArray = buildCashRegisterCustomerRows(finishedOrders)
         const paymentSummary = getCashRegisterPaymentSummary(finishedOrders)
 
         return {
-          tableName: table.username,
-          tableId: table.id,
+          tableName: this.tableDisplayName(table),
+          tableId,
           canceled: tableOrders.filter((x) => x.status === 4).length,
           finished: finishedOrders,
           waiting: tableOrders.filter((x) => x.status === 1).length,

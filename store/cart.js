@@ -55,8 +55,16 @@ const buildCheckoutPayload = (params, clientOrderToken) => ({
   expected_total: roundPrice(
     params.total == null ? params.expected_total : params.total
   ),
+  ...(params.discountType
+    ? { discount_type: params.discountType }
+    : {}),
+  ...(params.discountValue != null
+    ? { discount_value: roundPrice(params.discountValue) }
+    : {}),
   customer: params.customer,
-  customerID: params.customerID,
+  ...(params.servicePointId || params.service_point_id
+    ? { service_point_id: params.servicePointId || params.service_point_id }
+    : { customerID: params.customerID }),
   payment: params.payment,
   is_takeaway: params.isTakeaway === true,
   remark: params.remark,

@@ -16,7 +16,7 @@ export const plugins = [EasyAccess()]
 export const actions = {
   getAllTables({ dispatch }) {
     return this.$axios
-      .get('/baseurl/api/v1/users', {
+      .get('/baseurl/api/v1/service-points/tables', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -34,7 +34,7 @@ export const actions = {
   },
   postTable({ dispatch }, params) {
     return this.$axios
-      .post('/baseurl/api/v1/register', params, {
+      .post('/baseurl/api/v1/service-points/tables', params, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -50,7 +50,7 @@ export const actions = {
   },
   deleteTable(params) {
     return this.$axios
-      .delete(`/baseurl/api/v1/user/${params}`, {
+      .delete(`/baseurl/api/v1/service-points/tables/${params}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },

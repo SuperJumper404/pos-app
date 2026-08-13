@@ -7,10 +7,13 @@ const source = fs.readFileSync(
   'utf8'
 )
 
-assert.ok(source.includes('v-tabs'))
-assert.ok(source.includes('Commandes'))
+assert.ok(!source.includes('v-tabs'))
+assert.ok(!source.includes('<v-tab'))
+assert.ok(!source.includes('<v-tabs-items'))
+assert.ok(!source.includes('Commandes</v-tab>'))
 assert.ok(source.includes('Clôture Z'))
 assert.ok(source.includes('Historique Z'))
+assert.ok(source.indexOf('Clôture Z') < source.indexOf('Historique Z'))
 assert.ok(source.includes('currentClosure'))
 assert.ok(source.includes('closureHistory'))
 assert.ok(source.includes('closeClosureDialog'))
@@ -33,5 +36,6 @@ assert.ok(source.includes('selectedClosureDetail.vat_summary'))
 assert.ok(source.includes('mdi-printer'))
 assert.ok(source.includes('@click="printClosureDetail"'))
 assert.ok(source.includes('window.print()'))
+assert.ok(!source.includes("orders/getAllOrder"))
 
 console.log('reports ticket z tests passed')

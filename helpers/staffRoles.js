@@ -23,7 +23,40 @@ const ROLE_LABELS = {
   [ACCESS.KITCHEN]: 'Cuisine',
 }
 
-const MODULES_BY_ACCESS = {
+const STAFF_MODULE_KEYS = [
+  'home',
+  'orders',
+  'cashregister',
+  'history',
+  'catalog',
+  'stocks',
+  'tables',
+  'reports',
+  'website',
+]
+
+const MODULE_OPTIONS = [
+  { text: 'Accueil', value: 'home' },
+  { text: 'Commandes', value: 'orders' },
+  { text: 'Tiroir-caisse', value: 'cashregister' },
+  { text: 'Historique', value: 'history' },
+  { text: 'Produits et menus', value: 'catalog' },
+  { text: 'Stock', value: 'stocks' },
+  { text: 'Tables', value: 'tables' },
+  { text: 'Rapports', value: 'reports' },
+  { text: 'Site web', value: 'website' },
+]
+
+const DEFAULT_MODULES_BY_ACCESS = {
+  [ACCESS.ADMIN]: STAFF_MODULE_KEYS,
+  [ACCESS.CASHIER]: ['orders', 'cashregister', 'history'],
+  [ACCESS.TABLE_QR]: ['orders'],
+  [ACCESS.CLICK_AND_COLLECT]: ['orders'],
+  [ACCESS.SERVER]: ['orders'],
+  [ACCESS.KITCHEN]: ['orders'],
+}
+
+const LEGACY_MODULES_BY_ACCESS = {
   [ACCESS.ADMIN]: new Set([
     'home',
     'products',
@@ -32,9 +65,7 @@ const MODULES_BY_ACCESS = {
     'cashregister',
     'history',
     'tables',
-    'settings',
     'website',
-    'staff',
   ]),
   [ACCESS.CASHIER]: new Set(['menus', 'orders', 'cashregister', 'history']),
   [ACCESS.TABLE_QR]: new Set(['menus', 'cart']),
@@ -42,6 +73,24 @@ const MODULES_BY_ACCESS = {
   [ACCESS.SERVER]: new Set(['menus', 'orders', 'cart']),
   [ACCESS.KITCHEN]: new Set(['orders']),
 }
+
+const MODULE_PERMISSION_BY_NAV_KEY = {
+  home: 'home',
+  categories: 'catalog',
+  products: 'catalog',
+  customizations: 'catalog',
+  menus: 'orders',
+  cart: 'orders',
+  orders: 'orders',
+  cashregister: 'cashregister',
+  history: 'history',
+  stocks: 'stocks',
+  tables: 'tables',
+  reports: 'reports',
+  website: 'website',
+}
+
+const PRIMARY_ADMIN_MODULES = new Set(['staff', 'settings'])
 
 const isStaffAccess = (access) => ROLE_OPTIONS.some(
   (role) => role.value === Number(access)
@@ -51,21 +100,54 @@ const isTableQrAccess = (access) => Number(access) === ACCESS.TABLE_QR
 
 const getRoleLabel = (access) => ROLE_LABELS[Number(access)] || 'Inconnu'
 
-const canAccessModule = (access, moduleKey) => {
-  const modules = MODULES_BY_ACCESS[Number(access)]
-  return Boolean(modules && modules.has(moduleKey))
+const getRoleModuleDefaults = (access) => [
+  ...(DEFAULT_MODULES_BY_ACCESS[Number(access)] || []),
+]
+
+const canAccessModule = (
+  access,
+  moduleKey,
+  modulePermissions = null,
+  isPrimaryAdmin = false,
+  legacyModuleKey = moduleKey
+) => {
+  if (isPrimaryAdmin) return true
+  if (PRIMARY_ADMIN_MODULES.has(moduleKey)) return false
+
+  if (!Array.isArray(modulePermissions)) {
+    const legacyModules = LEGACY_MODULES_BY_ACCESS[Number(access)]
+    return Boolean(legacyModules && legacyModules.has(legacyModuleKey))
+  }
+
+  const permissionKey = MODULE_PERMISSION_BY_NAV_KEY[moduleKey] || moduleKey
+  return modulePermissions.includes(permissionKey)
 }
 
-const getAccessibleNavigationItems = (access, items = []) => items.filter(
+const getAccessibleNavigationItems = (
+  access,
+  items = [],
+  modulePermissions = null,
+  isPrimaryAdmin = false
+) => items.filter(
   (item) => item.name === 'logout' || (
-    item.to && canAccessModule(access, item.moduleKey)
+    !item.hiddenFromMainNavigation &&
+    item.to && canAccessModule(
+      access,
+      item.moduleKey,
+      modulePermissions,
+      isPrimaryAdmin,
+      item.legacyModuleKey
+    )
   )
 )
 
 module.exports = {
   ACCESS,
   ROLE_OPTIONS,
+  MODULE_OPTIONS,
+  STAFF_MODULE_KEYS,
   canAccessModule,
+  getRoleModuleDefaults,
   getAccessibleNavigationItems,
   getRoleLabel,
   isStaffAccess,

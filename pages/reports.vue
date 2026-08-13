@@ -10,162 +10,103 @@
     </v-card>
 
     <v-card v-else outlined class="mt-5">
-      <v-tabs v-model="activeTab" background-color="grey lighten-4">
-        <v-tab class="text-none">Commandes</v-tab>
-        <v-tab class="text-none">Clôture Z</v-tab>
-        <v-tab class="text-none">Historique Z</v-tab>
-      </v-tabs>
-
-      <v-tabs-items v-model="activeTab">
-        <v-tab-item>
-          <v-app-bar flat color="grey lighten-4" light>
-            <v-spacer></v-spacer>
-            <div class="mt-6">
-              <v-text-field
-                type="number"
-                placeholder="Rechercher un numéro de commande"
-                label="Rechercher"
-                outlined
-                dense
-                append-icon="mdi-card-search"
-                @keyup="searchData()"
-              ></v-text-field>
-            </div>
-          </v-app-bar>
-          <v-simple-table fixed-header height="300px">
-            <template #default>
-              <thead>
-                <tr>
-                  <th class="text-left">Date</th>
-                  <th class="text-left">Numéro de commande</th>
-                  <th class="text-left">Client</th>
-                  <th class="text-left">Opérateur</th>
-                  <th class="text-left">Total</th>
-                  <th class="text-left">Paiement</th>
-                  <th class="text-left">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="dataOrders.length === 0">
-                  <td>-</td>
-                  <td>-</td>
-                  <td>-</td>
-                  <td>Commande</td>
-                  <td>Aucune commande</td>
-                  <td>-</td>
-                  <td>-</td>
-                  <td>-</td>
-                </tr>
-                <tr v-for="item in dataOrders" v-else :key="item.name">
-                  <td>{{ setFormatDate(item.created) }}</td>
-                  <td>{{ item.ordernumber }}</td>
-                  <td>{{ item.customer }}</td>
-                  <td>{{ item.operator ? item.operator : '-' }}</td>
-                  <td>{{ formatCurrency(item.subtotal) }}</td>
-                  <td>{{ item.payment }}</td>
-                  <td>{{ item.status === 1 ? 'En attente' : 'Approuvée' }}</td>
-                </tr>
-              </tbody>
-            </template>
-          </v-simple-table>
-        </v-tab-item>
-
-        <v-tab-item>
-          <v-card-text>
-            <v-row>
-              <v-col cols="12" md="4">
-                <v-card outlined>
-                  <v-card-title>Ticket Z courant</v-card-title>
-                  <v-card-text>
-                    <div>Periode : {{ formatClosurePeriod(currentClosure) }}</div>
-                    <div>Commandes : {{ currentClosure.orders_count || 0 }}</div>
-                    <div>
-                      Total : {{ formatCurrency(currentClosure.total_revenue || 0) }}
-                    </div>
-                  </v-card-text>
-                  <v-card-actions>
-                    <v-btn
-                      color="primary"
-                      class="text-none"
-                      :loading="closingClosure"
-                      :disabled="closingClosure || !canCloseClosure"
-                      @click="closeClosureDialog = true"
-                    >
-                      Clôturer la caisse
-                      <v-icon small right>mdi-lock-check</v-icon>
-                    </v-btn>
-                  </v-card-actions>
-                </v-card>
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-card outlined>
-                  <v-card-title>Paiements</v-card-title>
-                  <v-simple-table dense>
-                    <tbody>
-                      <tr
-                        v-for="item in currentClosure.payments_summary || []"
-                        :key="item.payment"
-                      >
-                        <td>{{ item.payment }}</td>
-                        <td class="text-right">{{ formatCurrency(item.total) }}</td>
-                      </tr>
-                    </tbody>
-                  </v-simple-table>
-                </v-card>
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-card outlined>
-                  <v-card-title>TVA</v-card-title>
-                  <v-simple-table dense>
-                    <tbody>
-                      <tr
-                        v-for="item in currentClosure.vat_summary || []"
-                        :key="item.vat_rate"
-                      >
-                        <td>{{ item.vat_rate }}</td>
-                        <td class="text-right">
-                          {{ formatCurrency(item.total_vat) }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </v-simple-table>
-                </v-card>
-              </v-col>
-            </v-row>
-          </v-card-text>
-        </v-tab-item>
-
-        <v-tab-item>
-          <v-card-text>
-            <v-data-table
-              :headers="closureHeaders"
-              :items="closureHistory"
-              item-key="id"
-            >
-              <template #[`item.closure_number`]="{ item }">
-                Ticket Z #{{ item.closure_number }}
-              </template>
-              <template #[`item.closed_at`]="{ item }">
-                {{ formatClosureDate(item.closed_at) }}
-              </template>
-              <template #[`item.total_revenue`]="{ item }">
-                {{ formatCurrency(item.total_revenue) }}
-              </template>
-              <template #[`item.actions`]="{ item }">
+      <v-card-title>Clôture Z</v-card-title>
+      <v-card-text>
+        <v-row>
+          <v-col cols="12" md="4">
+            <v-card outlined>
+              <v-card-title>Ticket Z courant</v-card-title>
+              <v-card-text>
+                <div>Periode : {{ formatClosurePeriod(currentClosure) }}</div>
+                <div>Commandes : {{ currentClosure.orders_count || 0 }}</div>
+                <div>
+                  Total : {{ formatCurrency(currentClosure.total_revenue || 0) }}
+                </div>
+              </v-card-text>
+              <v-card-actions>
                 <v-btn
-                  icon
-                  small
-                  title="Voir le Ticket Z"
-                  :loading="loadingClosureDetail === item.id"
-                  @click="showClosureDetail(item)"
+                  color="primary"
+                  class="text-none"
+                  :loading="closingClosure"
+                  :disabled="closingClosure || !canCloseClosure"
+                  @click="closeClosureDialog = true"
                 >
-                  <v-icon small>mdi-eye</v-icon>
+                  Clôturer la caisse
+                  <v-icon small right>mdi-lock-check</v-icon>
                 </v-btn>
-              </template>
-            </v-data-table>
-          </v-card-text>
-        </v-tab-item>
-      </v-tabs-items>
+              </v-card-actions>
+            </v-card>
+          </v-col>
+
+          <v-col cols="12" md="4">
+            <v-card outlined>
+              <v-card-title>Paiements</v-card-title>
+              <v-simple-table dense>
+                <tbody>
+                  <tr
+                    v-for="item in currentClosure.payments_summary || []"
+                    :key="item.payment"
+                  >
+                    <td>{{ item.payment }}</td>
+                    <td class="text-right">{{ formatCurrency(item.total) }}</td>
+                  </tr>
+                </tbody>
+              </v-simple-table>
+            </v-card>
+          </v-col>
+
+          <v-col cols="12" md="4">
+            <v-card outlined>
+              <v-card-title>TVA</v-card-title>
+              <v-simple-table dense>
+                <tbody>
+                  <tr
+                    v-for="item in currentClosure.vat_summary || []"
+                    :key="item.vat_rate"
+                  >
+                    <td>{{ item.vat_rate }}</td>
+                    <td class="text-right">
+                      {{ formatCurrency(item.total_vat) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </v-simple-table>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-card-text>
+
+      <v-divider></v-divider>
+
+      <v-card-title>Historique Z</v-card-title>
+      <v-card-text>
+        <v-data-table
+          :headers="closureHeaders"
+          :items="closureHistory"
+          item-key="id"
+        >
+          <template #[`item.closure_number`]="{ item }">
+            Ticket Z #{{ item.closure_number }}
+          </template>
+          <template #[`item.closed_at`]="{ item }">
+            {{ formatClosureDate(item.closed_at) }}
+          </template>
+          <template #[`item.total_revenue`]="{ item }">
+            {{ formatCurrency(item.total_revenue) }}
+          </template>
+          <template #[`item.actions`]="{ item }">
+            <v-btn
+              icon
+              small
+              title="Voir le Ticket Z"
+              :loading="loadingClosureDetail === item.id"
+              @click="showClosureDetail(item)"
+            >
+              <v-icon small>mdi-eye</v-icon>
+            </v-btn>
+          </template>
+        </v-data-table>
+      </v-card-text>
     </v-card>
 
     <v-dialog v-model="closeClosureDialog" max-width="520">
@@ -270,16 +211,17 @@
     </v-dialog>
   </v-container>
 </template>
+
 <script>
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
+
 export default {
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {
     return {
       loadPage: false,
-      activeTab: 0,
       closeClosureDialog: false,
       closingClosure: false,
       closureDetailDialog: false,
@@ -302,9 +244,6 @@ export default {
     }
   },
   computed: {
-    dataOrders() {
-      return this.$store.get('orders/dataOrders')
-    },
     currentClosure() {
       return this.$store.get('cashClosures/current') || {}
     },
@@ -321,7 +260,6 @@ export default {
   mounted() {
     this.loadPage = true
     Promise.all([
-      this.$store.dispatch('orders/getAllOrder'),
       this.$store.dispatch('cashClosures/getCurrent'),
       this.$store.dispatch('cashClosures/getHistory'),
     ]).finally(() => {
@@ -329,9 +267,6 @@ export default {
     })
   },
   methods: {
-    searchData() {
-      this.$store.dispatch('orders/getAllOrder')
-    },
     formatClosureDate(value) {
       if (!value) return '-'
       return new Date(value).toLocaleString('fr-FR')

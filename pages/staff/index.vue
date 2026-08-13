@@ -18,7 +18,7 @@
     >
       <template #[`item.access`]="{ item }">
         <v-chip small :color="roleColor(item.access)" dark>
-          {{ roleLabel(item.access) }}
+          {{ isPrimaryAdmin(item) ? 'Admin principal' : roleLabel(item.access) }}
         </v-chip>
       </template>
       <template #[`item.status`]="{ item }">
@@ -38,15 +38,15 @@
           </template>
           Modifier
         </v-tooltip>
-        <v-tooltip top>
+        <v-tooltip v-if="!isPrimaryAdmin(item)" top>
           <template #activator="{ on, attrs }">
             <v-btn icon small v-bind="attrs" v-on="on" @click="openCredentials(item)">
               <v-icon small>mdi-key-variant</v-icon>
             </v-btn>
           </template>
-          Identifiants caisse
+          Nouveau PIN
         </v-tooltip>
-        <v-tooltip top>
+        <v-tooltip v-if="!isPrimaryAdmin(item)" top>
           <template #activator="{ on, attrs }">
             <v-btn icon small color="error" v-bind="attrs" v-on="on" @click="confirmRemove(item)">
               <v-icon small>mdi-delete</v-icon>
@@ -69,37 +69,44 @@
               autofocus
             />
             <v-text-field
-              v-model.trim="form.email"
-              label="E-mail"
-              type="email"
-              :disabled="isEditing"
-              :rules="emailRules"
-            />
-            <v-text-field v-model.trim="form.phone" label="Telephone" />
-            <v-text-field
-              v-if="!isEditing"
-              v-model="form.pin"
-              label="PIN a 4 chiffres"
-              type="password"
-              inputmode="numeric"
-              maxlength="4"
-              :rules="pinRules"
-            />
-            <v-text-field
-              v-if="!isEditing && Number(form.access) === 0"
-              v-model="form.password"
-              label="Mot de passe e-mail"
-              type="password"
+              v-if="isEditing"
+              :value="form.staff_login_id"
+              label="ID caisse"
+              readonly
             />
             <v-select
+              v-if="!isEditingPrimaryAdmin"
               v-model="form.access"
               :items="ROLE_OPTIONS"
               item-text="text"
               item-value="value"
-              label="Acces"
+              label="Role"
               :rules="accessRules"
+              @change="applyRolePreset"
             />
-            <v-switch v-model="form.active" label="Compte actif" />
+            <div v-if="!isEditingPrimaryAdmin" class="text-subtitle-2 mb-2">Modules accessibles</div>
+            <v-row v-if="!isEditingPrimaryAdmin" no-gutters>
+              <v-col
+                v-for="module in MODULE_OPTIONS"
+                :key="module.value"
+                cols="12"
+                sm="6"
+              >
+                <v-checkbox
+                  v-model="form.module_permissions"
+                  :label="module.text"
+                  :value="module.value"
+                  hide-details
+                  class="mt-1"
+                />
+              </v-col>
+            </v-row>
+            <v-switch
+              v-if="!isEditingPrimaryAdmin"
+              v-model="form.active"
+              label="Compte actif"
+              class="mt-4"
+            />
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -116,48 +123,33 @@
       <v-card>
         <v-card-title>Identifiants caisse</v-card-title>
         <v-card-text>
-          <v-form ref="credentialsForm" v-model="credentialsValid" @submit.prevent="saveCredentials">
-            <v-text-field
-              v-if="credentialResult"
-              :value="credentialResult.staff_login_id"
-              label="ID caisse"
-              readonly
-            />
-            <v-text-field
-              v-model="credentialsPin"
-              label="PIN a 4 chiffres"
-              type="password"
-              inputmode="numeric"
-              maxlength="4"
-              :rules="pinRules"
-            />
-            <v-switch v-model="regenerateLoginId" label="Regenerer ID caisse" />
-          </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn text class="text-none" @click="closeCredentials">Annuler</v-btn>
-          <v-btn color="primary" class="text-none" :loading="credentialLoading" @click="saveCredentials">
-            Enregistrer
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog v-model="createdCredentialsDialog" max-width="420">
-      <v-card>
-        <v-card-title>Identifiants caisse</v-card-title>
-        <v-card-text>
           <v-text-field
-            :value="createdCredentials.staff_login_id"
+            v-if="credentialResult"
+            :value="credentialResult.staff_login_id"
             label="ID caisse"
             readonly
+          />
+          <v-text-field
+            v-if="credentialResult && credentialResult.staff_pin"
+            :value="credentialResult.staff_pin"
+            label="PIN"
+            :type="showCredentialPin ? 'text' : 'password'"
+            :append-icon="showCredentialPin ? 'mdi-eye-off' : 'mdi-eye'"
+            readonly
+            @click:append="showCredentialPin = !showCredentialPin"
           />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn color="primary" class="text-none" @click="createdCredentialsDialog = false">
-            Fermer
+          <v-btn text class="text-none" @click="closeCredentials">Fermer</v-btn>
+          <v-btn
+            v-if="credentialUser && !(credentialResult && credentialResult.staff_pin)"
+            color="primary"
+            class="text-none"
+            :loading="credentialLoading"
+            @click="saveCredentials"
+          >
+            Generer un PIN
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -182,57 +174,51 @@
 </template>
 
 <script>
-const { ROLE_OPTIONS, getRoleLabel } = require('@/helpers/staffRoles')
+const {
+  MODULE_OPTIONS,
+  ROLE_OPTIONS,
+  getRoleLabel,
+  getRoleModuleDefaults,
+} = require('@/helpers/staffRoles')
 
 const emptyForm = () => ({
   id: null,
   username: '',
-  email: '',
-  phone: '',
-  password: '',
-  pin: '',
+  staff_login_id: '',
   access: null,
+  module_permissions: [],
   active: true,
+  is_primary_admin: false,
 })
 
 export default {
   middleware: 'auth',
   data() {
     return {
+      MODULE_OPTIONS,
       ROLE_OPTIONS,
       loading: false,
       submitting: false,
       removing: false,
       formDialog: false,
       credentialsDialog: false,
-      createdCredentialsDialog: false,
       removeDialog: false,
       formValid: false,
-      credentialsValid: false,
       credentialLoading: false,
       form: emptyForm(),
       credentialUser: null,
       credentialResult: null,
-      createdCredentials: {},
-      credentialsPin: '',
-      regenerateLoginId: false,
+      showCredentialPin: false,
       removeTarget: null,
       headers: [
         { text: 'Nom', value: 'username' },
-        { text: 'E-mail', value: 'email' },
         { text: 'ID caisse', value: 'staff_login_id' },
         { text: 'Role', value: 'access' },
         { text: 'Statut', value: 'status' },
         { text: 'Actions', value: 'actions', sortable: false },
       ],
       requiredRules: [(value) => !!value || 'Champ requis'],
-      emailRules: [
-        (value) => !value || /.+@.+\..+/.test(value) || 'E-mail invalide',
-      ],
-      pinRules: [
-        (value) => /^\d{4}$/.test(value || '') || 'PIN a 4 chiffres requis',
-      ],
-      accessRules: [(value) => value !== null || 'Acces requis'],
+      accessRules: [(value) => value !== null || 'Role requis'],
     }
   },
   computed: {
@@ -241,6 +227,9 @@ export default {
     },
     isEditing() {
       return this.form.id !== null
+    },
+    isEditingPrimaryAdmin() {
+      return this.isEditing && this.form.is_primary_admin
     },
   },
   mounted() {
@@ -258,6 +247,9 @@ export default {
         5: 'red darken-2',
       }[Number(access)] || 'grey'
     },
+    isPrimaryAdmin(user) {
+      return Number(user.is_primary_admin) === 1
+    },
     async refresh() {
       this.loading = true
       await this.$store.dispatch('staff/getAll')
@@ -268,17 +260,22 @@ export default {
       this.formDialog = true
     },
     openEdit(user) {
+      const access = Number(user.access)
       this.form = {
         id: user.id,
         username: user.username || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        password: '',
-        pin: '',
-        access: Number(user.access),
+        staff_login_id: user.staff_login_id || '',
+        access,
+        module_permissions: Array.isArray(user.module_permissions)
+          ? user.module_permissions
+          : getRoleModuleDefaults(access),
         active: Number(user.status) === 1,
+        is_primary_admin: this.isPrimaryAdmin(user),
       }
       this.formDialog = true
+    },
+    applyRolePreset(access) {
+      this.form.module_permissions = getRoleModuleDefaults(access)
     },
     closeForm() {
       this.formDialog = false
@@ -289,59 +286,50 @@ export default {
       if (!this.$refs.form.validate()) return
       const isCreating = !this.isEditing
       this.submitting = true
-      const data = {
-        username: this.form.username,
-        phone: this.form.phone,
-        access: this.form.access,
-        status: this.form.active ? 1 : 0,
-      }
+      const data = this.isEditingPrimaryAdmin
+        ? { username: this.form.username }
+        : {
+          username: this.form.username,
+          access: this.form.access,
+          status: this.form.active ? 1 : 0,
+          module_permissions: this.form.module_permissions,
+        }
       const result = this.isEditing
         ? await this.$store.dispatch('staff/update', { id: this.form.id, data })
-        : await this.$store.dispatch('staff/create', {
-          ...data,
-          email: this.form.email,
-          pin: this.form.pin,
-          password: this.form.password,
-        })
+        : await this.$store.dispatch('staff/create', data)
       this.submitting = false
       if (!result) return
       this.closeForm()
       await this.refresh()
-      if (isCreating && result.staff_login_id) {
-        this.createdCredentials = result
-        this.createdCredentialsDialog = true
+      if (isCreating && result.staff_login_id && result.staff_pin) {
+        this.credentialUser = null
+        this.credentialResult = result
+        this.showCredentialPin = false
+        this.credentialsDialog = true
       }
     },
     openCredentials(user) {
       this.credentialUser = user
-      this.credentialResult = user.staff_login_id
-        ? { staff_login_id: user.staff_login_id }
-        : null
-      this.credentialsPin = ''
-      this.regenerateLoginId = false
+      this.credentialResult = { staff_login_id: user.staff_login_id }
+      this.showCredentialPin = false
       this.credentialsDialog = true
     },
     closeCredentials() {
       this.credentialsDialog = false
       this.credentialUser = null
       this.credentialResult = null
-      this.credentialsPin = ''
-      this.regenerateLoginId = false
-      if (this.$refs.credentialsForm) this.$refs.credentialsForm.resetValidation()
+      this.showCredentialPin = false
     },
     async saveCredentials() {
-      if (!this.credentialUser || !this.$refs.credentialsForm.validate()) return
+      if (!this.credentialUser) return
       this.credentialLoading = true
       const result = await this.$store.dispatch('staff/provisionCredentials', {
         id: this.credentialUser.id,
-        pin: this.credentialsPin,
-        regenerateLoginId: this.regenerateLoginId,
       })
       this.credentialLoading = false
       if (!result) return
       this.credentialResult = result
-      this.credentialsPin = ''
-      this.regenerateLoginId = false
+      this.showCredentialPin = false
       await this.refresh()
     },
     confirmRemove(user) {

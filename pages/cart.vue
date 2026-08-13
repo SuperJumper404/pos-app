@@ -139,7 +139,7 @@
           <v-select
             v-model="selectedTable"
             :items="dataTables"
-            item-text="username"
+            item-text="name"
             item-value="id"
             :rules="[(v) => !!v || 'Veuillez sélectionner une table']"
             label="Sélectionner une table"
@@ -522,7 +522,7 @@ export default {
     kitchenClosedSnackbar: false,
     kitchenClosedMessage:
       'La cuisine est fermée. Aucune nouvelle commande possible.',
-    selectedTable: parseInt(localStorage.getItem('idUser')),
+    selectedTable: parseInt(localStorage.getItem('service_point_id')) || null,
     access: parseInt(localStorage.getItem('access')),
     formuser: {
       customer: '',
@@ -551,10 +551,7 @@ export default {
       return this.$store.get('cart/message')
     },
     dataTables() {
-      // ICI on ne  filtre pas les tables car on veut tout recup sinon on filter sur  acces === 2
-      const result = this.$store.get('tables/dataTables') || []
-      // const filtered = result.filter((x) => x.access === 2)
-      return result
+      return this.$store.get('servicePoints/items') || []
     },
     isKitchenClosed() {
       return [true, 1, '1', 'true'].includes(
@@ -694,6 +691,12 @@ export default {
     selectedTable() {
       this.handleStripeCheckoutChange()
     },
+    dataTables(points) {
+      if (!this.selectedTable && Array.isArray(points)) {
+        const counter = points.find((point) => point.system_key === 'counter')
+        if (counter) this.selectedTable = counter.id
+      }
+    },
     'formuser.customer'() {
       this.handleStripeCheckoutChange()
     },
@@ -739,7 +742,10 @@ export default {
     }
     const restoredCheckout = await this.restoreCheckoutFromStore()
     if (!restoredCheckout) this.total = this.totalCart
-    await this.$store.dispatch('shop/getCurrentShopInfo')
+    await Promise.all([
+      this.$store.dispatch('shop/getCurrentShopInfo'),
+      this.$store.dispatch('servicePoints/getAll'),
+    ])
     this.loadPage = false
     this.scheduleStripeAutoPrepare()
   },
@@ -859,7 +865,11 @@ export default {
       this.formuser.payment = payload.payment || this.formuser.payment
       this.formuser.notes = payload.remark || ''
       this.formuser.isTakeaway = [true, 1, '1'].includes(payload.is_takeaway)
-      if (payload.customerID != null) this.selectedTable = payload.customerID
+      if (payload.service_point_id != null) {
+        this.selectedTable = payload.service_point_id
+      } else if (payload.customerID != null) {
+        this.selectedTable = payload.customerID
+      }
 
       if (Array.isArray(payload.dataCart)) {
         const restoredCart = JSON.parse(JSON.stringify(payload.dataCart))
@@ -1366,7 +1376,7 @@ export default {
     ) {
       return {
         customer: this.formuser.customer,
-        customerID: this.selectedTable,
+        servicePointId: this.selectedTable,
         total: this.roundPrice(this.total),
         payment: paymentMethod,
         remark: this.formuser.notes,

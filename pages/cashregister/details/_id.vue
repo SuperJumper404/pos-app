@@ -291,7 +291,7 @@ export default {
   mounted() {
     this.loadPage = true
     this.$store
-      .dispatch('orders/getOrdersByUserId', { userId: this.user.id })
+      .dispatch('orders/getOrdersByUserId', { servicePointId: this.user.id })
       .then(() => {
         const ordersIds = this.dataOrders.map((x) => x.id)
         this.$store.dispatch('orders/getAllDetailOrders', ordersIds)
@@ -342,7 +342,7 @@ export default {
     reloadTableOrders() {
       this.loadPage = true
       return this.$store
-        .dispatch('orders/getOrdersByUserId', { userId: this.user.id })
+        .dispatch('orders/getOrdersByUserId', { servicePointId: this.user.id })
         .then(() => {
           const ordersIds = this.dataOrders.map((x) => x.id)
           return this.$store.dispatch('orders/getAllDetailOrders', ordersIds)

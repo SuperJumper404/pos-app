@@ -80,6 +80,18 @@
       <v-toolbar-title>{{ currentPage.title }}</v-toolbar-title>
       <v-spacer />
       <v-btn
+        v-if="showFloatingHomeButton"
+        class="toolbar-home-button"
+        fab
+        width="52"
+        height="52"
+        color="primary"
+        aria-label="Retour a l'accueil"
+        @click="goToInternalHome"
+      >
+        <v-icon>mdi-home</v-icon>
+      </v-btn>
+      <v-btn
         v-if="!isStaffUser && canAccessModule(userAccess, 'orders')"
         icon
         @click="$router.push('/orders')"
@@ -150,7 +162,12 @@ export default {
   },
   computed: {
     navigationItems() {
-      return getAccessibleNavigationItems(this.userAccess, this.list)
+      return getAccessibleNavigationItems(
+        this.userAccess,
+        this.list,
+        this.modulePermissions,
+        this.isPrimaryAdmin
+      )
     },
     idUser() {
       return this.$store.get('users/user')
@@ -161,6 +178,14 @@ export default {
     },
     isStaffUser() {
       return isStaffAccess(this.userAccess)
+    },
+    modulePermissions() {
+      return Array.isArray(this.idUser && this.idUser.module_permissions)
+        ? this.idUser.module_permissions
+        : null
+    },
+    isPrimaryAdmin() {
+      return Boolean(this.idUser && this.idUser.is_primary_admin)
     },
     indexCart() {
       return this.$store.get('cart/indexCart')
@@ -173,6 +198,28 @@ export default {
     },
     pendingOrderBadge() {
       return formatPendingOrderBadge(this.pendingOrderCount)
+    },
+    internalHomePaths() {
+      return ['/']
+    },
+    publicClientPaths() {
+      return [
+        '/menus',
+        '/cart',
+        '/ordersStatuses',
+        '/table-access',
+        '/click-and-collect',
+      ]
+    },
+    showFloatingHomeButton() {
+      if (!this.isStaffUser) return false
+
+      const path = this.$route.path
+      if (this.internalHomePaths.includes(path)) return false
+
+      return !this.publicClientPaths.some(
+        (publicPath) => path === publicPath || path.startsWith(`${publicPath}/`)
+      )
     },
     currentPage() {
       const title = this.list.find(
@@ -203,7 +250,12 @@ export default {
   },
   methods: {
     canAccessModule(access, moduleKey) {
-      return canUseModule(access, moduleKey)
+      return canUseModule(
+        access,
+        moduleKey,
+        this.modulePermissions,
+        this.isPrimaryAdmin
+      )
     },
     async refreshPendingOrders() {
       const isAdmin = Number(this.idUser && this.idUser.access) === 0
@@ -242,6 +294,9 @@ export default {
 
       this.$router.back()
     },
+    goToInternalHome() {
+      this.$router.push('/')
+    },
     cartBtn() {
       this.$store.dispatch('setDialog', true)
     },
@@ -254,3 +309,13 @@ export default {
   },
 }
 </script>
+<style scoped>
+.toolbar-home-button {
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.24), 0 0 0 4px rgba(255, 255, 255, 0.14);
+}
+
+.toolbar-home-button .v-icon {
+  font-size: 28px;
+}
+</style>

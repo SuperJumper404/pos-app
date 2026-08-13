@@ -184,6 +184,11 @@
                 </div>
               </v-card-text>
             </v-card>
+            <VatBreakdown
+              v-if="isTvaActive"
+              :details="getArchivedOrderDetailsByOrderId(item.id)"
+              class="mt-3 mb-3"
+            />
           </td>
         </template>
         <template #[`item.created`]="{ item }">
@@ -242,6 +247,7 @@
 </template>
 <script>
 import TakeawayChip from '@/components/orders/TakeawayChip'
+import VatBreakdown from '@/components/orders/VatBreakdown'
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
@@ -251,7 +257,7 @@ const {
   getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
 export default {
-  components: { TakeawayChip },
+  components: { TakeawayChip, VatBreakdown },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {
@@ -315,6 +321,11 @@ export default {
     },
     detailArchivedOrder() {
       return this.$store.get('history/detailArchivedOrder')
+    },
+    isTvaActive() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/activate_tva')
+      )
     },
     message() {
       return this.$store.get('history/message')

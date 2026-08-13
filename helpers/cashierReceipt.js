@@ -57,6 +57,16 @@ const buildCashierReceiptPayload = ({
   const totalAmount = roundPrice(
     order.subtotal == null ? sumDetails(normalizedDetails) : order.subtotal
   )
+  const subtotalBeforeDiscount = roundPrice(
+    order.subtotal_before_discount == null
+      ? totalAmount
+      : order.subtotal_before_discount
+  )
+  const discountAmount = roundPrice(
+    order.discount_amount == null
+      ? Math.max(0, subtotalBeforeDiscount - totalAmount)
+      : order.discount_amount
+  )
   const paymentMethod =
     order.used_payment_method ||
     order.payment ||
@@ -77,6 +87,10 @@ const buildCashierReceiptPayload = ({
     details: normalizedDetails,
     shopInfo,
     totalAmount,
+    subtotalBeforeDiscount,
+    discountType: order.discount_type || 'none',
+    discountValue: roundPrice(order.discount_value || 0),
+    discountAmount,
     isTvaActive: isEnabled(shopInfo.activate_tva),
     vatBreakdown: normalizeVatBreakdown(normalizedDetails),
   }
@@ -134,6 +148,19 @@ const buildCashierEscPos = (payload) => {
     push(alignLeft(), esc(`${qty}${name}${price} `), euroSymbol, esc('\n'))
   })
   push(line())
+
+  if (payload.discountAmount > 0) {
+    push(
+      alignRight(),
+      esc(`SOUS-TOTAL : ${formatTicketNumber(payload.subtotalBeforeDiscount)} `),
+      euroSymbol,
+      esc('\n'),
+      alignRight(),
+      esc(`REMISE : -${formatTicketNumber(payload.discountAmount)} `),
+      euroSymbol,
+      esc('\n')
+    )
+  }
 
   if (payload.isTvaActive) {
     payload.vatBreakdown.forEach((item) => {
@@ -204,6 +231,12 @@ const buildCashierCloudXml = (payload) => {
         .join('')
     : ''
   const totalLabel = `TOTAL${payload.isTvaActive ? ' TTC' : '*'}`
+  const discountXml = payload.discountAmount > 0
+    ? `<text align="right">SOUS-TOTAL : ${xmlEscape(formatPrice(payload.subtotalBeforeDiscount))} \u20AC</text>` +
+      '<feed line="1"/>' +
+      `<text align="right">REMISE : -${xmlEscape(formatPrice(payload.discountAmount))} \u20AC</text>` +
+      '<feed line="1"/>'
+    : ''
 
   return (
     '<?xml version="1.0" encoding="utf-8" ?>' +
@@ -230,6 +263,7 @@ const buildCashierCloudXml = (payload) => {
     '<text>--------------------------------</text><feed line="1"/>' +
     productXml +
     '<text>--------------------------------</text><feed line="1"/>' +
+    discountXml +
     vatXml +
     `<text align="right" width="2" height="2">${totalLabel} : ${xmlEscape(formatPrice(payload.totalAmount))} \u20AC</text>` +
     '<feed line="2"/>' +

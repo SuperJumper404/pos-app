@@ -22,10 +22,20 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-chart-box-outline',
+          title: 'Mes statistiques',
+          routeName: 'statistics',
+          to: '/statistics',
+          moduleKey: 'home',
+          isAdmin: true,
+        },
+        {
           icon: 'mdi-bookmark',
           title: 'Catégories',
           routeName: 'categories',
           to: '/categories',
+          moduleKey: 'categories',
+          hiddenFromMainNavigation: true,
           isAdmin: false,
         },
         {
@@ -39,7 +49,8 @@ const listdashboard = {
           title: 'Produits',
           routeName: 'products',
           to: '/products',
-          moduleKey: 'products',
+          moduleKey: 'catalog',
+          legacyModuleKey: 'products',
           isAdmin: true,
         },
         {
@@ -47,6 +58,7 @@ const listdashboard = {
           title: 'Étapes produits',
           routeName: 'customizations',
           to: '/customizations',
+          hiddenFromMainNavigation: true,
           isAdmin: false,
         },
         {
@@ -71,7 +83,8 @@ const listdashboard = {
           title: 'Menus',
           routeName: 'menus',
           to: '/menus',
-          moduleKey: 'menus',
+          moduleKey: 'orders',
+          legacyModuleKey: 'menus',
           isAdmin: true,
         },
         {
@@ -129,6 +142,8 @@ const listdashboard = {
           title: 'Stocks',
           routeName: 'stocks',
           to: '/stocks',
+          moduleKey: 'stocks',
+          hiddenFromMainNavigation: true,
           isAdmin: false,
         },
         {
@@ -136,6 +151,7 @@ const listdashboard = {
           title: 'Rapports',
           routeName: 'reports',
           to: '/reports',
+          moduleKey: 'reports',
           isAdmin: false,
         },
         {

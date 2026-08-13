@@ -54,7 +54,20 @@
             placeholder="Saisir le prix du produit"
             required
           />
-          <v-radio-group v-model="formeditproduct.vat_rate" label="Taux de TVA" row>
+          <v-radio-group
+            v-model="formeditproduct.vat_rate_dine_in"
+            label="TVA sur place"
+            row
+          >
+            <v-radio label="5,5 %" :value="5.5"></v-radio>
+            <v-radio label="10 %" :value="10"></v-radio>
+            <v-radio label="20 %" :value="20"></v-radio>
+          </v-radio-group>
+          <v-radio-group
+            v-model="formeditproduct.vat_rate_takeaway"
+            label="TVA à emporter"
+            row
+          >
             <v-radio label="5,5 %" :value="5.5"></v-radio>
             <v-radio label="10 %" :value="10"></v-radio>
             <v-radio label="20 %" :value="20"></v-radio>
@@ -138,6 +151,8 @@ export default {
         stock: '',
         image: '',
         vat_rate: 10,
+        vat_rate_dine_in: 10,
+        vat_rate_takeaway: 10,
       },
     }
   },
@@ -180,6 +195,15 @@ export default {
         description: product.description,
         image: product.image,
         vat_rate: Number(product.vat_rate || 10),
+        vat_rate_dine_in: Number(
+          product.vat_rate_dine_in || product.vat_rate || 10
+        ),
+        vat_rate_takeaway: Number(
+          product.vat_rate_takeaway ||
+            product.vat_rate_dine_in ||
+            product.vat_rate ||
+            10
+        ),
       }
       this.customizationConfig = (product.customization_steps || []).map(
         (step, stepIndex) => ({
@@ -215,7 +239,9 @@ export default {
         description: this.formeditproduct.description,
         stock: this.formeditproduct.stock,
         price: this.roundPrice(this.formeditproduct.price),
-        vat_rate: this.formeditproduct.vat_rate,
+        vat_rate: this.formeditproduct.vat_rate_dine_in,
+        vat_rate_dine_in: this.formeditproduct.vat_rate_dine_in,
+        vat_rate_takeaway: this.formeditproduct.vat_rate_takeaway,
         categoryid: this.formeditproduct.categoryid,
       }
       if (!this.productImg) return data

@@ -8,6 +8,10 @@ const historyTicketSource = fs.readFileSync(
   path.join(root, 'pages', 'history', 'ticket', '_id.vue'),
   'utf8'
 )
+const paymentMethodsSource = fs.readFileSync(
+  path.join(root, 'helpers', 'paymentMethods.js'),
+  'utf8'
+)
 const dashboardSource = fs.readFileSync(
   path.join(root, 'helpers', 'listdashboard.js'),
   'utf8'
@@ -255,13 +259,28 @@ assert.doesNotMatch(
 )
 assert.match(
   paymentDialogSource,
-  /express-payment-grid[\s\S]*?submitExpressPayment\('Carte bancaire'\)[\s\S]*?submitExpressPayment\('Chèque'\)[\s\S]*?submitExpressPayment\('Espèces'\)[\s\S]*?submitExpressPayLater/,
+  /express-payment-grid[\s\S]*?v-for="method in expressPaymentMethods"[\s\S]*?submitExpressPayment\(method\.value\)[\s\S]*?submitExpressPayLater/,
   'express payment methods must live together in the cash-out dialog'
 )
 assert.match(
   paymentDialogSource,
   /Payer plus tard/,
   'express payment dialog must include the pay-later action'
+)
+assert.match(
+  paymentDialogSource,
+  /v-for="method in expressPaymentMethods"/,
+  'express payment dialog must render configured payment methods'
+)
+assert.match(
+  paymentDialogSource,
+  /submitExpressPayment\(method\.value\)/,
+  'express payment dialog must submit the configured payment method value'
+)
+assert.match(
+  paymentMethodsSource,
+  /Ticket resto/,
+  'express mode must support restaurant tickets'
 )
 assert.match(
   menusSource,
@@ -274,8 +293,8 @@ assert.match(
   'express mode must offer a one-click takeaway choice'
 )
 assert.match(
-  menusSource,
-  /submitExpressPayment\('Carte bancaire'\)/,
+  paymentMethodsSource,
+  /Carte bancaire/,
   'express mode must offer direct card payment'
 )
 assert.match(
@@ -289,13 +308,13 @@ assert.doesNotMatch(
   'dine-in/takeaway choice must not take space in the checkout cart panel'
 )
 assert.match(
-  menusSource,
-  /submitExpressPayment\('Chèque'\)/,
+  paymentMethodsSource,
+  /Chèque/,
   'express mode must offer direct cheque payment'
 )
 assert.match(
-  menusSource,
-  /submitExpressPayment\('Espèces'\)/,
+  paymentMethodsSource,
+  /Espèces/,
   'express mode must offer direct cash payment'
 )
 assert.match(

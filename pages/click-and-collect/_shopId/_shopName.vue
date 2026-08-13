@@ -134,20 +134,11 @@
             <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
               <h2 class="text--white font-weight-bold">Commander via</h2>
               <v-btn
-                v-if="
-                  clickAndCollectTable &&
-                  clickAndCollectTable &&
-                  clickAndCollectTable.table_access_token
-                "
+                v-if="clickAndCollectServicePoint"
                 color="primary"
                 class="mt-2"
                 rounded
-                :href="
-                  isKitchenClosed
-                    ? undefined
-                    : tableAccessUrl(clickAndCollectTable)
-                "
-                target="_blank"
+                :loading="startingClickAndCollect"
                 @click="goToClickAndCollect"
               >
                 Click & Collet <v-icon> mdi-arrow-top-right </v-icon>
@@ -312,14 +303,13 @@
   </v-container>
 </template>
 <script>
-import { buildTableAccessUrl } from '@/helpers/tableIdentity'
-
 export default {
   layout: 'empty',
   data() {
     return {
       shop_identifier: '',
       shopProfileImageFailed: false,
+      startingClickAndCollect: false,
       kitchenClosedSnackbar: false,
       kitchenClosedMessage:
         'La cuisine est fermée. Aucune nouvelle commande possible.',
@@ -330,12 +320,8 @@ export default {
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
-    clickAndCollectTable() {
-      // const result = this.$store.get('tables/dataTables') || []
-      // return result.filter((x) => x.access === 3)[0]
-      const clickAndCollectTable = this.$store.get('shop/clickAndCollectTable')
-      // console.log('clickAndCollectTable', clickAndCollectTable)
-      return clickAndCollectTable
+    clickAndCollectServicePoint() {
+      return this.$store.get('shop/clickAndCollectServicePoint')
     },
     shopInfo() {
       return {
@@ -392,7 +378,7 @@ export default {
     )
 
     const clickandcollectdatafromshop = this.$store.get(
-      'shop/clickAndCollectTable'
+      'shop/clickAndCollectServicePoint'
     )
     console.log('clickandcollectdatafromshop', clickandcollectdatafromshop)
 
@@ -407,14 +393,18 @@ export default {
     //   })
   },
   methods: {
-    tableAccessUrl(item) {
-      return buildTableAccessUrl(window.location.origin, item.table_access_token)
-    },
-    goToClickAndCollect(event) {
-      if (!this.isKitchenClosed) return
-
-      if (event) event.preventDefault()
-      this.kitchenClosedSnackbar = true
+    async goToClickAndCollect() {
+      if (this.isKitchenClosed) {
+        this.kitchenClosedSnackbar = true
+        return
+      }
+      this.startingClickAndCollect = true
+      const connected = await this.$store.dispatch(
+        'users/postClickAndCollectAccess',
+        this.$route.params.shopId
+      )
+      this.startingClickAndCollect = false
+      if (connected) this.$router.push('/menus')
     },
     shopProfileImageSrc(image) {
       if (this.shopProfileImageFailed || !image) return '/logo.png'

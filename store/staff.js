@@ -8,6 +8,13 @@ const authHeaders = () => ({
 const errorMessage = (error) =>
   error?.response?.data?.message || 'Une erreur est survenue.'
 
+const staffPayload = (params) => ({
+  username: params.username,
+  access: params.access,
+  status: params.status,
+  module_permissions: params.module_permissions,
+})
+
 export const state = () => ({
   data: [],
   message: '',
@@ -23,7 +30,13 @@ export const actions = {
         headers: authHeaders(),
       })
       const users = Array.isArray(response.data.data) ? response.data.data : []
-      dispatch('set/data', users.filter((user) => isStaffAccess(user.access)))
+      const staff = users
+        .filter((user) => isStaffAccess(user.access))
+        .sort((first, second) => Number(second.is_primary_admin) - Number(first.is_primary_admin))
+      dispatch(
+        'set/data',
+        staff
+      )
       return true
     } catch (error) {
       const message = errorMessage(error)
@@ -36,7 +49,7 @@ export const actions = {
 
   async create({ dispatch }, params) {
     try {
-      const response = await this.$axios.post('/baseurl/api/v1/register', params, {
+      const response = await this.$axios.post('/baseurl/api/v1/register', staffPayload(params), {
         headers: authHeaders(),
       })
       dispatch('notifications/success', response.data.message, { root: true })
@@ -51,7 +64,7 @@ export const actions = {
 
   async update({ dispatch }, { id, data }) {
     try {
-      const response = await this.$axios.patch(`/baseurl/api/v1/user/${id}`, data, {
+      const response = await this.$axios.patch(`/baseurl/api/v1/user/${id}`, staffPayload(data), {
         headers: authHeaders(),
       })
       dispatch('notifications/success', response.data.message, { root: true })
@@ -64,11 +77,11 @@ export const actions = {
     }
   },
 
-  async provisionCredentials({ dispatch }, { id, pin, regenerateLoginId }) {
+  async provisionCredentials({ dispatch }, { id }) {
     try {
       const response = await this.$axios.patch(
         `/baseurl/api/v1/user/${id}/staff-credentials`,
-        { pin, regenerate_login_id: regenerateLoginId },
+        {},
         { headers: authHeaders() }
       )
       dispatch('notifications/success', response.data.message, { root: true })

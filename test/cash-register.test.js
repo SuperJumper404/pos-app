@@ -5,6 +5,7 @@ const {
   archiveOrdersSafely,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
+  isCashRegisterOrderArchivable,
   normalizeOrderIds,
   resolveRetryDueOrderIds,
   summarizeArchiveResults,
@@ -71,6 +72,36 @@ assert.deepStrictEqual(buildCashRegisterCustomerRows(orders), [
     hasAlreadyPaidAmount: false,
   },
 ])
+
+assert.strictEqual(
+  isCashRegisterOrderArchivable({
+    payment_status: 'requires_payment',
+    payment_provider: 'stripe',
+    stock_reservation_status: 'released',
+  }),
+  false
+)
+assert.strictEqual(
+  isCashRegisterOrderArchivable({
+    payment_status: 'requires_payment',
+    payment_provider: 'stripe',
+    stock_reservation_status: 'reserved',
+  }),
+  true
+)
+assert.deepStrictEqual(
+  buildCashRegisterCustomerRows([
+    {
+      id: 5,
+      customer: 'Expired Stripe',
+      subtotal: 15,
+      payment_status: 'requires_payment',
+      payment_provider: 'stripe',
+      stock_reservation_status: 'released',
+    },
+  ]),
+  []
+)
 
 assert.deepStrictEqual(
   buildCashRegisterCustomerRows([
@@ -246,6 +277,34 @@ const runAsyncAssertions = async () => {
     btnYesSource.indexOf('this.ordersToArchive = archiveSummary.failedOrderIds') <
       btnYesSource.indexOf("dispatch('orders/getAllOrder'")
   )
+
+  const cashRegisterSource = fs.readFileSync(
+    path.join(__dirname, '../pages/cashregister/index.vue'),
+    'utf8'
+  )
+  assert.ok(cashRegisterSource.includes('tableDisplayName(table)'))
+  assert.ok(cashRegisterSource.includes('tableServicePointId(table)'))
+  assert.ok(cashRegisterSource.includes('x.service_point_id'))
+  assert.ok(cashRegisterSource.includes("'servicePoints/getAll'"))
+  assert.ok(cashRegisterSource.includes("this.$store.get('servicePoints/items')"))
+  const cashRegisterDetailSource = fs.readFileSync(
+    path.join(__dirname, '../pages/cashregister/details/_id.vue'),
+    'utf8'
+  )
+  assert.ok(cashRegisterDetailSource.includes('servicePointId: this.user.id'))
+  assert.ok(!cashRegisterDetailSource.includes('userId: this.user.id'))
+
+  const ordersStoreSource = fs.readFileSync(
+    path.join(__dirname, '../store/orders.js'),
+    'utf8'
+  )
+  assert.match(ordersStoreSource, /servicePointId=\$\{params\.servicePointId\}/)
+  assert.ok(
+    !cashRegisterSource.includes(
+      'x.access === 2 || x.access === 0 || x.access === 3'
+    )
+  )
+  assert.ok(cashRegisterSource.includes("table.name || table.username"))
 
   const ordersSource = fs.readFileSync(
     path.join(__dirname, '../store/orders.js'),
