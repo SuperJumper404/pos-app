@@ -76,7 +76,8 @@ const buildCashierReceiptPayload = ({
   return {
     orderId,
     orderNumber: order.ordernumber || order.orderNumber || orderId || '',
-    table: order.username || order.table || fallbackTable,
+    table:
+      order.service_point_name || order.username || order.table || fallbackTable,
     customer: order.customer || order.customer_name || fallbackCustomer,
     created: order.created || new Date(),
     currentDate: moment(order.created || new Date())

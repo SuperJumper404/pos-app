@@ -261,7 +261,11 @@ assert.ok(
   'order and customer metadata must not be repeated on every product line'
 )
 assert.ok(
-  detailSource.includes('Modifier <v-icon small right>mdi-pencil</v-icon>'),
+  detailSource.includes(
+    'class="order-detail-action order-detail-action--secondary text-none"'
+  ) && detailSource.includes(
+    '<span class="order-detail-action__label">Modifier</span>'
+  ),
   'an unpaid editable order must expose the edit action'
 )
 assert.ok(
@@ -311,6 +315,34 @@ assert.ok(
 assert.ok(
   detailSource.includes("this.$router.push('/menus')"),
   'a complementary order must still navigate to the catalogue'
+)
+
+const menusEditSource = fs.readFileSync(require.resolve('../pages/menus.vue'), 'utf8')
+const cartEditSource = fs.readFileSync(require.resolve('../pages/cart.vue'), 'utf8')
+assert.match(
+  menusEditSource,
+  /v-if="isLargeProductView && !isOrderEditActive"/,
+  'the Express workspace must be hidden while editing an existing order'
+)
+assert.match(
+  menusEditSource,
+  /openExpressPaymentDialog\(\)\s*\{\s*if \(this\.isOrderEditActive\) return/,
+  'the Express payment dialog must be guarded during order edit'
+)
+assert.match(
+  menusEditSource,
+  /submitExpressPayment\(paymentMethod\)\s*\{\s*if \(this\.isOrderEditActive\) return/,
+  'Express payment selection must be guarded during order edit'
+)
+assert.match(
+  menusEditSource,
+  /async submitExpressPayLater\(\)\s*\{\s*if \(this\.isOrderEditActive\) return/,
+  'pay-later Express checkout must be guarded during order edit'
+)
+assert.match(
+  cartEditSource,
+  /checkoutButtonLabel\(\)[\s\S]*if \(this\.isOrderEditActive\) return 'Enregistrer les modifications'/,
+  'the edit cart must keep saving as its primary action'
 )
 
 const ordersSource = fs.readFileSync(require.resolve('../store/orders.js'), 'utf8')

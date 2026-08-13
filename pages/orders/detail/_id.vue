@@ -25,6 +25,16 @@
               <span class="order-detail-header__label">Client</span>
               <strong>{{ orderSummary.customer || '—' }}</strong>
             </div>
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Table</span>
+              <strong>{{ orderTableLabel }}</strong>
+            </div>
+            <div class="order-detail-header__field">
+              <span class="order-detail-header__label">Statut</span>
+              <v-chip small dark :color="orderStatusColor">
+                {{ orderStatusText }}
+              </v-chip>
+            </div>
             <div
               v-if="orderPaymentStatus"
               class="order-detail-header__field"
@@ -147,31 +157,96 @@
       Notes : {{ orderNote }}
     </v-alert>
 
-    <v-card color="grey lighten-3" class="mt-5">
-      <v-card-actions class="order-detail-footer-actions">
+    <v-card color="grey lighten-3" class="mt-5 order-detail-actions-card">
+      <v-card-actions class="order-detail-action-bar">
+        <v-btn
+          v-if="canApproveOrder && !loadPage"
+          color="success"
+          depressed
+          class="order-detail-action order-detail-action--success text-none"
+          :loading="statusActionLoading"
+          :disabled="statusActionLoading"
+          @click="approveOrder"
+        >
+          <v-icon class="order-detail-action__icon">mdi-check-circle</v-icon>
+          <span class="order-detail-action__label">Valider</span>
+        </v-btn>
+        <v-btn
+          v-if="canFinishOrder && !loadPage"
+          color="primary"
+          depressed
+          class="order-detail-action order-detail-action--success text-none"
+          :loading="statusActionLoading"
+          :disabled="statusActionLoading"
+          @click="finishOrder"
+        >
+          <v-icon class="order-detail-action__icon">mdi-check-circle</v-icon>
+          <span class="order-detail-action__label">Prête</span>
+        </v-btn>
+        <v-btn
+          v-if="canCancelOrder && !loadPage"
+          color="error"
+          outlined
+          class="order-detail-action order-detail-action--danger text-none"
+          :disabled="statusActionLoading"
+          @click="openCancelDialog"
+        >
+          <v-icon class="order-detail-action__icon">mdi-close-circle</v-icon>
+          <span class="order-detail-action__label">{{ cancelActionLabel }}</span>
+        </v-btn>
+        <v-btn
+          v-if="canCollectOrder && !loadPage"
+          color="success"
+          depressed
+          class="order-detail-action order-detail-action--primary text-none"
+          :loading="paymentLoading"
+          :disabled="paymentLoading"
+          @click="openPaymentDialog"
+        >
+          <v-icon class="order-detail-action__icon">mdi-cash-register</v-icon>
+          <span class="order-detail-action__label">Encaisser</span>
+        </v-btn>
+        <v-btn
+          v-if="orderSummary && !loadPage"
+          color="primaryPurple"
+          outlined
+          class="order-detail-action order-detail-action--secondary text-none"
+          :loading="orderPrintLoading"
+          :disabled="orderPrintLoading"
+          @click="printOrderTicket"
+        >
+          <v-icon class="order-detail-action__icon">mdi-printer-outline</v-icon>
+          <span class="order-detail-action__label">Imprimer ticket de commande</span>
+        </v-btn>
         <v-btn
           v-if="canOpenOrderEditModal && !loadPage"
           color="success"
-          class="text-none"
+          class="order-detail-action order-detail-action--secondary text-none"
           :loading="startLoading"
           :disabled="startLoading"
           @click="requestOrderEdit"
         >
-          Modifier <v-icon small right>mdi-pencil</v-icon>
+          <v-icon class="order-detail-action__icon">mdi-pencil</v-icon>
+          <span class="order-detail-action__label">Modifier</span>
         </v-btn>
         <v-btn
           v-if="canStartComplementaryOrder && !loadPage"
           color="success"
-          class="text-none"
+          class="order-detail-action order-detail-action--secondary text-none"
           :loading="startLoading"
           :disabled="startLoading"
           @click="requestComplementaryOrder"
         >
-          Ajouter une commande complémentaire
-          <v-icon small right>mdi-plus</v-icon>
+          <v-icon class="order-detail-action__icon">mdi-plus</v-icon>
+          <span class="order-detail-action__label">Ajouter une commande complémentaire</span>
         </v-btn>
-        <v-btn color="primary" class="text-none" @click="$router.go(-1)">
-          Retour <v-icon small right>mdi-arrow-left</v-icon>
+        <v-btn
+          color="primary"
+          class="order-detail-action order-detail-action--back text-none"
+          @click="$router.go(-1)"
+        >
+          <v-icon class="order-detail-action__icon">mdi-arrow-left</v-icon>
+          <span class="order-detail-action__label">Retour</span>
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -194,6 +269,115 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="cancelOrderDialog" max-width="420" persistent>
+      <v-card>
+        <v-card-title>{{ cancelActionLabel }}</v-card-title>
+        <v-card-text>{{ cancelActionMessage }}</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn
+            text
+            class="text-none"
+            :disabled="statusActionLoading"
+            @click="closeCancelDialog"
+          >
+            Retour
+          </v-btn>
+          <v-btn
+            color="error"
+            dark
+            class="text-none"
+            :loading="statusActionLoading"
+            :disabled="statusActionLoading"
+            @click="confirmCancelOrder"
+          >
+            Confirmer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="paymentDialog" max-width="640">
+      <v-card>
+        <v-card-title>Encaisser</v-card-title>
+        <v-card-text>
+          <div class="order-payment-total mb-4">
+            <span>Total à payer</span>
+            <strong>{{ formatCurrency(orderTotal) }}</strong>
+          </div>
+          <div class="order-payment-grid">
+            <v-btn
+              v-for="method in paymentMethods"
+              :key="method.value"
+              color="success"
+              class="order-payment-tile text-none font-weight-bold"
+              :disabled="paymentLoading"
+              :loading="paymentLoading && selectedPaymentMethod === method.value"
+              depressed
+              @click="submitOrderPayment(method.value)"
+            >
+              <v-icon class="mb-2">{{ method.icon }}</v-icon>
+              <span>{{ method.text }}</span>
+            </v-btn>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn text class="text-none" @click="paymentDialog = false">
+            Retour
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="receiptDialog" max-width="560" persistent>
+      <v-card>
+        <v-card-title>Ticket de caisse</v-card-title>
+        <v-card-text>
+          <div class="order-receipt-grid">
+            <v-btn
+              color="primary"
+              class="order-receipt-tile text-none"
+              :disabled="receiptPrinting"
+              depressed
+              dark
+              @click="confirmOrderReceipt(true)"
+            >
+              <template v-if="receiptPrinting">
+                <v-icon class="mb-2 mdi-spin">mdi-loading</v-icon>
+                <span>Impression...</span>
+              </template>
+              <template v-else>
+                <v-icon class="mb-2">mdi-printer-outline</v-icon>
+                <span>Imprimer ticket</span>
+              </template>
+            </v-btn>
+            <v-btn
+              color="grey lighten-3"
+              class="order-receipt-tile text-none"
+              depressed
+              :disabled="receiptPrinting"
+              @click="confirmOrderReceipt(false)"
+            >
+              <v-icon class="mb-2">mdi-receipt-text-remove-outline</v-icon>
+              <span>Pas de ticket</span>
+            </v-btn>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn
+            text
+            class="text-none"
+            :disabled="receiptPrinting"
+            @click="receiptDialog = false"
+          >
+            Retour
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <OrderEditModal
       v-model="orderEditDialog"
       :order-number="String((orderSummary && orderSummary.ordernumber) || '')"
@@ -209,6 +393,15 @@ import VatBreakdown from '@/components/orders/VatBreakdown'
 import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
+import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
+import {
+  buildCashierReceiptPayload,
+  sendCashierReceipt,
+} from '@/helpers/cashierReceipt'
+import {
+  buildOrderTicketPayload,
+  sendOrderTicket,
+} from '@/helpers/orderTicket'
 const {
   canEditOrder: isOrderEditable,
   canStartComplementaryOrder: canCreateComplementaryOrder,
@@ -245,6 +438,15 @@ export default {
       orderEditDialog: false,
       replaceCartDialog: false,
       pendingStart: null,
+      paymentDialog: false,
+      receiptDialog: false,
+      selectedPaymentMethod: null,
+      pendingPaymentMethod: null,
+      paymentLoading: false,
+      receiptPrinting: false,
+      orderPrintLoading: false,
+      statusActionLoading: false,
+      cancelOrderDialog: false,
     }
   },
 
@@ -294,6 +496,71 @@ export default {
     orderPaymentStatus() {
       return this.detailOrder[0] || null
     },
+    orderTableLabel() {
+      const order = this.orderSummary || {}
+      const table =
+        order.service_point_name ||
+        order.table_name ||
+        order.table ||
+        order.service_point ||
+        ''
+      if (String(table).trim()) return table
+      return order.is_takeaway ? 'À emporter' : 'Comptoir'
+    },
+    orderStatusText() {
+      const labels = {
+        1: 'En attente',
+        2: 'En préparation',
+        3: 'Terminée',
+        4: 'Annulée',
+      }
+      return (
+        labels[Number(this.orderSummary && this.orderSummary.status)] ||
+        'Inconnue'
+      )
+    },
+    orderStatusColor() {
+      const colors = {
+        1: 'grey darken-1',
+        2: 'success',
+        3: 'primary',
+        4: 'warning darken-1',
+      }
+      return (
+        colors[Number(this.orderSummary && this.orderSummary.status)] ||
+        'grey'
+      )
+    },
+    currentUser() {
+      return this.$store.get('users/user') || {}
+    },
+    canApproveOrder() {
+      return Boolean(this.orderSummary && Number(this.orderSummary.status) === 1)
+    },
+    canFinishOrder() {
+      return Boolean(this.orderSummary && Number(this.orderSummary.status) === 2)
+    },
+    canCancelOrder() {
+      return Boolean(
+        this.orderSummary &&
+          ![3, 4].includes(Number(this.orderSummary.status))
+      )
+    },
+    isStripeRefund() {
+      return Boolean(
+        this.orderSummary &&
+          this.orderSummary.payment_provider === 'stripe' &&
+          this.orderSummary.payment_status === 'paid'
+      )
+    },
+    cancelActionLabel() {
+      return this.isStripeRefund ? 'Rembourser' : 'Annuler'
+    },
+    cancelActionMessage() {
+      return this.isStripeRefund
+        ? 'Êtes-vous sûr de vouloir rembourser cette commande ?'
+        : 'Êtes-vous sûr de vouloir annuler cette commande ?'
+    },
     totalItemCount() {
       return this.detailOrder.reduce((total, item) => {
         const quantity = Number(item && item.qty)
@@ -303,6 +570,40 @@ export default {
     isTvaActive() {
       return [true, 1, '1', 'true'].includes(
         this.$store.get('shop/activate_tva')
+      )
+    },
+    shopInfo() {
+      return {
+        shop_name: this.$store.get('shop/shop_name'),
+        shop_adress: this.$store.get('shop/shop_adress'),
+        shop_phone: this.$store.get('shop/shop_phone'),
+        shop_siret: this.$store.get('shop/shop_siret'),
+        shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
+        smart_print_app: this.$store.get('shop/smart_print_app'),
+        activate_tva: this.$store.get('shop/activate_tva'),
+      }
+    },
+    paymentMethods() {
+      return getPaymentMethodOptions(
+        this.$store.get('shop/shop_payment_methods')
+      )
+    },
+    canCollectOrder() {
+      return Boolean(
+        this.orderSummary &&
+          ['unpaid', 'requires_payment'].includes(
+            this.orderSummary.payment_status
+          )
+      )
+    },
+    orderTotal() {
+      return this.roundPrice(
+        this.orderSummary && this.orderSummary.subtotal != null
+          ? this.orderSummary.subtotal
+          : this.detailOrder.reduce(
+              (total, item) => total + this.parsePrice(item && item.total),
+              0
+            )
       )
     },
   },
@@ -329,6 +630,12 @@ export default {
       this.orderEditDialog = false
       this.replaceCartDialog = false
       this.pendingStart = null
+      this.paymentDialog = false
+      this.receiptDialog = false
+      this.selectedPaymentMethod = null
+      this.pendingPaymentMethod = null
+      this.cancelOrderDialog = false
+      this.statusActionLoading = false
 
       try {
         const loaded = await this.$store.dispatch('orders/getDetailOrder', id)
@@ -454,6 +761,178 @@ export default {
     handleOrderEditCompleted() {
       this.loadOrderDetail(this.id)
     },
+    async updateOrderStatus(status) {
+      if (this.statusActionLoading || !this.orderSummary) return false
+      this.statusActionLoading = true
+      try {
+        const result = await this.$store.dispatch('orders/updateOrder', {
+          id: this.orderSummary.id,
+          data: {
+            operator: this.currentUser.id,
+            status,
+          },
+        })
+        if (!result) {
+          this.$store.dispatch(
+            'notifications/error',
+            this.$store.get('orders/message') ||
+              'Impossible de modifier le statut de la commande.'
+          )
+          return false
+        }
+        await this.loadOrderDetail(this.id)
+        return true
+      } finally {
+        this.statusActionLoading = false
+      }
+    },
+    async approveOrder() {
+      if (!this.canApproveOrder) return
+      const updated = await this.updateOrderStatus(2)
+      if (updated && this.shouldAutoPrintOrderTickets()) {
+        this.printOrderTicket()
+      }
+    },
+    finishOrder() {
+      if (!this.canFinishOrder) return
+      return this.updateOrderStatus(3)
+    },
+    shouldAutoPrintOrderTickets() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/auto_print_order_tickets')
+      )
+    },
+    openCancelDialog() {
+      if (!this.canCancelOrder || this.statusActionLoading) return
+      this.cancelOrderDialog = true
+    },
+    closeCancelDialog() {
+      if (this.statusActionLoading) return
+      this.cancelOrderDialog = false
+    },
+    async confirmCancelOrder() {
+      if (!this.canCancelOrder || this.statusActionLoading) return
+      this.statusActionLoading = true
+      try {
+        let result
+        if (this.isStripeRefund) {
+          result = await this.$store.dispatch('orders/refundStripeOrder', {
+            id: this.orderSummary.id,
+          })
+        } else {
+          result = await this.$store.dispatch('orders/updateOrder', {
+            id: this.orderSummary.id,
+            data: {
+              operator: this.currentUser.id,
+              status: 4,
+            },
+          })
+        }
+        if (!result) return
+        this.cancelOrderDialog = false
+        await this.loadOrderDetail(this.id)
+      } finally {
+        this.statusActionLoading = false
+      }
+    },
+    openPaymentDialog() {
+      if (!this.canCollectOrder || this.paymentLoading) return
+      this.selectedPaymentMethod = null
+      this.paymentDialog = true
+    },
+    submitOrderPayment(paymentMethod) {
+      if (!this.canCollectOrder || this.paymentLoading) return
+      this.selectedPaymentMethod = paymentMethod
+      this.pendingPaymentMethod = paymentMethod
+      this.paymentDialog = false
+      this.receiptDialog = true
+    },
+    async confirmOrderReceipt(wantsReceipt) {
+      if (this.paymentLoading || this.receiptPrinting) return
+      const paymentMethod = this.pendingPaymentMethod
+      const order = this.orderSummary
+      const details = this.detailOrder.slice()
+      if (!paymentMethod || !order || !this.canCollectOrder) {
+        this.receiptDialog = false
+        return
+      }
+
+      this.paymentLoading = true
+      this.receiptDialog = false
+      try {
+        const archived = await this.$store.dispatch('orders/archiveOrder', {
+          id: order.id,
+          payment_method: paymentMethod,
+          notify: false,
+        })
+        if (!archived) {
+          this.$store.dispatch(
+            'notifications/error',
+            this.$store.get('orders/message') ||
+              "Impossible d'encaisser la commande."
+          )
+          this.receiptDialog = true
+          return
+        }
+
+        if (wantsReceipt) {
+          this.receiptPrinting = true
+          try {
+            sendCashierReceipt({
+              payload: buildCashierReceiptPayload({
+                order,
+                details,
+                shopInfo: this.shopInfo,
+                fallbackPaymentMethod: paymentMethod,
+              }),
+              smartPrint: this.shopInfo.smart_print_app,
+              printerIp: this.shopInfo.shop_printer_ip,
+              dispatch: this.$store.dispatch,
+            })
+          } catch (error) {
+            this.$store.dispatch(
+              'notifications/error',
+              error.message || "L'impression du ticket a échoué."
+            )
+          } finally {
+            this.receiptPrinting = false
+          }
+        }
+
+        this.$store.dispatch(
+          'notifications/success',
+          'Commande encaissée avec succès.'
+        )
+        this.$router.replace('/orders')
+      } finally {
+        this.paymentLoading = false
+        this.pendingPaymentMethod = null
+        this.selectedPaymentMethod = null
+      }
+    },
+    printOrderTicket() {
+      if (this.orderPrintLoading || !this.orderSummary) return
+      this.orderPrintLoading = true
+      try {
+        sendOrderTicket({
+          payload: buildOrderTicketPayload({
+            order: this.orderSummary,
+            details: this.detailOrder,
+            shopInfo: this.shopInfo,
+          }),
+          smartPrint: this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.shop_printer_ip,
+          dispatch: this.$store.dispatch,
+        })
+      } catch (error) {
+        this.$store.dispatch(
+          'notifications/error',
+          error.message || "L'impression du ticket a échoué."
+        )
+      } finally {
+        this.orderPrintLoading = false
+      }
+    },
     customizationGroups(item) {
       const value = item || {}
       const snapshots = [
@@ -506,16 +985,15 @@ export default {
   align-items: center;
   color: rgba(0, 0, 0, 0.87);
   display: flex;
-  gap: 20px;
+  gap: 12px;
   justify-content: space-between;
-  padding-bottom: 24px;
-  padding: 16px 20px;
+  padding: 12px 14px 16px;
 }
 
 .order-detail-header__identity {
   display: grid;
-  gap: 12px 28px;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 8px 12px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   min-width: 0;
   width: 100%;
 }
@@ -532,7 +1010,7 @@ export default {
 .order-detail-header__field strong {
   color: rgba(0, 0, 0, 0.87);
   font-family: Poppins, sans-serif;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -541,15 +1019,17 @@ export default {
 
 .order-detail-header__field .v-chip {
   align-self: center;
-  font-size: 12px;
-  height: 28px;
-  padding: 0 14px;
+  font-size: 11px;
+  height: 24px;
+  max-width: 100%;
+  padding: 0 8px;
 }
 
 .order-detail-header__label {
   color: rgba(0, 0, 0, 0.87);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .order-detail-attribution__grid {
@@ -741,14 +1221,88 @@ export default {
   background-size: cover;
 }
 
-.order-detail-footer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.order-detail-actions-card {
+  border-radius: 12px !important;
 }
 
-.order-detail-footer-actions .v-btn {
+.order-detail-action-bar {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  padding: 12px !important;
+}
+
+.order-detail-action {
+  align-items: center;
+  border-radius: 10px !important;
+  display: flex !important;
+  flex-direction: column;
+  gap: 6px;
+  height: auto !important;
+  justify-content: center;
   margin: 0 !important;
+  min-height: 72px !important;
+  padding: 12px 10px !important;
+  text-align: center;
+  white-space: normal !important;
+}
+
+.order-detail-action ::v-deep .v-btn__content {
+  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  white-space: normal;
+}
+
+.order-detail-action__icon {
+  font-size: 28px !important;
+  height: 28px;
+  margin: 0 !important;
+  width: 28px;
+}
+
+.order-detail-action__label {
+  display: block;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.order-detail-action--primary {
+  font-size: 16px !important;
+  font-weight: 700;
+  min-height: 84px !important;
+}
+
+.order-payment-total {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.order-payment-total strong {
+  color: #1976d2;
+  font-size: 22px;
+}
+
+.order-payment-grid,
+.order-receipt-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.order-payment-tile,
+.order-receipt-tile {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 104px;
+}
+
+.order-payment-tile .v-icon,
+.order-receipt-tile .v-icon {
+  font-size: 26px;
 }
 
 @media (max-width: 960px) {
@@ -795,6 +1349,30 @@ export default {
 
   .order-detail-list {
     padding: 8px;
+  }
+
+  .order-payment-grid,
+  .order-receipt-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-detail-action-bar {
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px !important;
+  }
+
+  .order-detail-action {
+    font-size: 13px;
+    min-height: 78px !important;
+  }
+
+  .order-detail-action--primary {
+    min-height: 84px !important;
+  }
+
+  .order-detail-action--back {
+    grid-column: 1 / -1;
   }
 
   .order-detail-item {

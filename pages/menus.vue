@@ -34,7 +34,7 @@
         </v-card>
         <v-card v-else>
           <v-card-title
-            v-if="canUseLargeProductView"
+            v-if="canUseLargeProductView && !isOrderEditActive"
             class="menu-view-toolbar d-flex align-center justify-space-between"
           >
             <div>
@@ -66,7 +66,10 @@
             </v-btn>
           </v-card-title>
 
-          <div v-if="isLargeProductView" class="express-workspace">
+          <div
+            v-if="isLargeProductView && !isOrderEditActive"
+            class="express-workspace"
+          >
             <div class="express-category-bar">
               <v-btn
                 v-for="category in categories"
@@ -539,7 +542,7 @@
             </div>
             </div>
             <div
-              v-if="isLargeProductView && cartItem.length > 0"
+              v-if="isLargeProductView && !isOrderEditActive && cartItem.length > 0"
               class="express-checkout"
             >
               <div class="express-table-service-row">
@@ -692,7 +695,11 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="expressPaymentDialog" max-width="640">
+    <v-dialog
+      v-if="!isOrderEditActive"
+      v-model="expressPaymentDialog"
+      max-width="640"
+    >
       <v-card>
         <v-card-title>Encaisser</v-card-title>
         <v-card-text>
@@ -757,7 +764,11 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="expressDiscountDialog" max-width="520">
+    <v-dialog
+      v-if="!isOrderEditActive"
+      v-model="expressDiscountDialog"
+      max-width="520"
+    >
       <v-card>
         <v-card-title>Remise globale</v-card-title>
         <v-card-text>
@@ -833,7 +844,12 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="expressReceiptDialog" max-width="560" persistent>
+    <v-dialog
+      v-if="!isOrderEditActive"
+      v-model="expressReceiptDialog"
+      max-width="560"
+      persistent
+    >
       <v-card>
         <v-card-title>Ticket de caisse</v-card-title>
         <v-card-text>
@@ -1471,10 +1487,12 @@ export default {
       this.expressServiceDialog = true
     },
     openExpressPaymentDialog() {
+      if (this.isOrderEditActive) return
       if (this.expressSubmitDisabled) return
       this.expressPaymentDialog = true
     },
     openExpressDiscountDialog() {
+      if (this.isOrderEditActive) return
       this.expressDiscountDraftType =
         this.expressDiscountType === 'none'
           ? 'percent'
@@ -1485,6 +1503,7 @@ export default {
       this.expressDiscountDialog = true
     },
     applyExpressDiscount() {
+      if (this.isOrderEditActive) return
       const preview = this.expressDiscountPreview
       if (!preview.value || !preview.amount) {
         this.clearExpressDiscount()
@@ -1693,12 +1712,14 @@ export default {
       this.$store.dispatch('cart/setTocart', null)
     },
     submitExpressPayment(paymentMethod) {
+      if (this.isOrderEditActive) return
       if (this.expressSubmitDisabled) return
       this.pendingExpressPaymentMethod = paymentMethod
       this.expressPaymentDialog = false
       this.expressReceiptDialog = true
     },
     async submitExpressPayLater() {
+      if (this.isOrderEditActive) return
       if (this.expressSubmitDisabled) return
       const paymentMethod = 'Paiement au comptoir'
       this.expressPaymentDialog = false
@@ -1781,6 +1802,7 @@ export default {
       })
     },
     async confirmExpressReceipt(wantsReceipt) {
+      if (this.isOrderEditActive) return
       if (this.expressReceiptPrinting) return
       const paymentMethod = this.pendingExpressPaymentMethod
       if (wantsReceipt) {
