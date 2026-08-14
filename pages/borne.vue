@@ -34,7 +34,7 @@
               outlined
               hover
               class="kiosk-product-card"
-              @click="addToCart(product)"
+              @click="openProduct(product)"
             >
               <v-img :src="productImageSrc(product.image)" aspect-ratio="1.2" />
               <v-card-title>{{ product.name }}</v-card-title>
@@ -56,6 +56,15 @@
             >
               <strong>{{ item.name }}</strong>
               <span>{{ item.qty }} x {{ formatCurrency(item.price) }}</span>
+              <div class="kiosk-cart-actions">
+                <v-btn icon color="warning" @click="changeQuantity(index, -1)">
+                  <v-icon>mdi-minus</v-icon>
+                </v-btn>
+                <strong>{{ item.qty }}</strong>
+                <v-btn icon color="success" @click="changeQuantity(index, 1)">
+                  <v-icon>mdi-plus</v-icon>
+                </v-btn>
+              </div>
             </div>
           </div>
 
@@ -65,19 +74,43 @@
             <v-btn value="dine_in" class="text-none">Sur place</v-btn>
             <v-btn value="takeaway" class="text-none">A emporter</v-btn>
           </v-btn-toggle>
-          <v-btn color="success" block x-large class="text-none" disabled>
+          <v-alert v-if="checkoutErrorMessage" type="error" dense>
+            {{ checkoutErrorMessage }}
+          </v-alert>
+          <v-btn
+            color="success"
+            block
+            x-large
+            class="text-none"
+            :disabled="checkoutDisabled"
+          >
             Continuer
           </v-btn>
         </aside>
       </main>
+
+      <v-dialog v-model="customizationDialog" max-width="920" persistent>
+        <div v-if="selectedProduct">
+          <ProductCustomizationWizard
+            v-model="selectedChoices"
+            :product="selectedProduct"
+            @confirm="confirmCustomization"
+            @cancel="closeCustomization"
+          />
+        </div>
+      </v-dialog>
     </div>
   </v-container>
 </template>
 
 <script>
 import price from '@/helpers/price'
+import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 
 export default {
+  components: {
+    ProductCustomizationWizard,
+  },
   mixins: [price],
   middleware: 'auth',
   data() {
@@ -88,6 +121,10 @@ export default {
       saleMode: 'dine_in',
       servicePointId: parseInt(localStorage.getItem('service_point_id')) || null,
       cartItems: [],
+      customizationDialog: false,
+      selectedProduct: null,
+      selectedChoices: [],
+      checkoutErrorMessage: '',
     }
   },
   computed: {
@@ -104,6 +141,20 @@ export default {
     activeProducts() {
       return this.products.filter((product) => product.category === this.activeCategory)
     },
+    checkoutDisabled() {
+      return (
+        this.cartItems.length === 0 ||
+        !String(this.customer || '').trim() ||
+        !String(this.phone || '').trim() ||
+        !this.servicePointId
+      )
+    },
+    total() {
+      return this.cartItems.reduce(
+        (sum, item) => sum + this.parsePrice(item.price) * Number(item.qty || 0),
+        0
+      )
+    },
   },
   async mounted() {
     await Promise.all([
@@ -118,8 +169,44 @@ export default {
       const staticURL = this.$store.get('staticURL').replace(/\/+$/, '')
       return `${staticURL}/api/v1/imgproducts/${image}`
     },
+    openProduct(product) {
+      if ((product.customization_steps || []).length > 0) {
+        this.selectedProduct = product
+        this.selectedChoices = []
+        this.customizationDialog = true
+        return
+      }
+      this.addToCart(product)
+    },
+    confirmCustomization() {
+      this.addToCart({
+        ...this.selectedProduct,
+        selectedChoiceIds: [...this.selectedChoices],
+        configurationSignature: `${this.selectedProduct.id}:${this.selectedChoices.join(',')}`,
+      })
+      this.closeCustomization()
+    },
+    closeCustomization() {
+      this.customizationDialog = false
+      this.selectedProduct = null
+      this.selectedChoices = []
+    },
+    changeQuantity(index, delta) {
+      const item = this.cartItems[index]
+      if (!item) return
+      const nextQty = Number(item.qty || 0) + delta
+      if (nextQty <= 0) {
+        this.cartItems.splice(index, 1)
+        return
+      }
+      item.qty = nextQty
+    },
     addToCart(product) {
-      const existing = this.cartItems.find((item) => item.id === product.id)
+      const existing = this.cartItems.find(
+        (item) =>
+          item.id === product.id &&
+          item.configurationSignature === product.configurationSignature
+      )
       if (existing) {
         existing.qty += 1
         return
@@ -226,6 +313,13 @@ export default {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.kiosk-cart-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .kiosk-sale-mode {
