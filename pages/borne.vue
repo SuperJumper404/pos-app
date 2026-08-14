@@ -17,9 +17,24 @@
         </v-btn>
       </header>
 
-      <main class="kiosk-main">
-        <section class="kiosk-menu">
-          <div class="kiosk-category-bar">
+      <main v-if="kioskStep === 'welcome'" class="kiosk-welcome">
+        <v-btn
+          color="primary"
+          x-large
+          class="kiosk-start-button text-none"
+          :disabled="isKitchenClosed"
+          @click="startNewOrder"
+        >
+          Nouvelle commande
+        </v-btn>
+        <v-alert v-if="isKitchenClosed" type="warning" dense>
+          La cuisine est fermée. Aucune nouvelle commande n'est possible.
+        </v-alert>
+      </main>
+
+      <main v-else class="kiosk-main">
+        <aside class="kiosk-side-categories">
+          <div class="kiosk-category-stack">
             <v-btn
               v-for="category in categories"
               :key="category"
@@ -33,7 +48,9 @@
               {{ category }}
             </v-btn>
           </div>
+        </aside>
 
+        <section class="kiosk-menu">
           <div class="kiosk-products">
             <v-card
               v-for="product in activeProducts"
@@ -51,7 +68,7 @@
           </div>
         </section>
 
-        <aside class="kiosk-cart">
+        <section class="kiosk-bottom-cart">
           <section v-if="confirmation" class="kiosk-confirmation">
             <div class="kiosk-confirmation-label">Votre numero de commande</div>
             <strong>{{ confirmation.orderNumber }}</strong>
@@ -61,7 +78,10 @@
             </v-btn>
           </section>
           <template v-else>
-            <h2>Votre commande</h2>
+            <div class="kiosk-cart-head">
+              <h2>Votre commande</h2>
+              <strong>{{ formatCurrency(total) }}</strong>
+            </div>
             <div v-if="cartItems.length === 0" class="kiosk-empty">
               Votre panier est vide
             </div>
@@ -95,37 +115,6 @@
               </div>
             </div>
 
-            <v-text-field
-              v-model.trim="customer"
-              label="Votre nom"
-              :disabled="checkoutInteractionLocked"
-            />
-            <v-text-field
-              v-model.trim="phone"
-              label="Votre numero"
-              type="tel"
-              :disabled="checkoutInteractionLocked"
-            />
-            <v-btn-toggle v-model="saleMode" mandatory class="kiosk-sale-mode">
-              <v-btn
-                value="dine_in"
-                class="text-none"
-                :disabled="checkoutInteractionLocked"
-              >
-                Sur place
-              </v-btn>
-              <v-btn
-                value="takeaway"
-                class="text-none"
-                :disabled="checkoutInteractionLocked"
-              >
-                A emporter
-              </v-btn>
-            </v-btn-toggle>
-            <div class="kiosk-total">
-              <strong>Total</strong>
-              <strong>{{ formatCurrency(total) }}</strong>
-            </div>
             <v-alert v-if="servicePointError" type="error" dense>
               {{ servicePointError }}
             </v-alert>
@@ -139,7 +128,10 @@
             >
               {{ checkoutErrorMessage }}
             </v-alert>
-            <div v-if="!stripePaymentReady" class="kiosk-payment-actions">
+            <div
+              v-if="kioskStep === 'payment' && !stripePaymentReady"
+              class="kiosk-payment-actions"
+            >
               <v-btn
                 v-if="showCounterPayment"
                 color="primary"
@@ -163,6 +155,26 @@
                 @click="submitStripe"
               >
                 Payer par carte
+              </v-btn>
+            </div>
+            <div v-else class="kiosk-cart-footer">
+              <v-btn
+                outlined
+                x-large
+                class="text-none"
+                :disabled="Boolean(checkoutLoading)"
+                @click="cancelOrder"
+              >
+                Annuler
+              </v-btn>
+              <v-btn
+                color="primary"
+                x-large
+                class="text-none"
+                :disabled="cartItems.length === 0 || checkoutInteractionLocked"
+                @click="openCustomerNameStep"
+              >
+                Commander
               </v-btn>
             </div>
             <v-btn
@@ -204,8 +216,142 @@
               </v-btn>
             </div>
           </template>
-        </aside>
+        </section>
       </main>
+
+      <v-dialog
+        :value="kioskStep === 'mode'"
+        persistent
+        max-width="760"
+        content-class="kiosk-mode-dialog"
+      >
+        <v-card class="kiosk-dialog-card">
+          <v-card-title>Votre commande</v-card-title>
+          <v-card-text class="kiosk-mode-actions">
+            <v-btn
+              color="primary"
+              x-large
+              class="text-none"
+              @click="chooseSaleMode('dine_in')"
+            >
+              Sur place
+            </v-btn>
+            <v-btn
+              color="primary"
+              x-large
+              class="text-none"
+              @click="chooseSaleMode('takeaway')"
+            >
+              A emporter
+            </v-btn>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog
+        :value="kioskStep === 'name'"
+        persistent
+        max-width="860"
+        content-class="kiosk-name-dialog"
+      >
+        <v-card class="kiosk-dialog-card">
+          <v-card-title>Votre nom</v-card-title>
+          <v-card-text>
+            <v-text-field
+              :value="customer"
+              readonly
+              outlined
+              hide-details
+              class="kiosk-keyboard-field"
+            />
+            <div class="kiosk-keyboard">
+              <v-btn
+                v-for="key in nameKeyboardKeys"
+                :key="key"
+                x-large
+                class="text-none"
+                @click="appendKeyboardValue(key)"
+              >
+                {{ key }}
+              </v-btn>
+              <v-btn x-large class="text-none" @click="appendKeyboardValue(' ')">
+                Espace
+              </v-btn>
+              <v-btn x-large class="text-none" @click="backspaceKeyboardValue">
+                Effacer
+              </v-btn>
+              <v-btn x-large class="text-none" @click="clearKeyboardValue">
+                Vider
+              </v-btn>
+            </div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn text class="text-none" @click="kioskStep = 'menu'">
+              Retour
+            </v-btn>
+            <v-btn
+              color="primary"
+              class="text-none"
+              :disabled="!String(customer || '').trim()"
+              @click="openCustomerPhoneStep"
+            >
+              Suivant
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog
+        :value="kioskStep === 'phone'"
+        persistent
+        max-width="640"
+        content-class="kiosk-phone-dialog"
+      >
+        <v-card class="kiosk-dialog-card">
+          <v-card-title>Votre numero</v-card-title>
+          <v-card-text>
+            <v-text-field
+              :value="phone"
+              readonly
+              outlined
+              hide-details
+              class="kiosk-keyboard-field"
+            />
+            <div class="kiosk-keyboard kiosk-number-keyboard">
+              <v-btn
+                v-for="key in phoneKeyboardKeys"
+                :key="key"
+                x-large
+                class="text-none"
+                @click="appendKeyboardValue(key)"
+              >
+                {{ key }}
+              </v-btn>
+              <v-btn x-large class="text-none" @click="backspaceKeyboardValue">
+                Effacer
+              </v-btn>
+              <v-btn x-large class="text-none" @click="clearKeyboardValue">
+                Vider
+              </v-btn>
+            </div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn text class="text-none" @click="openCustomerNameStep">
+              Retour
+            </v-btn>
+            <v-btn
+              color="primary"
+              class="text-none"
+              :disabled="!String(phone || '').trim()"
+              @click="openPaymentStep"
+            >
+              Suivant
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
       <v-dialog v-model="customizationDialog" max-width="920" persistent>
         <div v-if="selectedProduct">
@@ -255,6 +401,8 @@ export default {
   middleware: 'auth',
   data() {
     return {
+      kioskStep: 'welcome',
+      keyboardTarget: null,
       activeCategory: '',
       customer: '',
       phone: '',
@@ -275,6 +423,8 @@ export default {
       stripePaymentOrderId: null,
       stripePaymentReference: null,
       stripePaymentElementInstance: null,
+      nameKeyboardKeys: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+      phoneKeyboardKeys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
     }
   },
   computed: {
@@ -327,10 +477,10 @@ export default {
       return getKioskPaymentAvailability(this.qrPaymentMode)
     },
     showCounterPayment() {
-      return this.paymentAvailability.counter
+      return true
     },
     showStripePayment() {
-      return this.paymentAvailability.stripe
+      return false
     },
     hasPreparedStripeAttempt() {
       return Boolean(
@@ -343,6 +493,7 @@ export default {
     },
     checkoutDisabled() {
       return (
+        this.kioskStep !== 'payment' ||
         this.cartItems.length === 0 ||
         !String(this.customer || '').trim() ||
         !String(this.phone || '').trim() ||
@@ -370,6 +521,71 @@ export default {
     this.resetStripePaymentState()
   },
   methods: {
+    startNewOrder() {
+      this.customer = ''
+      this.phone = ''
+      this.saleMode = 'dine_in'
+      this.cartItems = []
+      this.confirmation = null
+      this.checkoutErrorMessage = ''
+      this.checkoutAlertType = 'error'
+      this.checkoutFinalized = false
+      this.repriceConfirmation = false
+      this.resetStripePaymentState()
+      this.kioskStep = 'mode'
+    },
+    chooseSaleMode(mode) {
+      this.saleMode = mode === 'takeaway' ? 'takeaway' : 'dine_in'
+      this.kioskStep = 'menu'
+    },
+    openCustomerNameStep() {
+      if (this.cartItems.length === 0 || this.checkoutInteractionLocked) return
+      this.keyboardTarget = 'customer'
+      this.kioskStep = 'name'
+    },
+    openCustomerPhoneStep() {
+      if (!String(this.customer || '').trim()) return
+      this.keyboardTarget = 'phone'
+      this.kioskStep = 'phone'
+    },
+    openPaymentStep() {
+      if (!String(this.phone || '').trim()) return
+      this.keyboardTarget = null
+      this.kioskStep = 'payment'
+    },
+    appendKeyboardValue(value) {
+      if (this.keyboardTarget === 'phone') {
+        this.phone = `${this.phone}${value}`.slice(0, 20)
+        return
+      }
+      if (this.keyboardTarget === 'customer') {
+        this.customer = `${this.customer}${value}`.slice(0, 40)
+      }
+    },
+    backspaceKeyboardValue() {
+      if (this.keyboardTarget === 'phone') {
+        this.phone = this.phone.slice(0, -1)
+        return
+      }
+      if (this.keyboardTarget === 'customer') {
+        this.customer = this.customer.slice(0, -1)
+      }
+    },
+    clearKeyboardValue() {
+      if (this.keyboardTarget === 'phone') {
+        this.phone = ''
+        return
+      }
+      if (this.keyboardTarget === 'customer') {
+        this.customer = ''
+      }
+    },
+    async cancelOrder() {
+      if (this.checkoutLoading) return
+      await this.abandonPreparedCheckout()
+      this.startNewOrder()
+      this.kioskStep = 'welcome'
+    },
     productImageSrc(image) {
       const staticURL = this.$store.get('staticURL').replace(/\/+$/, '')
       return `${staticURL}/api/v1/imgproducts/${image}`
@@ -461,6 +677,7 @@ export default {
         this.repriceConfirmation = false
         this.checkoutFinalized = true
         await this.finishCheckout(result, 'Paiement au comptoir')
+        this.kioskStep = 'confirmation'
       } catch (error) {
         this.checkoutErrorMessage = error.message
       } finally {
@@ -753,6 +970,8 @@ export default {
       this.phone = ''
       this.saleMode = 'dine_in'
       this.confirmation = null
+      this.kioskStep = 'welcome'
+      this.keyboardTarget = null
       this.checkoutErrorMessage = ''
       this.checkoutAlertType = 'error'
       this.checkoutFinalized = false
@@ -781,6 +1000,25 @@ export default {
   flex-direction: column;
 }
 
+.kiosk-welcome {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
+}
+
+.kiosk-start-button {
+  min-width: min(520px, 90vw);
+  min-height: 108px;
+  border-radius: 8px;
+  font-size: 2rem !important;
+  font-weight: 900 !important;
+}
+
 .kiosk-header {
   min-height: 84px;
   padding: 18px 28px;
@@ -807,11 +1045,13 @@ export default {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .kiosk-menu,
-.kiosk-cart {
+.kiosk-side-categories,
+.kiosk-bottom-cart {
   min-height: 0;
   overflow: auto;
 }
@@ -820,11 +1060,17 @@ export default {
   padding: 18px;
 }
 
-.kiosk-category-bar {
+.kiosk-side-categories {
+  grid-row: 1 / 3;
+  background: #ffffff;
+  border-right: 1px solid #dfe5ee;
+  padding: 14px;
+}
+
+.kiosk-category-stack {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 16px;
 }
 
 .kiosk-category-button {
@@ -844,15 +1090,29 @@ export default {
   min-height: 260px;
 }
 
-.kiosk-cart {
+.kiosk-bottom-cart {
+  grid-column: 2;
   padding: 18px;
   background: #ffffff;
-  border-left: 1px solid #dfe5ee;
+  border-top: 1px solid #dfe5ee;
 }
 
-.kiosk-cart h2 {
+.kiosk-bottom-cart h2 {
+  margin: 0;
   font-size: 1.35rem;
   letter-spacing: 0;
+}
+
+.kiosk-cart-head,
+.kiosk-cart-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kiosk-cart-footer {
+  margin-top: 14px;
 }
 
 .kiosk-cart-line {
@@ -878,6 +1138,46 @@ export default {
 .kiosk-payment-actions {
   display: grid;
   gap: 12px;
+}
+
+.kiosk-dialog-card {
+  border-radius: 8px;
+}
+
+.kiosk-dialog-card .v-card__title {
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.kiosk-mode-actions {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.kiosk-mode-actions .v-btn {
+  min-height: 130px;
+  font-size: 1.4rem !important;
+  font-weight: 900 !important;
+}
+
+.kiosk-keyboard-field {
+  margin-bottom: 18px;
+}
+
+.kiosk-keyboard {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.kiosk-keyboard .v-btn {
+  min-height: 64px;
+  font-weight: 900 !important;
+}
+
+.kiosk-number-keyboard {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .kiosk-stripe-panel {
@@ -908,11 +1208,27 @@ export default {
 @media (max-width: 960px) {
   .kiosk-main {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
-  .kiosk-cart {
-    border-left: 0;
+  .kiosk-side-categories {
+    grid-row: auto;
+    border-right: 0;
     border-top: 1px solid #dfe5ee;
+  }
+
+  .kiosk-category-stack {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .kiosk-bottom-cart {
+    grid-column: auto;
+  }
+
+  .kiosk-mode-actions,
+  .kiosk-keyboard {
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>
