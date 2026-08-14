@@ -92,8 +92,9 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        console.log('RR', error.response)
-        dispatch('set/message', error.response.data.message)
+        const message =
+          error.response?.data?.message || 'Connexion impossible.'
+        dispatch('set/message', message)
         return false
       })
   },
