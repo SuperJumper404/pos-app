@@ -201,6 +201,15 @@ const listdashboard = {
         },
 
         {
+          icon: 'mdi-tablet-dashboard',
+          title: 'Borne',
+          routeName: 'borne',
+          to: '/borne',
+          moduleKey: 'borne',
+          isAdmin: true,
+        },
+
+        {
           icon: 'mdi-logout',
           name: 'logout',
           title: 'Déconnexion',
