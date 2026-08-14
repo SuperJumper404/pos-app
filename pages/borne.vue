@@ -361,8 +361,7 @@ export default {
   async mounted() {
     await Promise.all([
       this.$store.dispatch('products/getProducts'),
-      this.$store.dispatch('categories/getAllCategories'),
-      this.$store.dispatch('shop/getShopInfo'),
+      this.$store.dispatch('shop/getCurrentShopInfo'),
     ])
     this.activeCategory = this.categories[0] || ''
     await this.restoreStripeReturn()

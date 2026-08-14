@@ -22,7 +22,10 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', error.response.data.data)
+        dispatch(
+          'set/message',
+          error.response?.data?.message || 'Catégories indisponibles.'
+        )
         dispatch('set/dataCategories', [])
         return false
       })
