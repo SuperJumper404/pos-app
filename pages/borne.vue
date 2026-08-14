@@ -385,59 +385,50 @@ export default {
     },
     async finishCheckout(result, paymentMethod = 'Paiement au comptoir') {
       const reference = getKioskOrderReference(result)
-      const confirmation = {
+      this.confirmation = {
         ...reference,
         printStatus: 'Ticket en cours d impression.',
       }
-      this.confirmation = confirmation
-      this.printKioskReceipt(result, paymentMethod)
-        .then(() => {
-          if (this.confirmation === confirmation) {
-            this.confirmation.printStatus = 'Ticket envoye a l impression.'
-          }
-        })
-        .catch(() => {
-          if (this.confirmation === confirmation) {
-            this.confirmation.printStatus = 'Impossible d imprimer le ticket.'
-          }
-        })
+      const printed = await this.printKioskReceipt(reference.orderId, paymentMethod)
+      this.confirmation.printStatus = printed
+        ? 'Ticket imprime.'
+        : 'Ticket indisponible.'
       await this.$store.dispatch('cart/setTotal', 0)
       await this.$store.dispatch('cart/setIndex', 0)
       await this.$store.dispatch('cart/setTocart', null)
     },
-    async printKioskReceipt(result, paymentMethod) {
-      const { orderId } = getKioskOrderReference(result)
-      if (!orderId) {
-        throw new Error('La commande est introuvable pour l impression.')
-      }
-
-      const [orderLoaded, detailsLoaded] = await Promise.all([
-        this.$store.dispatch('orders/getAllOrder'),
-        this.$store.dispatch('orders/getDetailOrder', orderId),
-      ])
-      if (!orderLoaded || !detailsLoaded) {
-        throw new Error('Impossible de recuperer les donnees du ticket.')
-      }
-
-      const orders = this.$store.get('orders/dataOrders') || []
-      const order = orders.find((item) => String(item.id) === String(orderId))
-      if (!order) {
-        throw new Error('La commande creee est introuvable.')
-      }
-
-      return sendCashierReceipt({
-        payload: buildCashierReceiptPayload({
-          order,
+    async printKioskReceipt(orderId, paymentMethod) {
+      if (!orderId) return false
+      try {
+        await Promise.all([
+          this.$store.dispatch('orders/getAllOrder'),
+          this.$store.dispatch('orders/getDetailOrder', orderId),
+        ])
+        const orders = this.$store.get('orders/dataOrders') || []
+        const order = orders.find((item) => String(item.id) === String(orderId))
+        if (!order) return false
+        const payload = buildCashierReceiptPayload({
+          order: {
+            ...order,
+            source: 'borne',
+            order_source: 'borne',
+          },
           details: this.$store.get('orders/detailOrder') || [],
           shopInfo: this.shopInfo,
           fallbackPaymentMethod: paymentMethod,
-          fallbackCustomer: String(this.customer || '').trim() || 'Client borne',
+          fallbackCustomer: this.customer || 'Client borne',
           fallbackTable: 'Borne',
-        }),
-        smartPrint: this.shopInfo.smart_print_app,
-        printerIp: this.shopInfo.shop_printer_ip,
-        dispatch: this.$store.dispatch,
-      })
+          fallbackRemark: '',
+        })
+        return sendCashierReceipt({
+          payload,
+          smartPrint: this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.shop_printer_ip,
+          dispatch: this.$store.dispatch,
+        })
+      } catch (error) {
+        return false
+      }
     },
     resetKiosk() {
       this.cartItems = []

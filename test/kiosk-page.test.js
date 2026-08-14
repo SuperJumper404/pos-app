@@ -41,6 +41,8 @@ assert.match(pageSource, /numero de commande/)
 assert.match(pageSource, /buildCashierReceiptPayload/)
 assert.match(pageSource, /sendCashierReceipt/)
 assert.match(pageSource, /printKioskReceipt/)
+assert.match(pageSource, /Ticket imprime/)
+assert.match(pageSource, /Ticket indisponible/)
 assert.match(pageSource, /orders\/getAllOrder/)
 assert.match(pageSource, /orders\/getDetailOrder/)
 assert.match(pageSource, /stripePaymentReference/)
@@ -59,7 +61,11 @@ assert.match(confirmStripePaymentSource, /catch \(error\)[\s\S]*checkoutErrorMes
 
 const resetKioskStart = pageSource.indexOf('    resetKiosk() {', finishCheckoutStart)
 const finishCheckoutSource = pageSource.slice(finishCheckoutStart, resetKioskStart)
-assert.match(finishCheckoutSource, /this\.printKioskReceipt\(result, paymentMethod\)/)
-assert.match(finishCheckoutSource, /\.catch\(\(\) =>/)
+assert.match(
+  finishCheckoutSource,
+  /await this\.printKioskReceipt\(reference\.orderId, paymentMethod\)/
+)
+assert.match(finishCheckoutSource, /Ticket imprime/)
+assert.match(finishCheckoutSource, /Ticket indisponible/)
 
 console.log('kiosk page tests passed')
