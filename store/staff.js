@@ -13,6 +13,7 @@ const staffPayload = (params) => ({
   access: params.access,
   status: params.status,
   module_permissions: params.module_permissions,
+  service_point_id: params.service_point_id,
 })
 
 export const state = () => ({

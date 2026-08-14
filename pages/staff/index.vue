@@ -101,6 +101,31 @@
                 />
               </v-col>
             </v-row>
+            <v-row v-if="showKioskServicePointField" align="center" class="mt-3">
+              <v-col cols="12" sm="8">
+                <v-select
+                  v-model="form.service_point_id"
+                  :items="kioskServicePoints"
+                  item-text="name"
+                  item-value="id"
+                  label="Borne associée"
+                  :rules="kioskServicePointRules"
+                />
+              </v-col>
+              <v-col cols="12" sm="4">
+                <v-btn
+                  block
+                  outlined
+                  color="primary"
+                  class="text-none"
+                  :loading="creatingKiosk"
+                  @click="createKioskServicePoint"
+                >
+                  <v-icon left>mdi-tablet-dashboard</v-icon>
+                  Créer une borne
+                </v-btn>
+              </v-col>
+            </v-row>
             <v-switch
               v-if="!isEditingPrimaryAdmin"
               v-model="form.active"
@@ -187,6 +212,7 @@ const emptyForm = () => ({
   staff_login_id: '',
   access: null,
   module_permissions: [],
+  service_point_id: null,
   active: true,
   is_primary_admin: false,
 })
@@ -200,6 +226,7 @@ export default {
       loading: false,
       submitting: false,
       removing: false,
+      creatingKiosk: false,
       formDialog: false,
       credentialsDialog: false,
       removeDialog: false,
@@ -219,6 +246,7 @@ export default {
       ],
       requiredRules: [(value) => !!value || 'Champ requis'],
       accessRules: [(value) => value !== null || 'Role requis'],
+      kioskServicePointRules: [(value) => !!value || 'Borne requise'],
     }
   },
   computed: {
@@ -230,6 +258,18 @@ export default {
     },
     isEditingPrimaryAdmin() {
       return this.isEditing && this.form.is_primary_admin
+    },
+    kioskServicePoints() {
+      return (this.$store.get('servicePoints/items') || []).filter(
+        (point) => point.type === 'kiosk' && Number(point.is_active) === 1
+      )
+    },
+    showKioskServicePointField() {
+      return (
+        !this.isEditingPrimaryAdmin &&
+        Array.isArray(this.form.module_permissions) &&
+        this.form.module_permissions.includes('borne')
+      )
     },
   },
   mounted() {
@@ -252,7 +292,10 @@ export default {
     },
     async refresh() {
       this.loading = true
-      await this.$store.dispatch('staff/getAll')
+      await Promise.all([
+        this.$store.dispatch('staff/getAll'),
+        this.$store.dispatch('servicePoints/getAll'),
+      ])
       this.loading = false
     },
     openCreate() {
@@ -269,6 +312,7 @@ export default {
         module_permissions: Array.isArray(user.module_permissions)
           ? user.module_permissions
           : getRoleModuleDefaults(access),
+        service_point_id: user.service_point_id || null,
         active: Number(user.status) === 1,
         is_primary_admin: this.isPrimaryAdmin(user),
       }
@@ -276,6 +320,9 @@ export default {
     },
     applyRolePreset(access) {
       this.form.module_permissions = getRoleModuleDefaults(access)
+      if (!this.form.module_permissions.includes('borne')) {
+        this.form.service_point_id = null
+      }
     },
     closeForm() {
       this.formDialog = false
@@ -293,6 +340,9 @@ export default {
           access: this.form.access,
           status: this.form.active ? 1 : 0,
           module_permissions: this.form.module_permissions,
+          service_point_id: this.showKioskServicePointField
+            ? this.form.service_point_id
+            : null,
         }
       const result = this.isEditing
         ? await this.$store.dispatch('staff/update', { id: this.form.id, data })
@@ -331,6 +381,20 @@ export default {
       this.credentialResult = result
       this.showCredentialPin = false
       await this.refresh()
+    },
+    async createKioskServicePoint() {
+      const nextNumber = this.kioskServicePoints.length + 1
+      this.creatingKiosk = true
+      const result = await this.$store.dispatch(
+        'servicePoints/createKiosk',
+        `Borne ${nextNumber}`
+      )
+      this.creatingKiosk = false
+      if (!result) return
+      await this.$store.dispatch('servicePoints/getAll')
+      const createdId = result.insertId || result.id
+      const fallback = this.kioskServicePoints[this.kioskServicePoints.length - 1]
+      this.form.service_point_id = createdId || (fallback && fallback.id) || null
     },
     confirmRemove(user) {
       this.removeTarget = user

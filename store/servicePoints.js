@@ -36,4 +36,25 @@ export const actions = {
   select({ dispatch }, id) {
     dispatch('set/selectedId', id == null ? null : Number(id))
   },
+  createKiosk({ dispatch }, name) {
+    return this.$axios
+      .post(
+        '/baseurl/api/v1/service-points/kiosks',
+        { name },
+        { headers: { Authorization: `Bearer ${readToken()}` } }
+      )
+      .then((response) => {
+        dispatch('notifications/success', response.data.message, { root: true })
+        return response.data.data || true
+      })
+      .catch((error) => {
+        dispatch('set/message', error.response?.data?.message || '')
+        dispatch(
+          'notifications/error',
+          error.response?.data?.message || 'Impossible de créer la borne.',
+          { root: true }
+        )
+        return false
+      })
+  },
 }
