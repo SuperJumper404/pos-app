@@ -328,7 +328,7 @@ export default {
         )
         if (!result || !result.ok) {
           this.checkoutErrorMessage =
-            result?.error?.message || 'Impossible de preparer le paiement.'
+            result?.error?.message || 'Impossible de préparer le paiement.'
           return
         }
         await this.mountStripePayment(result.data)
@@ -368,7 +368,7 @@ export default {
         })
         if (result.error) {
           this.checkoutErrorMessage =
-            result.error.message || 'Le paiement a echoue.'
+            result.error.message || 'Le paiement a échoué.'
           return
         }
         await this.$store.dispatch('cart/completeCheckout')
@@ -378,7 +378,7 @@ export default {
         )
       } catch (error) {
         this.checkoutErrorMessage =
-          error.message || 'Le paiement a echoue.'
+          error.message || 'Le paiement a échoué.'
       } finally {
         this.checkoutLoading = null
       }
