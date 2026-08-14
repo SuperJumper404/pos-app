@@ -9,6 +9,8 @@ const layoutSource = fs.readFileSync(path.join(root, 'layouts', 'default.vue'), 
 assert.match(pageSource, /middleware:\s*['"]auth['"]/)
 assert.match(pageSource, /class="kiosk-page/)
 assert.match(pageSource, /products\/getProducts/)
+assert.match(pageSource, /this\.\$store\.get\('products\/dataProduct'\)/)
+assert.doesNotMatch(pageSource, /products\/dataProducts/)
 assert.match(pageSource, /categories\/getAllCategories/)
 assert.match(pageSource, /shop\/getShopInfo/)
 assert.match(pageSource, /servicePointId/)

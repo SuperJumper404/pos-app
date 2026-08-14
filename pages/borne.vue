@@ -95,7 +95,7 @@ export default {
       return this.$store.get('shop/shop_name')
     },
     products() {
-      return this.$store.get('products/dataProducts') || []
+      return this.$store.get('products/dataProduct') || []
     },
     categories() {
       const names = this.products.map((product) => product.category).filter(Boolean)
