@@ -133,6 +133,14 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-account-multiple',
+          title: 'Mes clients',
+          routeName: 'clients',
+          to: '/clients',
+          moduleKey: 'clients',
+          isAdmin: true,
+        },
+        {
           icon: 'mdi-receipt-text-check-outline',
           title: 'Ticket de caisse',
           routeName: 'history-ticket-id',

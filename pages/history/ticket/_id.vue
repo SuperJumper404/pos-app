@@ -104,6 +104,11 @@ export default {
         shop_name: this.$store.get('shop/shop_name'),
         shop_adress: this.$store.get('shop/shop_adress'),
         shop_siret: this.$store.get('shop/shop_siret'),
+        shop_naf: this.$store.get('shop/shop_naf'),
+        shop_vat_number: this.$store.get('shop/shop_vat_number'),
+        receipt_review_qr_url: this.$store.get('shop/receipt_review_qr_url'),
+        receipt_review_qr_label: this.$store.get('shop/receipt_review_qr_label'),
+        cash_register_number: this.$store.get('shop/cash_register_number'),
         shop_phone: this.$store.get('shop/shop_phone'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
@@ -400,17 +405,19 @@ export default {
       doc.setFont('courier', 'normal')
       doc.setFontSize(8)
 
-      doc.text(
-        'TEL:' + this.safePdfText(this.shopInfo.shop_phone),
-        center,
-        (y += gap),
-        {
-          align: 'center',
-        }
-      )
+      const optionalHeaderLines = [
+        ['TEL :', this.shopInfo.shop_phone],
+        ['SIRET :', this.shopInfo.shop_siret],
+        ['NAF :', this.shopInfo.shop_naf],
+        ['TVA :', this.shopInfo.shop_vat_number],
+      ]
+        .filter(([, value]) => this.safePdfText(value).trim())
+        .map(([label, value]) => `${label} ${this.safePdfText(value)}`)
       const address = this.safePdfText(this.shopInfo.shop_adress)
       const maxWidth = 50 // largeur max en mm
-      const lines = doc.splitTextToSize(address, maxWidth)
+      const lines = optionalHeaderLines.concat(
+        doc.splitTextToSize(address, maxWidth)
+      )
 
       lines.forEach((line) => {
         y += gap // espace entre les lignes
@@ -434,6 +441,23 @@ export default {
       )
 
       this.textWithBoldPart(doc, 'Date :', this.currentDate, 5, (y += bigGap))
+      const receiptLines = [
+        ['Vendeur :', this.receiptPayload.sellerName],
+        ['Caisse :', this.receiptPayload.cashRegisterNumber],
+        ['Mode :', this.receiptPayload.saleMode],
+        ['Articles :', this.receiptPayload.itemCount],
+      ]
+      receiptLines
+        .filter(([, value]) => this.safePdfText(value).trim())
+        .forEach(([label, value]) => {
+          this.textWithBoldPart(
+            doc,
+            label,
+            this.safePdfText(value),
+            5,
+            (y += bigGap)
+          )
+        })
 
       // Tableau produits
       const items = this.detailArchivedOrder || []

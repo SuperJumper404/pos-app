@@ -27,6 +27,32 @@ const formatTicketNumber = (value) => formatPrice(value)
 
 const formatVatRate = (value) => `${String(value).replace('.', ',')} %`
 
+const optionalText = (value) => String(value == null ? '' : value).trim()
+
+const getSaleMode = (order = {}) => {
+  if (order.sale_mode || order.saleMode) return order.sale_mode || order.saleMode
+  if (order.order_source === 'web' || order.source === 'click_collect') {
+    return 'Click & Collect'
+  }
+  return isEnabled(order.is_takeaway) ? 'À emporter' : 'Sur place'
+}
+
+const getSellerName = (order = {}) =>
+  optionalText(
+    order.taken_by_name ||
+      order.prepared_by_name ||
+      order.seller_name ||
+      order.username
+  )
+
+const getCashRegisterNumber = (order = {}, shopInfo = {}) =>
+  optionalText(
+    order.cash_register_number ||
+      order.cashRegisterNumber ||
+      order.service_point_cash_register_number ||
+      shopInfo.cash_register_number
+  )
+
 const xmlEscape = (value) =>
   String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
@@ -94,7 +120,61 @@ const buildCashierReceiptPayload = ({
     discountAmount,
     isTvaActive: isEnabled(shopInfo.activate_tva),
     vatBreakdown: normalizeVatBreakdown(normalizedDetails),
+    itemCount: normalizedDetails.reduce(
+      (sum, item) => sum + Math.max(0, Number(item.qty) || 0),
+      0
+    ),
+    saleMode: getSaleMode(order),
+    sellerName: getSellerName(order),
+    cashRegisterNumber: getCashRegisterNumber(order, shopInfo),
   }
+}
+
+const appendOptionalLine = (lines, label, value) => {
+  const normalized = optionalText(value)
+  if (normalized) lines.push(`${label} : ${normalized}`)
+  return lines
+}
+
+const receiptHeaderLines = (payload) => {
+  const shopInfo = payload.shopInfo || {}
+  const lines = []
+  appendOptionalLine(lines, 'TEL', shopInfo.shop_phone)
+  appendOptionalLine(lines, 'SIRET', shopInfo.shop_siret)
+  appendOptionalLine(lines, 'NAF', shopInfo.shop_naf)
+  appendOptionalLine(lines, 'TVA intracommunautaire', shopInfo.shop_vat_number)
+  splitByWords(shopInfo.shop_adress || '').forEach((line) => lines.push(line))
+  return lines
+}
+
+const receiptOrderLines = (payload) => {
+  const lines = []
+  appendOptionalLine(lines, 'Vendeur', payload.sellerName)
+  appendOptionalLine(lines, 'Caisse', payload.cashRegisterNumber)
+  appendOptionalLine(lines, 'Mode', payload.saleMode)
+  appendOptionalLine(lines, 'Articles', payload.itemCount)
+  return lines
+}
+
+const buildEscPosQrCode = (value, size = 6) => {
+  const data = Buffer.from(String(value), 'utf8')
+  const storeLength = data.length + 3
+  return Buffer.concat([
+    Buffer.from([0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]),
+    Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, size]),
+    Buffer.from([
+      0x1d,
+      0x28,
+      0x6b,
+      storeLength & 0xff,
+      (storeLength >> 8) & 0xff,
+      0x31,
+      0x50,
+      0x30,
+    ]),
+    data,
+    Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]),
+  ])
 }
 
 const buildCashierEscPos = (payload) => {
@@ -118,9 +198,7 @@ const buildCashierEscPos = (payload) => {
   push(alignCenter(), boldOn(), doubleOn())
   push(esc(`${shopInfo.shop_name || ''}\n`))
   push(doubleOff(), boldOff())
-  push(alignCenter(), esc(`TEL: ${shopInfo.shop_phone || ''}\n`))
-  push(alignCenter(), esc(`SIRET: ${shopInfo.shop_siret || ''}\n`))
-  splitByWords(shopInfo.shop_adress || '').forEach((lineText) => {
+  receiptHeaderLines(payload).forEach((lineText) => {
     push(alignCenter(), esc(`${lineText}\n`))
   })
   push(esc('\n'))
@@ -139,6 +217,9 @@ const buildCashierEscPos = (payload) => {
     esc(`${payload.currentDate}\n\n`),
     boldOff()
   )
+  receiptOrderLines(payload).forEach((lineText) => {
+    push(alignLeft(), esc(`${lineText}\n`))
+  })
   push(boldOn(), esc('QTE   PRODUIT                PRIX\n\n'), boldOff())
   push(line())
 
@@ -194,6 +275,15 @@ const buildCashierEscPos = (payload) => {
     esc(`${shopInfo.shop_name || ''}\n`),
     esc('Made with smarteat.fr\n')
   )
+  const qrUrl = optionalText(shopInfo.receipt_review_qr_url)
+  if (qrUrl) {
+    push(
+      alignCenter(),
+      esc(`${shopInfo.receipt_review_qr_label || 'Votre avis nous intéresse'}\n`),
+      buildEscPosQrCode(qrUrl),
+      esc('\n')
+    )
+  }
   if (!payload.isTvaActive) {
     push(esc('* TVA non applicable, art. 293 B du CGI\n'))
   }
@@ -203,10 +293,16 @@ const buildCashierEscPos = (payload) => {
 
 const buildCashierCloudXml = (payload) => {
   const shopInfo = payload.shopInfo || {}
-  const addressXml = splitByWords(shopInfo.shop_adress || '')
+  const headerXml = receiptHeaderLines(payload)
     .map(
       (line) =>
         `<text width="1" height="1" align="center">${xmlEscape(line)}</text><feed line="1"/>`
+    )
+    .join('')
+  const orderInfoXml = receiptOrderLines(payload)
+    .map(
+      (line) =>
+        `<text align="left">${xmlEscape(line)}</text><feed line="1"/>`
     )
     .join('')
   const productXml = payload.details
@@ -248,11 +344,7 @@ const buildCashierCloudXml = (payload) => {
     '<text smooth="true"></text>' +
     `<text em="true" align="center" width="2" height="2">${xmlEscape(shopInfo.shop_name)}</text>` +
     '<feed line="1"/>' +
-    `<text align="center">TEL : ${xmlEscape(shopInfo.shop_phone)}</text>` +
-    '<feed line="1"/>' +
-    `<text align="center">SIRET : ${xmlEscape(shopInfo.shop_siret)}</text>` +
-    '<feed line="1"/>' +
-    addressXml +
+    headerXml +
     '<feed line="2"/>' +
     `<text em="true" align="left">${xmlEscape(payload.table)}</text>` +
     '<feed line="1"/>' +
@@ -260,6 +352,7 @@ const buildCashierCloudXml = (payload) => {
     '<feed line="1"/>' +
     `<text>Date : ${xmlEscape(payload.currentDate)}</text>` +
     '<feed line="2"/>' +
+    orderInfoXml +
     '<text>QTE   PRODUIT                PRIX\n\n</text>' +
     '<text>--------------------------------</text><feed line="1"/>' +
     productXml +
@@ -270,6 +363,10 @@ const buildCashierCloudXml = (payload) => {
     '<feed line="2"/>' +
     `<text>Paiement : ${xmlEscape(payload.paymentMethod)}</text>` +
     '<feed line="1"/><text>--------------------------------</text><feed line="2"/>' +
+    (optionalText(shopInfo.receipt_review_qr_url)
+      ? `<text align="center">${xmlEscape(shopInfo.receipt_review_qr_label || 'Votre avis nous intéresse')}</text><feed line="1"/>` +
+        `<symbol type="qrcode" level="h" width="6" height="6">${xmlEscape(shopInfo.receipt_review_qr_url)}</symbol><feed line="1"/>`
+      : '') +
     '<text align="center">À très bientôt !</text><feed line="1"/>' +
     `<text align="center">${xmlEscape(shopInfo.shop_name)}</text>` +
     '<feed line="1"/><text align="center">Made with smarteat.fr</text>' +
@@ -336,6 +433,9 @@ module.exports = {
   buildCashierCloudXml,
   buildCashierEscPos,
   buildCashierReceiptPayload,
+  receiptHeaderLines,
+  receiptOrderLines,
+  buildEscPosQrCode,
   sendCashierReceipt,
   splitByWords,
 }

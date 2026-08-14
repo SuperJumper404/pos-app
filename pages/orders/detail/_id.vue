@@ -125,6 +125,27 @@
         </div>
       </v-card>
 
+      <v-card
+        v-if="discountAmount > 0"
+        outlined
+        class="order-detail-discount mt-3"
+      >
+        <v-card-text class="order-detail-discount__content">
+          <div class="order-detail-discount__row">
+            <span>Sous-total</span>
+            <strong>{{ formatCurrency(subtotalBeforeDiscount) }}</strong>
+          </div>
+          <div class="order-detail-discount__row order-detail-discount__row--discount">
+            <span>{{ discountLabel }}</span>
+            <strong>-{{ formatCurrency(discountAmount) }}</strong>
+          </div>
+          <div class="order-detail-discount__row order-detail-discount__row--total">
+            <span>Total</span>
+            <strong>{{ formatCurrency(orderTotal) }}</strong>
+          </div>
+        </v-card-text>
+      </v-card>
+
       <VatBreakdown
         v-if="isTvaActive"
         :details="detailOrder"
@@ -578,6 +599,11 @@ export default {
         shop_adress: this.$store.get('shop/shop_adress'),
         shop_phone: this.$store.get('shop/shop_phone'),
         shop_siret: this.$store.get('shop/shop_siret'),
+        shop_naf: this.$store.get('shop/shop_naf'),
+        shop_vat_number: this.$store.get('shop/shop_vat_number'),
+        receipt_review_qr_url: this.$store.get('shop/receipt_review_qr_url'),
+        receipt_review_qr_label: this.$store.get('shop/receipt_review_qr_label'),
+        cash_register_number: this.$store.get('shop/cash_register_number'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
         activate_tva: this.$store.get('shop/activate_tva'),
@@ -595,6 +621,28 @@ export default {
             this.orderSummary.payment_status
           )
       )
+    },
+    subtotalBeforeDiscount() {
+      const subtotal = this.orderSummary && this.orderSummary.subtotal_before_discount
+      return this.roundPrice(subtotal != null ? subtotal : this.orderTotal)
+    },
+    discountAmount() {
+      const savedAmount = this.orderSummary && this.orderSummary.discount_amount
+      if (savedAmount != null) {
+        return Math.max(0, this.roundPrice(savedAmount))
+      }
+      return Math.max(0, this.roundPrice(this.subtotalBeforeDiscount - this.orderTotal))
+    },
+    discountLabel() {
+      const order = this.orderSummary || {}
+      const value = Number(order.discount_value)
+      if (order.discount_type === 'percent' && Number.isFinite(value)) {
+        return `Remise (${value} %)`
+      }
+      if (order.discount_type === 'amount' && Number.isFinite(value)) {
+        return `Remise (${this.formatCurrency(value)})`
+      }
+      return 'Remise'
     },
     orderTotal() {
       return this.roundPrice(
@@ -974,6 +1022,46 @@ export default {
 .order-detail-list-card,
 .order-detail-attribution {
   border-radius: 12px !important;
+}
+
+.order-detail-discount {
+  border-radius: 12px !important;
+}
+
+.order-detail-discount__content {
+  display: grid;
+  gap: 8px;
+  padding: 14px 20px;
+}
+
+.order-detail-discount__row {
+  align-items: center;
+  color: rgba(0, 0, 0, 0.68);
+  display: flex;
+  font-size: 14px;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.order-detail-discount__row strong {
+  color: rgba(0, 0, 0, 0.87);
+  white-space: nowrap;
+}
+
+.order-detail-discount__row--discount {
+  color: #2e7d32;
+}
+
+.order-detail-discount__row--discount strong {
+  color: #2e7d32;
+}
+
+.order-detail-discount__row--total {
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.87);
+  font-size: 16px;
+  margin-top: 4px;
+  padding-top: 10px;
 }
 
 .order-detail-list-card {

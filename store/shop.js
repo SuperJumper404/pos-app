@@ -10,6 +10,11 @@ export const state = () => ({
   shop_name: '',
   shop_adress: '',
   shop_siret: '',
+  shop_naf: '',
+  shop_vat_number: '',
+  receipt_review_qr_url: '',
+  receipt_review_qr_label: '',
+  cash_register_number: '',
   shop_phone: '',
   shop_mail: '',
   shop_description: '',
@@ -62,6 +67,23 @@ export const actions = {
         dispatch('set/shop_name', response.data.data[0].shop_name)
         dispatch('set/shop_adress', response.data.data[0].shop_adress)
         dispatch('set/shop_siret', response.data.data[0].shop_siret)
+        dispatch('set/shop_naf', response.data.data[0].shop_naf || '')
+        dispatch(
+          'set/shop_vat_number',
+          response.data.data[0].shop_vat_number || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_url',
+          response.data.data[0].receipt_review_qr_url || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_label',
+          response.data.data[0].receipt_review_qr_label || ''
+        )
+        dispatch(
+          'set/cash_register_number',
+          response.data.data[0].cash_register_number || ''
+        )
         dispatch('set/activate_tva', response.data.data[0].activate_tva)
         dispatch('set/shop_phone', response.data.data[0].shop_phone)
         dispatch('set/shop_status', response.data.data[0].shop_status)
@@ -137,6 +159,23 @@ export const actions = {
         dispatch('set/shop_name', response.data.data.shop_name)
         dispatch('set/shop_adress', response.data.data.shop_adress)
         dispatch('set/shop_siret', response.data.data.shop_siret)
+        dispatch('set/shop_naf', response.data.data.shop_naf || '')
+        dispatch(
+          'set/shop_vat_number',
+          response.data.data.shop_vat_number || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_url',
+          response.data.data.receipt_review_qr_url || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_label',
+          response.data.data.receipt_review_qr_label || ''
+        )
+        dispatch(
+          'set/cash_register_number',
+          response.data.data.cash_register_number || ''
+        )
         dispatch('set/shop_phone', response.data.data.shop_phone)
         dispatch('set/shop_status', response.data.data.shop_status)
         dispatch('set/kitchen_closed', response.data.data.kitchen_closed)

@@ -21,7 +21,7 @@ assert.doesNotMatch(ordersSource, /value:\s*'prepared_by_name'/)
 assert.doesNotMatch(ordersSource, /item\.taken_by_name/)
 assert.doesNotMatch(ordersSource, /item\.prepared_by_name/)
 assert.match(ordersSource, /value:\s*'service_point_name'/)
-assert.match(ordersSource, /table:\s*order\.service_point_name/)
+assert.match(ordersSource, /buildOrderTicketPayload/)
 assert.doesNotMatch(
   detailSource,
   /order-detail-header__label">Prise par/

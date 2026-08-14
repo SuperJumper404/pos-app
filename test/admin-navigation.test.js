@@ -41,6 +41,16 @@ assert.match(
   /getAccessibleNavigationItems[\s\S]*?!item\.hiddenFromMainNavigation/,
   'la navigation principale doit filtrer les modules masques'
 )
+assert.match(
+  dashboardSource,
+  /title:\s*['"]Mes clients['"][\s\S]*?routeName:\s*['"]clients['"][\s\S]*?to:\s*['"]\/clients['"][\s\S]*?moduleKey:\s*['"]clients['"]/,
+  'Mes clients doit apparaitre comme module principal'
+)
+assert.match(
+  staffRolesSource,
+  /clients:\s*['"]history['"]/,
+  'Mes clients doit reutiliser la permission Historique'
+)
 
 assert.match(
   productsSource,

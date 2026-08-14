@@ -234,6 +234,10 @@
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
+import {
+  buildOrderTicketPayload,
+  sendOrderTicket,
+} from '@/helpers/orderTicket'
 const {
   getPaymentStatusText,
   getPaymentStatusColor,
@@ -406,64 +410,29 @@ export default {
     },
     async printOrderDetails(order) {
       if (!this.lockOrderPrint(order)) return
-      console.log('Print order details for order', order)
       try {
         await this.$store.dispatch('orders/getDetailOrder', order.id)
         const orderDetails = await this.$store.get('orders/detailOrder')
-        const orderInfo = {
-          table: order.service_point_name || order.username,
-          client: order.customer,
-          created: order.created,
-          total: orderDetails.reduce(
-            (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
-            0
-          ),
-          paymentMethod: order.payment,
-          remark: order.remark,
-        }
+        const payload = buildOrderTicketPayload({
+          order,
+          details: orderDetails,
+          shopInfo: this.shopInfo,
+        })
 
         if (this.shopInfo.smart_print_app) {
-          // genereate ESC/POS data
-          console.log('Generating ESC/POS data for Smart Print...')
-          const escposBuffer = this.generateEscPos(
-            orderDetails,
-            this.shopInfo,
-            orderInfo
-          )
-          console.log('ESC/POS BUFFER:', escposBuffer)
-          const dataFormatESCPOS = escposBuffer.toString('base64')
-
-          try {
-            Promise.resolve(
-              fetch(`http://${this.shopInfo.shop_printer_ip}:8989/print`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  ticketType: 'cuisine',
-                  dataFormatESCPOS,
-                  dataFormatXML: null,
-                }),
-              })
-            ).catch(() => {})
-          } catch (error) {
-            // The job was attempted; printer transport errors are intentionally ignored.
-          }
-          this.$store.dispatch('notifications/success', 'Impression envoyée.')
+          sendOrderTicket({
+            payload,
+            smartPrint: true,
+            printerIp: this.shopInfo.shop_printer_ip,
+            dispatch: this.$store.dispatch,
+          })
         } else {
-          console.log('Printing via Cloud Printing Service...')
-          // Envoie au backend pour impression cloud
-          this.printReceiptCloud(
-            orderDetails,
-            this.shopInfo,
-            orderInfo
-          )
+          sendOrderTicket({
+            payload,
+            smartPrint: false,
+            dispatch: this.$store.dispatch,
+          })
         }
-        console.log(
-          'printWithSmartPrint',
-          this.shopInfo.shop_printer_ip,
-          'orderDetails',
-          orderDetails
-        )
       } catch (error) {
         this.$store.dispatch('notifications/error', {
           message: error.message || "L'impression a échoué.",
