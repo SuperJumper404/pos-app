@@ -69,6 +69,7 @@ const buildCheckoutPayload = (params, clientOrderToken) => ({
   is_takeaway: params.isTakeaway === true,
   remark: params.remark,
   phone: params.phone,
+  ...(params.source ? { source: params.source } : {}),
   items: buildCheckoutItems(params.dataCart),
 })
 
