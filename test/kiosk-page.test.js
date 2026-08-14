@@ -38,5 +38,28 @@ assert.match(pageSource, /confirmStripePayment/)
 assert.match(pageSource, /stripePaymentElement/)
 assert.match(pageSource, /Nouvelle commande/)
 assert.match(pageSource, /numero de commande/)
+assert.match(pageSource, /buildCashierReceiptPayload/)
+assert.match(pageSource, /sendCashierReceipt/)
+assert.match(pageSource, /printKioskReceipt/)
+assert.match(pageSource, /orders\/getAllOrder/)
+assert.match(pageSource, /orders\/getDetailOrder/)
+assert.match(pageSource, /stripePaymentReference/)
+assert.match(pageSource, /v-if="!stripePaymentReady"/)
+assert.match(pageSource, /:disabled="checkoutDisabled \|\| Boolean\(checkoutLoading\)"/)
+
+const confirmStripePaymentStart = pageSource.indexOf(
+  '    async confirmStripePayment() {'
+)
+const finishCheckoutStart = pageSource.indexOf('    async finishCheckout(', confirmStripePaymentStart)
+const confirmStripePaymentSource = pageSource.slice(
+  confirmStripePaymentStart,
+  finishCheckoutStart
+)
+assert.match(confirmStripePaymentSource, /catch \(error\)[\s\S]*checkoutErrorMessage/)
+
+const resetKioskStart = pageSource.indexOf('    resetKiosk() {', finishCheckoutStart)
+const finishCheckoutSource = pageSource.slice(finishCheckoutStart, resetKioskStart)
+assert.match(finishCheckoutSource, /this\.printKioskReceipt\(result, paymentMethod\)/)
+assert.match(finishCheckoutSource, /\.catch\(\(\) =>/)
 
 console.log('kiosk page tests passed')

@@ -86,13 +86,13 @@
             <v-alert v-if="checkoutErrorMessage" type="error" dense>
               {{ checkoutErrorMessage }}
             </v-alert>
-            <div class="kiosk-payment-actions">
+            <div v-if="!stripePaymentReady" class="kiosk-payment-actions">
               <v-btn
                 color="primary"
                 block
                 x-large
                 class="text-none"
-                :disabled="checkoutDisabled"
+                :disabled="checkoutDisabled || Boolean(checkoutLoading)"
                 :loading="checkoutLoading === 'counter'"
                 @click="submitPayAtCounter"
               >
@@ -103,7 +103,7 @@
                 block
                 x-large
                 class="text-none"
-                :disabled="checkoutDisabled"
+                :disabled="checkoutDisabled || Boolean(checkoutLoading)"
                 :loading="checkoutLoading === 'stripe'"
                 @click="submitStripe"
               >
@@ -120,6 +120,7 @@
                 block
                 x-large
                 class="text-none mt-4"
+                :disabled="checkoutLoading === 'stripe-confirm'"
                 :loading="checkoutLoading === 'stripe-confirm'"
                 @click="confirmStripePayment"
               >
@@ -148,6 +149,10 @@
 import { loadStripe } from '@stripe/stripe-js'
 import price from '@/helpers/price'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
+import {
+  buildCashierReceiptPayload,
+  sendCashierReceipt,
+} from '@/helpers/cashierReceipt'
 
 const {
   buildKioskCheckoutPayload,
@@ -178,11 +183,23 @@ export default {
       stripeElements: null,
       stripePaymentReady: false,
       stripePaymentOrderId: null,
+      stripePaymentReference: null,
     }
   },
   computed: {
     shopName() {
       return this.$store.get('shop/shop_name')
+    },
+    shopInfo() {
+      return {
+        shop_name: this.$store.get('shop/shop_name'),
+        shop_adress: this.$store.get('shop/shop_adress'),
+        shop_siret: this.$store.get('shop/shop_siret'),
+        shop_phone: this.$store.get('shop/shop_phone'),
+        shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
+        smart_print_app: this.$store.get('shop/smart_print_app'),
+        activate_tva: this.$store.get('shop/activate_tva'),
+      }
     },
     products() {
       return this.$store.get('products/dataProduct') || []
@@ -280,7 +297,7 @@ export default {
       })
     },
     async submitPayAtCounter() {
-      if (this.checkoutDisabled) return
+      if (this.checkoutDisabled || this.checkoutLoading) return
       this.checkoutErrorMessage = ''
       this.checkoutLoading = 'counter'
       try {
@@ -301,7 +318,7 @@ export default {
       }
     },
     async submitStripe() {
-      if (this.checkoutDisabled) return
+      if (this.checkoutDisabled || this.checkoutLoading) return
       this.checkoutErrorMessage = ''
       this.checkoutLoading = 'stripe'
       try {
@@ -334,7 +351,8 @@ export default {
       const paymentElement = this.stripeElements.create('payment')
       paymentElement.mount(this.$refs.stripePaymentElement)
       this.stripePaymentReady = true
-      this.stripePaymentOrderId = payment.orderId || null
+      this.stripePaymentReference = getKioskOrderReference({ data: payment })
+      this.stripePaymentOrderId = this.stripePaymentReference.orderId
     },
     async confirmStripePayment() {
       if (!this.stripe || !this.stripeElements) return
@@ -355,22 +373,71 @@ export default {
         }
         await this.$store.dispatch('cart/completeCheckout')
         await this.finishCheckout(
-          { ok: true, data: { orderId: this.stripePaymentOrderId } },
+          { ok: true, data: this.stripePaymentReference },
           'Stripe'
         )
+      } catch (error) {
+        this.checkoutErrorMessage =
+          error.message || 'Le paiement a echoue.'
       } finally {
         this.checkoutLoading = null
       }
     },
     async finishCheckout(result, paymentMethod = 'Paiement au comptoir') {
       const reference = getKioskOrderReference(result)
-      this.confirmation = {
+      const confirmation = {
         ...reference,
         printStatus: 'Ticket en cours d impression.',
       }
+      this.confirmation = confirmation
+      this.printKioskReceipt(result, paymentMethod)
+        .then(() => {
+          if (this.confirmation === confirmation) {
+            this.confirmation.printStatus = 'Ticket envoye a l impression.'
+          }
+        })
+        .catch(() => {
+          if (this.confirmation === confirmation) {
+            this.confirmation.printStatus = 'Impossible d imprimer le ticket.'
+          }
+        })
       await this.$store.dispatch('cart/setTotal', 0)
       await this.$store.dispatch('cart/setIndex', 0)
       await this.$store.dispatch('cart/setTocart', null)
+    },
+    async printKioskReceipt(result, paymentMethod) {
+      const { orderId } = getKioskOrderReference(result)
+      if (!orderId) {
+        throw new Error('La commande est introuvable pour l impression.')
+      }
+
+      const [orderLoaded, detailsLoaded] = await Promise.all([
+        this.$store.dispatch('orders/getAllOrder'),
+        this.$store.dispatch('orders/getDetailOrder', orderId),
+      ])
+      if (!orderLoaded || !detailsLoaded) {
+        throw new Error('Impossible de recuperer les donnees du ticket.')
+      }
+
+      const orders = this.$store.get('orders/dataOrders') || []
+      const order = orders.find((item) => String(item.id) === String(orderId))
+      if (!order) {
+        throw new Error('La commande creee est introuvable.')
+      }
+
+      return sendCashierReceipt({
+        payload: buildCashierReceiptPayload({
+          order,
+          details: this.$store.get('orders/detailOrder') || [],
+          shopInfo: this.shopInfo,
+          fallbackPaymentMethod: paymentMethod,
+          fallbackCustomer: String(this.customer || '').trim() || 'Client borne',
+          fallbackTable: 'Borne',
+        }),
+        smartPrint: this.shopInfo.smart_print_app,
+        printerIp: this.shopInfo.shop_printer_ip,
+        dispatch: this.$store.dispatch,
+      })
     },
     resetKiosk() {
       this.cartItems = []
@@ -383,6 +450,7 @@ export default {
       this.stripeElements = null
       this.stripePaymentReady = false
       this.stripePaymentOrderId = null
+      this.stripePaymentReference = null
     },
     logout() {
       const result = this.$store.dispatch('users/postLogout')
