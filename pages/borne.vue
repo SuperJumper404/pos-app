@@ -86,13 +86,34 @@
               Votre panier est vide
             </div>
             <div v-else class="kiosk-cart-lines">
-              <div
+              <v-card
                 v-for="(item, index) in cartItems"
                 :key="item.configurationSignature || `${item.id}-${index}`"
-                class="kiosk-cart-line"
+                outlined
+                class="kiosk-cart-item-card"
               >
-                <strong>{{ item.name }}</strong>
-                <span>{{ item.qty }} x {{ formatCurrency(item.price) }}</span>
+                <v-img
+                  class="kiosk-cart-item-image"
+                  :src="productImageSrc(item.image)"
+                  aspect-ratio="1"
+                />
+                <div class="kiosk-cart-item-main">
+                  <strong>{{ item.name }}</strong>
+                  <span class="kiosk-cart-item-meta">
+                    {{ item.qty }} x {{ formatCurrency(item.price) }}
+                  </span>
+                  <div
+                    v-if="item.customizationList && item.customizationList.length"
+                    class="kiosk-cart-item-choices"
+                  >
+                    <span
+                      v-for="choice in item.customizationList"
+                      :key="choice.product_step_choice_id || choice.name"
+                    >
+                      {{ choice.name }}
+                    </span>
+                  </div>
+                </div>
                 <div class="kiosk-cart-actions">
                   <v-btn
                     icon
@@ -112,7 +133,10 @@
                     <v-icon>mdi-plus</v-icon>
                   </v-btn>
                 </div>
-              </div>
+                <strong class="kiosk-cart-item-subtotal">
+                  {{ formatCurrency(parsePrice(item.price) * Number(item.qty || 0)) }}
+                </strong>
+              </v-card>
             </div>
 
             <v-alert v-if="servicePointError" type="error" dense>
@@ -165,6 +189,7 @@
                 :disabled="Boolean(checkoutLoading)"
                 @click="cancelOrder"
               >
+                <v-icon left>mdi-delete-outline</v-icon>
                 Annuler
               </v-btn>
               <v-btn
@@ -174,6 +199,7 @@
                 :disabled="cartItems.length === 0 || checkoutInteractionLocked"
                 @click="openCustomerNameStep"
               >
+                <v-icon left>mdi-cart-check</v-icon>
                 Commander
               </v-btn>
             </div>
@@ -1115,12 +1141,64 @@ export default {
   margin-top: 14px;
 }
 
-.kiosk-cart-line {
-  min-height: 58px;
-  border-bottom: 1px solid #edf0f4;
+.kiosk-cart-lines {
+  display: grid;
+  gap: 10px;
+  max-height: 250px;
+  overflow: auto;
+  padding: 10px 0;
+}
+
+.kiosk-cart-item-card {
+  min-height: 96px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 8px;
+}
+
+.kiosk-cart-item-image {
+  width: 80px;
+  max-width: 80px;
+  flex: 0 0 80px;
+  border-radius: 8px;
+  background: #f1f3f5;
+}
+
+.kiosk-cart-item-main {
+  min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 3px;
+}
+
+.kiosk-cart-item-main strong,
+.kiosk-cart-item-meta,
+.kiosk-cart-item-choices {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kiosk-cart-item-meta {
+  color: #5f6b7a;
+  font-weight: 700;
+}
+
+.kiosk-cart-item-choices {
+  color: #1976d2;
+  font-size: 0.86rem;
+}
+
+.kiosk-cart-item-choices span + span::before {
+  content: " + ";
+}
+
+.kiosk-cart-item-subtotal {
+  min-width: 84px;
+  text-align: right;
 }
 
 .kiosk-cart-actions {
