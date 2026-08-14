@@ -1,0 +1,22 @@
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const root = path.resolve(__dirname, '..')
+const pageSource = fs.readFileSync(path.join(root, 'pages', 'borne.vue'), 'utf8')
+const layoutSource = fs.readFileSync(path.join(root, 'layouts', 'default.vue'), 'utf8')
+
+assert.match(pageSource, /middleware:\s*['"]auth['"]/)
+assert.match(pageSource, /class="kiosk-page/)
+assert.match(pageSource, /products\/getProducts/)
+assert.match(pageSource, /categories\/getAllCategories/)
+assert.match(pageSource, /shop\/getShopInfo/)
+assert.match(pageSource, /servicePointId/)
+assert.match(pageSource, /localStorage\.getItem\('service_point_id'\)/)
+assert.match(pageSource, /Votre commande/)
+assert.match(pageSource, /Sur place/)
+assert.match(pageSource, /A emporter/)
+assert.match(layoutSource, /isKioskRoute/)
+assert.match(layoutSource, /!isKioskPage/)
+
+console.log('kiosk page tests passed')
