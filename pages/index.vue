@@ -87,6 +87,7 @@ const {
   getRoleLabel,
   isStaffAccess,
 } = require('@/helpers/staffRoles')
+const { isKioskOnlyUser } = require('@/helpers/kioskAccess')
 const { countPendingOrders } = require('@/helpers/orderNotifications')
 
 export default {
@@ -196,6 +197,11 @@ export default {
   mounted() {
     this.loadPage = true
     this.accessUser = parseInt(localStorage.getItem('access'))
+    if (isKioskOnlyUser(this.idUser)) {
+      this.$router.replace('/borne')
+      this.loadPage = false
+      return
+    }
     const apiCalls = []
     this.clockTimer = setInterval(() => {
       this.now = new Date()

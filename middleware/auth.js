@@ -1,6 +1,23 @@
+const kioskAccess = typeof require === 'function'
+  ? require('../helpers/kioskAccess')
+  : {
+      isKioskOnlyUser: () => false,
+      isKioskRoute: () => false,
+    }
+
+const {
+  isKioskOnlyUser,
+  isKioskRoute,
+} = kioskAccess
+
 export default function ({ store, redirect, route, router }) {
   if (!store.state.authenticated) {
     return redirect('/login')
+  }
+
+  const currentUser = store.state.users.user || {}
+  if (isKioskOnlyUser(currentUser) && !isKioskRoute(route)) {
+    return redirect('/borne')
   }
 
   const allowedPaths = ['/menus', '/ordersStatuses', '/login', '/cart']
@@ -9,7 +26,7 @@ export default function ({ store, redirect, route, router }) {
     route.path.length > 1 ? route.path.replace(/\/+$/, '') : route.path
 
   const isClientAccess =
-    store.state.users.user.access === 2 || store.state.users.user.access === 3
+    currentUser.access === 2 || currentUser.access === 3
 
   if (
     isClientAccess &&
