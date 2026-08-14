@@ -44,48 +44,89 @@
         </section>
 
         <aside class="kiosk-cart">
-          <h2>Votre commande</h2>
-          <div v-if="cartItems.length === 0" class="kiosk-empty">
-            Votre panier est vide
-          </div>
-          <div v-else class="kiosk-cart-lines">
-            <div
-              v-for="(item, index) in cartItems"
-              :key="item.configurationSignature || `${item.id}-${index}`"
-              class="kiosk-cart-line"
-            >
-              <strong>{{ item.name }}</strong>
-              <span>{{ item.qty }} x {{ formatCurrency(item.price) }}</span>
-              <div class="kiosk-cart-actions">
-                <v-btn icon color="warning" @click="changeQuantity(index, -1)">
-                  <v-icon>mdi-minus</v-icon>
-                </v-btn>
-                <strong>{{ item.qty }}</strong>
-                <v-btn icon color="success" @click="changeQuantity(index, 1)">
-                  <v-icon>mdi-plus</v-icon>
-                </v-btn>
+          <section v-if="confirmation" class="kiosk-confirmation">
+            <div class="kiosk-confirmation-label">Votre numero de commande</div>
+            <strong>{{ confirmation.orderNumber }}</strong>
+            <p>{{ confirmation.printStatus }}</p>
+            <v-btn color="primary" x-large class="text-none" @click="resetKiosk">
+              Nouvelle commande
+            </v-btn>
+          </section>
+          <template v-else>
+            <h2>Votre commande</h2>
+            <div v-if="cartItems.length === 0" class="kiosk-empty">
+              Votre panier est vide
+            </div>
+            <div v-else class="kiosk-cart-lines">
+              <div
+                v-for="(item, index) in cartItems"
+                :key="item.configurationSignature || `${item.id}-${index}`"
+                class="kiosk-cart-line"
+              >
+                <strong>{{ item.name }}</strong>
+                <span>{{ item.qty }} x {{ formatCurrency(item.price) }}</span>
+                <div class="kiosk-cart-actions">
+                  <v-btn icon color="warning" @click="changeQuantity(index, -1)">
+                    <v-icon>mdi-minus</v-icon>
+                  </v-btn>
+                  <strong>{{ item.qty }}</strong>
+                  <v-btn icon color="success" @click="changeQuantity(index, 1)">
+                    <v-icon>mdi-plus</v-icon>
+                  </v-btn>
+                </div>
               </div>
             </div>
-          </div>
 
-          <v-text-field v-model.trim="customer" label="Votre nom" />
-          <v-text-field v-model.trim="phone" label="Votre numero" type="tel" />
-          <v-btn-toggle v-model="saleMode" mandatory class="kiosk-sale-mode">
-            <v-btn value="dine_in" class="text-none">Sur place</v-btn>
-            <v-btn value="takeaway" class="text-none">A emporter</v-btn>
-          </v-btn-toggle>
-          <v-alert v-if="checkoutErrorMessage" type="error" dense>
-            {{ checkoutErrorMessage }}
-          </v-alert>
-          <v-btn
-            color="success"
-            block
-            x-large
-            class="text-none"
-            :disabled="checkoutDisabled"
-          >
-            Continuer
-          </v-btn>
+            <v-text-field v-model.trim="customer" label="Votre nom" />
+            <v-text-field v-model.trim="phone" label="Votre numero" type="tel" />
+            <v-btn-toggle v-model="saleMode" mandatory class="kiosk-sale-mode">
+              <v-btn value="dine_in" class="text-none">Sur place</v-btn>
+              <v-btn value="takeaway" class="text-none">A emporter</v-btn>
+            </v-btn-toggle>
+            <v-alert v-if="checkoutErrorMessage" type="error" dense>
+              {{ checkoutErrorMessage }}
+            </v-alert>
+            <div class="kiosk-payment-actions">
+              <v-btn
+                color="primary"
+                block
+                x-large
+                class="text-none"
+                :disabled="checkoutDisabled"
+                :loading="checkoutLoading === 'counter'"
+                @click="submitPayAtCounter"
+              >
+                Payer au comptoir
+              </v-btn>
+              <v-btn
+                color="success"
+                block
+                x-large
+                class="text-none"
+                :disabled="checkoutDisabled"
+                :loading="checkoutLoading === 'stripe'"
+                @click="submitStripe"
+              >
+                Payer par carte
+              </v-btn>
+            </div>
+            <div
+              v-show="stripePaymentReady && !confirmation"
+              class="kiosk-stripe-panel"
+            >
+              <div ref="stripePaymentElement"></div>
+              <v-btn
+                color="success"
+                block
+                x-large
+                class="text-none mt-4"
+                :loading="checkoutLoading === 'stripe-confirm'"
+                @click="confirmStripePayment"
+              >
+                Confirmer le paiement
+              </v-btn>
+            </div>
+          </template>
         </aside>
       </main>
 
@@ -104,8 +145,14 @@
 </template>
 
 <script>
+import { loadStripe } from '@stripe/stripe-js'
 import price from '@/helpers/price'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
+
+const {
+  buildKioskCheckoutPayload,
+  getKioskOrderReference,
+} = require('@/helpers/kioskCheckout')
 
 export default {
   components: {
@@ -125,6 +172,12 @@ export default {
       selectedProduct: null,
       selectedChoices: [],
       checkoutErrorMessage: '',
+      checkoutLoading: null,
+      confirmation: null,
+      stripe: null,
+      stripeElements: null,
+      stripePaymentReady: false,
+      stripePaymentOrderId: null,
     }
   },
   computed: {
@@ -212,6 +265,124 @@ export default {
         return
       }
       this.cartItems.push({ ...product, qty: 1 })
+    },
+    buildPayload(payment, stripe) {
+      return buildKioskCheckoutPayload({
+        customer: this.customer,
+        phone: this.phone,
+        servicePointId: this.servicePointId,
+        total: this.total,
+        payment,
+        isTakeaway: this.saleMode === 'takeaway',
+        dataCart: this.cartItems,
+        stripe,
+        source: 'borne',
+      })
+    },
+    async submitPayAtCounter() {
+      if (this.checkoutDisabled) return
+      this.checkoutErrorMessage = ''
+      this.checkoutLoading = 'counter'
+      try {
+        const result = await this.$store.dispatch(
+          'cart/checkoutCounterPayBefore',
+          this.buildPayload('Paiement au comptoir', false)
+        )
+        if (!result || !result.ok) {
+          this.checkoutErrorMessage =
+            result?.error?.message || 'Impossible d envoyer la commande.'
+          return
+        }
+        await this.finishCheckout(result, 'Paiement au comptoir')
+      } catch (error) {
+        this.checkoutErrorMessage = error.message
+      } finally {
+        this.checkoutLoading = null
+      }
+    },
+    async submitStripe() {
+      if (this.checkoutDisabled) return
+      this.checkoutErrorMessage = ''
+      this.checkoutLoading = 'stripe'
+      try {
+        const result = await this.$store.dispatch(
+          'cart/checkoutOrder',
+          this.buildPayload('Stripe', true)
+        )
+        if (!result || !result.ok) {
+          this.checkoutErrorMessage =
+            result?.error?.message || 'Impossible de preparer le paiement.'
+          return
+        }
+        await this.mountStripePayment(result.data)
+      } catch (error) {
+        this.checkoutErrorMessage = error.message
+      } finally {
+        this.checkoutLoading = null
+      }
+    },
+    async mountStripePayment(payment) {
+      if (!payment || !payment.clientSecret || !payment.publishableKey) {
+        throw new Error('Donnees Stripe incompletes.')
+      }
+      this.stripe = await loadStripe(payment.publishableKey)
+      if (!this.stripe) throw new Error('Stripe est indisponible.')
+      this.stripeElements = this.stripe.elements({
+        clientSecret: payment.clientSecret,
+      })
+      await this.$nextTick()
+      const paymentElement = this.stripeElements.create('payment')
+      paymentElement.mount(this.$refs.stripePaymentElement)
+      this.stripePaymentReady = true
+      this.stripePaymentOrderId = payment.orderId || null
+    },
+    async confirmStripePayment() {
+      if (!this.stripe || !this.stripeElements) return
+      this.checkoutErrorMessage = ''
+      this.checkoutLoading = 'stripe-confirm'
+      try {
+        const result = await this.stripe.confirmPayment({
+          elements: this.stripeElements,
+          redirect: 'if_required',
+          confirmParams: {
+            return_url: `${window.location.origin}/borne`,
+          },
+        })
+        if (result.error) {
+          this.checkoutErrorMessage =
+            result.error.message || 'Le paiement a echoue.'
+          return
+        }
+        await this.$store.dispatch('cart/completeCheckout')
+        await this.finishCheckout(
+          { ok: true, data: { orderId: this.stripePaymentOrderId } },
+          'Stripe'
+        )
+      } finally {
+        this.checkoutLoading = null
+      }
+    },
+    async finishCheckout(result, paymentMethod = 'Paiement au comptoir') {
+      const reference = getKioskOrderReference(result)
+      this.confirmation = {
+        ...reference,
+        printStatus: 'Ticket en cours d impression.',
+      }
+      await this.$store.dispatch('cart/setTotal', 0)
+      await this.$store.dispatch('cart/setIndex', 0)
+      await this.$store.dispatch('cart/setTocart', null)
+    },
+    resetKiosk() {
+      this.cartItems = []
+      this.customer = ''
+      this.phone = ''
+      this.saleMode = 'dine_in'
+      this.confirmation = null
+      this.checkoutErrorMessage = ''
+      this.stripe = null
+      this.stripeElements = null
+      this.stripePaymentReady = false
+      this.stripePaymentOrderId = null
     },
     logout() {
       const result = this.$store.dispatch('users/postLogout')
@@ -325,6 +496,36 @@ export default {
 .kiosk-sale-mode {
   width: 100%;
   margin-bottom: 16px;
+}
+
+.kiosk-payment-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.kiosk-stripe-panel {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+}
+
+.kiosk-confirmation {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.kiosk-confirmation-label {
+  font-size: 1.15rem;
+}
+
+.kiosk-confirmation strong {
+  margin: 12px 0;
+  font-size: 3rem;
 }
 
 @media (max-width: 960px) {
