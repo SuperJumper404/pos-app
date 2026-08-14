@@ -1,0 +1,72 @@
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const root = path.resolve(__dirname, '..')
+const pageSource = fs.readFileSync(path.join(root, 'pages', 'borne.vue'), 'utf8')
+const layoutSource = fs.readFileSync(path.join(root, 'layouts', 'default.vue'), 'utf8')
+
+assert.match(pageSource, /middleware:\s*['"]auth['"]/)
+assert.match(pageSource, /class="kiosk-page/)
+assert.match(pageSource, /products\/getProducts/)
+assert.match(pageSource, /this\.\$store\.get\('products\/dataProduct'\)/)
+assert.doesNotMatch(pageSource, /products\/dataProducts/)
+assert.match(pageSource, /categories\/getAllCategories/)
+assert.match(pageSource, /shop\/getShopInfo/)
+assert.match(pageSource, /servicePointId/)
+assert.match(pageSource, /this\.\$store\.get\('users\/user'\)/)
+assert.doesNotMatch(pageSource, /localStorage\.getItem\('service_point_id'\)/)
+assert.match(pageSource, /Votre commande/)
+assert.match(pageSource, /Sur place/)
+assert.match(pageSource, /A emporter/)
+assert.match(layoutSource, /isKioskRoute/)
+assert.match(layoutSource, /!isKioskPage/)
+assert.match(pageSource, /ProductCustomizationWizard/)
+assert.match(pageSource, /customizationDialog/)
+assert.match(pageSource, /checkoutDisabled/)
+assert.match(pageSource, /checkoutErrorMessage/)
+assert.match(pageSource, /mdi-minus/)
+assert.match(pageSource, /mdi-plus/)
+assert.match(pageSource, /buildKioskCheckoutPayload/)
+assert.match(pageSource, /getKioskOrderReference/)
+assert.match(pageSource, /submitPayAtCounter/)
+assert.match(pageSource, /submitStripe/)
+assert.match(pageSource, /cart\/checkoutOrder/)
+assert.match(pageSource, /cart\/checkoutCounterPayBefore/)
+assert.match(pageSource, /source:\s*'borne'/)
+assert.match(pageSource, /mountStripePayment/)
+assert.match(pageSource, /confirmStripePayment/)
+assert.match(pageSource, /stripePaymentElement/)
+assert.match(pageSource, /Nouvelle commande/)
+assert.match(pageSource, /numero de commande/)
+assert.match(pageSource, /buildCashierReceiptPayload/)
+assert.match(pageSource, /sendCashierReceipt/)
+assert.match(pageSource, /printKioskReceipt/)
+assert.match(pageSource, /Ticket imprime/)
+assert.match(pageSource, /Ticket indisponible/)
+assert.match(pageSource, /orders\/getAllOrder/)
+assert.match(pageSource, /orders\/getDetailOrder/)
+assert.match(pageSource, /stripePaymentReference/)
+assert.match(pageSource, /v-if="!stripePaymentReady"/)
+assert.match(pageSource, /:disabled="checkoutDisabled \|\| Boolean\(checkoutLoading\)"/)
+
+const confirmStripePaymentStart = pageSource.indexOf(
+  '    async confirmStripePayment() {'
+)
+const finishCheckoutStart = pageSource.indexOf('    async finishCheckout(', confirmStripePaymentStart)
+const confirmStripePaymentSource = pageSource.slice(
+  confirmStripePaymentStart,
+  finishCheckoutStart
+)
+assert.match(confirmStripePaymentSource, /catch \(error\)[\s\S]*checkoutErrorMessage/)
+
+const resetKioskStart = pageSource.indexOf('    resetKiosk() {', finishCheckoutStart)
+const finishCheckoutSource = pageSource.slice(finishCheckoutStart, resetKioskStart)
+assert.match(
+  finishCheckoutSource,
+  /await this\.printKioskReceipt\(reference\.orderId, paymentMethod\)/
+)
+assert.match(finishCheckoutSource, /Ticket imprime/)
+assert.match(finishCheckoutSource, /Ticket indisponible/)
+
+console.log('kiosk page tests passed')

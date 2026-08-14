@@ -2,6 +2,7 @@
   <v-app dark>
     <v-navigation-drawer
       v-if="
+        !isKioskPage &&
         $route.path != '/register' &&
         $route.path != '/login' &&
         $route.name != 'activation-token-email-position-access' &&
@@ -53,6 +54,7 @@
     </v-navigation-drawer>
     <v-app-bar
       v-if="
+        !isKioskPage &&
         $route.path != '/register' &&
         $route.path != '/login' &&
         $route.name != 'activation-token-email-position-access' &&
@@ -143,6 +145,7 @@ const {
   countPendingOrders,
   formatPendingOrderBadge,
 } = require('@/helpers/orderNotifications')
+const { isKioskRoute } = require('@/helpers/kioskAccess')
 export default {
   mixins: [listdashboard],
   data() {
@@ -161,6 +164,9 @@ export default {
     }
   },
   computed: {
+    isKioskPage() {
+      return isKioskRoute(this.$route)
+    },
     navigationItems() {
       return getAccessibleNavigationItems(
         this.userAccess,

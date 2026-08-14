@@ -33,6 +33,7 @@ const STAFF_MODULE_KEYS = [
   'tables',
   'reports',
   'website',
+  'borne',
 ]
 
 const MODULE_OPTIONS = [
@@ -45,6 +46,7 @@ const MODULE_OPTIONS = [
   { text: 'Tables', value: 'tables' },
   { text: 'Rapports', value: 'reports' },
   { text: 'Site web', value: 'website' },
+  { text: 'Borne', value: 'borne' },
 ]
 
 const DEFAULT_MODULES_BY_ACCESS = {
@@ -90,6 +92,7 @@ const MODULE_PERMISSION_BY_NAV_KEY = {
   tables: 'tables',
   reports: 'reports',
   website: 'website',
+  borne: 'borne',
 }
 
 const PRIMARY_ADMIN_MODULES = new Set(['staff', 'settings'])
