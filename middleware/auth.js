@@ -1,11 +1,13 @@
 const kioskAccess = typeof require === 'function'
   ? require('../helpers/kioskAccess')
   : {
+      canAccessKiosk: () => false,
       isKioskOnlyUser: () => false,
       isKioskRoute: () => false,
     }
 
 const {
+  canAccessKiosk,
   isKioskOnlyUser,
   isKioskRoute,
 } = kioskAccess
@@ -16,6 +18,10 @@ export default function ({ store, redirect, route, router }) {
   }
 
   const currentUser = store.state.users.user || {}
+  if (isKioskRoute(route) && !canAccessKiosk(currentUser)) {
+    return redirect([2, 3].includes(Number(currentUser.access)) ? '/menus' : '/')
+  }
+
   if (isKioskOnlyUser(currentUser) && !isKioskRoute(route)) {
     return redirect('/borne')
   }

@@ -31,6 +31,19 @@ assert.deepStrictEqual(payload, {
   stripe: false,
   source: 'borne',
 })
+assert.strictEqual(
+  buildKioskCheckoutPayload({
+    customer: 'Nora',
+    phone: '0611223344',
+    servicePointId: 42,
+    total: 20,
+    payment: 'Stripe',
+    dataCart: [{ id: 7, qty: 2, price: 10 }],
+    stripe: true,
+    repriceConfirmation: true,
+  }).repriceConfirmation,
+  true
+)
 assert.throws(
   () => buildKioskCheckoutPayload({ customer: 'Nora', phone: '06' }),
   /service point/i
@@ -48,6 +61,10 @@ assert.deepStrictEqual(
     data: { insertId: 92 },
   }),
   { orderId: 92, orderNumber: '92' }
+)
+assert.deepStrictEqual(
+  getKioskOrderReference({ id: 93, ordernumber: 'B-93' }),
+  { orderId: 93, orderNumber: 'B-93' }
 )
 
 const cartSource = fs.readFileSync(path.join(root, 'store', 'cart.js'), 'utf8')

@@ -6,7 +6,13 @@
           <div class="kiosk-eyebrow">Commande borne</div>
           <h1>{{ shopName || 'Menu' }}</h1>
         </div>
-        <v-btn icon large aria-label="Deconnexion" @click="logout">
+        <v-btn
+          icon
+          large
+          aria-label="Deconnexion"
+          :disabled="Boolean(checkoutLoading)"
+          @click="logout"
+        >
           <v-icon>mdi-logout</v-icon>
         </v-btn>
       </header>
@@ -21,6 +27,7 @@
               class="kiosk-category-button text-none"
               :color="category === activeCategory ? 'primary' : 'grey lighten-3'"
               :dark="category === activeCategory"
+              :disabled="checkoutInteractionLocked"
               @click="activeCategory = category"
             >
               {{ category }}
@@ -34,6 +41,7 @@
               outlined
               hover
               class="kiosk-product-card"
+              :disabled="checkoutInteractionLocked || isKitchenClosed"
               @click="openProduct(product)"
             >
               <v-img :src="productImageSrc(product.image)" aspect-ratio="1.2" />
@@ -66,28 +74,74 @@
                 <strong>{{ item.name }}</strong>
                 <span>{{ item.qty }} x {{ formatCurrency(item.price) }}</span>
                 <div class="kiosk-cart-actions">
-                  <v-btn icon color="warning" @click="changeQuantity(index, -1)">
+                  <v-btn
+                    icon
+                    color="warning"
+                    :disabled="checkoutInteractionLocked"
+                    @click="changeQuantity(index, -1)"
+                  >
                     <v-icon>mdi-minus</v-icon>
                   </v-btn>
                   <strong>{{ item.qty }}</strong>
-                  <v-btn icon color="success" @click="changeQuantity(index, 1)">
+                  <v-btn
+                    icon
+                    color="success"
+                    :disabled="checkoutInteractionLocked"
+                    @click="changeQuantity(index, 1)"
+                  >
                     <v-icon>mdi-plus</v-icon>
                   </v-btn>
                 </div>
               </div>
             </div>
 
-            <v-text-field v-model.trim="customer" label="Votre nom" />
-            <v-text-field v-model.trim="phone" label="Votre numero" type="tel" />
+            <v-text-field
+              v-model.trim="customer"
+              label="Votre nom"
+              :disabled="checkoutInteractionLocked"
+            />
+            <v-text-field
+              v-model.trim="phone"
+              label="Votre numero"
+              type="tel"
+              :disabled="checkoutInteractionLocked"
+            />
             <v-btn-toggle v-model="saleMode" mandatory class="kiosk-sale-mode">
-              <v-btn value="dine_in" class="text-none">Sur place</v-btn>
-              <v-btn value="takeaway" class="text-none">A emporter</v-btn>
+              <v-btn
+                value="dine_in"
+                class="text-none"
+                :disabled="checkoutInteractionLocked"
+              >
+                Sur place
+              </v-btn>
+              <v-btn
+                value="takeaway"
+                class="text-none"
+                :disabled="checkoutInteractionLocked"
+              >
+                A emporter
+              </v-btn>
             </v-btn-toggle>
-            <v-alert v-if="checkoutErrorMessage" type="error" dense>
+            <div class="kiosk-total">
+              <strong>Total</strong>
+              <strong>{{ formatCurrency(total) }}</strong>
+            </div>
+            <v-alert v-if="servicePointError" type="error" dense>
+              {{ servicePointError }}
+            </v-alert>
+            <v-alert v-if="isKitchenClosed" type="warning" dense>
+              La cuisine est fermée. Aucune nouvelle commande n'est possible.
+            </v-alert>
+            <v-alert
+              v-if="checkoutErrorMessage"
+              :type="checkoutAlertType"
+              dense
+            >
               {{ checkoutErrorMessage }}
             </v-alert>
             <div v-if="!stripePaymentReady" class="kiosk-payment-actions">
               <v-btn
+                v-if="showCounterPayment"
                 color="primary"
                 block
                 x-large
@@ -99,6 +153,7 @@
                 Payer au comptoir
               </v-btn>
               <v-btn
+                v-if="showStripePayment"
                 color="success"
                 block
                 x-large
@@ -110,6 +165,17 @@
                 Payer par carte
               </v-btn>
             </div>
+            <v-btn
+              v-if="hasPreparedStripeAttempt && !stripePaymentReady"
+              text
+              block
+              class="text-none mt-2"
+              :disabled="Boolean(checkoutLoading)"
+              @click="cancelStripePayment"
+            >
+              <v-icon left>mdi-close</v-icon>
+              Annuler la tentative de paiement
+            </v-btn>
             <div
               v-show="stripePaymentReady && !confirmation"
               class="kiosk-stripe-panel"
@@ -125,6 +191,16 @@
                 @click="confirmStripePayment"
               >
                 Confirmer le paiement
+              </v-btn>
+              <v-btn
+                text
+                block
+                class="text-none mt-2"
+                :disabled="Boolean(checkoutLoading)"
+                @click="cancelStripePayment"
+              >
+                <v-icon left>mdi-close</v-icon>
+                Annuler le paiement
               </v-btn>
             </div>
           </template>
@@ -149,14 +225,19 @@
 import { loadStripe } from '@stripe/stripe-js'
 import price from '@/helpers/price'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
+import { applyServerQuoteToCart } from '@/helpers/customizations'
 import {
   buildCashierReceiptPayload,
   sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
 
 const {
+  buildKioskCartLine,
   buildKioskCheckoutPayload,
+  getKioskPaymentAvailability,
   getKioskOrderReference,
+  getKioskStripeReturnOutcome,
+  isKioskProductAvailable,
 } = require('@/helpers/kioskCheckout')
 
 export default {
@@ -164,6 +245,13 @@ export default {
     ProductCustomizationWizard,
   },
   mixins: [price],
+  async beforeRouteLeave(to, from, next) {
+    if (this.checkoutFinalized) {
+      next()
+      return
+    }
+    next((await this.abandonPreparedCheckout()) === true)
+  },
   middleware: 'auth',
   data() {
     return {
@@ -171,22 +259,36 @@ export default {
       customer: '',
       phone: '',
       saleMode: 'dine_in',
-      servicePointId: parseInt(localStorage.getItem('service_point_id')) || null,
       cartItems: [],
       customizationDialog: false,
       selectedProduct: null,
       selectedChoices: [],
       checkoutErrorMessage: '',
+      checkoutAlertType: 'error',
       checkoutLoading: null,
+      checkoutFinalized: false,
+      repriceConfirmation: false,
       confirmation: null,
       stripe: null,
       stripeElements: null,
       stripePaymentReady: false,
       stripePaymentOrderId: null,
       stripePaymentReference: null,
+      stripePaymentElementInstance: null,
     }
   },
   computed: {
+    currentUser() {
+      return this.$store.get('users/user') || {}
+    },
+    servicePointId() {
+      return Number(this.currentUser.service_point_id) || null
+    },
+    servicePointError() {
+      return this.servicePointId
+        ? ''
+        : "Configuration borne incomplète : aucun point de service n'est attribué à cette session. Mettez à jour l'API puis reconnectez-vous."
+    },
     shopName() {
       return this.$store.get('shop/shop_name')
     },
@@ -202,7 +304,9 @@ export default {
       }
     },
     products() {
-      return this.$store.get('products/dataProduct') || []
+      return (this.$store.get('products/dataProduct') || []).filter(
+        isKioskProductAvailable
+      )
     },
     categories() {
       const names = this.products.map((product) => product.category).filter(Boolean)
@@ -211,12 +315,40 @@ export default {
     activeProducts() {
       return this.products.filter((product) => product.category === this.activeCategory)
     },
+    isKitchenClosed() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/kitchen_closed')
+      )
+    },
+    qrPaymentMode() {
+      return this.$store.get('shop/qr_payment_mode') || 'stripe_before_order'
+    },
+    paymentAvailability() {
+      return getKioskPaymentAvailability(this.qrPaymentMode)
+    },
+    showCounterPayment() {
+      return this.paymentAvailability.counter
+    },
+    showStripePayment() {
+      return this.paymentAvailability.stripe
+    },
+    hasPreparedStripeAttempt() {
+      return Boolean(
+        this.stripePaymentOrderId ||
+          this.$store.get('cart/clientOrderOrderId')
+      )
+    },
+    checkoutInteractionLocked() {
+      return this.hasPreparedStripeAttempt || this.repriceConfirmation
+    },
     checkoutDisabled() {
       return (
         this.cartItems.length === 0 ||
         !String(this.customer || '').trim() ||
         !String(this.phone || '').trim() ||
-        !this.servicePointId
+        !this.servicePointId ||
+        this.isKitchenClosed ||
+        this.hasPreparedStripeAttempt
       )
     },
     total() {
@@ -233,6 +365,10 @@ export default {
       this.$store.dispatch('shop/getShopInfo'),
     ])
     this.activeCategory = this.categories[0] || ''
+    await this.restoreStripeReturn()
+  },
+  beforeDestroy() {
+    this.resetStripePaymentState()
   },
   methods: {
     productImageSrc(image) {
@@ -240,20 +376,24 @@ export default {
       return `${staticURL}/api/v1/imgproducts/${image}`
     },
     openProduct(product) {
+      if (
+        this.checkoutInteractionLocked ||
+        this.isKitchenClosed ||
+        !isKioskProductAvailable(product)
+      ) {
+        return
+      }
       if ((product.customization_steps || []).length > 0) {
         this.selectedProduct = product
         this.selectedChoices = []
         this.customizationDialog = true
         return
       }
-      this.addToCart(product)
+      this.addToCart(buildKioskCartLine(product))
     },
-    confirmCustomization() {
-      this.addToCart({
-        ...this.selectedProduct,
-        selectedChoiceIds: [...this.selectedChoices],
-        configurationSignature: `${this.selectedProduct.id}:${this.selectedChoices.join(',')}`,
-      })
+    confirmCustomization(customization) {
+      if (!this.selectedProduct || this.checkoutInteractionLocked) return
+      this.addToCart(buildKioskCartLine(this.selectedProduct, customization))
       this.closeCustomization()
     },
     closeCustomization() {
@@ -262,6 +402,7 @@ export default {
       this.selectedChoices = []
     },
     changeQuantity(index, delta) {
+      if (this.checkoutInteractionLocked) return
       const item = this.cartItems[index]
       if (!item) return
       const nextQty = Number(item.qty || 0) + delta
@@ -270,18 +411,22 @@ export default {
         return
       }
       item.qty = nextQty
+      item.subtotal = this.roundPrice(this.parsePrice(item.price) * nextQty)
     },
-    addToCart(product) {
+    addToCart(line) {
       const existing = this.cartItems.find(
         (item) =>
-          item.id === product.id &&
-          item.configurationSignature === product.configurationSignature
+          item.id === line.id &&
+          item.configurationSignature === line.configurationSignature
       )
       if (existing) {
         existing.qty += 1
+        existing.subtotal = this.roundPrice(
+          this.parsePrice(existing.price) * existing.qty
+        )
         return
       }
-      this.cartItems.push({ ...product, qty: 1 })
+      this.cartItems.push({ ...line })
     },
     buildPayload(payment, stripe) {
       return buildKioskCheckoutPayload({
@@ -293,12 +438,14 @@ export default {
         isTakeaway: this.saleMode === 'takeaway',
         dataCart: this.cartItems,
         stripe,
+        repriceConfirmation: this.repriceConfirmation,
         source: 'borne',
       })
     },
     async submitPayAtCounter() {
       if (this.checkoutDisabled || this.checkoutLoading) return
       this.checkoutErrorMessage = ''
+      this.checkoutAlertType = 'error'
       this.checkoutLoading = 'counter'
       try {
         const result = await this.$store.dispatch(
@@ -306,10 +453,14 @@ export default {
           this.buildPayload('Paiement au comptoir', false)
         )
         if (!result || !result.ok) {
-          this.checkoutErrorMessage =
-            result?.error?.message || 'Impossible d envoyer la commande.'
+          this.handleCheckoutFailure(
+            result?.error,
+            'Impossible d envoyer la commande.'
+          )
           return
         }
+        this.repriceConfirmation = false
+        this.checkoutFinalized = true
         await this.finishCheckout(result, 'Paiement au comptoir')
       } catch (error) {
         this.checkoutErrorMessage = error.message
@@ -320,6 +471,7 @@ export default {
     async submitStripe() {
       if (this.checkoutDisabled || this.checkoutLoading) return
       this.checkoutErrorMessage = ''
+      this.checkoutAlertType = 'error'
       this.checkoutLoading = 'stripe'
       try {
         const result = await this.$store.dispatch(
@@ -327,18 +479,40 @@ export default {
           this.buildPayload('Stripe', true)
         )
         if (!result || !result.ok) {
-          this.checkoutErrorMessage =
-            result?.error?.message || 'Impossible de préparer le paiement.'
+          this.handleCheckoutFailure(
+            result?.error,
+            'Impossible de préparer le paiement.'
+          )
           return
         }
+        this.repriceConfirmation = false
         await this.mountStripePayment(result.data)
       } catch (error) {
         this.checkoutErrorMessage = error.message
+        await this.abandonPreparedCheckout({ preserveMessage: true })
       } finally {
         this.checkoutLoading = null
       }
     },
+    handleCheckoutFailure(error, fallbackMessage) {
+      if (error?.code === 'ORDER_REPRICE_REQUIRED' && error.server_quote) {
+        this.cartItems = applyServerQuoteToCart(
+          this.cartItems,
+          error.server_quote
+        )
+        this.repriceConfirmation = true
+        this.checkoutAlertType = 'warning'
+        this.checkoutErrorMessage =
+          'Les prix ont été mis à jour. Vérifiez le nouveau total puis relancez le paiement.'
+        return
+      }
+
+      this.checkoutAlertType = 'error'
+      this.checkoutErrorMessage = error?.message || fallbackMessage
+    },
     async mountStripePayment(payment) {
+      this.stripePaymentReference = getKioskOrderReference({ data: payment })
+      this.stripePaymentOrderId = this.stripePaymentReference.orderId
       if (!payment || !payment.clientSecret || !payment.publishableKey) {
         throw new Error('Donnees Stripe incompletes.')
       }
@@ -350,13 +524,13 @@ export default {
       await this.$nextTick()
       const paymentElement = this.stripeElements.create('payment')
       paymentElement.mount(this.$refs.stripePaymentElement)
+      this.stripePaymentElementInstance = paymentElement
       this.stripePaymentReady = true
-      this.stripePaymentReference = getKioskOrderReference({ data: payment })
-      this.stripePaymentOrderId = this.stripePaymentReference.orderId
     },
     async confirmStripePayment() {
       if (!this.stripe || !this.stripeElements) return
       this.checkoutErrorMessage = ''
+      this.checkoutAlertType = 'error'
       this.checkoutLoading = 'stripe-confirm'
       try {
         const result = await this.stripe.confirmPayment({
@@ -371,7 +545,14 @@ export default {
             result.error.message || 'Le paiement a échoué.'
           return
         }
+        if (result.paymentIntent?.status !== 'succeeded') {
+          this.checkoutAlertType = 'info'
+          this.checkoutErrorMessage =
+            'Paiement en cours de vérification. Ne relancez pas la commande.'
+          return
+        }
         await this.$store.dispatch('cart/completeCheckout')
+        this.checkoutFinalized = true
         await this.finishCheckout(
           { ok: true, data: this.stripePaymentReference },
           'Stripe'
@@ -384,7 +565,21 @@ export default {
       }
     },
     async finishCheckout(result, paymentMethod = 'Paiement au comptoir') {
-      const reference = getKioskOrderReference(result)
+      const initialReference = getKioskOrderReference(result)
+      const authoritativeOrder = await this.fetchKioskOrder(
+        initialReference.orderId
+      )
+      const resolvedReference = authoritativeOrder
+        ? getKioskOrderReference(authoritativeOrder)
+        : initialReference
+      const reference = {
+        ...resolvedReference,
+        orderNumber: String(
+          authoritativeOrder?.ordernumber ||
+            authoritativeOrder?.orderNumber ||
+            resolvedReference.orderNumber
+        ),
+      }
       this.confirmation = {
         ...reference,
         printStatus: 'Ticket en cours d impression.',
@@ -396,6 +591,73 @@ export default {
       await this.$store.dispatch('cart/setTotal', 0)
       await this.$store.dispatch('cart/setIndex', 0)
       await this.$store.dispatch('cart/setTocart', null)
+    },
+    async fetchKioskOrder(orderId) {
+      if (!orderId) return null
+      try {
+        await this.$store.dispatch('orders/getAllOrder')
+        const orders = this.$store.get('orders/dataOrders') || []
+        return (
+          orders.find((order) => String(order.id) === String(orderId)) || null
+        )
+      } catch (error) {
+        return null
+      }
+    },
+    restoreCheckoutPayload(payload) {
+      if (!payload || typeof payload !== 'object') return
+      this.customer = payload.customer || ''
+      this.phone = payload.phone || ''
+      this.saleMode = payload.is_takeaway === true ? 'takeaway' : 'dine_in'
+      if (Array.isArray(payload.dataCart)) {
+        this.cartItems = JSON.parse(JSON.stringify(payload.dataCart))
+      }
+    },
+    async restoreStripeReturn() {
+      const query = this.$route.query || {}
+      const hasStripeReturn = Boolean(
+        query.redirect_status ||
+          query.payment_intent ||
+          query.payment_intent_client_secret
+      )
+      if (!hasStripeReturn) return
+
+      this.restoreCheckoutPayload(this.$store.get('cart/clientOrderPayload'))
+      const orderId = this.$store.get('cart/clientOrderOrderId')
+      if (!orderId) {
+        this.checkoutAlertType = 'error'
+        this.checkoutErrorMessage =
+          'Retour de paiement détecté, mais la référence de commande est introuvable. Contactez le comptoir.'
+        return
+      }
+
+      this.checkoutAlertType = 'info'
+      this.checkoutErrorMessage = 'Vérification du paiement en cours.'
+      const order = await this.fetchKioskOrder(orderId)
+      if (!order) {
+        this.checkoutErrorMessage =
+          'Le paiement ne peut pas encore être vérifié. Ne relancez pas la commande et contactez le comptoir.'
+        return
+      }
+
+      const outcome = getKioskStripeReturnOutcome(order)
+      if (outcome === 'paid') {
+        await this.$store.dispatch('cart/completeCheckout')
+        this.checkoutFinalized = true
+        await this.finishCheckout({ data: order }, 'Stripe')
+        return
+      }
+      if (outcome === 'failed') {
+        await this.$store.dispatch('cart/abandonCheckout', { safe: true })
+        this.resetStripePaymentState()
+        this.checkoutAlertType = 'error'
+        this.checkoutErrorMessage =
+          'Le paiement a échoué ou a été annulé. Vous pouvez recommencer.'
+        return
+      }
+
+      this.checkoutErrorMessage =
+        'Paiement en cours de vérification. Ne relancez pas la commande.'
     },
     async printKioskReceipt(orderId, paymentMethod) {
       if (!orderId) return false
@@ -430,22 +692,79 @@ export default {
         return false
       }
     },
-    resetKiosk() {
-      this.cartItems = []
-      this.customer = ''
-      this.phone = ''
-      this.saleMode = 'dine_in'
-      this.confirmation = null
-      this.checkoutErrorMessage = ''
+    resetStripePaymentState() {
+      if (this.stripePaymentElementInstance) {
+        try {
+          this.stripePaymentElementInstance.unmount()
+        } catch (error) {
+          // The element may already be detached after a route change.
+        }
+      }
+      this.stripePaymentElementInstance = null
       this.stripe = null
       this.stripeElements = null
       this.stripePaymentReady = false
       this.stripePaymentOrderId = null
       this.stripePaymentReference = null
     },
-    logout() {
-      const result = this.$store.dispatch('users/postLogout')
-      if (result) this.$router.push('/login')
+    async abandonPreparedCheckout({ preserveMessage = false } = {}) {
+      const orderId =
+        this.stripePaymentOrderId ||
+        this.$store.get('cart/clientOrderOrderId') ||
+        null
+      if (orderId) {
+        const canceled = await this.$store.dispatch(
+          'cart/cancelStripeCheckout',
+          orderId
+        )
+        if (!canceled || !canceled.ok) {
+          this.checkoutAlertType = 'error'
+          this.checkoutErrorMessage =
+            canceled?.error?.message ||
+            "Impossible d'annuler le paiement préparé. Réessayez avant de quitter."
+          return false
+        }
+      }
+
+      const abandoned = await this.$store.dispatch(
+        'cart/abandonCheckout',
+        orderId ? { safe: true } : undefined
+      )
+      if (!abandoned || !abandoned.ok) {
+        this.checkoutAlertType = 'error'
+        this.checkoutErrorMessage =
+          abandoned?.error?.message ||
+          'La tentative de commande doit être résolue avant de quitter.'
+        return false
+      }
+
+      this.resetStripePaymentState()
+      this.repriceConfirmation = false
+      if (!preserveMessage) this.checkoutErrorMessage = ''
+      return true
+    },
+    async cancelStripePayment() {
+      if (this.checkoutLoading) return
+      await this.abandonPreparedCheckout()
+    },
+    async resetKiosk() {
+      await this.$store.dispatch('cart/abandonCheckout', { safe: true })
+      this.cartItems = []
+      this.customer = ''
+      this.phone = ''
+      this.saleMode = 'dine_in'
+      this.confirmation = null
+      this.checkoutErrorMessage = ''
+      this.checkoutAlertType = 'error'
+      this.checkoutFinalized = false
+      this.repriceConfirmation = false
+      this.resetStripePaymentState()
+    },
+    async logout() {
+      if (this.checkoutLoading) return
+      if (!(await this.abandonPreparedCheckout())) return
+      const result = await this.$store.dispatch('users/postLogout')
+      if (result) await this.$router.push('/login')
     },
   },
 }
