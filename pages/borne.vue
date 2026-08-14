@@ -260,6 +260,7 @@
               class="text-none"
               @click="chooseSaleMode('dine_in')"
             >
+              <v-icon left x-large>mdi-silverware-fork-knife</v-icon>
               Sur place
             </v-btn>
             <v-btn
@@ -268,6 +269,7 @@
               class="text-none"
               @click="chooseSaleMode('takeaway')"
             >
+              <v-icon left x-large>mdi-shopping</v-icon>
               A emporter
             </v-btn>
           </v-card-text>
