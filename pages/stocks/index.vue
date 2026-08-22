@@ -153,9 +153,11 @@ export default {
       this.replenishDialog = true
     },
     async replenishItem() {
-      await this.$store.dispatch('stockInventory/replenishItem', { id: this.selectedItem.stock_item_id || this.selectedItem.id, data: this.replenishForm })
-      this.replenishDialog = false
-      await this.loadStock()
+      const success = await this.$store.dispatch('stockInventory/replenishItem', { id: this.selectedItem.stock_item_id || this.selectedItem.id, data: this.replenishForm })
+      if (success) {
+        this.replenishDialog = false
+        await this.loadStock()
+      }
     },
     openInventory(item) { this.selectedItem = item; this.inventoryForm = { quantity: item.current_stock, remark: '' }; this.inventoryDialog = true },
     async inventoryItem() {

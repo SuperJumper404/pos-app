@@ -15,6 +15,12 @@
         <template #[`item.movement_type`]="{ item: movement }">
           <span>{{ movementLabel(movement.movement_type) }}</span>
         </template>
+        <template #[`item.unit_price`]="{ item: movement }">
+          {{ formatEstimatedPrice(movement.unit_price) }}
+        </template>
+        <template #[`item.total_price`]="{ item: movement }">
+          {{ formatEstimatedPrice(movement.total_price) }}
+        </template>
       </v-data-table>
     </div>
   </v-container>
