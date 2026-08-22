@@ -25,14 +25,49 @@
             placeholder="Saisir la description du produit"
             required
           ></v-text-field>
-          <v-text-field
-            v-model="formproduct.stock"
-            label="Stock"
-            type="number"
-            :rules="[(v) => !!v || 'Quantité en stock requise']"
-            placeholder="Saisir la quantité en stock"
-            required
-          ></v-text-field>
+          <v-switch
+            v-model="formproduct.track_stock"
+            label="Suivre le stock"
+          />
+          <div v-if="formproduct.track_stock">
+            <v-text-field
+              v-model="formproduct.stock"
+              label="Stock actuel"
+              type="number"
+              :rules="[(v) => v !== '' || 'Stock actuel requis']"
+              required
+            ></v-text-field>
+            <v-text-field
+              v-model="formproduct.minimum_stock"
+              label="Seuil minimum"
+              type="number"
+              :rules="[(v) => v !== '' || 'Seuil minimum requis']"
+              required
+            />
+            <v-text-field
+              v-model="formproduct.target_stock"
+              label="Stock cible"
+              type="number"
+              :rules="[(v) => v !== '' || 'Stock cible requis']"
+              required
+            />
+            <v-combobox
+              v-model="formproduct.stock_unit"
+              :items="['piece', 'paquet', 'bouteille', 'carton', 'bac']"
+              label="Unite"
+              :rules="[(v) => !!v || 'Unite requise']"
+              required
+            />
+            <v-select
+              v-model="formproduct.stock_zero_behavior"
+              :items="[
+                { text: 'Bloquer a zero', value: 'block' },
+                { text: 'Autoriser avec alerte', value: 'warn' },
+              ]"
+              label="A stock zero"
+              required
+            />
+          </div>
 
           <v-text-field
             v-model="formproduct.price"
@@ -128,6 +163,11 @@ export default {
       categoryid: '',
       price: '',
       stock: '',
+      track_stock: true,
+      stock_zero_behavior: 'block',
+      minimum_stock: 1,
+      target_stock: 1,
+      stock_unit: 'piece',
       image: '',
       vat_rate: 10,
       vat_rate_dine_in: 10,
@@ -189,6 +229,11 @@ export default {
       fd.append('categoryid', this.formproduct.categoryid)
       fd.append('image', this.formproduct.image)
       fd.append('description', this.formproduct.description)
+      fd.append('track_stock', this.formproduct.track_stock ? 1 : 0)
+      fd.append('stock_zero_behavior', this.formproduct.stock_zero_behavior)
+      fd.append('minimum_stock', this.formproduct.minimum_stock)
+      fd.append('target_stock', this.formproduct.target_stock)
+      fd.append('stock_unit', this.formproduct.stock_unit)
       fd.append('customization_config', JSON.stringify(serializedConfig))
 
       this.loadingBtn = true

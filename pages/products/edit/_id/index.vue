@@ -33,15 +33,49 @@
             placeholder="Saisir la description du produit"
             required
           />
-          <v-text-field
-            v-model="formeditproduct.stock"
-            label="Stock"
-            class="d-inline-flex"
-            type="number"
-            :rules="[(v) => !!v || 'Stock requis']"
-            placeholder="Saisir le stock du produit"
-            required
+          <v-switch
+            v-model="formeditproduct.track_stock"
+            label="Suivre le stock"
           />
+          <div v-if="formeditproduct.track_stock">
+            <v-text-field
+              v-model="formeditproduct.stock"
+              label="Stock actuel"
+              type="number"
+              :rules="[(v) => v !== '' || 'Stock actuel requis']"
+              required
+            />
+            <v-text-field
+              v-model="formeditproduct.minimum_stock"
+              label="Seuil minimum"
+              type="number"
+              :rules="[(v) => v !== '' || 'Seuil minimum requis']"
+              required
+            />
+            <v-text-field
+              v-model="formeditproduct.target_stock"
+              label="Stock cible"
+              type="number"
+              :rules="[(v) => v !== '' || 'Stock cible requis']"
+              required
+            />
+            <v-combobox
+              v-model="formeditproduct.stock_unit"
+              :items="['piece', 'paquet', 'bouteille', 'carton', 'bac']"
+              label="Unite"
+              :rules="[(v) => !!v || 'Unite requise']"
+              required
+            />
+            <v-select
+              v-model="formeditproduct.stock_zero_behavior"
+              :items="[
+                { text: 'Bloquer a zero', value: 'block' },
+                { text: 'Autoriser avec alerte', value: 'warn' },
+              ]"
+              label="A stock zero"
+              required
+            />
+          </div>
           <br />
           <v-text-field
             v-model="formeditproduct.price"
@@ -149,6 +183,11 @@ export default {
         categoryid: '',
         price: '',
         stock: '',
+        track_stock: true,
+        stock_zero_behavior: 'block',
+        minimum_stock: 1,
+        target_stock: 1,
+        stock_unit: 'piece',
         image: '',
         vat_rate: 10,
         vat_rate_dine_in: 10,
@@ -192,6 +231,11 @@ export default {
         categoryid: product.categoryid,
         price: product.price,
         stock: product.stock,
+        track_stock: Number(product.track_stock) !== 0,
+        stock_zero_behavior: product.stock_zero_behavior || 'block',
+        minimum_stock: product.minimum_stock || 1,
+        target_stock: product.target_stock || product.stock || 1,
+        stock_unit: product.stock_unit || 'piece',
         description: product.description,
         image: product.image,
         vat_rate: Number(product.vat_rate || 10),
@@ -238,6 +282,11 @@ export default {
         name: this.formeditproduct.name,
         description: this.formeditproduct.description,
         stock: this.formeditproduct.stock,
+        track_stock: this.formeditproduct.track_stock ? 1 : 0,
+        stock_zero_behavior: this.formeditproduct.stock_zero_behavior,
+        minimum_stock: this.formeditproduct.minimum_stock,
+        target_stock: this.formeditproduct.target_stock,
+        stock_unit: this.formeditproduct.stock_unit,
         price: this.roundPrice(this.formeditproduct.price),
         vat_rate: this.formeditproduct.vat_rate_dine_in,
         vat_rate_dine_in: this.formeditproduct.vat_rate_dine_in,

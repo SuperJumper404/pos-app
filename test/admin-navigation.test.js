@@ -33,8 +33,13 @@ assert.match(
 )
 assert.match(
   dashboardSource,
+  /title:\s*['"]Stocks['"][\s\S]*?routeName:\s*['"]stocks['"][\s\S]*?to:\s*['"]\/stocks['"][\s\S]*?moduleKey:\s*['"]stocks['"]/,
+  'Stock doit apparaitre dans le menu principal pour les utilisateurs autorises'
+)
+assert.doesNotMatch(
+  dashboardSource,
   /routeName:\s*['"]stocks['"][\s\S]*?hiddenFromMainNavigation:\s*true/,
-  'Stock ne doit pas apparaitre dans le menu lateral ni sur l accueil'
+  'Stock ne doit plus etre masque de la navigation principale'
 )
 assert.match(
   staffRolesSource,
