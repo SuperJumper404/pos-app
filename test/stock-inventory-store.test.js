@@ -1,0 +1,21 @@
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const source = fs.readFileSync(path.join(__dirname, '..', 'store', 'stockInventory.js'), 'utf8')
+
+assert.match(source, /dataItems/)
+assert.match(source, /shoppingList/)
+assert.match(source, /getItems/)
+assert.match(source, /\/baseurl\/api\/v1\/stock\/items/)
+assert.match(source, /createIngredient/)
+assert.match(source, /\/baseurl\/api\/v1\/stock\/ingredients/)
+assert.match(source, /replenishItem/)
+assert.match(source, /\/replenishments/)
+assert.match(source, /inventoryItem/)
+assert.match(source, /\/inventories/)
+assert.match(source, /generateShoppingList/)
+assert.match(source, /\/baseurl\/api\/v1\/stock\/shopping-list\/generate/)
+assert.match(source, /setShoppingListTaken/)
+
+console.log('stock inventory store tests passed')
