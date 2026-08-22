@@ -113,7 +113,7 @@ export const actions = {
       .then(async (response) => {
         dispatch('set/message', response.data.message)
         await dispatch('getAllCategories')
-        dispatch('notifications/success', 'Ordre des catÃ©gories mis Ã  jour.', {
+        dispatch('notifications/success', 'Ordre des catégories mis à jour.', {
           root: true,
         })
         return true
@@ -122,7 +122,7 @@ export const actions = {
         dispatch(
           'set/message',
           error.response?.data?.message ||
-            "Impossible de modifier l'ordre des catÃ©gories."
+            "Impossible de modifier l'ordre des catégories."
         )
         return false
       })

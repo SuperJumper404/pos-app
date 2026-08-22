@@ -112,7 +112,7 @@ assert.deepStrictEqual(
     source: 'borne',
   }),
   {
-    text: 'Ã€ encaisser',
+    text: 'À encaisser',
     color: 'orange',
   }
 )
@@ -124,7 +124,7 @@ assert.deepStrictEqual(
     order_source: 'borne',
   }),
   {
-    text: 'Ã€ encaisser',
+    text: 'À encaisser',
     color: 'orange',
   }
 )

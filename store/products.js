@@ -140,7 +140,7 @@ export const actions = {
       .then(async (response) => {
         dispatch('set/message', response.data.message)
         await dispatch('getProducts')
-        dispatch('notifications/success', "Ordre des produits mis Ã  jour.", {
+        dispatch('notifications/success', 'Ordre des produits mis à jour.', {
           root: true,
         })
         return true

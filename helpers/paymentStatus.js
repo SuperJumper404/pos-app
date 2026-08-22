@@ -61,7 +61,7 @@ const isKioskPayAtCounterOrder = (order = {}) => {
 const getPaymentStatusDisplay = (order = {}) => {
   if (isKioskPayAtCounterOrder(order)) {
     return {
-      text: 'Ã€ encaisser',
+      text: 'À encaisser',
       color: 'orange',
     }
   }
