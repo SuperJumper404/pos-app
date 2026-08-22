@@ -59,13 +59,13 @@ assert.match(
 
 assert.match(
   productsSource,
-  /(?:Ajouter catégorie|Ajouter catÃ©gorie)/,
-  'la page Produits doit proposer le bouton Ajouter catÃ©gorie'
+  /(?:Ajouter catégorie|Ajouter catÃ©gorie|Gérer les catégories|GÃ©rer les catÃ©gories)/,
+  'la page Produits doit proposer le bouton de gestion des catÃ©gories'
 )
 assert.match(
   productsSource,
-  /openNewCategory\(\)[\s\S]*?this\.\$router\.push\(['"]\/categories\/newcategory['"]\)/,
-  'le bouton Ajouter catÃ©gorie doit ouvrir la crÃ©ation de catÃ©gorie'
+  /openNewCategory\(\)[\s\S]*?this\.\$router\.push\(['"]\/categories['"]\)/,
+  'le bouton de gestion des catÃ©gories doit ouvrir la page CatÃ©gories'
 )
 assert.match(
   dashboardSource,
