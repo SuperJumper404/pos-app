@@ -221,7 +221,6 @@ export default {
 
       const fd = new FormData()
       fd.append('name', this.formproduct.name)
-      fd.append('stock', this.formproduct.stock)
       fd.append('price', this.roundPrice(this.formproduct.price))
       fd.append('vat_rate', this.formproduct.vat_rate_dine_in)
       fd.append('vat_rate_dine_in', this.formproduct.vat_rate_dine_in)
@@ -230,10 +229,13 @@ export default {
       fd.append('image', this.formproduct.image)
       fd.append('description', this.formproduct.description)
       fd.append('track_stock', this.formproduct.track_stock ? 1 : 0)
-      fd.append('stock_zero_behavior', this.formproduct.stock_zero_behavior)
-      fd.append('minimum_stock', this.formproduct.minimum_stock)
-      fd.append('target_stock', this.formproduct.target_stock)
-      fd.append('stock_unit', this.formproduct.stock_unit)
+      if (this.formproduct.track_stock) {
+        fd.append('stock', this.formproduct.stock)
+        fd.append('stock_zero_behavior', this.formproduct.stock_zero_behavior)
+        fd.append('minimum_stock', this.formproduct.minimum_stock)
+        fd.append('target_stock', this.formproduct.target_stock)
+        fd.append('stock_unit', this.formproduct.stock_unit)
+      }
       fd.append('customization_config', JSON.stringify(serializedConfig))
 
       this.loadingBtn = true

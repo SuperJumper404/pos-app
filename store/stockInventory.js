@@ -2,6 +2,7 @@ import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 
 export const state = () => ({
   dataItems: [],
+  lowItems: [],
   detailItem: null,
   movements: [],
   shoppingList: [],
@@ -46,6 +47,18 @@ export const actions = {
       })
       .catch((error) => {
         dispatch('set/message', errorMessage(error, "Impossible de creer l'ingredient."))
+        return false
+      })
+  },
+  getLowItems({ dispatch }) {
+    return this.$axios
+      .get('/baseurl/api/v1/stock/low', { headers: authHeaders() })
+      .then((response) => {
+        dispatch('set/lowItems', response.data.data || [])
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', errorMessage(error, 'Impossible de charger les stocks bas.'))
         return false
       })
   },
@@ -96,6 +109,43 @@ export const actions = {
       })
       .catch((error) => {
         dispatch('set/message', errorMessage(error, "Impossible d'enregistrer l'inventaire."))
+        return false
+      })
+  },
+  bulkInventory({ dispatch }, items) {
+    return this.$axios
+      .post('/baseurl/api/v1/stock/inventory/bulk', { items }, { headers: authHeaders() })
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        dispatch('notifications/success', 'Inventaire enregistre.', { root: true })
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', errorMessage(error, "Impossible d'enregistrer l'inventaire."))
+        return false
+      })
+  },
+  archiveIngredient({ dispatch }, id) {
+    return this.$axios
+      .post(`/baseurl/api/v1/stock/items/${id}/archive`, {}, { headers: authHeaders() })
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', errorMessage(error, "Impossible d'archiver l'ingredient."))
+        return false
+      })
+  },
+  deleteIngredient({ dispatch }, id) {
+    return this.$axios
+      .delete(`/baseurl/api/v1/stock/items/${id}`, { headers: authHeaders() })
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', errorMessage(error, "Impossible de supprimer l'ingredient."))
         return false
       })
   },

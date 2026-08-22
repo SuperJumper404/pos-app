@@ -233,9 +233,9 @@ export default {
         stock: product.stock,
         track_stock: Number(product.track_stock) !== 0,
         stock_zero_behavior: product.stock_zero_behavior || 'block',
-        minimum_stock: product.minimum_stock || 1,
-        target_stock: product.target_stock || product.stock || 1,
-        stock_unit: product.stock_unit || 'piece',
+        minimum_stock: product.minimum_stock ?? 1,
+        target_stock: product.target_stock ?? product.stock ?? 1,
+        stock_unit: product.stock_unit ?? 'piece',
         description: product.description,
         image: product.image,
         vat_rate: Number(product.vat_rate || 10),
@@ -281,17 +281,21 @@ export default {
       const data = {
         name: this.formeditproduct.name,
         description: this.formeditproduct.description,
-        stock: this.formeditproduct.stock,
         track_stock: this.formeditproduct.track_stock ? 1 : 0,
-        stock_zero_behavior: this.formeditproduct.stock_zero_behavior,
-        minimum_stock: this.formeditproduct.minimum_stock,
-        target_stock: this.formeditproduct.target_stock,
-        stock_unit: this.formeditproduct.stock_unit,
         price: this.roundPrice(this.formeditproduct.price),
         vat_rate: this.formeditproduct.vat_rate_dine_in,
         vat_rate_dine_in: this.formeditproduct.vat_rate_dine_in,
         vat_rate_takeaway: this.formeditproduct.vat_rate_takeaway,
         categoryid: this.formeditproduct.categoryid,
+      }
+      if (this.formeditproduct.track_stock) {
+        Object.assign(data, {
+          stock: this.formeditproduct.stock,
+          stock_zero_behavior: this.formeditproduct.stock_zero_behavior,
+          minimum_stock: this.formeditproduct.minimum_stock,
+          target_stock: this.formeditproduct.target_stock,
+          stock_unit: this.formeditproduct.stock_unit,
+        })
       }
       if (!this.productImg) return data
 

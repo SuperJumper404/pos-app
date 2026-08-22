@@ -28,8 +28,28 @@ const formatEstimatedPrice = (value) => {
   return `${Number(value).toFixed(2)} EUR`
 }
 
+const isOperationalStockItem = (item) => {
+  if (!item || Number(item.archived) === 1) return false
+  if (item.item_type === 'ingredient') return true
+  return (
+    item.item_type === 'product' &&
+    Number(item.product_archived || 0) === 0 &&
+    Number(item.track_stock) === 1
+  )
+}
+
+const filterStockItems = (items = [], search = '') => {
+  const term = String(search || '').trim().toLowerCase()
+  if (!term) return [...items]
+  return items.filter((item) =>
+    String(item.name || '').toLowerCase().includes(term)
+  )
+}
+
 module.exports = {
   getStockStatus,
   sortShoppingListItems,
   formatEstimatedPrice,
+  filterStockItems,
+  isOperationalStockItem,
 }
