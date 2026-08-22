@@ -126,6 +126,33 @@ export const actions = {
         return false
       })
   },
+  reorderProducts({ dispatch }, ids) {
+    return this.$axios
+      .patch(
+        '/baseurl/api/v1/products/order',
+        { ids },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then(async (response) => {
+        dispatch('set/message', response.data.message)
+        await dispatch('getProducts')
+        dispatch('notifications/success', "Ordre des produits mis Ã  jour.", {
+          root: true,
+        })
+        return true
+      })
+      .catch((error) => {
+        dispatch(
+          'set/message',
+          getErrorMessage(error, "Impossible de modifier l'ordre des produits.")
+        )
+        return false
+      })
+  },
   deleteProduct({ dispatch }, params) {
     return this.$axios
       .delete(`/baseurl/api/v1/product/${params}`, {

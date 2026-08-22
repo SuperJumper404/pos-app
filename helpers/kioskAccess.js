@@ -7,6 +7,9 @@ const normalizePath = (path = '') =>
   path.length > 1 ? String(path).replace(/\/+$/, '') : String(path)
 
 const isKioskOnlyUser = (user = {}) => {
+  if (user.session_subject === 'service_point') {
+    return user.source === 'borne' || user.order_source === 'borne'
+  }
   if (!isStaffAccess(user.access)) return false
   if (user.is_primary_admin) return false
   if (!Array.isArray(user.module_permissions)) return false
@@ -20,14 +23,21 @@ const isKioskOnlyUser = (user = {}) => {
 const isKioskRoute = (route = {}) =>
   normalizePath(route.path || '') === KIOSK_HOME_PATH || route.name === 'borne'
 
-const canAccessKiosk = (user = {}) =>
-  isStaffAccess(user.access) &&
-  canAccessModule(
-    user.access,
-    KIOSK_MODULE,
-    user.module_permissions,
-    [true, 1, '1'].includes(user.is_primary_admin)
+const canAccessKiosk = (user = {}) => {
+  if (user.session_subject === 'service_point') {
+    return user.source === 'borne' || user.order_source === 'borne'
+  }
+
+  return (
+    isStaffAccess(user.access) &&
+    canAccessModule(
+      user.access,
+      KIOSK_MODULE,
+      user.module_permissions,
+      [true, 1, '1'].includes(user.is_primary_admin)
+    )
   )
+}
 
 const getKioskHomePath = () => KIOSK_HOME_PATH
 

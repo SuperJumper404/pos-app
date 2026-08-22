@@ -278,7 +278,7 @@ const sendOrderTicket = ({
     throw new TypeError("La commande est introuvable pour l'impression.")
   }
 
-  if (smartPrint) {
+  if (isEnabled(smartPrint)) {
     const requestFetch =
       fetchImplementation || (typeof fetch === 'function' ? fetch : null)
     if (!requestFetch || !printerIp) {

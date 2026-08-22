@@ -15,12 +15,18 @@
           <div class="cashregister-payout-summary">
             <div>
               <strong>À encaisser</strong><br />
-              {{ formatCurrency(paymentSummary.dueAmount) }}
+              {{ formatCurrency(effectiveDueAmount) }}
             </div>
             <div>
               <strong>Déjà payé</strong><br />
               {{ formatCurrency(paymentSummary.paidAmount) }}
             </div>
+          </div>
+          <div
+            v-if="discountAmount > 0"
+            class="cashregister-payout-discount"
+          >
+            {{ discountLabel }} : -{{ formatCurrency(discountAmount) }}
           </div>
 
           <v-radio-group
@@ -42,6 +48,15 @@
           <p>Ces commandes sont déjà payées. Vous pouvez les clôturer.</p>
         </v-card-text>
         <v-card-actions>
+          <v-btn
+            v-if="requiresPaymentMethod"
+            :disabled="loadingBtn"
+            color="warning"
+            class="text-none"
+            @click="openDiscountDialog"
+          >
+            Remise <v-icon small right>mdi-tag-percent-outline</v-icon>
+          </v-btn>
           <v-spacer></v-spacer>
 
           <v-btn
@@ -63,10 +78,75 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <v-dialog v-model="discountDialog" max-width="520">
+      <v-card>
+        <v-card-title>Remise globale</v-card-title>
+        <v-card-text>
+          <v-btn-toggle
+            v-model="discountDraftType"
+            mandatory
+            color="primary"
+            class="d-flex mb-4"
+          >
+            <v-btn value="percent" class="flex-grow-1 text-none">
+              Pourcentage
+            </v-btn>
+            <v-btn value="amount" class="flex-grow-1 text-none">
+              Montant en euros
+            </v-btn>
+          </v-btn-toggle>
+          <div v-if="discountDraftType === 'percent'" class="d-flex flex-wrap">
+            <v-btn
+              v-for="percentage in discountPercentages"
+              :key="percentage"
+              outlined
+              color="primary"
+              class="mr-2 mb-2 text-none"
+              @click="discountDraftValue = percentage"
+            >
+              {{ percentage }} %
+            </v-btn>
+          </div>
+          <v-text-field
+            v-model="discountDraftValue"
+            :label="discountDraftType === 'percent' ? 'Pourcentage' : 'Montant de la remise'"
+            :suffix="discountDraftType === 'percent' ? '%' : '€'"
+            type="number"
+            min="0"
+            step="0.01"
+            outlined
+            autofocus
+          ></v-text-field>
+          <div class="cashregister-payout-summary">
+            <div>
+              <strong>Avant remise</strong><br />
+              {{ formatCurrency(paymentSummary.dueAmount) }}
+            </div>
+            <div>
+              <strong>Après remise</strong><br />
+              {{ formatCurrency(discountPreview.total) }}
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn text class="text-none" @click="clearDiscount">
+            Supprimer
+          </v-btn>
+          <v-spacer />
+          <v-btn text class="text-none" @click="discountDialog = false">
+            Annuler
+          </v-btn>
+          <v-btn color="primary" class="text-none" @click="applyDiscount">
+            Appliquer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 <script>
 import price from '@/helpers/price'
+import { calculateDiscount } from '@/helpers/discount'
 const {
   archiveOrdersSafely,
   getCashRegisterPaymentSummary,
@@ -85,6 +165,11 @@ export default {
       loadingBtn: false,
       ordersLoaded: false,
       selectedPaymentMethod: null,
+      discountDialog: false,
+      discountType: null,
+      discountValue: null,
+      discountDraftType: 'percent',
+      discountDraftValue: 0,
       retryActive: false,
       retryDueOrderIds: [],
     }
@@ -104,6 +189,51 @@ export default {
     },
     paymentSummary() {
       return getCashRegisterPaymentSummary(this.selectedOrders)
+    },
+    discountPercentages() {
+      return this.$store.get('shop/shop_discount_percentages') || [5, 10, 15, 20]
+    },
+    discountPreview() {
+      return calculateDiscount({
+        subtotal: this.paymentSummary.dueAmount,
+        type: this.discountDraftType,
+        value: this.discountDraftValue,
+      })
+    },
+    effectiveDiscount() {
+      if (this.discountType === null) {
+        return calculateDiscount({
+          subtotal: this.paymentSummary.dueAmount,
+          type: 'none',
+          value: 0,
+        })
+      }
+      return calculateDiscount({
+        subtotal: this.paymentSummary.dueAmount,
+        type: this.discountType,
+        value: this.discountValue,
+      })
+    },
+    effectiveDiscountType() {
+      return this.effectiveDiscount.amount > 0 ? this.effectiveDiscount.type : 'none'
+    },
+    effectiveDiscountValue() {
+      return this.effectiveDiscount.amount > 0 ? this.effectiveDiscount.value : 0
+    },
+    discountAmount() {
+      return this.effectiveDiscount.amount
+    },
+    effectiveDueAmount() {
+      return this.effectiveDiscount.total
+    },
+    discountLabel() {
+      if (this.effectiveDiscountType === 'percent') {
+        return `Remise ${this.effectiveDiscountValue} %`
+      }
+      if (this.effectiveDiscountType === 'amount') {
+        return `Remise ${this.formatCurrency(this.effectiveDiscountValue)}`
+      }
+      return 'Remise'
     },
     requiresPaymentMethod() {
       if (this.retryActive) return this.retryDueOrderIds.length > 0
@@ -132,6 +262,56 @@ export default {
     })
   },
   methods: {
+    openDiscountDialog() {
+      if (!this.requiresPaymentMethod || this.loadingBtn) return
+      this.discountDraftType =
+        !this.discountType || this.discountType === 'none'
+          ? 'percent'
+          : this.discountType
+      this.discountDraftValue =
+        !this.discountType || this.discountType === 'none' ? 0 : this.discountValue
+      this.discountDialog = true
+    },
+    applyDiscount() {
+      const preview = this.discountPreview
+      if (!preview.value || !preview.amount) {
+        this.clearDiscount()
+        return
+      }
+      this.discountType = preview.type
+      this.discountValue = preview.value
+      this.discountDialog = false
+    },
+    clearDiscount() {
+      this.discountType = 'none'
+      this.discountValue = 0
+      this.discountDraftValue = 0
+      this.discountDialog = false
+    },
+    orderDiscountPayload(orderId) {
+      if (this.discountType === null) return {}
+      if (this.effectiveDiscountType === 'none') {
+        return {
+          discountType: this.effectiveDiscountType,
+          discountValue: this.effectiveDiscountValue,
+        }
+      }
+      const order = this.selectedOrders.find(
+        (item) => Number(item.id) === Number(orderId)
+      )
+      if (!order || order.payment_status === 'paid') return {}
+      const dueAmount = Number(this.paymentSummary.dueAmount) || 0
+      const orderAmount = Number(order.subtotal) || 0
+      if (dueAmount <= 0 || orderAmount <= 0) return {}
+      const discountValue =
+        this.effectiveDiscountType === 'percent'
+          ? this.effectiveDiscountValue
+          : this.roundPrice((this.discountAmount * orderAmount) / dueAmount)
+      return {
+        discountType: this.effectiveDiscountType,
+        discountValue,
+      }
+    },
     btnNo() {
       if (this.loadingBtn) return
 
@@ -170,6 +350,7 @@ export default {
             this.$store.dispatch('orders/archiveOrder', {
               id: orderId,
               payment_method: paymentMethod,
+              ...this.orderDiscountPayload(orderId),
               notify: false,
             })
         )

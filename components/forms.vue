@@ -244,7 +244,10 @@ export default {
           this.$store.set('authenticated', true)
           console.log('SToree', this.$store)
           console.log('Connected')
-          this.$router.push('/')
+          const isBorne =
+            res.session_subject === 'service_point' &&
+            (res.source === 'borne' || res.order_source === 'borne')
+          this.$router.push(isBorne ? '/borne' : '/')
         } else {
           const msg = `Votre compte n'est pas encore activé! Vérifiez votre e-mail!`
           if (this.$store.get('users/message') === msg) {

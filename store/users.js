@@ -123,9 +123,9 @@ export const actions = {
     return this.$axios
       .post(`/baseurl/api/v1/shopInfo/click-and-collect/${shopId}/session`)
       .then((response) => {
-        persistAuthenticatedUser(dispatch, response)
+        const user = persistAuthenticatedUser(dispatch, response)
         dispatch('set/message', response.data.message)
-        return true
+        return user || true
       })
       .catch((error) => {
         dispatch(

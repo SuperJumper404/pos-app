@@ -48,6 +48,27 @@ export const actions = {
         return false
       })
   },
+  reorderTables({ dispatch }, ids) {
+    return this.$axios
+      .patch(
+        '/baseurl/api/v1/service-points/tables/order',
+        { ids },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      )
+      .then(async (response) => {
+        dispatch('set/message', response.data.message)
+        await dispatch('getAllTables')
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', error.response?.data?.message)
+        return false
+      })
+  },
   deleteTable(params) {
     return this.$axios
       .delete(`/baseurl/api/v1/service-points/tables/${params}`, {

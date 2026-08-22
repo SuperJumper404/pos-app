@@ -66,10 +66,14 @@ import price from '@/helpers/price'
 // import moment from 'moment'
 import moment from 'moment'
 import { jsPDF as JSPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import QRCode from 'qrcode-js-package/qrcode.js'
 import { normalizeVatBreakdown } from '@/helpers/vat'
 import {
   buildCashierReceiptPayload,
+  formatReceiptProductHeader,
+  formatReceiptProductLine,
+  receiptHeaderLines,
+  receiptOrderLines,
   sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
 
@@ -386,191 +390,156 @@ export default {
 
     generateCleanTicketPDF(size) {
       if (!this.dataArchivedOrder) return 0
+      const payload = this.receiptPayload
       const doc = new JSPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: [58, size > 0 ? size + 10 : 500], // Format ticket thermique
       })
 
-      const center = 29 // Moitié de 58 mm
+      const center = 29
+      const left = 3
+      const right = 55
       let y = 5
-      const gap = 3
-      const bigGap = 5
+      const write = (value, { align = 'left', x = left, fontSize = 8, style = 'normal', gap = 3 } = {}) => {
+        const text = this.safePdfText(value)
+        if (!text) return
+        doc.setFont('courier', style)
+        doc.setFontSize(fontSize)
+        y += gap
+        doc.text(text, x, y, { align })
+      }
+      const drawLine = () => {
+        this.drawDashLine(doc, (y += 3), 52, '-', 8, 58)
+      }
 
-      doc.setFontSize(10)
-      doc.setFont('courier', 'bold')
-      doc.text(this.safePdfText(this.shopInfo.shop_name), center, (y += gap), {
+      write(this.shopInfo.shop_name, {
         align: 'center',
+        x: center,
+        fontSize: 10,
+        style: 'bold',
       })
-      doc.setFont('courier', 'normal')
-      doc.setFontSize(8)
-
-      const optionalHeaderLines = [
-        ['TEL :', this.shopInfo.shop_phone],
-        ['SIRET :', this.shopInfo.shop_siret],
-        ['NAF :', this.shopInfo.shop_naf],
-        ['TVA :', this.shopInfo.shop_vat_number],
-      ]
-        .filter(([, value]) => this.safePdfText(value).trim())
-        .map(([label, value]) => `${label} ${this.safePdfText(value)}`)
-      const address = this.safePdfText(this.shopInfo.shop_adress)
-      const maxWidth = 50 // largeur max en mm
-      const lines = optionalHeaderLines.concat(
-        doc.splitTextToSize(address, maxWidth)
-      )
-
-      lines.forEach((line) => {
-        y += gap // espace entre les lignes
-        doc.text(line, center, y, { align: 'center' })
+      write(payload.ticketTitle || 'Ticket de caisse', {
+        align: 'center',
+        x: center,
+        fontSize: 8,
+        style: 'bold',
       })
-      y += gap
-      doc.setFontSize(8)
-      this.textWithBoldPart(
-        doc,
-        '',
-        this.safePdfText(this.dataArchivedOrder.username),
-        5,
-        (y += bigGap)
-      )
-      this.textWithBoldPart(
-        doc,
-        'Commande n°',
-        this.safePdfText(this.dataArchivedOrder.ordernumber),
-        5,
-        (y += bigGap)
-      )
 
-      this.textWithBoldPart(doc, 'Date :', this.currentDate, 5, (y += bigGap))
-      const receiptLines = [
-        ['Vendeur :', this.receiptPayload.sellerName],
-        ['Caisse :', this.receiptPayload.cashRegisterNumber],
-        ['Mode :', this.receiptPayload.saleMode],
-        ['Articles :', this.receiptPayload.itemCount],
-      ]
-      receiptLines
-        .filter(([, value]) => this.safePdfText(value).trim())
-        .forEach(([label, value]) => {
-          this.textWithBoldPart(
-            doc,
-            label,
-            this.safePdfText(value),
-            5,
-            (y += bigGap)
-          )
+      receiptHeaderLines(payload).forEach((lineText) => {
+        write(lineText, { align: 'center', x: center, fontSize: 7.5 })
+      })
+      write(payload.table, { style: 'bold' })
+      write(`Commande n° ${payload.orderNumber}`)
+      write(`Date : ${payload.currentDate}`)
+      receiptOrderLines(payload).forEach((lineText) => write(lineText))
+
+      write(formatReceiptProductHeader(payload.isTvaActive), { fontSize: 7.5 })
+      drawLine()
+      payload.details.forEach((item) => {
+        write(`${formatReceiptProductLine(item, payload.isTvaActive)} €`, {
+          fontSize: 7.5,
+          gap: 3,
         })
-
-      // Tableau produits
-      const items = this.detailArchivedOrder || []
-
-      autoTable(doc, {
-        startY: (y += bigGap),
-        startX: 1,
-        theme: 'plain',
-        styles: {
-          font: 'courier',
-          fontStyle: 'normal', // ou 'bold' si besoin
-          fontSize: 8,
-        },
-        head: [['QTE', 'PRODUIT', 'PRIX']],
-        body: items.map((order) => [
-          this.safePdfText(order.qty),
-          this.safePdfText(order.name),
-          this.formatPrice(order.total),
-        ]),
-        columnStyles: {
-          0: { cellWidth: 10, halign: 'center' }, // Qté
-          1: { cellWidth: 25, halign: 'left' }, // Article
-          2: { cellWidth: 20 }, // Prix
-        },
-        margin: { left: 1 },
       })
+      drawLine()
 
-      // Totaux
-      y = doc.lastAutoTable.finalY + gap
-      this.drawDashLine(doc, y)
-      // doc.line(2, y, 56, y)
-      if (this.isTvaActive) {
-        doc.setFontSize(8)
-        this.vatBreakdown.forEach((item) => {
-          doc.text(
-            `HT (${this.formatVatRate(item.vatRate)}): ${this.formatPrice(item.totalHt)}`,
-            53,
-            (y += bigGap),
-            { align: 'right' }
+      if (payload.discountAmount > 0) {
+        write(
+          `SOUS-TOTAL : ${this.formatTicketNumber(payload.subtotalBeforeDiscount)} €`,
+          { align: 'right', x: right }
+        )
+        write(
+          `REMISE : -${this.formatTicketNumber(payload.discountAmount)} €`,
+          { align: 'right', x: right }
+        )
+      }
+
+      if (payload.isTvaActive) {
+        payload.vatBreakdown.forEach((item) => {
+          write(
+            `HT (${this.formatVatRate(item.vatRate)}) : ${this.formatTicketNumber(item.totalHt)} €`,
+            { align: 'right', x: right }
           )
-          doc.text(
-            `TVA (${this.formatVatRate(item.vatRate)}): ${this.formatPrice(item.totalVat)}`,
-            53,
-            (y += bigGap),
-            { align: 'right' }
+          write(
+            `TVA (${this.formatVatRate(item.vatRate)}) : ${this.formatTicketNumber(item.totalVat)} €`,
+            { align: 'right', x: right }
           )
         })
       }
-      if (this.discountAmount > 0) {
-        doc.text(
-          `SOUS-TOTAL: ${this.formatPrice(this.subtotalBeforeDiscount)}`,
-          53,
-          (y += bigGap),
-          { align: 'right' }
-        )
-        doc.text(
-          `REMISE: -${this.formatPrice(this.discountAmount)}`,
-          53,
-          (y += bigGap),
-          { align: 'right' }
-        )
-      }
-      doc.setFontSize(10)
-      doc.setFont('courier', 'bold')
 
-      doc.text(
-        `TOTAL${this.isTvaActive ? ' TTC' : '*'}: ` +
-          this.formatPrice(this.totalAmount),
-        53,
-        (y += bigGap),
-        {
-          align: 'right',
-        }
+      write(
+        `TOTAL${payload.isTvaActive ? ' TTC' : '*'} : ${this.formatTicketNumber(payload.totalAmount)} €`,
+        { align: 'right', x: right, fontSize: 10, style: 'bold', gap: 4 }
       )
-      doc.setFont('courier', 'normal')
-
-      const text =
-        'Paiement : ' +
-        this.safePdfText(this.dataArchivedOrder.used_payment_method, '-')
-
-      const paymentLines = this.splitByWords(text, 20)
-      doc.text(paymentLines, 53, (y += bigGap), {
+      write(`Paiement : ${payload.paymentMethod}`, {
         align: 'right',
+        x: right,
+        gap: 4,
       })
-      this.drawDashLine(doc, (y += bigGap * paymentLines.length))
+      drawLine()
 
-      doc.setFontSize(8)
-      doc.text('À très bientôt ', center, (y += bigGap), {
-        align: 'center',
-      })
-      doc.text(this.safePdfText(this.shopInfo.shop_name), center, (y += bigGap), {
-        align: 'center',
-      })
-      doc.text('Made with smarteat.fr ', center, (y += bigGap), {
-        align: 'center',
-      })
+      const qrUrl = this.safePdfText(payload.shopInfo.receipt_review_qr_url).trim()
+      if (qrUrl) {
+        write(payload.shopInfo.receipt_review_qr_label || 'Votre avis nous intéresse', {
+          align: 'center',
+          x: center,
+          fontSize: 7.5,
+          gap: 4,
+        })
+        y = this.addReviewQrCode(doc, qrUrl, center, y + 1)
+      }
 
-      if (!this.isTvaActive) {
-        doc.setFontSize(6)
-        doc.text(
-          '* TVA non applicable, art. 293 B du CGI',
-          center,
-          (y += bigGap),
-          {
-            align: 'center',
-          }
-        )
-        doc.setFontSize(8)
+      write('À très bientôt !', { align: 'center', x: center, gap: 4 })
+      write(this.shopInfo.shop_name, { align: 'center', x: center })
+      write('Made with smarteat.fr', { align: 'center', x: center })
+
+      if (!payload.isTvaActive) {
+        write('* TVA non applicable, art. 293 B du CGI', {
+          align: 'center',
+          x: center,
+          fontSize: 6,
+          gap: 4,
+        })
       }
 
       const blob = doc.output('blob')
       this.urlPDF = URL.createObjectURL(blob)
       return y
+    },
+    addReviewQrCode(doc, value, center, topY) {
+      if (typeof document === 'undefined') return topY
+
+      const container = document.createElement('div')
+      container.style.position = 'fixed'
+      container.style.left = '-10000px'
+      container.style.top = '0'
+      document.body.appendChild(container)
+
+      try {
+        const qrCode = new QRCode(container, {
+          text: value,
+          width: 160,
+          height: 160,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H,
+        })
+        const canvas = container.querySelector('canvas')
+        const image = container.querySelector('img')
+        const imageData = canvas
+          ? canvas.toDataURL('image/png')
+          : image && image.src
+        if (!qrCode || !imageData) return topY
+
+        const size = 22
+        doc.addImage(imageData, 'PNG', center - size / 2, topY, size, size)
+        return topY + size + 3
+      } catch (error) {
+        return topY
+      } finally {
+        container.remove()
+      }
     },
     textWithBoldPart(doc, normalText, boldText, x, y, options = {}) {
       const safeNormalText = this.safePdfText(normalText)

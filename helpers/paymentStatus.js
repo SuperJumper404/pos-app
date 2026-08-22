@@ -47,7 +47,25 @@ const isCounterPayment = (order = {}) =>
     .toLowerCase()
     .includes('comptoir')
 
+const isKioskPayAtCounterOrder = (order = {}) => {
+  const source = String(order.source || order.order_source || '').toLowerCase()
+  const payment = String(order.payment || order.used_payment_method || '')
+    .toLowerCase()
+    .trim()
+  return (
+    source === 'borne' &&
+    (payment.includes('comptoir') || payment.includes('encaisser'))
+  )
+}
+
 const getPaymentStatusDisplay = (order = {}) => {
+  if (isKioskPayAtCounterOrder(order)) {
+    return {
+      text: 'Ã€ encaisser',
+      color: 'orange',
+    }
+  }
+
   if (order.payment_status === 'paid') {
     return {
       text: getPaymentMethodText(order),

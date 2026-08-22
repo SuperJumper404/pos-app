@@ -1,5 +1,6 @@
 <template>
   <v-container>
+    <v-form ref="form" v-model="valid" @submit.prevent="submitShopEdit">
     <v-card
       v-if="loadPage"
       outlined

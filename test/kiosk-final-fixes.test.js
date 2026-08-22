@@ -69,9 +69,9 @@ assert.strictEqual(
 
 assert.strictEqual(
   canAccessKiosk({
-    access: 1,
-    module_permissions: ['borne'],
-    is_primary_admin: false,
+    access: 2,
+    session_subject: 'service_point',
+    source: 'borne',
   }),
   true
 )

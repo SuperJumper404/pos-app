@@ -324,7 +324,14 @@
         <v-card-text>
           <div class="order-payment-total mb-4">
             <span>Total à payer</span>
-            <strong>{{ formatCurrency(orderTotal) }}</strong>
+            <strong>{{ formatCurrency(effectiveOrderTotal) }}</strong>
+          </div>
+          <div
+            v-if="effectiveDiscountAmount > 0"
+            class="order-payment-total order-payment-discount mb-4"
+          >
+            <span>{{ effectiveDiscountLabel }}</span>
+            <strong>-{{ formatCurrency(effectiveDiscountAmount) }}</strong>
           </div>
           <div class="order-payment-grid">
             <v-btn
@@ -340,12 +347,101 @@
               <v-icon class="mb-2">{{ method.icon }}</v-icon>
               <span>{{ method.text }}</span>
             </v-btn>
+            <v-btn
+              color="warning"
+              class="order-payment-tile text-none font-weight-bold"
+              :disabled="paymentLoading"
+              depressed
+              @click="openOrderDiscountDialog"
+            >
+              <v-icon class="mb-2">mdi-tag-percent-outline</v-icon>
+              <span>{{ effectiveDiscountLabel }}</span>
+            </v-btn>
           </div>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn text class="text-none" @click="paymentDialog = false">
             Retour
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="orderDiscountDialog" max-width="520">
+      <v-card>
+        <v-card-title>Remise globale</v-card-title>
+        <v-card-text>
+          <div class="text-body-2 mb-3">
+            La remise s'applique à toute la commande non encaissée.
+          </div>
+          <v-btn-toggle
+            v-model="orderDiscountDraftType"
+            mandatory
+            color="primary"
+            class="d-flex mb-4"
+          >
+            <v-btn value="percent" class="flex-grow-1 text-none">
+              Pourcentage
+            </v-btn>
+            <v-btn value="amount" class="flex-grow-1 text-none">
+              Montant en euros
+            </v-btn>
+          </v-btn-toggle>
+          <div
+            v-if="orderDiscountDraftType === 'percent'"
+            class="d-flex flex-wrap"
+          >
+            <v-btn
+              v-for="percentage in discountPercentages"
+              :key="percentage"
+              outlined
+              color="primary"
+              class="mr-2 mb-2 text-none"
+              @click="orderDiscountDraftValue = percentage"
+            >
+              {{ percentage }} %
+            </v-btn>
+          </div>
+          <v-text-field
+            v-model="orderDiscountDraftValue"
+            :label="orderDiscountDraftType === 'percent' ? 'Pourcentage' : 'Montant de la remise'"
+            :suffix="orderDiscountDraftType === 'percent' ? '%' : '€'"
+            type="number"
+            min="0"
+            step="0.01"
+            outlined
+            autofocus
+          ></v-text-field>
+          <div class="order-discount-preview">
+            <div class="d-flex justify-space-between">
+              <span>Total avant remise</span>
+              <strong>{{ formatCurrency(orderDiscountBaseTotal) }}</strong>
+            </div>
+            <div class="d-flex justify-space-between warning--text">
+              <span>Remise</span>
+              <strong>- {{ formatCurrency(orderDiscountPreview.amount) }}</strong>
+            </div>
+            <div class="d-flex justify-space-between text-h6 mt-2">
+              <span>Total à payer</span>
+              <strong>{{ formatCurrency(orderDiscountPreview.total) }}</strong>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn text class="text-none" @click="clearOrderDiscount">
+            Supprimer
+          </v-btn>
+          <v-spacer />
+          <v-btn
+            text
+            class="text-none"
+            @click="paymentDialog = true; orderDiscountDialog = false"
+          >
+            Annuler
+          </v-btn>
+          <v-btn color="primary" class="text-none" @click="applyOrderDiscount">
+            Appliquer
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -413,6 +509,7 @@ import TakeawayChip from '@/components/orders/TakeawayChip'
 import VatBreakdown from '@/components/orders/VatBreakdown'
 import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
+import { calculateDiscount } from '@/helpers/discount'
 import { groupCustomizationSelections } from '@/helpers/customizations'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import {
@@ -460,6 +557,11 @@ export default {
       replaceCartDialog: false,
       pendingStart: null,
       paymentDialog: false,
+      orderDiscountDialog: false,
+      orderDiscountType: null,
+      orderDiscountValue: null,
+      orderDiscountDraftType: 'percent',
+      orderDiscountDraftValue: 0,
       receiptDialog: false,
       selectedPaymentMethod: null,
       pendingPaymentMethod: null,
@@ -614,6 +716,9 @@ export default {
         this.$store.get('shop/shop_payment_methods')
       )
     },
+    discountPercentages() {
+      return this.$store.get('shop/shop_discount_percentages') || [5, 10, 15, 20]
+    },
     canCollectOrder() {
       return Boolean(
         this.orderSummary &&
@@ -641,6 +746,57 @@ export default {
       }
       if (order.discount_type === 'amount' && Number.isFinite(value)) {
         return `Remise (${this.formatCurrency(value)})`
+      }
+      return 'Remise'
+    },
+    orderDiscountBaseTotal() {
+      return this.roundPrice(this.orderTotal)
+    },
+    orderDiscountPreview() {
+      return calculateDiscount({
+        subtotal: this.orderDiscountBaseTotal,
+        type: this.orderDiscountDraftType,
+        value: this.orderDiscountDraftValue,
+      })
+    },
+    effectiveDiscount() {
+      if (!this.orderDiscountType) {
+        return calculateDiscount({
+          subtotal: this.orderDiscountBaseTotal,
+          type: 'none',
+          value: 0,
+        })
+      }
+      return calculateDiscount({
+        subtotal: this.orderDiscountBaseTotal,
+        type: this.orderDiscountType,
+        value: this.orderDiscountValue,
+      })
+    },
+    effectiveDiscountType() {
+      return this.effectiveDiscount.amount > 0 ? this.effectiveDiscount.type : 'none'
+    },
+    archiveDiscountType() {
+      return this.orderDiscountType === null ? null : this.effectiveDiscountType
+    },
+    effectiveDiscountValue() {
+      return this.effectiveDiscount.amount > 0 ? this.effectiveDiscount.value : 0
+    },
+    archiveDiscountValue() {
+      return this.orderDiscountType === null ? null : this.effectiveDiscountValue
+    },
+    effectiveDiscountAmount() {
+      return this.effectiveDiscount.amount
+    },
+    effectiveOrderTotal() {
+      return this.effectiveDiscount.total
+    },
+    effectiveDiscountLabel() {
+      if (this.effectiveDiscountType === 'percent') {
+        return `Remise (${this.effectiveDiscountValue} %)`
+      }
+      if (this.effectiveDiscountType === 'amount') {
+        return `Remise (${this.formatCurrency(this.effectiveDiscountValue)})`
       }
       return 'Remise'
     },
@@ -888,6 +1044,37 @@ export default {
       this.selectedPaymentMethod = null
       this.paymentDialog = true
     },
+    openOrderDiscountDialog() {
+      if (!this.canCollectOrder || this.paymentLoading) return
+      this.orderDiscountDraftType =
+        this.orderDiscountType && this.orderDiscountType !== 'none'
+          ? this.orderDiscountType
+          : 'percent'
+      this.orderDiscountDraftValue =
+        this.orderDiscountType && this.orderDiscountType !== 'none'
+          ? this.orderDiscountValue
+          : 0
+      this.paymentDialog = false
+      this.orderDiscountDialog = true
+    },
+    applyOrderDiscount() {
+      const preview = this.orderDiscountPreview
+      if (!preview.value || !preview.amount) {
+        this.clearOrderDiscount()
+        return
+      }
+      this.orderDiscountType = preview.type
+      this.orderDiscountValue = preview.value
+      this.orderDiscountDialog = false
+      this.paymentDialog = true
+    },
+    clearOrderDiscount() {
+      this.orderDiscountType = 'none'
+      this.orderDiscountValue = 0
+      this.orderDiscountDraftValue = 0
+      this.orderDiscountDialog = false
+      this.paymentDialog = true
+    },
     submitOrderPayment(paymentMethod) {
       if (!this.canCollectOrder || this.paymentLoading) return
       this.selectedPaymentMethod = paymentMethod
@@ -911,6 +1098,8 @@ export default {
         const archived = await this.$store.dispatch('orders/archiveOrder', {
           id: order.id,
           payment_method: paymentMethod,
+          discountType: this.archiveDiscountType,
+          discountValue: this.archiveDiscountValue,
           notify: false,
         })
         if (!archived) {

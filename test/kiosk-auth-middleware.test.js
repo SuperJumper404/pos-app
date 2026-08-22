@@ -18,6 +18,14 @@ assert.strictEqual(
     module_permissions: ['borne'],
     is_primary_admin: false,
   }),
+  false
+)
+assert.strictEqual(
+  canAccessKiosk({
+    access: 2,
+    session_subject: 'service_point',
+    source: 'borne',
+  }),
   true
 )
 assert.strictEqual(
@@ -30,12 +38,12 @@ assert.strictEqual(
 )
 assert.strictEqual(
   isKioskOnlyUser({
-    access: 1,
-    module_permissions: ['borne'],
-    is_primary_admin: false,
+    access: 2,
+    session_subject: 'service_point',
+    source: 'borne',
   }),
   true,
-  'only borne permission must be kiosk-only'
+  'borne service point sessions must be kiosk-only'
 )
 assert.strictEqual(
   isKioskOnlyUser({
@@ -100,6 +108,13 @@ assert.deepStrictEqual(
 assert.deepStrictEqual(
   runMiddleware(
     { access: 1, module_permissions: ['borne'], is_primary_admin: false },
+    { path: '/borne', name: 'borne' }
+  ),
+  ['/']
+)
+assert.deepStrictEqual(
+  runMiddleware(
+    { access: 2, session_subject: 'service_point', source: 'borne' },
     { path: '/borne', name: 'borne' }
   ),
   []

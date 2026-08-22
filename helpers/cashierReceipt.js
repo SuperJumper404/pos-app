@@ -27,6 +27,32 @@ const formatTicketNumber = (value) => formatPrice(value)
 
 const formatVatRate = (value) => `${String(value).replace('.', ',')} %`
 
+const getItemVatRate = (item = {}) =>
+  item.vat_rate !== undefined ? item.vat_rate : item.vatRate
+
+const formatCompactVatRate = (item = {}) => {
+  const value = Number(getItemVatRate(item))
+  return Number.isFinite(value)
+    ? `${String(value).replace('.', ',')}%`
+    : ''
+}
+
+const formatReceiptProductHeader = (isTvaActive = false) =>
+  isTvaActive
+    ? `${'QTE'.padEnd(4)}${'PRODUIT'.padEnd(15)}${'TVA'.padEnd(5)}${'PRIX'.padStart(7)}`
+    : 'QTE   PRODUIT                PRIX'
+
+const formatReceiptProductLine = (item = {}, isTvaActive = false) => {
+  const qty = `${item.qty}x`.padEnd(4)
+  const name = String(item.name || '')
+    .padEnd(isTvaActive ? 15 : 20)
+    .slice(0, isTvaActive ? 15 : 20)
+  const price = formatTicketNumber(item.total).padStart(7)
+  if (!isTvaActive) return `${qty}${name}${price}`
+
+  return `${qty}${name}${formatCompactVatRate(item).padStart(5)}${price}`
+}
+
 const optionalText = (value) => String(value == null ? '' : value).trim()
 
 const getSaleMode = (order = {}) => {
@@ -77,6 +103,7 @@ const buildCashierReceiptPayload = ({
   fallbackCustomer = 'Client comptoir',
   fallbackTable = 'Comptoir',
   fallbackRemark = '',
+  ticketKind = 'caisse',
 } = {}) => {
   const normalizedDetails = Array.isArray(details) ? details : []
   const orderId = order.id || order.orderId
@@ -98,8 +125,15 @@ const buildCashierReceiptPayload = ({
     order.payment ||
     fallbackPaymentMethod ||
     'Caisse'
+  const normalizedTicketKind = ticketKind === 'commande' ? 'commande' : 'caisse'
 
   return {
+    ticketKind: normalizedTicketKind,
+    ticketType: normalizedTicketKind,
+    ticketTitle:
+      normalizedTicketKind === 'commande'
+        ? 'TICKET DE COMMANDE'
+        : 'Ticket de caisse',
     orderId,
     orderNumber: order.ordernumber || order.orderNumber || orderId || '',
     table:
@@ -142,7 +176,7 @@ const receiptHeaderLines = (payload) => {
   appendOptionalLine(lines, 'TEL', shopInfo.shop_phone)
   appendOptionalLine(lines, 'SIRET', shopInfo.shop_siret)
   appendOptionalLine(lines, 'NAF', shopInfo.shop_naf)
-  appendOptionalLine(lines, 'TVA intracommunautaire', shopInfo.shop_vat_number)
+  appendOptionalLine(lines, 'TVA', shopInfo.shop_vat_number)
   splitByWords(shopInfo.shop_adress || '').forEach((line) => lines.push(line))
   return lines
 }
@@ -198,11 +232,15 @@ const buildCashierEscPos = (payload) => {
   push(alignCenter(), boldOn(), doubleOn())
   push(esc(`${shopInfo.shop_name || ''}\n`))
   push(doubleOff(), boldOff())
+  push(
+    alignCenter(),
+    boldOn(),
+    esc(`${payload.ticketTitle || 'Ticket de caisse'}\n`),
+    boldOff()
+  )
   receiptHeaderLines(payload).forEach((lineText) => {
     push(alignCenter(), esc(`${lineText}\n`))
   })
-  push(esc('\n'))
-
   push(
     alignLeft(),
     boldOn(),
@@ -214,20 +252,26 @@ const buildCashierEscPos = (payload) => {
     boldOff(),
     esc('Date : '),
     boldOn(),
-    esc(`${payload.currentDate}\n\n`),
+    esc(`${payload.currentDate}\n`),
     boldOff()
   )
   receiptOrderLines(payload).forEach((lineText) => {
     push(alignLeft(), esc(`${lineText}\n`))
   })
-  push(boldOn(), esc('QTE   PRODUIT                PRIX\n\n'), boldOff())
+  push(
+    boldOn(),
+    esc(`${formatReceiptProductHeader(payload.isTvaActive)}\n`),
+    boldOff()
+  )
   push(line())
 
   payload.details.forEach((item) => {
-    const qty = `${item.qty}x`.padEnd(5)
-    const name = String(item.name || '').padEnd(20).slice(0, 20)
-    const price = formatTicketNumber(item.total).padStart(7)
-    push(alignLeft(), esc(`${qty}${name}${price} `), euroSymbol, esc('\n'))
+    push(
+      alignLeft(),
+      esc(`${formatReceiptProductLine(item, payload.isTvaActive)} `),
+      euroSymbol,
+      esc('\n')
+    )
   })
   push(line())
 
@@ -268,20 +312,33 @@ const buildCashierEscPos = (payload) => {
     boldOff(),
     esc('\n'),
     alignRight(),
-    esc(`Paiement : ${payload.paymentMethod}\n`),
+    esc(
+      payload.ticketKind === 'commande'
+        ? 'A PAYER AU COMPTOIR\n'
+        : `Paiement : ${payload.paymentMethod}\n`
+    ),
     line(),
-    alignCenter(),
-    esc('À très bientôt !\n'),
-    esc(`${shopInfo.shop_name || ''}\n`),
-    esc('Made with smarteat.fr\n')
+    alignCenter()
   )
-  const qrUrl = optionalText(shopInfo.receipt_review_qr_url)
+  const qrUrl =
+    payload.ticketKind === 'commande'
+      ? ''
+      : optionalText(shopInfo.receipt_review_qr_url)
   if (qrUrl) {
     push(
       alignCenter(),
       esc(`${shopInfo.receipt_review_qr_label || 'Votre avis nous intéresse'}\n`),
       buildEscPosQrCode(qrUrl),
       esc('\n')
+    )
+  }
+  if (payload.ticketKind === 'commande') {
+    push(esc('Presentez ce ticket au comptoir\n'))
+  } else {
+    push(
+      esc('À très bientôt !\n'),
+      esc(`${shopInfo.shop_name || ''}\n`),
+      esc('Made with smarteat.fr\n')
     )
   }
   if (!payload.isTvaActive) {
@@ -307,11 +364,8 @@ const buildCashierCloudXml = (payload) => {
     .join('')
   const productXml = payload.details
     .map((item) => {
-      const qty = `${item.qty}x`.padEnd(5)
-      const name = String(item.name || '').padEnd(20).slice(0, 20)
-      const price = formatTicketNumber(item.total).padStart(7)
       return (
-        `<text em="true" align="left">${xmlEscape(qty + name + price)} \u20AC</text>` +
+        `<text em="true" align="left">${xmlEscape(formatReceiptProductLine(item, payload.isTvaActive))} \u20AC</text>` +
         '<feed line="1"/>'
       )
     })
@@ -344,16 +398,18 @@ const buildCashierCloudXml = (payload) => {
     '<text smooth="true"></text>' +
     `<text em="true" align="center" width="2" height="2">${xmlEscape(shopInfo.shop_name)}</text>` +
     '<feed line="1"/>' +
+    `<text em="true" align="center">${xmlEscape(payload.ticketTitle || 'Ticket de caisse')}</text>` +
+    '<feed line="1"/>' +
     headerXml +
-    '<feed line="2"/>' +
+    '<feed line="1"/>' +
     `<text em="true" align="left">${xmlEscape(payload.table)}</text>` +
     '<feed line="1"/>' +
     `<text em="false">Commande n° ${xmlEscape(payload.orderNumber)}</text>` +
     '<feed line="1"/>' +
     `<text>Date : ${xmlEscape(payload.currentDate)}</text>` +
-    '<feed line="2"/>' +
+    '<feed line="1"/>' +
     orderInfoXml +
-    '<text>QTE   PRODUIT                PRIX\n\n</text>' +
+    `<text>${xmlEscape(formatReceiptProductHeader(payload.isTvaActive))}\n</text>` +
     '<text>--------------------------------</text><feed line="1"/>' +
     productXml +
     '<text>--------------------------------</text><feed line="1"/>' +
@@ -361,15 +417,19 @@ const buildCashierCloudXml = (payload) => {
     vatXml +
     `<text align="right" width="2" height="2">${totalLabel} : ${xmlEscape(formatPrice(payload.totalAmount))} \u20AC</text>` +
     '<feed line="2"/>' +
-    `<text>Paiement : ${xmlEscape(payload.paymentMethod)}</text>` +
+    (payload.ticketKind === 'commande'
+      ? '<text align="center" em="true">A PAYER AU COMPTOIR</text>'
+      : `<text>Paiement : ${xmlEscape(payload.paymentMethod)}</text>`) +
     '<feed line="1"/><text>--------------------------------</text><feed line="2"/>' +
-    (optionalText(shopInfo.receipt_review_qr_url)
+    (payload.ticketKind !== 'commande' && optionalText(shopInfo.receipt_review_qr_url)
       ? `<text align="center">${xmlEscape(shopInfo.receipt_review_qr_label || 'Votre avis nous intéresse')}</text><feed line="1"/>` +
         `<symbol type="qrcode" level="h" width="6" height="6">${xmlEscape(shopInfo.receipt_review_qr_url)}</symbol><feed line="1"/>`
       : '') +
-    '<text align="center">À très bientôt !</text><feed line="1"/>' +
-    `<text align="center">${xmlEscape(shopInfo.shop_name)}</text>` +
-    '<feed line="1"/><text align="center">Made with smarteat.fr</text>' +
+    (payload.ticketKind === 'commande'
+      ? '<text align="center">Presentez ce ticket au comptoir</text>'
+      : '<text align="center">À très bientôt !</text><feed line="1"/>' +
+        `<text align="center">${xmlEscape(shopInfo.shop_name)}</text>` +
+        '<feed line="1"/><text align="center">Made with smarteat.fr</text>') +
     '<feed line="3"/><cut/></epos-print></PrintData></ePOSPrint></PrintRequestInfo>'
   )
 }
@@ -385,7 +445,7 @@ const sendCashierReceipt = ({
     throw new TypeError('La commande est introuvable pour l’impression.')
   }
 
-  if (smartPrint) {
+  if (isEnabled(smartPrint)) {
     const requestFetch =
       fetchImplementation || (typeof fetch === 'function' ? fetch : null)
     if (!requestFetch || !printerIp) {
@@ -397,7 +457,10 @@ const sendCashierReceipt = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ticketType: 'caisse',
+            ticketType:
+              payload.ticketKind === 'commande'
+                ? 'cuisine'
+                : payload.ticketType || 'caisse',
             dataFormatESCPOS: buildCashierEscPos(payload).toString('base64'),
             dataFormatXML: null,
           }),
@@ -419,7 +482,7 @@ const sendCashierReceipt = ({
     Promise.resolve(
       dispatch('printing/postPrintingJob', {
         requete: buildCashierCloudXml(payload),
-        ticketType: 'caisse',
+        ticketType: payload.ticketType || 'caisse',
         orderId: payload.orderId,
       })
     ).catch(() => {})
@@ -433,6 +496,8 @@ module.exports = {
   buildCashierCloudXml,
   buildCashierEscPos,
   buildCashierReceiptPayload,
+  formatReceiptProductHeader,
+  formatReceiptProductLine,
   receiptHeaderLines,
   receiptOrderLines,
   buildEscPosQrCode,

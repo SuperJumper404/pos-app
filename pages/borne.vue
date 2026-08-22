@@ -6,46 +6,103 @@
           <div class="kiosk-eyebrow">Commande borne</div>
           <h1>{{ shopName || 'Menu' }}</h1>
         </div>
-        <v-btn
-          icon
-          large
-          aria-label="Deconnexion"
-          :disabled="Boolean(checkoutLoading)"
-          @click="logout"
-        >
-          <v-icon>mdi-logout</v-icon>
-        </v-btn>
       </header>
 
       <main v-if="kioskStep === 'welcome'" class="kiosk-welcome">
-        <v-btn
-          color="primary"
-          x-large
-          class="kiosk-start-button text-none"
-          :disabled="isKitchenClosed"
-          @click="startNewOrder"
+        <div
+          v-if="welcomeProductImages.length"
+          class="kiosk-welcome-mosaic"
+          :class="`kiosk-welcome-mosaic--${welcomeAnimationMode}`"
+          aria-hidden="true"
         >
-          Nouvelle commande
-        </v-btn>
-        <v-alert v-if="isKitchenClosed" type="warning" dense>
-          La cuisine est fermée. Aucune nouvelle commande n'est possible.
-        </v-alert>
+          <template v-if="welcomeAnimationMode === 'mixedHorizontal'">
+            <div
+              v-for="row in welcomeMixedHorizontalRows"
+              :key="row.key"
+              class="kiosk-welcome-mosaic-row"
+              :class="row.className"
+            >
+              <div
+                v-for="(image, index) in row.images"
+                :key="`${row.key}-${image}-${index}`"
+                class="kiosk-welcome-mosaic-tile"
+              >
+                <v-img :src="productImageSrc(image)" aspect-ratio="1" />
+              </div>
+            </div>
+          </template>
+          <template v-else-if="welcomeAnimationMode === 'diagonal'">
+            <div
+              v-for="column in welcomeDiagonalColumns"
+              :key="column.key"
+              class="kiosk-welcome-mosaic-column"
+              :class="column.className"
+            >
+              <div
+                v-for="(image, index) in column.images"
+                :key="`${column.key}-${image}-${index}`"
+                class="kiosk-welcome-mosaic-tile"
+              >
+                <v-img :src="productImageSrc(image)" aspect-ratio="1" />
+              </div>
+            </div>
+          </template>
+          <template v-else-if="welcomeAnimationMode === 'horizontal'">
+            <div
+              v-for="row in welcomeHorizontalRows"
+              :key="row.key"
+              class="kiosk-welcome-mosaic-row"
+              :class="row.className"
+            >
+              <div
+                v-for="(image, index) in row.images"
+                :key="`${row.key}-${image}-${index}`"
+                class="kiosk-welcome-mosaic-tile"
+              >
+                <v-img :src="productImageSrc(image)" aspect-ratio="1" />
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="kiosk-welcome-content">
+          <v-btn
+            color="primary"
+            x-large
+            class="kiosk-start-button text-none"
+            :disabled="isKitchenClosed"
+            @click="startNewOrder"
+          >
+            Nouvelle commande
+          </v-btn>
+          <v-alert v-if="isKitchenClosed" type="warning" dense>
+            La cuisine est fermée. Aucune nouvelle commande n'est possible.
+          </v-alert>
+        </div>
       </main>
 
       <main v-else class="kiosk-main">
         <aside class="kiosk-side-categories">
           <div class="kiosk-category-stack">
             <v-btn
-              v-for="category in categories"
-              :key="category"
+              v-for="category in categoryTiles"
+              :key="category.name"
               depressed
               class="kiosk-category-button text-none"
-              :color="category === activeCategory ? 'primary' : 'grey lighten-3'"
-              :dark="category === activeCategory"
+              :color="category.name === activeCategory ? 'primary' : 'grey lighten-3'"
+              :dark="category.name === activeCategory"
               :disabled="checkoutInteractionLocked"
-              @click="activeCategory = category"
+              @click="activeCategory = category.name"
             >
-              {{ category }}
+              <v-img
+                v-if="category.image"
+                class="kiosk-category-image"
+                :src="categoryImageSrc(category.image)"
+                aspect-ratio="1"
+              />
+              <v-icon v-else class="kiosk-category-fallback-icon">
+                mdi-shape
+              </v-icon>
+              <span>{{ category.name }}</span>
             </v-btn>
           </div>
         </aside>
@@ -79,7 +136,12 @@
           </section>
           <template v-else>
             <div class="kiosk-cart-head">
-              <h2>Votre commande</h2>
+              <div>
+                <h2>Votre commande</h2>
+                <span class="kiosk-cart-count">
+                  {{ cartItemCount }} article{{ cartItemCount > 1 ? 's' : '' }}
+                </span>
+              </div>
               <strong>{{ formatCurrency(total) }}</strong>
             </div>
             <div v-if="cartItems.length === 0" class="kiosk-empty">
@@ -285,32 +347,55 @@
         <v-card class="kiosk-dialog-card">
           <v-card-title>Votre nom</v-card-title>
           <v-card-text>
-            <v-text-field
-              :value="customer"
-              readonly
-              outlined
-              hide-details
-              class="kiosk-keyboard-field"
-            />
+            <div class="kiosk-keyboard-input-wrap">
+              <v-text-field
+                :value="customer"
+                readonly
+                outlined
+                hide-details
+                clearable
+                clear-icon="mdi-close-circle"
+                class="kiosk-keyboard-field"
+                @click:clear="clearKeyboardValue"
+              />
+            </div>
             <div class="kiosk-keyboard">
-              <v-btn
-                v-for="key in nameKeyboardKeys"
-                :key="key"
-                x-large
-                class="text-none"
-                @click="appendKeyboardValue(key)"
+              <div
+                v-for="(row, rowIndex) in nameKeyboardRows"
+                :key="`name-row-${rowIndex}`"
+                class="kiosk-keyboard-row"
               >
-                {{ key }}
-              </v-btn>
-              <v-btn x-large class="text-none" @click="appendKeyboardValue(' ')">
-                Espace
-              </v-btn>
-              <v-btn x-large class="text-none" @click="backspaceKeyboardValue">
-                Effacer
-              </v-btn>
-              <v-btn x-large class="text-none" @click="clearKeyboardValue">
-                Vider
-              </v-btn>
+                <v-btn
+                  v-for="key in row"
+                  :key="key.value || key.type"
+                  x-large
+                  class="text-none"
+                  :class="keyboardKeyClass(key)"
+                  @click="handleNameKeyboardKey(key)"
+                >
+                  <template v-if="key.type === 'shift'">
+                    <v-icon left>mdi-arrow-up-bold</v-icon>
+                    Maj
+                  </template>
+                  <template v-else-if="key.type === 'backspace'">
+                    <v-icon left>mdi-backspace-outline</v-icon>
+                    Effacer
+                  </template>
+                  <template v-else>
+                    {{ displayNameKeyboardKey(key.value) }}
+                  </template>
+                </v-btn>
+              </div>
+              <div class="kiosk-keyboard-row kiosk-keyboard-control-row">
+                <v-btn
+                  x-large
+                  class="text-none kiosk-space-key"
+                  @click="appendKeyboardValue(' ')"
+                >
+                  <v-icon left>mdi-keyboard-space</v-icon>
+                  Espace
+                </v-btn>
+              </div>
             </div>
           </v-card-text>
           <v-card-actions>
@@ -339,13 +424,18 @@
         <v-card class="kiosk-dialog-card">
           <v-card-title>Votre numero</v-card-title>
           <v-card-text>
-            <v-text-field
-              :value="phone"
-              readonly
-              outlined
-              hide-details
-              class="kiosk-keyboard-field"
-            />
+            <div class="kiosk-keyboard-input-wrap">
+              <v-text-field
+                :value="phone"
+                readonly
+                outlined
+                hide-details
+                clearable
+                clear-icon="mdi-close-circle"
+                class="kiosk-keyboard-field"
+                @click:clear="clearKeyboardValue"
+              />
+            </div>
             <div class="kiosk-keyboard kiosk-number-keyboard">
               <v-btn
                 v-for="key in phoneKeyboardKeys"
@@ -356,11 +446,13 @@
               >
                 {{ key }}
               </v-btn>
-              <v-btn x-large class="text-none" @click="backspaceKeyboardValue">
+              <v-btn
+                x-large
+                class="text-none kiosk-backspace-key"
+                @click="backspaceKeyboardValue"
+              >
+                <v-icon left>mdi-backspace-outline</v-icon>
                 Effacer
-              </v-btn>
-              <v-btn x-large class="text-none" @click="clearKeyboardValue">
-                Vider
               </v-btn>
             </div>
           </v-card-text>
@@ -401,9 +493,9 @@ import price from '@/helpers/price'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import { applyServerQuoteToCart } from '@/helpers/customizations'
 import {
-  buildCashierReceiptPayload,
-  sendCashierReceipt,
-} from '@/helpers/cashierReceipt'
+  buildOrderTicketPayload,
+  sendOrderTicket,
+} from '@/helpers/orderTicket'
 
 const {
   buildKioskCartLine,
@@ -442,6 +534,9 @@ export default {
       checkoutErrorMessage: '',
       checkoutAlertType: 'error',
       checkoutLoading: null,
+      welcomeAnimationMode: 'mixedHorizontal',
+      welcomeAnimationTimer: null,
+      welcomeShuffleSeed: Date.now(),
       checkoutFinalized: false,
       repriceConfirmation: false,
       confirmation: null,
@@ -451,7 +546,23 @@ export default {
       stripePaymentOrderId: null,
       stripePaymentReference: null,
       stripePaymentElementInstance: null,
-      nameKeyboardKeys: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+      keyboardUppercase: true,
+      nameKeyboardRows: [
+        ['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(
+          (value) => ({ type: 'letter', value })
+        ),
+        ['Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M'].map(
+          (value) => ({ type: 'letter', value })
+        ),
+        [
+          { type: 'shift' },
+          ...['W', 'X', 'C', 'V', 'B', 'N'].map((value) => ({
+            type: 'letter',
+            value,
+          })),
+          { type: 'backspace' },
+        ],
+      ],
       phoneKeyboardKeys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
     }
   },
@@ -489,6 +600,81 @@ export default {
     categories() {
       const names = this.products.map((product) => product.category).filter(Boolean)
       return [...new Set(names)]
+    },
+    categoryTiles() {
+      const categories = new Map()
+      this.products.forEach((product) => {
+        const name = product.category
+        if (!name || categories.has(name)) return
+        categories.set(name, {
+          name,
+          image: product.category_image || product.categoryImage || '',
+        })
+      })
+      return [...categories.values()]
+    },
+    welcomeProductImages() {
+      return [...new Set(this.products.map((product) => product.image).filter(Boolean))]
+    },
+    welcomeShuffledProductImages() {
+      const images = [...this.welcomeProductImages]
+      let seed = this.welcomeShuffleSeed || 1
+      for (let index = images.length - 1; index > 0; index--) {
+        seed = (seed * 9301 + 49297) % 233280
+        const swapIndex = seed % (index + 1)
+        const image = images[index]
+        images[index] = images[swapIndex]
+        images[swapIndex] = image
+      }
+      return images
+    },
+    welcomeRepeatedProductImages() {
+      const images = this.welcomeShuffledProductImages
+      if (!images.length) return []
+      const minimumLength = Math.max(48, images.length)
+      const repeated = []
+      while (repeated.length < minimumLength) {
+        repeated.push(...images)
+      }
+      return repeated.slice(0, minimumLength)
+    },
+    welcomeDiagonalColumns() {
+      const images = this.welcomeRepeatedProductImages
+      const columnSize = Math.ceil(images.length / 3)
+      return [0, 1, 2].map((columnIndex) => ({
+        key: `diagonal-column-${columnIndex}`,
+        className: `kiosk-welcome-mosaic-column--${columnIndex + 1}`,
+        images: images.slice(
+          columnIndex * columnSize,
+          (columnIndex + 1) * columnSize
+        ),
+      }))
+    },
+    welcomeHorizontalRows() {
+      const images = this.welcomeRepeatedProductImages
+      const rowSize = Math.ceil(images.length / 4)
+      return [0, 1, 2, 3].map((rowIndex) => ({
+        key: `horizontal-row-${rowIndex}`,
+        className: rowIndex < 2
+          ? 'kiosk-welcome-mosaic-row--top'
+          : 'kiosk-welcome-mosaic-row--bottom',
+        images: images.slice(rowIndex * rowSize, (rowIndex + 1) * rowSize),
+      }))
+    },
+    welcomeMixedHorizontalRows() {
+      const images = this.welcomeRepeatedProductImages
+      const rowSize = Math.ceil(images.length / 4)
+      const classes = [
+        'kiosk-welcome-mosaic-row--right',
+        'kiosk-welcome-mosaic-row--left',
+        'kiosk-welcome-mosaic-row--right',
+        'kiosk-welcome-mosaic-row--left',
+      ]
+      return [0, 1, 2, 3].map((rowIndex) => ({
+        key: `mixed-horizontal-row-${rowIndex}`,
+        className: classes[rowIndex],
+        images: images.slice(rowIndex * rowSize, (rowIndex + 1) * rowSize),
+      }))
     },
     activeProducts() {
       return this.products.filter((product) => product.category === this.activeCategory)
@@ -536,6 +722,12 @@ export default {
         0
       )
     },
+    cartItemCount() {
+      return this.cartItems.reduce(
+        (sum, item) => sum + Number(item.qty || 0),
+        0
+      )
+    },
   },
   async mounted() {
     await Promise.all([
@@ -543,9 +735,11 @@ export default {
       this.$store.dispatch('shop/getCurrentShopInfo'),
     ])
     this.activeCategory = this.categories[0] || ''
+    this.startWelcomeAnimationRotation()
     await this.restoreStripeReturn()
   },
   beforeDestroy() {
+    this.stopWelcomeAnimationRotation()
     this.resetStripePaymentState()
   },
   methods: {
@@ -561,6 +755,21 @@ export default {
       this.repriceConfirmation = false
       this.resetStripePaymentState()
       this.kioskStep = 'mode'
+    },
+    startWelcomeAnimationRotation() {
+      this.stopWelcomeAnimationRotation()
+      if (typeof window === 'undefined') return
+      this.welcomeAnimationTimer = setInterval(() => {
+        const modes = ['mixedHorizontal', 'diagonal', 'horizontal']
+        const currentIndex = modes.indexOf(this.welcomeAnimationMode)
+        this.welcomeAnimationMode = modes[(currentIndex + 1) % modes.length]
+        this.welcomeShuffleSeed = Date.now()
+      }, 10000)
+    },
+    stopWelcomeAnimationRotation() {
+      if (!this.welcomeAnimationTimer) return
+      clearInterval(this.welcomeAnimationTimer)
+      this.welcomeAnimationTimer = null
     },
     chooseSaleMode(mode) {
       this.saleMode = mode === 'takeaway' ? 'takeaway' : 'dine_in'
@@ -590,6 +799,30 @@ export default {
         this.customer = `${this.customer}${value}`.slice(0, 40)
       }
     },
+    displayNameKeyboardKey(value) {
+      return this.keyboardUppercase ? value : String(value).toLowerCase()
+    },
+    handleNameKeyboardKey(key) {
+      if (key.type === 'shift') {
+        this.toggleKeyboardCase()
+        return
+      }
+      if (key.type === 'backspace') {
+        this.backspaceKeyboardValue()
+        return
+      }
+      this.appendKeyboardValue(this.displayNameKeyboardKey(key.value))
+    },
+    keyboardKeyClass(key) {
+      return {
+        'kiosk-letter-key': key.type === 'letter',
+        'kiosk-shift-key': key.type === 'shift',
+        'kiosk-backspace-key': key.type === 'backspace',
+      }
+    },
+    toggleKeyboardCase() {
+      this.keyboardUppercase = !this.keyboardUppercase
+    },
     backspaceKeyboardValue() {
       if (this.keyboardTarget === 'phone') {
         this.phone = this.phone.slice(0, -1)
@@ -617,6 +850,10 @@ export default {
     productImageSrc(image) {
       const staticURL = this.$store.get('staticURL').replace(/\/+$/, '')
       return `${staticURL}/api/v1/imgproducts/${image}`
+    },
+    categoryImageSrc(image) {
+      const staticURL = this.$store.get('staticURL').replace(/\/+$/, '')
+      return `${staticURL}/api/v1/imgcategories/${image}`
     },
     openProduct(product) {
       if (
@@ -692,8 +929,8 @@ export default {
       this.checkoutLoading = 'counter'
       try {
         const result = await this.$store.dispatch(
-          'cart/checkoutCounterPayBefore',
-          this.buildPayload('Paiement au comptoir', false)
+          'cart/checkoutOrder',
+          this.buildPayload('À encaisser', false)
         )
         if (!result || !result.ok) {
           this.handleCheckoutFailure(
@@ -704,7 +941,7 @@ export default {
         }
         this.repriceConfirmation = false
         this.checkoutFinalized = true
-        await this.finishCheckout(result, 'Paiement au comptoir')
+        await this.finishCheckout(result, 'À encaisser')
         this.kioskStep = 'confirmation'
       } catch (error) {
         this.checkoutErrorMessage = error.message
@@ -913,20 +1150,19 @@ export default {
         const orders = this.$store.get('orders/dataOrders') || []
         const order = orders.find((item) => String(item.id) === String(orderId))
         if (!order) return false
-        const payload = buildCashierReceiptPayload({
+        const payload = buildOrderTicketPayload({
           order: {
             ...order,
+            customer: order.customer || this.customer || 'Client borne',
             source: 'borne',
             order_source: 'borne',
           },
           details: this.$store.get('orders/detailOrder') || [],
           shopInfo: this.shopInfo,
           fallbackPaymentMethod: paymentMethod,
-          fallbackCustomer: this.customer || 'Client borne',
           fallbackTable: 'Borne',
-          fallbackRemark: '',
         })
-        return sendCashierReceipt({
+        return sendOrderTicket({
           payload,
           smartPrint: this.shopInfo.smart_print_app,
           printerIp: this.shopInfo.shop_printer_ip,
@@ -1031,12 +1267,113 @@ export default {
 .kiosk-welcome {
   flex: 1 1 auto;
   min-height: 0;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 24px;
   padding: 24px;
+  background: #ffffff;
+}
+
+.kiosk-welcome-mosaic {
+  --kiosk-welcome-tile-size: min(340px, 27vw);
+  position: absolute;
+  inset: 10% -24% -34% 14%;
+  display: flex;
+  gap: 52px;
+  transform: rotate(-7deg) scale(1.08);
+}
+
+.kiosk-welcome-mosaic--diagonal .kiosk-welcome-mosaic-column {
+  display: flex;
+  flex-direction: column;
+  gap: 52px;
+  width: min(260px, 22vw);
+  animation: kioskMosaicSlide 28s linear infinite;
+}
+
+.kiosk-welcome-mosaic--diagonal .kiosk-welcome-mosaic-column--2 {
+  animation-duration: 35s;
+  animation-direction: reverse;
+  margin-top: 90px;
+}
+
+.kiosk-welcome-mosaic--diagonal .kiosk-welcome-mosaic-column--3 {
+  animation-duration: 31s;
+  margin-top: 38px;
+}
+
+.kiosk-welcome-mosaic--diagonal .kiosk-welcome-mosaic-tile {
+  flex: 0 0 min(260px, 22vw);
+  width: min(260px, 22vw);
+}
+
+.kiosk-welcome-mosaic--horizontal,
+.kiosk-welcome-mosaic--mixedHorizontal {
+  inset: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  transform: none;
+  padding: 28px 0;
+}
+
+.kiosk-welcome-mosaic--horizontal .kiosk-welcome-mosaic-row,
+.kiosk-welcome-mosaic--mixedHorizontal .kiosk-welcome-mosaic-row {
+  display: flex;
+  gap: 18px;
+  width: max-content;
+  min-width: 220vw;
+  animation: kioskMosaicHorizontalTop 30s linear infinite;
+}
+
+.kiosk-welcome-mosaic--horizontal .kiosk-welcome-mosaic-row--bottom {
+  animation-name: kioskMosaicHorizontalBottom;
+}
+
+.kiosk-welcome-mosaic--mixedHorizontal .kiosk-welcome-mosaic-row--right {
+  animation-name: kioskMosaicHorizontalBottom;
+}
+
+.kiosk-welcome-mosaic--mixedHorizontal .kiosk-welcome-mosaic-row--left {
+  animation-name: kioskMosaicHorizontalTop;
+}
+
+.kiosk-welcome-mosaic--horizontal .kiosk-welcome-mosaic-tile,
+.kiosk-welcome-mosaic--mixedHorizontal .kiosk-welcome-mosaic-tile {
+  width: var(--kiosk-welcome-tile-size);
+  aspect-ratio: 1;
+}
+
+.kiosk-welcome-mosaic-tile {
+  overflow: visible;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  padding: 10px;
+}
+
+.kiosk-welcome-mosaic-tile ::v-deep .v-image {
+  height: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.kiosk-welcome-mosaic-tile ::v-deep .v-image__image {
+  border-radius: 12px;
+}
+
+.kiosk-welcome-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
 }
 
 .kiosk-start-button {
@@ -1045,6 +1382,37 @@ export default {
   border-radius: 8px;
   font-size: 2rem !important;
   font-weight: 900 !important;
+  box-shadow: 0 20px 42px rgba(67, 56, 202, 0.28);
+}
+
+@keyframes kioskMosaicSlide {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-34%);
+  }
+}
+
+@keyframes kioskMosaicHorizontalTop {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-36%);
+  }
+}
+
+@keyframes kioskMosaicHorizontalBottom {
+  from {
+    transform: translateX(-36%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
 }
 
 .kiosk-header {
@@ -1102,10 +1470,39 @@ export default {
 }
 
 .kiosk-category-button {
-  min-height: 56px !important;
+  min-height: 132px !important;
   border-radius: 8px !important;
   font-size: 1.05rem !important;
   font-weight: 800 !important;
+  padding: 8px !important;
+}
+
+.kiosk-category-button ::v-deep .v-btn__content {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kiosk-category-button span {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.kiosk-category-image {
+  width: 100%;
+  max-width: 96px;
+  border-radius: 8px;
+  background: #eef2f6;
+}
+
+.kiosk-category-fallback-icon {
+  min-height: 74px;
+  font-size: 42px !important;
 }
 
 .kiosk-products {
@@ -1141,6 +1538,14 @@ export default {
 
 .kiosk-cart-footer {
   margin-top: 14px;
+}
+
+.kiosk-cart-count {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .kiosk-cart-lines {
@@ -1241,14 +1646,34 @@ export default {
   font-weight: 900 !important;
 }
 
-.kiosk-keyboard-field {
-  margin-bottom: 18px;
+.kiosk-keyboard-input-wrap {
+  margin-bottom: 30px;
 }
 
 .kiosk-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kiosk-keyboard-row {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 10px;
+}
+
+.kiosk-keyboard-row:nth-child(2) {
+  padding: 0 28px;
+}
+
+.kiosk-keyboard-row:nth-child(3) {
+  grid-template-columns: 120px repeat(6, minmax(0, 1fr)) 170px;
+  padding: 0 56px;
+}
+
+.kiosk-keyboard-control-row {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 8px 90px 0 !important;
 }
 
 .kiosk-keyboard .v-btn {
@@ -1256,8 +1681,23 @@ export default {
   font-weight: 900 !important;
 }
 
+.kiosk-letter-key {
+  min-width: 0 !important;
+}
+
+.kiosk-space-key {
+  min-height: 70px !important;
+}
+
+.kiosk-backspace-key,
+.kiosk-shift-key {
+  min-height: 70px !important;
+}
+
 .kiosk-number-keyboard {
+  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .kiosk-stripe-panel {
@@ -1302,13 +1742,29 @@ export default {
     overflow-x: auto;
   }
 
+  .kiosk-category-button {
+    min-width: 132px !important;
+  }
+
   .kiosk-bottom-cart {
     grid-column: auto;
   }
 
-  .kiosk-mode-actions,
-  .kiosk-keyboard {
+  .kiosk-mode-actions {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .kiosk-keyboard-row,
+  .kiosk-keyboard-row:nth-child(2),
+  .kiosk-keyboard-row:nth-child(3),
+  .kiosk-keyboard-control-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 !important;
+  }
+
+  .kiosk-space-key,
+  .kiosk-backspace-key {
+    grid-column: auto;
   }
 }
 </style>

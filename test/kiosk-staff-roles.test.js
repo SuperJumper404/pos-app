@@ -9,45 +9,23 @@ const dashboardSource = fs.readFileSync(
   'utf8'
 )
 
-assert.ok(
+assert.strictEqual(
   roles.STAFF_MODULE_KEYS.includes('borne'),
-  'staff module keys must include borne'
+  false,
+  'staff module keys must not include borne anymore'
 )
-assert.ok(
-  roles.MODULE_OPTIONS.some(
-    (item) => item.value === 'borne' && item.text === 'Borne'
-  ),
-  'staff module options must expose Borne'
+assert.strictEqual(
+  roles.MODULE_OPTIONS.some((item) => item.value === 'borne'),
+  false,
+  'staff module options must not expose Borne anymore'
 )
 assert.strictEqual(
   roles.canAccessModule(roles.ACCESS.CASHIER, 'borne', ['borne'], false),
-  true,
-  'explicit borne permission must allow the kiosk module'
-)
-assert.strictEqual(
-  roles.canAccessModule(roles.ACCESS.CASHIER, 'orders', ['borne'], false),
   false,
-  'a kiosk-only user must not access orders'
+  'explicit staff permissions must not allow the kiosk route anymore'
 )
-assert.strictEqual(
-  roles.canAccessModule(roles.ACCESS.CASHIER, 'cashregister', ['borne'], false),
-  false,
-  'a kiosk-only user must not access cash register'
-)
-assert.deepStrictEqual(
-  roles
-    .getAccessibleNavigationItems(roles.ACCESS.CASHIER, [
-      { title: 'Borne', to: '/borne', moduleKey: 'borne' },
-      { title: 'Menus', to: '/menus', moduleKey: 'orders' },
-      { title: 'Commandes', to: '/orders', moduleKey: 'orders' },
-      { title: 'Deconnexion', name: 'logout' },
-    ], ['borne'], false)
-    .map((item) => item.title),
-  ['Borne', 'Deconnexion'],
-  'kiosk-only navigation must expose only Borne and logout'
-)
-assert.match(dashboardSource, /title:\s*['"]Borne['"]/)
-assert.match(dashboardSource, /to:\s*['"]\/borne['"]/)
-assert.match(dashboardSource, /moduleKey:\s*['"]borne['"]/)
+assert.match(dashboardSource, /title:\s*'Bornes'/)
+assert.match(dashboardSource, /to:\s*'\/bornes'/)
+assert.match(dashboardSource, /moduleKey:\s*'settings'/)
 
 console.log('kiosk staff role tests passed')

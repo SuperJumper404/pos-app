@@ -24,7 +24,7 @@
         <h4>Aucune table</h4>
       </v-card-title>
       <v-card
-        v-for="items in dataTables"
+        v-for="(items, index) in dataTables"
         :key="items.id"
         outlined
         class="pa-2 d-flex justify-space-between align-center ma-3"
@@ -81,6 +81,24 @@
           <!-- <qrcode-vue value="items.email" size="300" level="H" /> -->
         </v-card-text>
         <v-card-actions class="d-block">
+          <div class="table-order-buttons mb-3">
+            <v-btn
+              icon
+              small
+              :disabled="index === 0 || orderLoading"
+              @click="moveTable(index, -1)"
+            >
+              <v-icon small>mdi-arrow-up</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              small
+              :disabled="index === dataTables.length - 1 || orderLoading"
+              @click="moveTable(index, 1)"
+            >
+              <v-icon small>mdi-arrow-down</v-icon>
+            </v-btn>
+          </div>
           <!-- Desktop / tablette -->
           <v-btn
             color="red darken-1"
@@ -155,6 +173,7 @@ export default {
   data() {
     return {
       loadPage: false,
+      orderLoading: false,
     }
   },
   head() {
@@ -184,6 +203,20 @@ export default {
     },
     searchData() {
       this.$store.dispatch('tables/getAllTables')
+    },
+    async moveTable(index, direction) {
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= this.dataTables.length) return
+
+      const ordered = [...this.dataTables]
+      const [moved] = ordered.splice(index, 1)
+      ordered.splice(targetIndex, 0, moved)
+      this.orderLoading = true
+      await this.$store.dispatch(
+        'tables/reorderTables',
+        ordered.map((table) => table.id)
+      )
+      this.orderLoading = false
     },
     async copyTableUrl(item) {
       const url = this.tableAccessUrl(item)
@@ -253,3 +286,9 @@ export default {
   },
 }
 </script>
+<style scoped>
+.table-order-buttons {
+  display: flex;
+  justify-content: flex-end;
+}
+</style>

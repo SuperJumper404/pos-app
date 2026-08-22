@@ -181,6 +181,9 @@ export const actions = {
         dispatch('set/kitchen_closed', response.data.data.kitchen_closed)
         dispatch('set/shop_mail', response.data.data.shop_mail)
         dispatch('set/shop_description', response.data.data.shop_description)
+        dispatch('set/shop_printer_ip', response.data.data.shop_printer_ip)
+        dispatch('set/smart_print_app', response.data.data.smart_print_app)
+        dispatch('set/activate_tva', response.data.data.activate_tva)
         console.log('Open Hours', JSON.parse(response.data.data.hours))
         dispatch('set/shop_hours', JSON.parse(response.data.data.hours))
         dispatch(

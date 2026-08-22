@@ -11,6 +11,49 @@
         height="auto"
         class="products-toolbar py-2"
       >
+        <div class="products-toolbar-left">
+          <v-menu offset-y :close-on-content-click="false">
+            <template #activator="{ on, attrs }">
+              <v-btn
+                depressed
+                class="product-filter-button text-none"
+                v-bind="attrs"
+                v-on="on"
+              >
+                <v-icon left>mdi-filter-variant</v-icon>
+                Filtrer
+              </v-btn>
+            </template>
+            <v-list class="product-category-menu" dense>
+              <v-list-item>
+                <v-btn text small class="text-none" @click="selectedCategoryIds = []">
+                  Toutes
+                </v-btn>
+              </v-list-item>
+              <v-list-item
+                v-for="category in productCategories"
+                :key="category.id"
+                dense
+              >
+                <v-avatar size="28" class="mr-2 product-filter-avatar">
+                  <v-img
+                    v-if="category.image"
+                    :src="categoryImageSrc(category.image)"
+                  ></v-img>
+                  <v-icon v-else small>mdi-shape</v-icon>
+                </v-avatar>
+                <v-checkbox
+                  v-model="selectedCategoryIds"
+                  :value="category.id"
+                  :label="category.name"
+                  dense
+                  hide-details
+                  class="mt-0"
+                ></v-checkbox>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </div>
         <v-spacer></v-spacer>
         <div class="products-toolbar-actions">
           <v-btn
@@ -19,8 +62,8 @@
             class="text-none"
             @click="openNewCategory"
           >
-            <v-icon left>mdi-shape-plus</v-icon>
-            Ajouter catégorie
+            <v-icon left>mdi-shape</v-icon>
+            Gérer les catégories
           </v-btn>
           <v-btn
             outlined
@@ -42,7 +85,7 @@
         </div>
       </v-app-bar>
       <v-card-title
-        v-if="dataProduct.length == 0"
+        v-if="filteredProducts.length == 0"
         class="d-none d-sm-flex justify-center"
       >
         <v-icon large>mdi-emoticon-neutral-outline</v-icon>
@@ -51,9 +94,10 @@
       <!-- md -->
       <div v-else>
         <v-card
-          v-for="items in dataProduct"
+          v-for="(items, index) in filteredProducts"
           :key="items.id"
           outlined
+          draggable="true"
           :disabled="items.archived === 1"
           class="
             product-list-card
@@ -62,6 +106,11 @@
             justify-space-between
             ma-3
           "
+          :class="{ 'product-dragging': draggedProductId === items.id }"
+          @dragstart="startProductDrag(items)"
+          @dragover.prevent
+          @drop="dropProduct(items)"
+          @dragend="clearProductDrag"
         >
           <v-img
             :src="productImageSrc(items.image)"
@@ -96,6 +145,24 @@
             </div>
 
             <div v-if="items.archived === 0" class="product-action-buttons">
+              <div class="product-order-buttons">
+                <v-btn
+                  icon
+                  small
+                  :disabled="index === 0 || orderLoading"
+                  @click="moveVisibleProduct(index, -1)"
+                >
+                  <v-icon small>mdi-arrow-up</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  small
+                  :disabled="index === lastVisibleActiveProductIndex || orderLoading"
+                  @click="moveVisibleProduct(index, 1)"
+                >
+                  <v-icon small>mdi-arrow-down</v-icon>
+                </v-btn>
+              </div>
               <v-btn
                 color="primary"
                 class="text-none"
@@ -130,7 +197,7 @@
 
       <!-- sm to xs -->
       <v-card-title
-        v-if="dataProduct.length == 0"
+        v-if="filteredProducts.length == 0"
         class="d-flex d-sm-none justify-center"
       >
         <v-icon large>mdi-emoticon-neutral-outline</v-icon>
@@ -139,11 +206,17 @@
 
       <div v-else>
         <v-card
-          v-for="itm in dataProduct"
+          v-for="(itm, index) in filteredProducts"
           :key="itm.name"
           outlined
+          draggable="true"
           :disabled="itm.archived === 1"
           class="pa-2 d-block d-sm-none ma-5"
+          :class="{ 'product-dragging': draggedProductId === itm.id }"
+          @dragstart="startProductDrag(itm)"
+          @dragover.prevent
+          @drop="dropProduct(itm)"
+          @dragend="clearProductDrag"
         >
           <v-img
             :src="productImageSrc(itm.image)"
@@ -160,6 +233,24 @@
           <v-card-actions class="product-actions d-md-flex">
             <!-- Si pas archivé : boutons visibles -->
             <template v-if="itm.archived === 0">
+              <div class="product-order-buttons">
+                <v-btn
+                  icon
+                  small
+                  :disabled="index === 0 || orderLoading"
+                  @click="moveVisibleProduct(index, -1)"
+                >
+                  <v-icon small>mdi-arrow-up</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  small
+                  :disabled="index === lastVisibleActiveProductIndex || orderLoading"
+                  @click="moveVisibleProduct(index, 1)"
+                >
+                  <v-icon small>mdi-arrow-down</v-icon>
+                </v-btn>
+              </div>
               <v-switch
                 :input-value="!isProductHidden(itm)"
                 :loading="visibilityLoadingId === itm.id"
@@ -232,6 +323,9 @@ export default {
     return {
       loadPage: false,
       visibilityLoadingId: null,
+      orderLoading: false,
+      selectedCategoryIds: [],
+      draggedProductId: null,
     }
   },
 
@@ -241,7 +335,39 @@ export default {
     },
     dataProduct() {
       const arr = this.$store.get('products/dataProduct') || []
-      return [...arr].sort((a, b) => (a.archived ?? 0) - (b.archived ?? 0))
+      return [...arr].sort((a, b) => {
+        const archivedDiff = (a.archived ?? 0) - (b.archived ?? 0)
+        if (archivedDiff !== 0) return archivedDiff
+        return (
+          (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) ||
+          new Date(a.created || 0) - new Date(b.created || 0) ||
+          Number(a.id) - Number(b.id)
+        )
+      })
+    },
+    filteredProducts() {
+      if (this.selectedCategoryIds.length === 0) return this.dataProduct
+      const selected = this.selectedCategoryIds.map((id) => Number(id))
+      return this.dataProduct.filter((product) =>
+        selected.includes(Number(product.categoryid || product.categoryId))
+      )
+    },
+    productCategories() {
+      const categories = new Map()
+      this.dataProduct.forEach((product) => {
+        const id = Number(product.categoryid || product.categoryId)
+        if (!id || !product.category) return
+        categories.set(id, { id, name: product.category, image: product.category_image })
+      })
+      return [...categories.values()].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      )
+    },
+    lastVisibleActiveProductIndex() {
+      return this.filteredProducts.reduce(
+        (last, product, index) => (product.archived === 0 ? index : last),
+        -1
+      )
     },
     totalPage() {
       return this.$store.get('products/totalPage')
@@ -249,6 +375,9 @@ export default {
   },
   watch: {
     dataProduct() {
+      this.scheduleFit(true)
+    },
+    filteredProducts() {
       this.scheduleFit(true)
     },
   },
@@ -270,7 +399,7 @@ export default {
   },
   methods: {
     openNewCategory() {
-      this.$router.push('/categories/newcategory')
+      this.$router.push('/categories')
     },
     openCustomizationSteps() {
       this.$router.push('/customizations')
@@ -279,11 +408,75 @@ export default {
       const fileName = image || 'default.png'
       return `${this.staticurl}/api/v1/imgproducts/${fileName}`
     },
+    categoryImageSrc(image) {
+      return `${this.staticurl}/api/v1/imgcategories/${image}`
+    },
     pageProduct() {
       this.$store.dispatch('products/getProducts')
     },
     isProductHidden(product) {
       return [true, 1, '1'].includes(product.is_hidden)
+    },
+    moveProduct(index, direction) {
+      return this.moveVisibleProduct(index, direction)
+    },
+    startProductDrag(product) {
+      if (product.archived === 1 || this.orderLoading) return
+      this.draggedProductId = product.id
+    },
+    clearProductDrag() {
+      this.draggedProductId = null
+    },
+    dropProduct(targetProduct) {
+      if (!this.draggedProductId || targetProduct.archived === 1) {
+        this.clearProductDrag()
+        return
+      }
+      const fromIndex = this.filteredProducts.findIndex(
+        (product) => product.id === this.draggedProductId
+      )
+      const toIndex = this.filteredProducts.findIndex(
+        (product) => product.id === targetProduct.id
+      )
+      if (fromIndex !== toIndex) {
+        this.moveVisibleProduct(fromIndex, toIndex - fromIndex)
+      }
+      this.clearProductDrag()
+    },
+    async moveVisibleProduct(index, direction) {
+      const visibleActiveProducts = this.filteredProducts.filter(
+        (product) => product.archived === 0
+      )
+      const product = this.filteredProducts[index]
+      if (!product || product.archived === 1) return
+
+      const currentVisibleIndex = visibleActiveProducts.findIndex(
+        (item) => item.id === product.id
+      )
+      const targetVisibleIndex = currentVisibleIndex + direction
+      if (
+        currentVisibleIndex < 0 ||
+        targetVisibleIndex < 0 ||
+        targetVisibleIndex >= visibleActiveProducts.length
+      ) {
+        return
+      }
+
+      const reorderedVisible = [...visibleActiveProducts]
+      const [moved] = reorderedVisible.splice(currentVisibleIndex, 1)
+      reorderedVisible.splice(targetVisibleIndex, 0, moved)
+      const visibleIds = new Set(reorderedVisible.map((item) => item.id))
+      const visibleQueue = [...reorderedVisible]
+      const ordered = this.dataProduct
+        .filter((item) => item.archived === 0)
+        .map((item) => (visibleIds.has(item.id) ? visibleQueue.shift() : item))
+
+      this.orderLoading = true
+      await this.$store.dispatch(
+        'products/reorderProducts',
+        ordered.map((product) => product.id)
+      )
+      this.orderLoading = false
     },
     async toggleProductVisibility(product, isVisible) {
       this.visibilityLoadingId = product.id
@@ -372,6 +565,33 @@ export default {
   justify-content: flex-end;
 }
 
+.products-toolbar-left {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.product-filter-button {
+  background: #e8f5e9 !important;
+  border: 1px solid #66bb6a;
+  color: #1b5e20 !important;
+  font-weight: 600;
+}
+
+.product-filter-button:hover {
+  background: #d7efd9 !important;
+}
+
+.product-category-menu {
+  max-height: 340px;
+  min-width: 240px;
+  overflow-y: auto;
+}
+
+.product-filter-avatar {
+  background: #eef2f7;
+  flex: 0 0 auto;
+}
+
 .product-list-card {
   align-items: center;
   display: grid !important;
@@ -419,6 +639,16 @@ export default {
   justify-content: flex-end;
   min-width: 280px;
   white-space: nowrap;
+}
+
+.product-order-buttons {
+  align-items: center;
+  display: flex;
+  gap: 2px;
+}
+
+.product-dragging {
+  opacity: 0.55;
 }
 
 .product-actions {

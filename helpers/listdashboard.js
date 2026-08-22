@@ -210,10 +210,10 @@ const listdashboard = {
 
         {
           icon: 'mdi-tablet-dashboard',
-          title: 'Borne',
-          routeName: 'borne',
-          to: '/borne',
-          moduleKey: 'borne',
+          title: 'Bornes',
+          routeName: 'bornes',
+          to: '/bornes',
+          moduleKey: 'settings',
           isAdmin: true,
         },
 

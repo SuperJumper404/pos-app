@@ -31,8 +31,9 @@ export default function ({ store, redirect, route, router }) {
   const normalizedPath =
     route.path.length > 1 ? route.path.replace(/\/+$/, '') : route.path
 
+  const isServicePointSession = currentUser.session_subject === 'service_point'
   const isClientAccess =
-    currentUser.access === 2 || currentUser.access === 3
+    !isServicePointSession && (currentUser.access === 2 || currentUser.access === 3)
 
   if (
     isClientAccess &&

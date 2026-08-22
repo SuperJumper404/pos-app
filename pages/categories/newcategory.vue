@@ -14,6 +14,20 @@
         required
         autofocus
       ></v-text-field>
+      <div class="category-image-field mb-4">
+        <v-avatar size="72" class="mr-4 category-avatar-preview">
+          <v-img v-if="imagePreview" :src="imagePreview"></v-img>
+          <v-icon v-else>mdi-shape</v-icon>
+        </v-avatar>
+        <v-file-input
+          v-model="formcategory.image"
+          accept="image/png,image/jpeg"
+          label="Image de la catégorie"
+          prepend-icon="mdi-camera"
+          show-size
+          @change="previewImage"
+        ></v-file-input>
+      </div>
       <v-btn
         :disabled="!isValue"
         :loading="loadingBtn"
@@ -43,11 +57,20 @@ export default {
       message: '',
       formcategory: {
         name: '',
+        image: null,
       },
+      imagePreview: null,
     }
   },
 
+  beforeDestroy() {
+    if (this.imagePreview) URL.revokeObjectURL(this.imagePreview)
+  },
   methods: {
+    previewImage(file) {
+      if (this.imagePreview) URL.revokeObjectURL(this.imagePreview)
+      this.imagePreview = file ? URL.createObjectURL(file) : null
+    },
     async submitCategory() {
       this.loadingBtn = true
       const res = await this.$store.dispatch(
@@ -64,3 +87,14 @@ export default {
   },
 }
 </script>
+<style scoped>
+.category-image-field {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+}
+
+.category-avatar-preview {
+  background: #eef2f7;
+}
+</style>

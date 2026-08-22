@@ -63,4 +63,33 @@ assert.strictEqual(cloudCalls[0].action, 'printing/postPrintingJob')
 assert.strictEqual(cloudCalls[0].params.ticketType, 'caisse')
 assert.strictEqual(cloudCalls[0].params.orderId, 42)
 assert.match(cloudCalls[0].params.requete, /TOTAL\*/)
+
+const commandPayload = buildCashierReceiptPayload({
+  order: { id: 43, ordernumber: 'K43', subtotal: 8 },
+  details: [{ name: 'Menu borne', qty: 1, total: 8 }],
+  shopInfo: { shop_name: 'Borne' },
+  ticketKind: 'commande',
+})
+const commandSmartPrintCalls = []
+sendCashierReceipt({
+  payload: commandPayload,
+  smartPrint: true,
+  printerIp: '192.168.1.20',
+  fetchImplementation: (url, options) => {
+    commandSmartPrintCalls.push({ url, options })
+    return { ok: true }
+  },
+  dispatch: () => true,
+})
+assert.match(commandSmartPrintCalls[0].options.body, /"ticketType":"cuisine"/)
+const commandCloudCalls = []
+sendCashierReceipt({
+  payload: commandPayload,
+  smartPrint: false,
+  dispatch: (action, params) => {
+    commandCloudCalls.push({ action, params })
+    return true
+  },
+})
+assert.strictEqual(commandCloudCalls[0].params.ticketType, 'commande')
 console.log('receipt printing tests passed')

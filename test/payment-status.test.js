@@ -105,4 +105,28 @@ assert.strictEqual(
   'warning'
 )
 
+assert.deepStrictEqual(
+  getPaymentStatusDisplay({
+    payment_status: 'paid',
+    payment: 'Paiement au comptoir',
+    source: 'borne',
+  }),
+  {
+    text: 'Ã€ encaisser',
+    color: 'orange',
+  }
+)
+
+assert.deepStrictEqual(
+  getPaymentStatusDisplay({
+    payment_status: 'paid',
+    payment: 'Paiement au comptoir',
+    order_source: 'borne',
+  }),
+  {
+    text: 'Ã€ encaisser',
+    color: 'orange',
+  }
+)
+
 console.log('paymentStatus tests passed')

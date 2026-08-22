@@ -25,6 +25,11 @@ assert.ok(!settingsSource.includes('Aperçu du ticket de caisse'))
 assert.ok(!settingsSource.includes('<qr-code'))
 assert.match(
   settingsSource,
+  /<v-form ref="form" v-model="valid" @submit\.prevent="submitShopEdit">/
+)
+assert.match(settingsSource, /type="submit"/)
+assert.match(
+  settingsSource,
   /<v-col cols="6">[\s\S]*Avis client sur le ticket de caisse/
 )
 assert.ok(
