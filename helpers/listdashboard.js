@@ -151,7 +151,6 @@ const listdashboard = {
           routeName: 'stocks',
           to: '/stocks',
           moduleKey: 'stocks',
-          hiddenFromMainNavigation: true,
           isAdmin: false,
         },
         {
