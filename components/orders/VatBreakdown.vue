@@ -51,6 +51,7 @@ export default {
 
 <style scoped>
 .vat-breakdown {
+  box-shadow: none !important;
   border-radius: 12px !important;
 }
 </style>

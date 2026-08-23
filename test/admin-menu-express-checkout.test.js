@@ -49,6 +49,11 @@ assert.match(
 )
 assert.match(
   menusSource,
+  /productViewMode:\s*'all'/,
+  'admin menus must open in express mode by default'
+)
+assert.match(
+  menusSource,
   /express-category-bar/,
   'express mode must keep categories as small rectangular choices at the top'
 )

@@ -61,6 +61,7 @@
         $route.name != null
       "
       :clipped-left="clipped"
+      flat
       fixed
       app
     >
@@ -107,7 +108,7 @@
         disabled
         class="d-md-block d-sm-none d-none"
       >
-        <v-badge color="green" :content="`${indexCart}`" overlap top
+        <v-badge color="success" :content="`${indexCart}`" overlap top
           ><v-icon color="success">mdi-cart-minus</v-icon></v-badge
         >
       </v-btn>
@@ -118,7 +119,7 @@
         class="d-md-none d-sm-block d-block"
         @click="cartBtn"
       >
-        <v-badge color="green" :content="`${indexCart}`" overlap top
+        <v-badge color="success" :content="`${indexCart}`" overlap top
           ><v-icon color="success">mdi-cart-minus</v-icon></v-badge
         >
       </v-btn>
@@ -210,7 +211,6 @@ export default {
     },
     publicClientPaths() {
       return [
-        '/menus',
         '/cart',
         '/ordersStatuses',
         '/table-access',
@@ -219,6 +219,7 @@ export default {
     },
     showFloatingHomeButton() {
       if (!this.isStaffUser) return false
+      if (!this.$vuetify.breakpoint.smAndUp) return false
 
       const path = this.$route.path
       if (this.internalHomePaths.includes(path)) return false
@@ -234,7 +235,6 @@ export default {
         title: this.$route.name,
         icon: '',
       }
-      console.log('Current Page Title', title, 'route', this.$route)
       return title
     },
   },
@@ -244,10 +244,6 @@ export default {
     },
   },
   mounted() {
-    console.log('Mixins List Dashbord', this.list)
-    console.log('route', this.$route)
-    console.log('router', this.$router)
-    console.log('currentPage', this.shopInfo)
     this.ordersPollingReady = true
     this.syncOrdersPolling()
   },

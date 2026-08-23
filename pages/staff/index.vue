@@ -243,7 +243,7 @@ export default {
     roleColor(access) {
       return {
         0: 'primary',
-        1: 'green darken-2',
+        1: 'success',
         4: 'orange darken-2',
         5: 'red darken-2',
       }[Number(access)] || 'grey'

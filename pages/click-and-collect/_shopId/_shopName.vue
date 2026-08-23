@@ -80,7 +80,7 @@
           </v-row>
           <v-row class="mt-2 mb-0 pt-0 pb-0">
             <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <v-chip :color="isRestaurantOpen ? 'green' : 'red'" dark small>
+              <v-chip :color="isRestaurantOpen ? 'success' : 'red'" dark small>
                 <v-icon left small>
                   {{ isRestaurantOpen ? 'mdi-door-open' : 'mdi-door-closed' }}
                 </v-icon>

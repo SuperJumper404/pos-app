@@ -328,7 +328,7 @@
             <div class="d-flex justify-center">
               <v-text-field
                 v-model="formShop.shop_social_media.tiktok"
-                prepend-icon="mdi-tiktokbvcbcv"
+                prepend-icon="mdi-music-note"
                 label="TikTok"
                 type="text"
                 class="d-inline-flex"

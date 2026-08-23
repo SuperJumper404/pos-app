@@ -1617,6 +1617,7 @@ menusVm.cartItem[1].subtotal = 20
 
 menusOptions.methods.editCartLine.call(menusVm, 1)
 assert.strictEqual(menusVm.editingCartIndex, 1)
+assert.strictEqual(menusVm.selectedItem.id, menuProduct.id)
 assert.deepStrictEqual(menusVm.selectedChoiceIds, [30])
 assert.strictEqual(menusVm.customizationDialog, true)
 

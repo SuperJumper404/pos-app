@@ -4,91 +4,80 @@
       <Loading />
     </v-card>
     <v-card v-else ref="productsCard" outlined class="product-page-card mt-5">
-      <v-app-bar
-        flat
-        color="grey lighten-4"
-        light
-        height="auto"
-        class="products-toolbar py-2"
-      >
-        <div class="products-toolbar-left">
-          <v-menu offset-y :close-on-content-click="false">
-            <template #activator="{ on, attrs }">
-              <v-btn
-                depressed
-                class="product-filter-button text-none"
-                v-bind="attrs"
-                v-on="on"
-              >
-                <v-icon left>mdi-filter-variant</v-icon>
-                Filtrer
+      <div class="products-action-bar">
+        <v-menu offset-y :close-on-content-click="false">
+          <template #activator="{ on, attrs }">
+            <v-btn
+              depressed
+              class="product-filter-button text-none"
+              v-bind="attrs"
+              v-on="on"
+            >
+              <v-icon left>mdi-filter-variant</v-icon>
+              Filtrer
+            </v-btn>
+          </template>
+          <v-list class="product-category-menu" dense>
+            <v-list-item>
+              <v-btn text small class="text-none" @click="selectedCategoryIds = []">
+                Toutes
               </v-btn>
-            </template>
-            <v-list class="product-category-menu" dense>
-              <v-list-item>
-                <v-btn text small class="text-none" @click="selectedCategoryIds = []">
-                  Toutes
-                </v-btn>
-              </v-list-item>
-              <v-list-item
-                v-for="category in productCategories"
-                :key="category.id"
+            </v-list-item>
+            <v-list-item
+              v-for="category in productCategories"
+              :key="category.id"
+              dense
+            >
+              <v-avatar size="28" class="mr-2 product-filter-avatar">
+                <v-img
+                  v-if="category.image"
+                  :src="categoryImageSrc(category.image)"
+                ></v-img>
+                <v-icon v-else small>mdi-shape</v-icon>
+              </v-avatar>
+              <v-checkbox
+                v-model="selectedCategoryIds"
+                :value="category.id"
+                :label="category.name"
                 dense
-              >
-                <v-avatar size="28" class="mr-2 product-filter-avatar">
-                  <v-img
-                    v-if="category.image"
-                    :src="categoryImageSrc(category.image)"
-                  ></v-img>
-                  <v-icon v-else small>mdi-shape</v-icon>
-                </v-avatar>
-                <v-checkbox
-                  v-model="selectedCategoryIds"
-                  :value="category.id"
-                  :label="category.name"
-                  dense
-                  hide-details
-                  class="mt-0"
-                ></v-checkbox>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-        </div>
-        <v-spacer></v-spacer>
-        <div class="products-toolbar-actions">
-          <v-btn
-            outlined
-            color="primaryPurple lighten-1"
-            class="text-none"
-            @click="openNewCategory"
-          >
-            <v-icon left>mdi-shape</v-icon>
-            Gérer les catégories
-          </v-btn>
-          <v-btn
-            outlined
-            color="primaryPurple lighten-1"
-            class="text-none"
-            @click="openCustomizationSteps"
-          >
-            <v-icon left>mdi-tune-variant</v-icon>
-            Gérer les étapes
-          </v-btn>
-          <v-btn
-            color="primaryPurple lighten-1"
-            class="primaryWhite--text text--lighten-1 text-none"
-            @click="$router.push('/products/newproduct')"
-          >
-            <v-icon left>mdi-plus</v-icon>
-            Ajouter un produit
-          </v-btn>
-        </div>
-      </v-app-bar>
+                hide-details
+                class="mt-0"
+              ></v-checkbox>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+        <v-btn
+          outlined
+          color="primary"
+          class="text-none"
+          @click="openNewCategory"
+        >
+          <v-icon left>mdi-shape</v-icon>
+          Gérer les catégories
+        </v-btn>
+        <v-btn
+          outlined
+          color="primary"
+          class="text-none"
+          @click="openCustomizationSteps"
+        >
+          <v-icon left>mdi-tune-variant</v-icon>
+          Gérer les étapes
+        </v-btn>
+        <v-btn
+          color="primary"
+          class="primaryWhite--text text--lighten-1 text-none"
+          @click="$router.push('/products/newproduct')"
+        >
+          <v-icon left>mdi-plus</v-icon>
+          Ajouter un produit
+        </v-btn>
+      </div>
       <v-card-title
         v-if="filteredProducts.length == 0"
-        class="d-none d-sm-flex justify-center"
+        class="products-empty-state d-none d-sm-flex justify-center"
       >
-        <v-icon large>mdi-emoticon-neutral-outline</v-icon>
+        <v-icon large color="primary">mdi-package-variant-closed</v-icon>
         <h4>Aucun produit</h4>
       </v-card-title>
       <!-- md -->
@@ -149,6 +138,7 @@
                 <v-btn
                   icon
                   small
+                  aria-label="Monter le produit"
                   :disabled="index === 0 || orderLoading"
                   @click="moveVisibleProduct(index, -1)"
                 >
@@ -157,6 +147,7 @@
                 <v-btn
                   icon
                   small
+                  aria-label="Descendre le produit"
                   :disabled="index === lastVisibleActiveProductIndex || orderLoading"
                   @click="moveVisibleProduct(index, 1)"
                 >
@@ -198,9 +189,9 @@
       <!-- sm to xs -->
       <v-card-title
         v-if="filteredProducts.length == 0"
-        class="d-flex d-sm-none justify-center"
+        class="products-empty-state d-flex d-sm-none justify-center"
       >
-        <v-icon large>mdi-emoticon-neutral-outline</v-icon>
+        <v-icon large color="primary">mdi-package-variant-closed</v-icon>
         <h4>Aucun produit</h4>
       </v-card-title>
 
@@ -211,7 +202,7 @@
           outlined
           draggable="true"
           :disabled="itm.archived === 1"
-          class="pa-2 d-block d-sm-none ma-5"
+          class="product-mobile-card pa-2 d-block d-sm-none ma-5"
           :class="{ 'product-dragging': draggedProductId === itm.id }"
           @dragstart="startProductDrag(itm)"
           @dragover.prevent
@@ -237,6 +228,7 @@
                 <v-btn
                   icon
                   small
+                  aria-label="Monter le produit"
                   :disabled="index === 0 || orderLoading"
                   @click="moveVisibleProduct(index, -1)"
                 >
@@ -245,6 +237,7 @@
                 <v-btn
                   icon
                   small
+                  aria-label="Descendre le produit"
                   :disabled="index === lastVisibleActiveProductIndex || orderLoading"
                   @click="moveVisibleProduct(index, 1)"
                 >
@@ -558,27 +551,27 @@ export default {
   min-width: 0;
 }
 
-.products-toolbar-actions {
+.products-action-bar {
+  align-items: center;
+  background: var(--se-color-surface);
+  border-bottom: 1px solid var(--se-color-border-soft);
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--se-space-2);
   justify-content: flex-end;
-}
-
-.products-toolbar-left {
-  display: flex;
-  justify-content: flex-start;
+  min-height: 56px;
+  padding: 10px 16px;
 }
 
 .product-filter-button {
-  background: #e8f5e9 !important;
-  border: 1px solid #66bb6a;
-  color: #1b5e20 !important;
+  background: var(--se-color-success-soft) !important;
+  border: 1px solid var(--se-color-success);
+  color: var(--se-color-text) !important;
   font-weight: 600;
 }
 
 .product-filter-button:hover {
-  background: #d7efd9 !important;
+  background: var(--se-color-surface) !important;
 }
 
 .product-category-menu {
@@ -588,17 +581,25 @@ export default {
 }
 
 .product-filter-avatar {
-  background: #eef2f7;
+  background: var(--se-color-surface-muted);
   flex: 0 0 auto;
 }
 
 .product-list-card {
   align-items: center;
+  border-color: var(--se-color-border-soft) !important;
+  border-radius: var(--se-radius-md);
   display: grid !important;
   gap: 16px;
   grid-template-columns: 128px minmax(0, 1fr);
   min-height: 114px;
   width: auto;
+}
+
+.product-list-card:hover,
+.product-mobile-card:hover {
+  border-color: var(--se-color-border) !important;
+  box-shadow: var(--se-shadow-panel);
 }
 
 .product-list-row {
@@ -619,11 +620,18 @@ export default {
 }
 
 .product-list-cell {
+  color: var(--se-color-text-body);
+  font-size: var(--se-font-small);
   margin-bottom: 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.product-list-cell.font-weight-bold {
+  color: var(--se-color-text);
+  font-size: var(--se-font-body);
 }
 
 .product-list-image ::v-deep .v-image__image,
@@ -641,6 +649,11 @@ export default {
   white-space: nowrap;
 }
 
+.product-action-buttons ::v-deep .v-btn,
+.product-actions ::v-deep .v-btn {
+  min-height: var(--se-touch-target);
+}
+
 .product-order-buttons {
   align-items: center;
   display: flex;
@@ -649,6 +662,35 @@ export default {
 
 .product-dragging {
   opacity: 0.55;
+}
+
+.products-empty-state {
+  align-items: center;
+  color: var(--se-color-text-muted);
+  flex-direction: column;
+  gap: var(--se-space-2);
+  min-height: 220px;
+}
+
+.products-empty-state h4 {
+  color: var(--se-color-text);
+  font-size: var(--se-font-title);
+  font-weight: var(--se-weight-semibold);
+  margin: 0;
+}
+
+.product-mobile-card {
+  border-color: var(--se-color-border-soft) !important;
+  border-radius: var(--se-radius-md);
+}
+
+.product-mobile-card ::v-deep .v-card__text {
+  color: var(--se-color-text-body);
+  padding-bottom: var(--se-space-3);
+}
+
+.product-mobile-card p {
+  margin-bottom: var(--se-space-2);
 }
 
 .product-actions {
@@ -675,5 +717,15 @@ export default {
 
 .product-actions ::v-deep .v-btn {
   flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .products-action-bar {
+    align-items: stretch;
+  }
+
+  .products-action-bar ::v-deep .v-btn {
+    width: 100%;
+  }
 }
 </style>

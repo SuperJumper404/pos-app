@@ -24,7 +24,7 @@
     >
       <Loading />
     </v-card>
-    <v-card v-else outlined class="mt-5">
+    <v-card v-else outlined class="mt-5 history-panel-card">
       <v-app-bar flat color="grey lighten-4" light>
         <v-spacer></v-spacer>
         <v-spacer></v-spacer>
@@ -34,7 +34,8 @@
           <v-btn
             v-if="selectedOrders.length"
             color="red"
-            elevation="3"
+            depressed
+            elevation="0"
             style="color: white; height: 40px; margin: 0px 8px 2px 0px"
             :loading="deleteLoading"
             @click="deleteSelectedOrders()"
@@ -73,7 +74,14 @@
               v-for="(itm, i) in getArchivedOrderDetailsByOrderId(item.id)"
               :key="i"
               outlined
-              class="mb-3 d-flex justify-space-evenly align-items-center pa-2"
+              class="
+                mb-3
+                d-flex
+                justify-space-evenly
+                align-items-center
+                pa-2
+                history-detail-card
+              "
             >
               <v-img
                 :src="productImageSrc(itm.image)"
@@ -153,6 +161,8 @@
                   fab
                   small
                   dark
+                  depressed
+                  elevation="0"
                 >
                   {{ itm.qty }}</v-btn
                 >
@@ -409,6 +419,24 @@ export default {
 }
 </script>
 <style scoped>
+.history-panel-card,
+.history-detail-card {
+  box-shadow: none !important;
+}
+
+.history-detail-card:first-child {
+  margin-top: 8px;
+}
+
+.history-panel-card ::v-deep .v-data-table,
+.history-panel-card ::v-deep .v-data-table__wrapper,
+.history-panel-card ::v-deep .v-data-table__expanded,
+.history-panel-card ::v-deep .v-data-table__expanded__content,
+.history-panel-card ::v-deep .v-toolbar,
+.history-panel-card ::v-deep .v-btn {
+  box-shadow: none !important;
+}
+
 .history-detail-image {
   flex: 0 0 auto;
   min-width: 128px;

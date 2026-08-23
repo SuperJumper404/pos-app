@@ -42,6 +42,7 @@
               v-model="formeditproduct.stock"
               label="Stock actuel"
               type="number"
+              prepend-icon="mdi-package-variant-closed"
               :rules="[(v) => v !== '' || 'Stock actuel requis']"
               required
             />
@@ -49,6 +50,7 @@
               v-model="formeditproduct.minimum_stock"
               label="Seuil minimum"
               type="number"
+              prepend-icon="mdi-alert-outline"
               :rules="[(v) => v !== '' || 'Seuil minimum requis']"
               required
             />
@@ -56,23 +58,26 @@
               v-model="formeditproduct.target_stock"
               label="Stock cible"
               type="number"
+              prepend-icon="mdi-bullseye-arrow"
               :rules="[(v) => v !== '' || 'Stock cible requis']"
               required
             />
             <v-combobox
               v-model="formeditproduct.stock_unit"
               :items="['piece', 'paquet', 'bouteille', 'carton', 'bac']"
-              label="Unite"
-              :rules="[(v) => !!v || 'Unite requise']"
+              label="Unité"
+              prepend-icon="mdi-scale"
+              :rules="[(v) => !!v || 'Unité requise']"
               required
             />
             <v-select
               v-model="formeditproduct.stock_zero_behavior"
               :items="[
-                { text: 'Bloquer a zero', value: 'block' },
+                { text: 'Bloquer à zéro', value: 'block' },
                 { text: 'Autoriser avec alerte', value: 'warn' },
               ]"
-              label="A stock zero"
+              label="À stock zéro"
+              prepend-icon="mdi-alert-circle-outline"
               required
             />
           </div>

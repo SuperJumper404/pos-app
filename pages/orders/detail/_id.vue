@@ -182,7 +182,7 @@
       <v-card-actions class="order-detail-action-bar">
         <v-btn
           v-if="canApproveOrder && !loadPage"
-          color="success"
+          color="primary"
           depressed
           class="order-detail-action order-detail-action--success text-none"
           :loading="statusActionLoading"
@@ -194,7 +194,7 @@
         </v-btn>
         <v-btn
           v-if="canFinishOrder && !loadPage"
-          color="primary"
+          color="success"
           depressed
           class="order-detail-action order-detail-action--success text-none"
           :loading="statusActionLoading"
@@ -1095,14 +1095,14 @@ export default {
       this.paymentLoading = true
       this.receiptDialog = false
       try {
-        const archived = await this.$store.dispatch('orders/archiveOrder', {
+        const collected = await this.$store.dispatch('orders/collectOrderPayment', {
           id: order.id,
           payment_method: paymentMethod,
           discountType: this.archiveDiscountType,
           discountValue: this.archiveDiscountValue,
           notify: false,
         })
-        if (!archived) {
+        if (!collected) {
           this.$store.dispatch(
             'notifications/error',
             this.$store.get('orders/message') ||
@@ -1140,7 +1140,7 @@ export default {
           'notifications/success',
           'Commande encaissée avec succès.'
         )
-        this.$router.replace('/orders')
+        await this.loadOrderDetail(this.id)
       } finally {
         this.paymentLoading = false
         this.pendingPaymentMethod = null
@@ -1238,11 +1238,11 @@ export default {
 }
 
 .order-detail-discount__row--discount {
-  color: #2e7d32;
+  color: #00e676;
 }
 
 .order-detail-discount__row--discount strong {
-  color: #2e7d32;
+  color: #00e676;
 }
 
 .order-detail-discount__row--total {

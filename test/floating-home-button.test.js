@@ -21,13 +21,18 @@ assert.match(
 )
 assert.match(
   defaultLayoutSource,
-  /publicClientPaths\(\)\s*\{[\s\S]*?return\s+\[[\s\S]*?['"]\/menus['"][\s\S]*?['"]\/cart['"][\s\S]*?['"]\/ordersStatuses['"][\s\S]*?['"]\/table-access['"][\s\S]*?['"]\/click-and-collect['"][\s\S]*?\]/,
-  'le bouton accueil doit exclure les routes client, publiques, QR, menu et commande'
+  /publicClientPaths\(\)\s*\{[\s\S]*?return\s+\[[\s\S]*?['"]\/cart['"][\s\S]*?['"]\/ordersStatuses['"][\s\S]*?['"]\/table-access['"][\s\S]*?['"]\/click-and-collect['"][\s\S]*?\]/,
+  'le bouton accueil doit exclure les routes client, publiques, QR et commande'
+)
+assert.doesNotMatch(
+  defaultLayoutSource,
+  /publicClientPaths\(\)\s*\{[\s\S]*?return\s+\[[\s\S]*?['"]\/menus['"][\s\S]*?\]/,
+  'la page menu doit garder le bouton accueil cote caisse'
 )
 assert.match(
   defaultLayoutSource,
-  /showFloatingHomeButton\(\)\s*\{[\s\S]*?if\s*\(!this\.isStaffUser\)\s*return\s+false[\s\S]*?if\s*\(this\.internalHomePaths\.includes\(path\)\)\s*return\s+false[\s\S]*?return\s+!this\.publicClientPaths\.some/,
-  'le bouton accueil ne doit apparaitre que cote staff et hors accueil/routes client'
+  /showFloatingHomeButton\(\)\s*\{[\s\S]*?if\s*\(!this\.isStaffUser\)\s*return\s+false[\s\S]*?if\s*\(!this\.\$vuetify\.breakpoint\.smAndUp\)\s*return\s+false[\s\S]*?if\s*\(this\.internalHomePaths\.includes\(path\)\)\s*return\s+false[\s\S]*?return\s+!this\.publicClientPaths\.some/,
+  'le bouton accueil ne doit apparaitre que cote staff, hors mobile et hors accueil/routes client'
 )
 assert.match(
   defaultLayoutSource,

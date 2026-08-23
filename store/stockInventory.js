@@ -42,11 +42,11 @@ export const actions = {
       .post('/baseurl/api/v1/stock/ingredients', data, { headers: authHeaders() })
       .then((response) => {
         dispatch('set/message', response.data.message)
-        dispatch('notifications/success', 'Ingredient cree avec succes.', { root: true })
+        dispatch('notifications/success', 'Ingrédient créé avec succès.', { root: true })
         return true
       })
       .catch((error) => {
-        dispatch('set/message', errorMessage(error, "Impossible de creer l'ingredient."))
+        dispatch('set/message', errorMessage(error, "Impossible de créer l'ingrédient."))
         return false
       })
   },
@@ -92,11 +92,11 @@ export const actions = {
       .post(`/baseurl/api/v1/stock/items/${id}/replenishments`, data, { headers: authHeaders() })
       .then((response) => {
         dispatch('set/message', response.data.message)
-        dispatch('notifications/success', 'Stock reapprovisionne.', { root: true })
+        dispatch('notifications/success', 'Stock réapprovisionné.', { root: true })
         return true
       })
       .catch((error) => {
-        dispatch('set/message', errorMessage(error, 'Impossible de reapprovisionner.'))
+        dispatch('set/message', errorMessage(error, 'Impossible de réapprovisionner.'))
         return false
       })
   },
@@ -117,7 +117,7 @@ export const actions = {
       .post('/baseurl/api/v1/stock/inventory/bulk', { items }, { headers: authHeaders() })
       .then((response) => {
         dispatch('set/message', response.data.message)
-        dispatch('notifications/success', 'Inventaire enregistre.', { root: true })
+        dispatch('notifications/success', 'Inventaire enregistré.', { root: true })
         return true
       })
       .catch((error) => {
@@ -133,7 +133,7 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', errorMessage(error, "Impossible d'archiver l'ingredient."))
+        dispatch('set/message', errorMessage(error, "Impossible d'archiver l'ingrédient."))
         return false
       })
   },
@@ -145,7 +145,7 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', errorMessage(error, "Impossible de supprimer l'ingredient."))
+        dispatch('set/message', errorMessage(error, "Impossible de supprimer l'ingrédient."))
         return false
       })
   },
@@ -157,7 +157,7 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', errorMessage(error, 'Impossible de generer la liste de courses.'))
+        dispatch('set/message', errorMessage(error, 'Impossible de générer la liste de courses.'))
         return false
       })
   },
@@ -179,7 +179,7 @@ export const actions = {
       .patch(`/baseurl/api/v1/stock/shopping-list/${id}/taken`, { taken }, { headers: authHeaders() })
       .then(() => true)
       .catch((error) => {
-        dispatch('set/message', errorMessage(error, 'Impossible de mettre a jour la ligne.'))
+        dispatch('set/message', errorMessage(error, 'Impossible de mettre à jour la ligne.'))
         return false
       })
   },

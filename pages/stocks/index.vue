@@ -1,35 +1,44 @@
 <template>
   <v-container>
-    <v-card outlined>
-      <v-card-title class="stock-toolbar">
-        <span>Stock</span>
-        <v-spacer />
-        <v-btn color="primary" class="text-none mr-2" @click="openIngredient()">
-          <v-icon left>mdi-plus</v-icon>
-          Ajouter un ingredient
-        </v-btn>
-        <v-text-field
-          v-model="search"
-          label="Rechercher"
-          append-icon="mdi-magnify"
-          dense
-          outlined
-          hide-details
-          class="stock-search"
-        />
-      </v-card-title>
+    <v-card outlined class="stock-panel">
+      <SePageHeader
+        title="Stock"
+        subtitle="Inventaire, alertes et liste de courses"
+        icon="mdi-warehouse"
+      >
+        <template #actions>
+          <v-btn
+            color="primary"
+            class="text-none stock-action"
+            depressed
+            @click="openIngredient()"
+          >
+            <v-icon left>mdi-plus</v-icon>
+            Ajouter un ingrédient
+          </v-btn>
+          <v-text-field
+            v-model="search"
+            label="Rechercher"
+            prepend-inner-icon="mdi-magnify"
+            dense
+            outlined
+            hide-details
+            class="stock-search"
+          />
+        </template>
+      </SePageHeader>
 
-      <v-tabs v-model="activeTab" show-arrows>
-        <v-tab>Produits</v-tab>
-        <v-tab>Ingredients</v-tab>
-        <v-tab>Stocks bas</v-tab>
-        <v-tab>Liste de courses</v-tab>
-        <v-tab>Inventaire</v-tab>
+      <v-tabs v-model="activeTab" show-arrows class="stock-tabs">
+        <v-tab><v-icon left small>mdi-package-variant-closed</v-icon>Produits</v-tab>
+        <v-tab><v-icon left small>mdi-food-apple-outline</v-icon>Ingrédients</v-tab>
+        <v-tab><v-icon left small>mdi-alert-circle-outline</v-icon>Stocks bas</v-tab>
+        <v-tab><v-icon left small>mdi-cart-outline</v-icon>Liste de courses</v-tab>
+        <v-tab><v-icon left small>mdi-clipboard-check-outline</v-icon>Inventaire</v-tab>
       </v-tabs>
 
       <v-tabs-items v-model="activeTab">
         <v-tab-item>
-          <v-data-table :headers="productHeaders" :items="filteredProducts" :loading="loading">
+          <v-data-table class="stock-table" :headers="productHeaders" :items="filteredProducts" :loading="loading">
             <template #[`item.track_stock`]="{ item }">
               <v-icon :color="Number(item.track_stock) === 1 ? 'success' : 'grey'">
                 {{ Number(item.track_stock) === 1 ? 'mdi-check-circle' : 'mdi-minus-circle' }}
@@ -42,7 +51,7 @@
               <span v-else class="grey--text">Non suivi</span>
             </template>
             <template #[`item.actions`]="{ item }">
-              <v-btn icon :to="`/stocks/${item.id}`" aria-label="Voir le detail" title="Voir le detail">
+              <v-btn icon :to="`/stocks/${item.id}`" aria-label="Voir le détail" title="Voir le détail">
                 <v-icon>mdi-eye</v-icon>
               </v-btn>
               <v-btn icon :to="`/products/edit/${item.product_id}`" aria-label="Modifier" title="Modifier">
@@ -53,33 +62,33 @@
         </v-tab-item>
 
         <v-tab-item>
-          <v-data-table :headers="itemHeaders" :items="filteredIngredients" :loading="loading">
+          <v-data-table class="stock-table" :headers="itemHeaders" :items="filteredIngredients" :loading="loading">
             <template #[`item.status`]="{ item }">
               <v-chip small :color="statusColor(item)" label>{{ statusLabel(item) }}</v-chip>
             </template>
             <template #[`item.actions`]="{ item }">
-              <v-btn icon :to="`/stocks/${item.id}`" aria-label="Voir le detail" title="Voir le detail"><v-icon>mdi-eye</v-icon></v-btn>
+              <v-btn icon :to="`/stocks/${item.id}`" aria-label="Voir le détail" title="Voir le détail"><v-icon>mdi-eye</v-icon></v-btn>
               <v-btn icon aria-label="Modifier" title="Modifier" @click="openIngredient(item)"><v-icon>mdi-pencil</v-icon></v-btn>
               <v-btn icon aria-label="Archiver" title="Archiver" @click="archiveIngredient(item)"><v-icon>mdi-archive</v-icon></v-btn>
-              <v-btn icon aria-label="Supprimer" title="Supprimer" @click="deleteIngredient(item)"><v-icon>mdi-delete</v-icon></v-btn>
+              <v-btn icon color="error" aria-label="Supprimer" title="Supprimer" @click="deleteIngredient(item)"><v-icon>mdi-delete</v-icon></v-btn>
             </template>
           </v-data-table>
         </v-tab-item>
 
         <v-tab-item>
-          <v-data-table :headers="itemHeaders" :items="lowItems" :loading="loading">
+          <v-data-table class="stock-table" :headers="itemHeaders" :items="lowItems" :loading="loading">
             <template #[`item.status`]="{ item }"><v-chip small :color="statusColor(item)" label>{{ statusLabel(item) }}</v-chip></template>
-            <template #[`item.actions`]="{ item }"><v-btn icon aria-label="Reapprovisionner" title="Reapprovisionner" @click="openReplenish(item)"><v-icon>mdi-package-up</v-icon></v-btn></template>
+            <template #[`item.actions`]="{ item }"><v-btn icon aria-label="Réapprovisionner" title="Réapprovisionner" @click="openReplenish(item)"><v-icon>mdi-package-up</v-icon></v-btn></template>
           </v-data-table>
         </v-tab-item>
 
         <v-tab-item>
-          <div class="pa-4 d-flex flex-wrap align-center shopping-actions">
-            <v-btn color="primary" class="text-none mr-2 mb-2" @click="generateShoppingList">
+          <div class="stock-section-actions">
+            <v-btn color="primary" class="text-none stock-action" depressed @click="generateShoppingList">
               <v-icon left>mdi-format-list-checks</v-icon>
-              Generer la liste
+              Générer la liste
             </v-btn>
-            <v-btn outlined class="text-none mb-2" @click="printShoppingList">
+            <v-btn outlined class="text-none stock-action" @click="printShoppingList">
               <v-icon left>mdi-printer</v-icon>
               Imprimer
             </v-btn>
@@ -92,21 +101,21 @@
               :item-class="shoppingRowClass"
             >
               <template #[`item.taken`]="{ item }"><v-checkbox :input-value="Boolean(Number(item.taken))" label="Pris" hide-details class="mt-0" @change="toggleTaken(item)" /></template>
-              <template #[`item.estimated_unit_price`]="{ item }">{{ item.estimated_unit_price == null ? 'Non renseigne' : formatEstimatedPrice(item.estimated_unit_price) }}</template>
-              <template #[`item.estimated_total_price`]="{ item }">{{ item.estimated_total_price == null ? 'Non renseigne' : formatEstimatedPrice(item.estimated_total_price) }}</template>
-              <template #[`item.actions`]="{ item }"><v-btn small color="primary" class="text-none" @click="openReplenish(item)">Reapprovisionner</v-btn></template>
+              <template #[`item.estimated_unit_price`]="{ item }">{{ item.estimated_unit_price == null ? 'Non renseigné' : formatEstimatedPrice(item.estimated_unit_price) }}</template>
+              <template #[`item.estimated_total_price`]="{ item }">{{ item.estimated_total_price == null ? 'Non renseigné' : formatEstimatedPrice(item.estimated_total_price) }}</template>
+              <template #[`item.actions`]="{ item }"><v-btn small color="primary" class="text-none" depressed @click="openReplenish(item)"><v-icon left small>mdi-package-up</v-icon>Réapprovisionner</v-btn></template>
             </v-data-table>
           </div>
         </v-tab-item>
 
         <v-tab-item>
-          <div class="pa-4">
-            <v-btn color="primary" class="text-none" :disabled="!hasInventoryCounts" @click="bulkInventory">
+          <div class="stock-section-actions">
+            <v-btn color="primary" class="text-none stock-action" depressed :disabled="!hasInventoryCounts" @click="bulkInventory">
               <v-icon left>mdi-content-save</v-icon>
               Enregistrer les lignes remplies
             </v-btn>
           </div>
-          <v-data-table :headers="inventoryHeaders" :items="inventoryItems" :loading="loading">
+          <v-data-table class="stock-table" :headers="inventoryHeaders" :items="inventoryItems" :loading="loading">
             <template #[`item.counted_stock`]="{ item }">
               <v-text-field
                 :value="inventoryCounts[item.id]"
@@ -116,7 +125,8 @@
                 dense
                 outlined
                 hide-details
-                aria-label="Stock compte"
+                prepend-icon="mdi-counter"
+                aria-label="Stock compté"
                 @input="$set(inventoryCounts, item.id, $event)"
               />
             </template>
@@ -128,51 +138,61 @@
 
     <v-dialog v-model="ingredientDialog" max-width="720">
       <v-card>
-        <v-card-title>{{ editingIngredientId ? 'Modifier l ingredient' : 'Ajouter un ingredient' }}</v-card-title>
+        <v-card-title class="stock-dialog-title">
+          <v-icon left color="primary">mdi-food-apple-outline</v-icon>
+          {{ editingIngredientId ? "Modifier l'ingrédient" : 'Ajouter un ingrédient' }}
+        </v-card-title>
         <v-card-text>
-          <v-text-field v-model="ingredientForm.name" label="Nom" />
-          <v-combobox v-model="ingredientForm.unit" :items="units" label="Unite" />
+          <v-text-field v-model="ingredientForm.name" label="Nom" prepend-icon="mdi-tag-outline" outlined dense />
+          <v-combobox v-model="ingredientForm.unit" :items="units" label="Unité" prepend-icon="mdi-scale" outlined dense />
           <v-row>
-            <v-col cols="12" sm="4"><v-text-field v-model="ingredientForm.current_stock" label="Stock actuel" type="number" min="0" step="1" /></v-col>
-            <v-col cols="12" sm="4"><v-text-field v-model="ingredientForm.minimum_stock" label="Seuil minimum" type="number" min="0" step="1" /></v-col>
-            <v-col cols="12" sm="4"><v-text-field v-model="ingredientForm.target_stock" label="Stock cible" type="number" min="0" step="1" /></v-col>
+            <v-col cols="12" sm="4"><v-text-field v-model="ingredientForm.current_stock" label="Stock actuel" type="number" min="0" step="1" prepend-icon="mdi-package-variant-closed" outlined dense /></v-col>
+            <v-col cols="12" sm="4"><v-text-field v-model="ingredientForm.minimum_stock" label="Seuil minimum" type="number" min="0" step="1" prepend-icon="mdi-alert-outline" outlined dense /></v-col>
+            <v-col cols="12" sm="4"><v-text-field v-model="ingredientForm.target_stock" label="Stock cible" type="number" min="0" step="1" prepend-icon="mdi-bullseye-arrow" outlined dense /></v-col>
           </v-row>
-          <v-combobox v-model="ingredientForm.category_label" :items="ingredientCategories" label="Categorie" />
-          <v-text-field v-model="ingredientForm.reference" label="Reference" />
-          <v-text-field v-model="ingredientForm.default_supplier" label="Fournisseur par defaut" />
-          <v-textarea v-model="ingredientForm.note" label="Note" />
+          <v-combobox v-model="ingredientForm.category_label" :items="ingredientCategories" label="Catégorie" prepend-icon="mdi-shape-outline" outlined dense />
+          <v-text-field v-model="ingredientForm.reference" label="Référence" prepend-icon="mdi-barcode" outlined dense />
+          <v-text-field v-model="ingredientForm.default_supplier" label="Fournisseur par défaut" prepend-icon="mdi-truck-outline" outlined dense />
+          <v-textarea v-model="ingredientForm.note" label="Note" prepend-icon="mdi-note-text-outline" outlined dense rows="3" />
         </v-card-text>
-        <v-card-actions><v-spacer /><v-btn text @click="ingredientDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" @click="saveIngredient">Enregistrer</v-btn></v-card-actions>
+        <v-card-actions class="stock-dialog-actions"><v-spacer /><v-btn text @click="ingredientDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" depressed @click="saveIngredient"><v-icon left small>mdi-content-save</v-icon>Enregistrer</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="replenishDialog" max-width="560">
       <v-card>
-        <v-card-title>Reapprovisionner</v-card-title>
+        <v-card-title class="stock-dialog-title">
+          <v-icon left color="primary">mdi-truck-delivery-outline</v-icon>
+          Réapprovisionner
+        </v-card-title>
         <v-card-text>
-          <v-text-field v-model="replenishForm.quantity" label="Quantite achetee" type="number" min="1" step="1" />
-          <v-text-field v-model="replenishForm.supplier" label="Fournisseur" />
-          <v-text-field v-model="replenishForm.reference" label="Reference" />
-          <v-text-field v-model="replenishForm.purchase_date" label="Date d achat" type="date" />
-          <v-text-field v-model="replenishForm.unit_price" label="Prix unitaire" type="number" min="0" />
-          <v-text-field v-model="replenishForm.total_price" label="Prix total" type="number" min="0" />
-          <v-textarea v-model="replenishForm.remark" label="Remarque" />
+          <v-text-field v-model="replenishForm.quantity" label="Quantité achetée" type="number" min="1" step="1" prepend-icon="mdi-counter" outlined dense />
+          <v-text-field v-model="replenishForm.supplier" label="Fournisseur" prepend-icon="mdi-truck-outline" outlined dense />
+          <v-text-field v-model="replenishForm.reference" label="Référence" prepend-icon="mdi-barcode" outlined dense />
+          <v-text-field v-model="replenishForm.purchase_date" label="Date d'achat" type="date" prepend-icon="mdi-calendar" outlined dense />
+          <v-text-field v-model="replenishForm.unit_price" label="Prix unitaire" type="number" min="0" prepend-icon="mdi-currency-eur" outlined dense />
+          <v-text-field v-model="replenishForm.total_price" label="Prix total" type="number" min="0" prepend-icon="mdi-cash-multiple" outlined dense />
+          <v-textarea v-model="replenishForm.remark" label="Remarque" prepend-icon="mdi-note-text-outline" outlined dense rows="3" />
         </v-card-text>
-        <v-card-actions><v-spacer /><v-btn text @click="replenishDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" @click="replenishItem">Enregistrer</v-btn></v-card-actions>
+        <v-card-actions class="stock-dialog-actions"><v-spacer /><v-btn text @click="replenishDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" depressed @click="replenishItem"><v-icon left small>mdi-content-save</v-icon>Enregistrer</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="inventoryDialog" max-width="560">
       <v-card>
-        <v-card-title>Inventaire rapide</v-card-title>
-        <v-card-text><v-text-field v-model="inventoryForm.quantity" label="Quantite constatee" type="number" min="0" step="1" /><v-textarea v-model="inventoryForm.remark" label="Remarque" /></v-card-text>
-        <v-card-actions><v-spacer /><v-btn text @click="inventoryDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" @click="inventoryItem">Enregistrer</v-btn></v-card-actions>
+        <v-card-title class="stock-dialog-title">
+          <v-icon left color="primary">mdi-clipboard-check-outline</v-icon>
+          Inventaire rapide
+        </v-card-title>
+        <v-card-text><v-text-field v-model="inventoryForm.quantity" label="Quantité constatée" type="number" min="0" step="1" prepend-icon="mdi-counter" outlined dense /><v-textarea v-model="inventoryForm.remark" label="Remarque" prepend-icon="mdi-note-text-outline" outlined dense rows="3" /></v-card-text>
+        <v-card-actions class="stock-dialog-actions"><v-spacer /><v-btn text @click="inventoryDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" depressed @click="inventoryItem"><v-icon left small>mdi-content-save</v-icon>Enregistrer</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
   </v-container>
 </template>
 
 <script>
+import SePageHeader from '@/components/design-system/SePageHeader'
 import {
   filterStockItems,
   formatEstimatedPrice,
@@ -187,6 +207,9 @@ const emptyIngredientForm = () => ({
 })
 
 export default {
+  components: {
+    SePageHeader,
+  },
   middleware: ['auth', 'stocks'],
   data: () => ({
     activeTab: 0,
@@ -201,25 +224,25 @@ export default {
     units: ['piece', 'paquet', 'bouteille', 'carton', 'bac', 'kg', 'g', 'l', 'ml'],
     productHeaders: [
       { text: 'Nom', value: 'name' }, { text: 'Suivi', value: 'track_stock' },
-      { text: 'Stock', value: 'current_stock' }, { text: 'Unite', value: 'unit' },
+      { text: 'Stock', value: 'current_stock' }, { text: 'Unité', value: 'unit' },
       { text: 'Minimum', value: 'minimum_stock' }, { text: 'Cible', value: 'target_stock' },
       { text: 'Statut', value: 'status' }, { text: '', value: 'actions', sortable: false },
     ],
     itemHeaders: [
       { text: 'Nom', value: 'name' }, { text: 'Stock', value: 'current_stock' },
-      { text: 'Unite', value: 'unit' }, { text: 'Minimum', value: 'minimum_stock' },
+      { text: 'Unité', value: 'unit' }, { text: 'Minimum', value: 'minimum_stock' },
       { text: 'Cible', value: 'target_stock' }, { text: 'Statut', value: 'status' },
       { text: '', value: 'actions', sortable: false },
     ],
     shoppingHeaders: [
-      { text: 'Article', value: 'name' }, { text: 'A acheter', value: 'quantity_to_buy' },
-      { text: 'Unite', value: 'unit' }, { text: 'Prix unitaire', value: 'estimated_unit_price' },
+      { text: 'Article', value: 'name' }, { text: 'À acheter', value: 'quantity_to_buy' },
+      { text: 'Unité', value: 'unit' }, { text: 'Prix unitaire', value: 'estimated_unit_price' },
       { text: 'Prix total', value: 'estimated_total_price' }, { text: 'Pris', value: 'taken', sortable: false },
       { text: '', value: 'actions', sortable: false },
     ],
     inventoryHeaders: [
-      { text: 'Article', value: 'name' }, { text: 'Stock theorique', value: 'current_stock' },
-      { text: 'Unite', value: 'unit' }, { text: 'Stock compte', value: 'counted_stock', sortable: false },
+      { text: 'Article', value: 'name' }, { text: 'Stock théorique', value: 'current_stock' },
+      { text: 'Unité', value: 'unit' }, { text: 'Stock compté', value: 'counted_stock', sortable: false },
       { text: '', value: 'actions', sortable: false },
     ],
     ingredientForm: emptyIngredientForm(),
@@ -352,14 +375,61 @@ export default {
 </script>
 
 <style scoped>
-.stock-toolbar { gap: 8px; }
-.stock-search { max-width: 280px; }
-.shopping-actions { gap: 4px; }
-::v-deep .shopping-taken { color: #777; background: #f2f2f2; text-decoration: line-through; }
+.stock-panel { overflow: hidden; }
+.stock-search {
+  max-width: 300px;
+  min-width: 220px;
+}
+.stock-action {
+  min-height: 38px;
+}
+.stock-tabs {
+  border-bottom: 1px solid var(--se-color-border-soft);
+}
+.stock-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px 10px;
+}
+.stock-dialog-title {
+  gap: var(--se-space-2);
+  font-size: var(--se-font-title-sm);
+  font-weight: var(--se-weight-semibold);
+  border-bottom: 1px solid var(--se-color-border-soft);
+}
+.stock-dialog-actions {
+  padding: 12px 24px 20px;
+}
+.stock-table ::v-deep th {
+  color: var(--se-color-text-muted) !important;
+  font-weight: 600 !important;
+}
+.stock-table ::v-deep td {
+  color: var(--se-color-text-body);
+}
+::v-deep .shopping-taken {
+  color: var(--se-color-text-muted);
+  background: var(--se-color-surface-muted);
+  text-decoration: line-through;
+}
 @media print {
-  .stock-toolbar, .v-tabs, .shopping-actions, ::v-deep .v-data-table__wrapper th:last-child,
+  .se-page-header, .v-tabs, .stock-section-actions, ::v-deep .v-data-table__wrapper th:last-child,
   ::v-deep .v-data-table__wrapper td:last-child { display: none !important; }
   ::v-deep .v-window-item { display: none !important; }
   ::v-deep .v-window-item--active { display: block !important; }
+}
+@media (max-width: 720px) {
+  .se-page-header {
+    align-items: stretch;
+  }
+  .stock-search {
+    max-width: none;
+    width: 100%;
+  }
+  .stock-action {
+    width: 100%;
+  }
 }
 </style>

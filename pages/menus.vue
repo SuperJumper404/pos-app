@@ -32,7 +32,7 @@
             <p>Menu vide</p>
           </v-card-text>
         </v-card>
-        <v-card v-else>
+        <v-card v-else class="menu-panel-card">
           <v-card-title
             v-if="canUseLargeProductView && !isOrderEditActive"
             class="menu-view-toolbar d-flex align-center justify-space-between"
@@ -95,7 +95,6 @@
                   class="product-grid-col"
                 >
                   <v-card
-                    hover
                     outlined
                     class="
                       d-flex
@@ -157,7 +156,6 @@
                     'mobile-category-chip--active':
                       category === activeMobileCategory,
                   }"
-                  :color="undefined"
                   :outlined="category === activeMobileCategory"
                   text-color="black"
                   label
@@ -185,7 +183,6 @@
                     class="product-grid-col"
                   >
                     <v-card
-                      hover
                       outlined
                       class="d-flex flex-column product-card product-clickable"
                       @click="openProductPreview(items)"
@@ -273,7 +270,6 @@
                       class="product-grid-col"
                     >
                       <v-card
-                        hover
                         outlined
                         class="d-flex flex-column product-card product-clickable"
                         @click="openProductPreview(items)"
@@ -411,7 +407,7 @@
           <v-card
             outlined
             height="100%"
-            class="pa-2"
+            class="pa-2 menu-panel-card"
             :class="{ 'express-cart-card': isLargeProductView }"
           >
             <div class="express-cart-items-scroll">
@@ -512,6 +508,8 @@
                       fab
                       small
                       dark
+                      depressed
+                      elevation="0"
                     >
                       {{ itm.qty }}
                     </v-btn>
@@ -633,7 +631,7 @@
                 <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
               <v-btn
-                color="red ligthen-1"
+                color="red lighten-1"
                 class="cart-order-btn cart-order-btn--cancel text-none"
                 dark
                 @click="btnCancel"
@@ -1080,7 +1078,7 @@ export default {
     total: 0,
     idxCart: 0,
     allowRouteLeave: false,
-    productViewMode: 'categories',
+    productViewMode: 'all',
     activeMobileCategory: null,
     activeExpressCategory: null,
     expressSelectedTable: parseInt(localStorage.getItem('service_point_id')) || null,
@@ -1967,9 +1965,17 @@ export default {
 }
 
 .product-card {
+  box-shadow: none !important;
   height: 100%;
   min-height: 320px;
   width: 100%;
+}
+
+.menu-panel-card,
+.cart-item-card,
+.product-clickable:hover,
+.product-clickable:focus {
+  box-shadow: none !important;
 }
 
 .product-card--compact {
@@ -2107,6 +2113,7 @@ export default {
 }
 
 .cart-qty-btn {
+  box-shadow: none !important;
   height: 34px !important;
   min-width: 34px !important;
   width: 34px !important;

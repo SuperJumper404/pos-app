@@ -12,6 +12,12 @@ for (const source of [newProduct, editProduct]) {
   assert.match(source, /minimum_stock/)
   assert.match(source, /target_stock/)
   assert.match(source, /stock_unit/)
+  assert.match(source, /label="Unité"/)
+  assert.match(source, /mdi-package-variant-closed/)
+  assert.match(source, /mdi-bullseye-arrow/)
+  assert.match(source, /À stock zéro/)
+  assert.doesNotMatch(source, /label="Unite"/)
+  assert.doesNotMatch(source, /Bloquer a zero/)
 }
 
 assert.match(

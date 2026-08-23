@@ -185,6 +185,47 @@ export const actions = {
         return false
       })
   },
+  collectOrderPayment({ dispatch }, params) {
+    return this.$axios
+      .post(
+        `/baseurl/api/v1/orders/collect/${params.id}`,
+        {
+          payment_method: params.payment_method,
+          ...(params.discountType
+            ? { discount_type: params.discountType }
+            : {}),
+          ...(params.discountValue != null
+            ? { discount_value: params.discountValue }
+            : {}),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          skipGlobalErrorNotification: params.notify === false,
+        }
+      )
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        if (params.notify !== false) {
+          dispatch('notifications/success', response.data.message, {
+            root: true,
+          })
+        }
+        return true
+      })
+      .catch((error) => {
+        const message =
+          error.response?.data?.message ||
+          error.message ||
+          "Impossible d'encaisser la commande."
+        dispatch('set/message', message)
+        if (params.notify !== false) {
+          dispatch('notifications/error', message, { root: true })
+        }
+        return false
+      })
+  },
   refundStripeOrder({ dispatch }, params) {
     return this.$axios
       .post(

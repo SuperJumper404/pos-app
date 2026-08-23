@@ -16,7 +16,7 @@
       />
       <v-row>
         <v-col cols="12" md="6">
-          <div v-if="urlPDF" class="border rounded shadow">
+          <div v-if="urlPDF" class="border rounded history-ticket-preview">
             <iframe
               :src="urlPDF"
               width="60%"
@@ -609,3 +609,10 @@ export default {
   },
 }
 </script>
+<style scoped>
+.history-ticket-preview,
+.history-ticket-preview ::v-deep iframe,
+::v-deep .v-btn {
+  box-shadow: none !important;
+}
+</style>
