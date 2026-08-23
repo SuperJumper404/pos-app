@@ -244,7 +244,7 @@ export default {
       return {
         0: 'primary',
         1: 'success',
-        4: 'orange darken-2',
+        4: 'warning',
         5: 'red darken-2',
       }[Number(access)] || 'grey'
     },

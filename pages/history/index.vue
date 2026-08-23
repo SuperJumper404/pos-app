@@ -45,12 +45,12 @@
         </div>
         <v-text-field
           v-model="searchFilter"
-          class="mt-6"
+          class="se-search-field"
           placeholder="Rechercher une commande, table ou client"
-          label="Rechercher une commande, table ou client"
           outlined
           dense
-          append-icon="mdi-card-search"
+          hide-details
+          prepend-inner-icon="mdi-magnify"
         ></v-text-field>
       </v-app-bar>
       <v-data-table

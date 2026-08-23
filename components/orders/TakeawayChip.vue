@@ -46,7 +46,7 @@ export default {
       return this.isTakeaway ? 'À emporter' : 'Sur place'
     },
     color() {
-      return this.isTakeaway ? 'orange darken-1' : 'primary'
+      return this.isTakeaway ? 'warning' : 'primary'
     },
     icon() {
       return this.isTakeaway ? 'mdi-basket' : 'mdi-silverware-fork-knife'

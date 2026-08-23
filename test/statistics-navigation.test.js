@@ -10,14 +10,14 @@ const dashboardSource = fs.readFileSync(
 const statisticsPath = path.join(root, 'pages', 'statistics.vue')
 const indexSource = fs.readFileSync(path.join(root, 'pages', 'index.vue'), 'utf8')
 
-assert.ok(fs.existsSync(statisticsPath), 'la page Mes statistiques doit exister')
+assert.ok(fs.existsSync(statisticsPath), 'la page Statistiques doit exister')
 
 const statisticsSource = fs.readFileSync(statisticsPath, 'utf8')
 
 assert.match(
   dashboardSource,
-  /title:\s*['"]Mes statistiques['"][\s\S]*?routeName:\s*['"]statistics['"][\s\S]*?to:\s*['"]\/statistics['"]/,
-  'Mes statistiques doit etre disponible dans la navigation'
+  /title:\s*['"]Statistiques['"][\s\S]*?routeName:\s*['"]statistics['"][\s\S]*?to:\s*['"]\/statistics['"]/,
+  'Statistiques doit etre disponible dans la navigation'
 )
 assert.match(
   statisticsSource,

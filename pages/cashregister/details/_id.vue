@@ -335,7 +335,7 @@ export default {
       return getPaymentStatusText(item)
     },
     paymentStatusColor(item) {
-      if (item.payment_status === 'requires_payment') return 'orange'
+      if (item.payment_status === 'requires_payment') return 'warning'
       return getPaymentStatusColor(item)
     },
 

@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid>
+  <v-container fluid class="products-page">
     <v-card v-if="loadPage" outlined class="mt-5" style="height: 350px">
       <Loading />
     </v-card>
@@ -534,12 +534,19 @@ export default {
 }
 </script>
 <style scoped>
+.products-page {
+  background: #f7f9fc;
+  min-height: calc(100vh - 64px);
+}
+
 .product-list-image,
 .product-mobile-image {
   flex: 0 0 auto;
 }
 
 .product-page-card {
+  border-color: var(--se-color-border) !important;
+  border-radius: var(--se-radius-md) !important;
   box-sizing: border-box;
   max-width: none;
   min-width: 1300px;
@@ -557,15 +564,21 @@ export default {
   border-bottom: 1px solid var(--se-color-border-soft);
   display: flex;
   flex-wrap: wrap;
-  gap: var(--se-space-2);
+  gap: var(--se-space-3);
   justify-content: flex-end;
   min-height: 56px;
   padding: 10px 16px;
 }
 
+.products-action-bar ::v-deep .v-btn {
+  border-radius: var(--se-radius-sm) !important;
+  min-height: 38px;
+}
+
 .product-filter-button {
   background: var(--se-color-success-soft) !important;
   border: 1px solid var(--se-color-success);
+  box-shadow: none !important;
   color: var(--se-color-text) !important;
   font-weight: 600;
 }
@@ -587,12 +600,14 @@ export default {
 
 .product-list-card {
   align-items: center;
-  border-color: var(--se-color-border-soft) !important;
-  border-radius: var(--se-radius-md);
+  background: var(--se-color-surface) !important;
+  border-color: var(--se-color-border) !important;
+  border-radius: var(--se-radius-md) !important;
   display: grid !important;
   gap: 16px;
   grid-template-columns: 128px minmax(0, 1fr);
-  min-height: 114px;
+  min-height: 116px;
+  padding: 12px !important;
   width: auto;
 }
 
@@ -604,16 +619,16 @@ export default {
 
 .product-list-row {
   align-items: center;
-  column-gap: 24px;
+  column-gap: 16px;
   display: grid;
   flex: 1 1 auto;
   grid-template-columns:
-    minmax(160px, 1.2fr)
-    minmax(120px, 0.9fr)
-    minmax(80px, 0.55fr)
-    minmax(130px, 0.75fr)
-    210px
-    280px;
+    minmax(200px, 1fr)
+    120px
+    82px
+    118px
+    270px
+    320px;
   min-width: 0;
   padding: 0 20px 0 0 !important;
   width: auto;
@@ -622,6 +637,7 @@ export default {
 .product-list-cell {
   color: var(--se-color-text-body);
   font-size: var(--se-font-small);
+  font-weight: var(--se-weight-medium);
   margin-bottom: 0;
   min-width: 0;
   overflow: hidden;
@@ -631,7 +647,14 @@ export default {
 
 .product-list-cell.font-weight-bold {
   color: var(--se-color-text);
-  font-size: var(--se-font-body);
+  font-size: var(--se-font-title-sm);
+  font-weight: var(--se-weight-bold) !important;
+}
+
+.product-list-image,
+.product-mobile-image {
+  border-radius: var(--se-radius-sm);
+  overflow: hidden;
 }
 
 .product-list-image ::v-deep .v-image__image,
@@ -643,21 +666,37 @@ export default {
 .product-action-buttons {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: flex-end;
+  justify-self: end;
   min-width: 280px;
   white-space: nowrap;
 }
 
 .product-action-buttons ::v-deep .v-btn,
 .product-actions ::v-deep .v-btn {
+  border-radius: var(--se-radius-sm) !important;
   min-height: var(--se-touch-target);
+  padding-left: 14px !important;
+  padding-right: 14px !important;
 }
 
 .product-order-buttons {
   align-items: center;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
+  border-radius: var(--se-radius-pill);
   display: flex;
   gap: 2px;
+  padding: 2px;
+}
+
+.product-order-buttons ::v-deep .v-btn {
+  height: 32px !important;
+  min-height: 32px !important;
+  min-width: 32px !important;
+  padding: 0 !important;
+  width: 32px !important;
 }
 
 .product-dragging {
@@ -681,12 +720,18 @@ export default {
 
 .product-mobile-card {
   border-color: var(--se-color-border-soft) !important;
-  border-radius: var(--se-radius-md);
+  border-radius: var(--se-radius-md) !important;
+  overflow: hidden;
 }
 
 .product-mobile-card ::v-deep .v-card__text {
   color: var(--se-color-text-body);
   padding-bottom: var(--se-space-3);
+}
+
+.product-mobile-card .font-weight-bold {
+  color: var(--se-color-text);
+  font-size: var(--se-font-title-sm);
 }
 
 .product-mobile-card p {
@@ -697,8 +742,9 @@ export default {
   align-items: center;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  padding: 0 !important;
+  padding: 0 var(--se-space-3) var(--se-space-3) !important;
   white-space: nowrap;
 }
 
@@ -707,10 +753,13 @@ export default {
   margin-top: 0;
   padding-top: 0;
   padding-left: 20px !important;
+  justify-self: start;
 }
 
 .product-visibility-switch ::v-deep .v-label {
-  font-size: 0.88rem;
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-medium);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -726,6 +775,22 @@ export default {
 
   .products-action-bar ::v-deep .v-btn {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .product-list-card,
+  .product-mobile-card,
+  .products-action-bar ::v-deep .v-btn {
+    transition:
+      border-color var(--se-transition-fast),
+      box-shadow var(--se-transition-fast),
+      transform var(--se-transition-fast);
+  }
+
+  .product-list-card:hover,
+  .product-mobile-card:hover {
+    transform: translateY(-1px);
   }
 }
 </style>

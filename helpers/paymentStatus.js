@@ -9,7 +9,7 @@ const PAYMENT_STATUS_DISPLAY = {
   },
   unpaid: {
     text: 'À encaisser',
-    color: 'orange',
+    color: 'warning',
   },
   failed: {
     text: 'Échoué',
@@ -62,7 +62,7 @@ const getPaymentStatusDisplay = (order = {}) => {
   if (isKioskPayAtCounterOrder(order)) {
     return {
       text: 'À encaisser',
-      color: 'orange',
+      color: 'warning',
     }
   }
 
@@ -76,7 +76,7 @@ const getPaymentStatusDisplay = (order = {}) => {
   if (order.payment_status === 'unpaid' && isCounterPayment(order)) {
     return {
       text: 'À encaisser',
-      color: 'orange',
+      color: 'warning',
     }
   }
 

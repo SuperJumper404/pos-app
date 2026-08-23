@@ -25,8 +25,8 @@
       "warning": {
         "role": "warning",
         "displayName": "Ambre Attention",
-        "canonical": "#d89800",
-        "tonalRamp": ["#5a3b00", "#946700", "#d89800", "#ffc84a", "#fff6df"]
+        "canonical": "#ffa014",
+        "tonalRamp": ["#5a3b00", "#9b5f00", "#ffa014", "#ffc267", "#fff4df"]
       },
       "danger": {
         "role": "danger",

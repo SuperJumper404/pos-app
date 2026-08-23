@@ -8,12 +8,13 @@ colors:
   brand-purple-soft: "#f3e8ff"
   success: "#00e676"
   success-soft: "#e8f8ef"
-  warning: "#d89800"
-  warning-soft: "#fff6df"
+  warning: "#ffa014"
+  warning-soft: "#fff4df"
   danger: "#d83b3b"
   danger-soft: "#ffecec"
   info: "#1976d2"
   app-bg: "#f3f5f8"
+  analytics-bg: "#f7f9fc"
   surface: "#ffffff"
   surface-muted: "#f8fafc"
   border: "#dfe5ee"
@@ -86,6 +87,62 @@ components:
     textColor: "{colors.text-body}"
     rounded: "{rounded.md}"
     padding: "16px"
+  analytics-toolbar:
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border}"
+    rounded: "{rounded.md}"
+    padding: "16px 18px"
+    gap: "18px 32px"
+  analytics-date-field:
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border}"
+    rounded: "{rounded.sm}"
+    height: "36px"
+    width: "178px"
+  analytics-kpi-card:
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border}"
+    rounded: "{rounded.md}"
+    padding: "18px"
+    minHeight: "118px"
+  analytics-panel:
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border}"
+    headerBorderColor: "{colors.border-soft}"
+    rounded: "{rounded.md}"
+    overflow: "hidden"
+  analytics-kpi-icon:
+    size: "44px"
+    rounded: "{rounded.lg}"
+    revenueBackground: "{colors.success-soft}"
+    revenueColor: "{colors.success}"
+    ordersBackground: "{colors.primary-soft}"
+    ordersColor: "{colors.primary}"
+    averageBackground: "{colors.warning-soft}"
+    averageColor: "{colors.warning}"
+    timeBackground: "{colors.brand-purple-soft}"
+    timeColor: "{colors.brand-purple}"
+  cashregister-hero:
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border}"
+    rounded: "{rounded.md}"
+    padding: "18px 20px"
+    iconBackground: "{colors.primary-soft}"
+    iconColor: "{colors.primary}"
+  cashregister-table-card:
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border}"
+    headerBorderColor: "{colors.border-soft}"
+    footerBackground: "{colors.surface-muted}"
+    rounded: "{rounded.md}"
+    minWidth: "440px"
+  cashregister-status-chip:
+    rounded: "{rounded.pill}"
+    countSize: "20px"
+    waitingBackground: "{colors.surface-muted}"
+    preparingBackground: "{colors.success-soft}"
+    canceledBackground: "{colors.warning-soft}"
+    readyBackground: "{colors.primary-soft}"
 ---
 
 # Design System: Smart Eat POS
@@ -108,7 +165,7 @@ L'identite est fonctionnelle : Poppins porte toute l'interface, les coins resten
 
 ## 2. Colors
 
-La palette est retenue et semantique : bleu pour l'action, violet comme accent Smart Eat ponctuel, verts/oranges/rouges pour les etats.
+La palette est retenue et semantique : bleu pour l'action, violet comme accent Smart Eat ponctuel, success/warning/danger pour les etats.
 
 ### Primary
 
@@ -123,6 +180,7 @@ La palette est retenue et semantique : bleu pour l'action, violet comme accent S
 ### Neutral
 
 - **Fond Service** : role `app-bg`. Fond principal des pages de travail.
+- **Fond Analytics** : role `analytics-bg` (`#f7f9fc`). Fond legerement plus clair pour les pages de reporting composees de cartes blanches.
 - **Surface Caisse** : role `surface`. Cartes, dialogues et panneaux.
 - **Surface Discrete** : role `surface-muted`. Headers de panneaux, tableaux et zones secondaires.
 - **Trait Structurel** : roles `border` et `border-soft`. Separation et contours.
@@ -193,12 +251,82 @@ Le systeme est plat par defaut et utilise la separation tonale avant les ombres.
 - **Shadow Strategy:** plat par defaut, ombre seulement pour surface flottante ou hover actionnable.
 - **Border:** `1px solid border` pour separer sans lourdeur.
 - **Internal Padding:** `16px` standard, `24px` pour page header.
+- **Analytics Page Background:** utiliser `analytics-bg` (`#f7f9fc`) sur les pages de reporting afin que les cartes blanches ressortent sans ombre lourde.
+- **Analytics Card Surface:** les cartes KPI et panneaux restent en `surface` (`#ffffff`) avec bordure `border`; ne pas teinter le fond de la carte elle-meme.
 
 ### Inputs / Fields
 
 - **Style:** Vuetify `outlined dense` reste la base.
 - **Focus:** focus visible via couleur primaire.
 - **Error / Disabled:** erreurs rouges avec message lisible ; disabled neutre, pas simplement faible opacite illisible.
+
+### Analytics Toolbar
+
+La toolbar de la page Statistiques est le pattern de reference pour les pages de pilotage.
+
+- **Structure:** une carte blanche `outlined`, sans ombre, avec padding `16px 18px`.
+- **Grid:** trois zones : presets rapides a gauche, periode personnalisee au centre, action primaire a droite.
+- **Spacing:** garder au moins `32px` entre la periode personnalisee et l'action primaire. Les dates ne doivent pas etre collees au bouton.
+- **Presets:** boutons `small depressed text-none`; actif rempli, inactif outlined.
+- **Date fields:** `v-text-field outlined dense hide-details`, largeur standard `178px`, icone interne MDI, labels courts `Debut` et `Fin`.
+- **Refresh:** bouton primary avec `mdi-refresh`, texte `Rafraichir`, etat loading visible.
+- **Responsive:** sous `1180px`, passer en une colonne, dates en largeur disponible et bouton aligne a gauche. Sous mobile, empiler les presets et champs.
+
+### Analytics KPI Cards
+
+- **Shape:** carte blanche `outlined`, pas d'ombre au repos, hauteur minimale `118px`, padding `18px`.
+- **Content:** icone dans un carre doux de `44px`, libelle muted, valeur forte, hint court.
+- **Color mapping:** revenu en success, commandes en primary, ticket moyen en warning, temps/preparation en brand-purple.
+- **Icon backgrounds:** revenu `success-soft`, commandes `primary-soft`, ticket moyen `warning-soft`, temps/preparation `brand-purple-soft`.
+- **Icon colors:** revenu `success`, commandes `primary`, ticket moyen `warning`, temps/preparation `brand-purple`.
+- **Typography:** valeur KPI autour de `26px`, libelle en meta semibold, hint en caption.
+- **Hover:** leger changement de bordure ou translation discrete seulement si la page utilise deja ce mouvement.
+
+### Analytics Panels / Tables
+
+- **Panel:** carte blanche `outlined`, `surface` en fond, `border` en contour, overflow hidden, header separe par `border-soft`.
+- **Header background:** garder le header blanc sur la page Statistiques; utiliser `surface-muted` seulement pour des panneaux plus denses.
+- **Header:** titre avec icone MDI primary, sous-titre muted qui explique la mesure.
+- **Tables:** Vuetify dense, footer masque si la liste est courte.
+- **Bars:** utiliser `v-progress-linear` hauteur `8px`, rounded, fond `border-soft`.
+- **Empty state:** texte francais explicite, par exemple `Aucun paiement sur cette periode`.
+
+### Cash Register Cockpit
+
+Le tiroir-caisse reprend le fond `analytics-bg` mais sert une action immediate, pas seulement de la lecture.
+
+- **Page:** fond `analytics-bg` (`#f7f9fc`), padding `20px`, cartes blanches bordees.
+- **Hero:** surface blanche `outlined`, padding `18px 20px`, icone `mdi-cash-register` dans un carre `44px` en `primary-soft`.
+- **Title copy:** titre court `Tiroir-caisse`, sous-texte operationnel. Pas de hero marketing.
+- **Refresh:** bouton primary `Actualiser`, `mdi-refresh`, `text-none`, etat loading lie au chargement des donnees.
+
+### Cash Register KPI
+
+- **Model:** meme structure que les KPI analytics : icone 44px, libelle muted, valeur forte, hint court.
+- **Due amount:** `warning-soft` + `warning`, libelle `A encaisser`.
+- **Paid amount:** `success-soft` + `success`, libelle `Deja paye`.
+- **Active tables:** `primary-soft` + `primary`, libelle `Tables actives`.
+- **Kitchen open:** `brand-purple-soft` + `brand-purple`, libelle `Cuisine ouverte`.
+- **Value size:** autour de `24px`, pas plus grand afin de garder la page dense et scannable.
+
+### Cash Register Table Cards
+
+- **Grid:** `repeat(auto-fit, minmax(440px, 1fr))` sur desktop; une colonne sous mobile.
+- **Card:** blanche `outlined`, `border`, sans ombre au repos, `overflow hidden`.
+- **Header:** nom de table a gauche, montant `A encaisser` a droite, separation `border-soft`.
+- **Status row:** chips compactes sous le header, avec compteur rond `20px`.
+- **Body:** `v-data-table dense`, footer cache, texte en `text-body`, montant restant en gras.
+- **Footer:** fond `surface-muted`, deux recap courts : total deja paye et nombre de clients.
+- **Actions:** `Encaisser/Cloturer` en primary depressed et extensible, `Details` en outlined primary.
+- **Disabled state:** l'action primary est desactivee tant qu'aucun client de la table n'est selectionne.
+
+### Cash Register Status Colors
+
+- **En attente:** `surface-muted` + compteur `border`, neutre.
+- **En preparation:** `success-soft` + texte vert fonce, compteur `success`.
+- **Annulee:** `warning-soft` + texte brun/orange fonce, compteur `warning`.
+- **Pret a encaisser:** `primary-soft` + texte primary, compteur primary.
+- **Deja paye:** chip `brand-purple-soft` + `brand-purple`, reservee aux montants deja encaisses dans la table client.
 
 ### Navigation
 
@@ -217,6 +345,8 @@ Les notifications sont des surfaces flottantes compactes avec icone semantique, 
 - **Do** associer chaque couleur de statut a un libelle textuel explicite.
 - **Do** garantir des cibles tactiles de `44px` pour les actions importantes.
 - **Do** utiliser MDI de facon coherente : une icone par role.
+- **Do** reutiliser le pattern Statistiques pour les ecrans de reporting : toolbar de filtres, KPI, panneaux details.
+- **Do** reutiliser le cockpit caisse pour les ecrans ou l'utilisateur doit choisir une table ou un groupe avant une action critique.
 
 ### Don't:
 
@@ -225,3 +355,5 @@ Les notifications sont des surfaces flottantes compactes avec icone semantique, 
 - **Don't** utiliser `large`, `medium`, `x-large` pour dimensionner du texte.
 - **Don't** multiplier les variantes pour la meme action : choisir un standard pour supprimer, fermer, imprimer et confirmer.
 - **Don't** bloquer l'encaissement, l'envoi de commande ou l'impression avec des integrations externes lentes.
+- **Don't** coller les filtres de date au bouton primaire dans les toolbars de reporting.
+- **Don't** utiliser des cartes `max-content` pour les surfaces de caisse; elles doivent former une grille stable.

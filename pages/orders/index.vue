@@ -57,12 +57,12 @@
 
         <v-text-field
           v-model="searchFilter"
-          style="max-width: 320px"
+          class="se-search-field"
           placeholder="Rechercher une commande, table ou client"
           outlined
           dense
           hide-details
-          append-icon="mdi-card-search"
+          prepend-inner-icon="mdi-magnify"
         ></v-text-field>
       </v-app-bar>
       <v-data-table
@@ -80,7 +80,7 @@
               <v-chip
                 v-if="isTakeawayOrder(item)"
                 small
-                color="orange darken-1"
+                color="warning"
                 dark
                 class="order-reference__takeaway-icon"
                 aria-label="À emporter"

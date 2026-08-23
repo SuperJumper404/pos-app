@@ -22,14 +22,6 @@ const listdashboard = {
           isAdmin: true,
         },
         {
-          icon: 'mdi-chart-box-outline',
-          title: 'Mes statistiques',
-          routeName: 'statistics',
-          to: '/statistics',
-          moduleKey: 'home',
-          isAdmin: true,
-        },
-        {
           icon: 'mdi-bookmark',
           title: 'Catégories',
           routeName: 'categories',
@@ -133,6 +125,14 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-poll',
+          title: 'Statistiques',
+          routeName: 'statistics',
+          to: '/statistics',
+          moduleKey: 'home',
+          isAdmin: true,
+        },
+        {
           icon: 'mdi-account-multiple',
           title: 'Mes clients',
           routeName: 'clients',
@@ -163,7 +163,7 @@ const listdashboard = {
         },
         {
           icon: 'mdi-account-group',
-          title: 'Staff / Equipe',
+          title: 'Equipe',
           routeName: 'staff',
           to: '/staff',
           moduleKey: 'staff',

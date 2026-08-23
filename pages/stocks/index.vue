@@ -18,12 +18,12 @@
           </v-btn>
           <v-text-field
             v-model="search"
-            label="Rechercher"
+            placeholder="Rechercher un ingrédient ou produit"
             prepend-inner-icon="mdi-magnify"
             dense
             outlined
             hide-details
-            class="stock-search"
+            class="se-search-field"
           />
         </template>
       </SePageHeader>
@@ -270,7 +270,7 @@ export default {
     formatEstimatedPrice,
     statusColor(item) {
       const status = getStockStatus(item)
-      return status === 'red' ? 'red' : status === 'orange' ? 'orange' : 'grey'
+      return status === 'red' ? 'red' : status === 'orange' ? 'warning' : 'grey'
     },
     statusLabel(item) {
       const status = getStockStatus(item)
@@ -376,10 +376,6 @@ export default {
 
 <style scoped>
 .stock-panel { overflow: hidden; }
-.stock-search {
-  max-width: 300px;
-  min-width: 220px;
-}
 .stock-action {
   min-height: 38px;
 }
@@ -423,10 +419,6 @@ export default {
 @media (max-width: 720px) {
   .se-page-header {
     align-items: stretch;
-  }
-  .stock-search {
-    max-width: none;
-    width: 100%;
   }
   .stock-action {
     width: 100%;

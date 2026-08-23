@@ -47,12 +47,12 @@
         <v-spacer></v-spacer>
         <v-text-field
           v-model="searchFilter"
-          style="max-width: 320px"
-          placeholder="Rechercher un telephone ou un nom"
+          class="se-search-field clients-search-field"
+          placeholder="Rechercher un téléphone ou un nom"
           outlined
           dense
           hide-details
-          append-icon="mdi-card-search"
+          prepend-inner-icon="mdi-magnify"
         ></v-text-field>
         <v-btn
           color="primary"

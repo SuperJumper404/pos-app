@@ -85,13 +85,13 @@ assert.deepStrictEqual(
   }),
   {
     text: 'À encaisser',
-    color: 'orange',
+    color: 'warning',
   }
 )
 
 assert.deepStrictEqual(getPaymentStatusDisplay({ payment_status: 'unpaid' }), {
   text: 'À encaisser',
-  color: 'orange',
+  color: 'warning',
 })
 
 assert.strictEqual(getPaymentStatusText({ payment_status: 'failed' }), 'Échoué')
@@ -113,7 +113,7 @@ assert.deepStrictEqual(
   }),
   {
     text: 'À encaisser',
-    color: 'orange',
+    color: 'warning',
   }
 )
 
@@ -125,7 +125,7 @@ assert.deepStrictEqual(
   }),
   {
     text: 'À encaisser',
-    color: 'orange',
+    color: 'warning',
   }
 )
 
