@@ -114,12 +114,15 @@
       app
     >
       <div class="top-bar-left-actions">
-        <v-app-bar-nav-icon
+        <v-btn
           v-if="isStaffUser"
-          class="top-bar-icon-button"
-          aria-label="Ouvrir le menu"
-          @click.stop="drawer = !drawer"
-        />
+          icon
+          class="top-bar-icon-button top-bar-menu-button"
+          :aria-label="drawerToggleLabel"
+          @click.stop="cycleDrawerState"
+        >
+          <v-icon>{{ drawerToggleIcon }}</v-icon>
+        </v-btn>
         <v-btn
           v-if="isStaffUser"
           icon
@@ -128,15 +131,6 @@
           @click="previousPage()"
         >
           <v-icon>mdi-chevron-left</v-icon>
-        </v-btn>
-        <v-btn
-          v-if="isStaffUser"
-          icon
-          class="top-bar-icon-button"
-          aria-label="Reduire le menu"
-          @click.stop="miniVariant = !miniVariant"
-        >
-          <v-icon>{{ miniVariant ? 'mdi-menu-open' : 'mdi-menu-collapse' }}</v-icon>
         </v-btn>
       </div>
 
@@ -333,6 +327,18 @@ export default {
     pendingOrderBadge() {
       return formatPendingOrderBadge(this.pendingOrderCount)
     },
+    drawerToggleIcon() {
+      if (!this.drawer) return 'mdi-menu'
+      if (this.miniVariant) return 'mdi-dock-left'
+
+      return 'mdi-menu-open'
+    },
+    drawerToggleLabel() {
+      if (!this.drawer) return 'Ouvrir le menu'
+      if (this.miniVariant) return 'Fermer le menu'
+
+      return 'Reduire le menu'
+    },
     internalHomePaths() {
       return ['/']
     },
@@ -422,6 +428,21 @@ export default {
       if (this.$route.path === '/') return
 
       this.$router.back()
+    },
+    cycleDrawerState() {
+      if (!this.drawer) {
+        this.drawer = true
+        this.miniVariant = false
+        return
+      }
+
+      if (!this.miniVariant) {
+        this.miniVariant = true
+        return
+      }
+
+      this.miniVariant = false
+      this.drawer = false
     },
     goToInternalHome() {
       this.$router.push('/')

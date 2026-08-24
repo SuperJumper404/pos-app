@@ -97,8 +97,8 @@ assert.doesNotMatch(
 )
 assert.match(
   defaultLayoutSource,
-  /<v-app-bar-nav-icon[\s\S]*?v-if="isStaffUser"/,
-  'staff users must receive an app bar navigation icon'
+  /class="[^"]*top-bar-menu-button[^"]*"[\s\S]*?@click\.stop="cycleDrawerState"/,
+  'staff users must receive a single menu button that cycles drawer states'
 )
 assert.match(
   defaultLayoutSource,
@@ -144,6 +144,21 @@ assert.match(
   defaultLayoutSource,
   /class="top-bar-page-icon"[\s\S]*?currentPage\.icon[\s\S]*?class="top-bar-page-title"/,
   'the top navigation header must show the current page icon in a soft block beside the title'
+)
+assert.match(
+  defaultLayoutSource,
+  /drawerToggleIcon\(\)[\s\S]*?!this\.drawer[\s\S]*?mdi-menu[\s\S]*?this\.miniVariant[\s\S]*?mdi-dock-left[\s\S]*?mdi-menu-open/,
+  'the single drawer button must expose coherent menu icons for closed, mini and open states'
+)
+assert.match(
+  defaultLayoutSource,
+  /cycleDrawerState\(\)[\s\S]*?!this\.drawer[\s\S]*?this\.drawer = true[\s\S]*?this\.miniVariant = false[\s\S]*?!this\.miniVariant[\s\S]*?this\.miniVariant = true[\s\S]*?this\.drawer = false/,
+  'the single drawer button must cycle closed, open and mini states'
+)
+assert.doesNotMatch(
+  defaultLayoutSource,
+  /@click\.stop="miniVariant = !miniVariant"/,
+  'the header must not keep a separate third button just for mini mode'
 )
 
 console.log('admin navigation tests passed')
