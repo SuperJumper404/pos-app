@@ -102,13 +102,48 @@ assert.match(
 )
 assert.match(
   defaultLayoutSource,
-  /<v-list-item-content\s+v-if="!miniVariant">/,
+  /<v-list-item-content\s+v-if="!miniVariant"[\s\S]*?class="side-nav-item__content"/,
   'mini sidebar mode must hide navigation labels'
 )
 assert.match(
   defaultLayoutSource,
   /v-if="[\s\S]*?!miniVariant[\s\S]*?item\.routeName === 'orders'[\s\S]*?pendingOrderCount > 0[\s\S]*?"/,
   'mini sidebar mode must hide the text badge area and keep only icons'
+)
+assert.match(
+  defaultLayoutSource,
+  /navigationGroups\(\)[\s\S]*?title:\s*'Service'[\s\S]*?title:\s*'Pilotage'[\s\S]*?title:\s*'Gestion'[\s\S]*?title:\s*'Parametres'/,
+  'the side menu must organize primary navigation into service, pilotage, gestion and parametres sections'
+)
+assert.match(
+  defaultLayoutSource,
+  /v-for="\(\s*group,\s*groupIndex\s*\) in navigationGroups"[\s\S]*?<v-subheader[\s\S]*?{{ group\.title }}/,
+  'the side menu must render a visible section label for each navigation group'
+)
+assert.match(
+  defaultLayoutSource,
+  /:title="item\.title"[\s\S]*?:aria-label="item\.title"/,
+  'mini sidebar items must keep accessible labels while visual text is hidden'
+)
+assert.match(
+  defaultLayoutSource,
+  /side-nav-mini-badge[\s\S]*?pendingOrderCount > 0/,
+  'mini sidebar mode must show a compact pending order indicator'
+)
+assert.match(
+  defaultLayoutSource,
+  /side-nav-mini-rail/,
+  'mini sidebar mode must use a dedicated premium rail treatment'
+)
+assert.match(
+  defaultLayoutSource,
+  /class="app-top-bar"[\s\S]*?class="top-bar-left-actions"[\s\S]*?class="top-bar-page-chip"[\s\S]*?class="top-bar-right-actions"/,
+  'the top navigation header must use the premium cockpit structure'
+)
+assert.match(
+  defaultLayoutSource,
+  /class="top-bar-page-icon"[\s\S]*?currentPage\.icon[\s\S]*?class="top-bar-page-title"/,
+  'the top navigation header must show the current page icon in a soft block beside the title'
 )
 
 console.log('admin navigation tests passed')
