@@ -20,6 +20,16 @@ assert.match(
 )
 assert.match(
   ordersSource,
+  /\.orders-toolbar__actions \{[\s\S]*?flex: 1 1 720px;[\s\S]*?justify-content: flex-end;[\s\S]*?margin-left: auto;[\s\S]*?max-width: 720px;[\s\S]*?\.orders-search-field \{[\s\S]*?flex: 0 0 560px !important;[\s\S]*?min-width: 560px !important;[\s\S]*?width: 560px !important;/,
+  'orders search field must stay wide enough and pinned to the toolbar side'
+)
+assert.match(
+  ordersSource,
+  /:items-per-page="20"[\s\S]*?'items-per-page-options': \[10, 15, 20, \{ text: 'ALL', value: -1 \}\][\s\S]*?'items-per-page-text': 'Commandes par page'/,
+  'orders table pagination must show 20 orders by default with 10, 15, 20, and ALL options'
+)
+assert.match(
+  ordersSource,
   /class="orders-table"[\s\S]*?class="orders-actions"/,
   'orders data table must use premium table and grouped row actions'
 )
@@ -73,10 +83,10 @@ assert.match(
   /orderStats\(\)[\s\S]*?activeOrdersCount\(\)[\s\S]*?servicePulseText\(\)/,
   'orders overdrive mode must compute operational service metrics'
 )
-assert.match(
+assert.doesNotMatch(
   ordersSource,
-  /class="\['orders-row-signal', orderSignalClass\(item\)\]"[\s\S]*?orderSignalClass\(item\)/,
-  'orders overdrive mode must add semantic row signals'
+  /orders-row-signal|orderSignalClass/,
+  'orders page must not show colored signal dots before order numbers'
 )
 assert.match(
   ordersSource,
@@ -85,13 +95,28 @@ assert.match(
 )
 assert.match(
   ordersSource,
-  /orderLanes\(\)[\s\S]*?laneOrders\(lane\)[\s\S]*?isPaymentDue\(order\)/,
-  'orders workflow mode must compute lane groups by payment and status'
+  /orderLanes\(\)[\s\S]*?label: 'En attente'[\s\S]*?label: 'En preparation'[\s\S]*?label: 'Terminees \/ Annulees'[\s\S]*?laneOrders\(lane\)[\s\S]*?waiting: \(order\) => order\.status === 1[\s\S]*?preparing: \(order\) => order\.status === 2[\s\S]*?closed: \(order\) => \[3, 4\]\.includes\(order\.status\)/,
+  'orders workflow mode must compute lane groups by status'
+)
+assert.doesNotMatch(
+  ordersSource,
+  /key: 'payment-due'/,
+  'orders workflow lanes must not split payment due into its own status column'
 )
 assert.match(
   ordersSource,
   /orders-lane-order__actions[\s\S]*?btnApprove\(order\)[\s\S]*?btnFinish\(order\.id\)[\s\S]*?openOrderDetail\(order\)/,
   'orders workflow cards must keep fast operational actions'
+)
+assert.match(
+  ordersSource,
+  /class="orders-lane-action orders-lane-action--primary text-none"[\s\S]*?:aria-label="`Valider la commande \$\{order\.ordernumber\}`"[\s\S]*?mdi-check-circle[\s\S]*?class="orders-lane-action orders-lane-action--primary text-none"[\s\S]*?:aria-label="`Marquer la commande \$\{order\.ordernumber\} comme prete`"[\s\S]*?mdi-check-bold[\s\S]*?class="orders-lane-action orders-lane-action--secondary text-none"[\s\S]*?:aria-label="`Voir le detail de la commande \$\{order\.ordernumber\}`"[\s\S]*?mdi-information-outline/,
+  'orders workflow card actions must use visible icons and accessible labels'
+)
+assert.match(
+  ordersSource,
+  /\.orders-lane-order__actions \{[\s\S]*?display: flex;[\s\S]*?flex-wrap: wrap;[\s\S]*?gap: 7px;[\s\S]*?\.orders-lane-action \{[\s\S]*?height: 34px !important;[\s\S]*?min-width: 92px !important;/,
+  'orders workflow card actions must stay compact and accessible'
 )
 assert.match(
   ordersSource,

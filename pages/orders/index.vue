@@ -69,8 +69,6 @@
           ></v-switch>
         </div>
 
-        <v-spacer></v-spacer>
-
         <div class="orders-toolbar__actions">
           <v-btn
             v-if="selectedOrders.length"
@@ -101,6 +99,11 @@
         :items="dataOrders"
         :search="searchFilter"
         :hide-default-header="$vuetify.breakpoint.smAndDown"
+        :items-per-page="20"
+        :footer-props="{
+          'items-per-page-options': [10, 15, 20, { text: 'ALL', value: -1 }],
+          'items-per-page-text': 'Commandes par page',
+        }"
         class="orders-table"
         show-select
         @click:row="openOrderDetail"
@@ -108,7 +111,6 @@
         <template #[`item.ordernumber`]="{ item }">
           <div class="order-reference">
             <div class="order-reference__number">
-              <span :class="['orders-row-signal', orderSignalClass(item)]"></span>
               #{{ item.ordernumber }}
               <v-chip
                 v-if="isTakeawayOrder(item)"
@@ -268,7 +270,6 @@
           >
             <div class="orders-lane-order__main">
               <div class="orders-lane-order__number">
-                <span :class="['orders-row-signal', orderSignalClass(order)]"></span>
                 #{{ order.ordernumber }}
               </div>
               <div class="orders-lane-order__meta">
@@ -283,39 +284,45 @@
               <v-chip
                 small
                 class="orders-data-chip orders-lane-order__chip"
-                :class="lane.chipClass"
+                :class="orderLaneChipClass(order)"
               >
-                {{ lane.cardStatus }}
+                {{ orderLaneStatusText(order) }}
               </v-chip>
             </div>
             <div class="orders-lane-order__actions">
               <v-btn
                 v-if="order.status === 1"
-                x-small
+                small
                 depressed
                 color="success"
-                class="orders-lane-action text-none"
+                class="orders-lane-action orders-lane-action--primary text-none"
+                :aria-label="`Valider la commande ${order.ordernumber}`"
                 @click.stop="btnApprove(order)"
               >
+                <v-icon small left>mdi-check-circle</v-icon>
                 Valider
               </v-btn>
               <v-btn
                 v-if="order.status === 2"
-                x-small
+                small
                 depressed
                 color="primary"
-                class="orders-lane-action text-none"
+                class="orders-lane-action orders-lane-action--primary text-none"
+                :aria-label="`Marquer la commande ${order.ordernumber} comme prete`"
                 @click.stop="btnFinish(order.id)"
               >
+                <v-icon small left>mdi-check-bold</v-icon>
                 Prête
               </v-btn>
               <v-btn
-                x-small
+                small
                 outlined
                 color="primary"
-                class="orders-lane-action text-none"
+                class="orders-lane-action orders-lane-action--secondary text-none"
+                :aria-label="`Voir le detail de la commande ${order.ordernumber}`"
                 @click.stop="openOrderDetail(order)"
               >
+                <v-icon small left>mdi-information-outline</v-icon>
                 Détails
               </v-btn>
             </div>
@@ -463,31 +470,25 @@ export default {
     orderLanes() {
       return [
         {
-          key: 'payment-due',
-          label: 'A encaisser',
-          hint: 'Paiement comptoir ou borne',
-          icon: 'mdi-cash-register',
-          tone: 'warning',
-          chipClass: 'orders-lane-order__chip--warning',
-          cardStatus: 'A encaisser',
-        },
-        {
           key: 'waiting',
           label: 'En attente',
-          hint: 'A valider ou a preparer',
+          hint: 'Commandes a valider',
           icon: 'mdi-timer-sand',
-          tone: 'success',
-          chipClass: 'orders-lane-order__chip--success',
-          cardStatus: 'Service',
+          tone: 'warning',
         },
         {
-          key: 'done',
-          label: 'Terminees',
-          hint: 'Pretes ou finalisees',
+          key: 'preparing',
+          label: 'En preparation',
+          hint: 'Commandes en cuisine',
+          icon: 'mdi-chef-hat',
+          tone: 'success',
+        },
+        {
+          key: 'closed',
+          label: 'Terminees / Annulees',
+          hint: 'Commandes finalisees',
           icon: 'mdi-check-circle-outline',
           tone: 'primary',
-          chipClass: 'orders-lane-order__chip--primary',
-          cardStatus: 'Terminee',
         },
       ]
     },
@@ -573,33 +574,34 @@ export default {
     },
     laneOrders(lane) {
       const laneFilters = {
-        'payment-due': (order) => this.isPaymentDue(order),
-        waiting: (order) =>
-          !this.isPaymentDue(order) && [1, 2].includes(order.status),
-        done: (order) => order.status === 3,
+        waiting: (order) => order.status === 1,
+        preparing: (order) => order.status === 2,
+        closed: (order) => [3, 4].includes(order.status),
       }
       const filter = laneFilters[lane.key] || (() => false)
       return this.dataOrders.filter(filter)
     },
-    isPaymentDue(order) {
-      const paymentText = this.paymentStatusText(order)
-        .normalize('NFD')
-        .replace(/[\u0300-\u036F]/g, '')
-        .toLowerCase()
-      return paymentText.includes('encaisser') || order.payment_status === 'unpaid'
+    orderLaneStatusText(order) {
+      const labels = {
+        1: 'En attente',
+        2: 'En preparation',
+        3: 'Terminee',
+        4: 'Annulee',
+      }
+      return labels[order.status] || 'Statut inconnu'
+    },
+    orderLaneChipClass(order) {
+      const classes = {
+        1: 'orders-lane-order__chip--warning',
+        2: 'orders-lane-order__chip--success',
+        3: 'orders-lane-order__chip--primary',
+        4: 'orders-lane-order__chip--warning',
+      }
+      return classes[order.status] || 'orders-lane-order__chip--primary'
     },
     openOrderDetail(item) {
       if (!item || !item.id) return
       this.$router.push(`orders/detail/${item.id}`)
-    },
-    orderSignalClass(item) {
-      const statusMap = {
-        1: 'orders-row-signal--waiting',
-        2: 'orders-row-signal--preparing',
-        3: 'orders-row-signal--done',
-        4: 'orders-row-signal--canceled',
-      }
-      return statusMap[item.status] || 'orders-row-signal--neutral'
     },
     isOrderPrinting(order) {
       return Boolean(order && this.printingOrderIds[order.id])
@@ -1410,6 +1412,12 @@ export default {
   border-color: #cfd9e7;
 }
 
+.orders-lane-order:focus-visible {
+  border-color: var(--se-color-primary);
+  outline: 3px solid rgba(25, 118, 210, 0.22);
+  outline-offset: 2px;
+}
+
 .orders-lane-order__main {
   min-width: 0;
 }
@@ -1478,7 +1486,20 @@ export default {
 .orders-lane-action {
   border-radius: var(--se-radius-sm) !important;
   font-weight: var(--se-weight-semibold);
+  height: 34px !important;
   letter-spacing: 0;
+  min-width: 92px !important;
+  padding: 0 10px !important;
+}
+
+::v-deep .orders-lane-action .v-btn__content {
+  gap: 4px;
+  justify-content: center;
+}
+
+.orders-lane-action:focus-visible {
+  outline: 3px solid rgba(25, 118, 210, 0.24);
+  outline-offset: 2px;
 }
 
 .orders-lane-card__empty {
@@ -1516,8 +1537,12 @@ export default {
 .orders-toolbar__actions {
   align-items: center;
   display: flex;
+  flex: 1 1 720px;
   gap: 12px;
   justify-content: flex-end;
+  margin-left: auto;
+  max-width: 720px;
+  min-width: 0;
 }
 
 .orders-kitchen-control {
@@ -1537,8 +1562,10 @@ export default {
 }
 
 .orders-search-field {
-  flex-basis: 420px;
-  max-width: 420px;
+  flex: 0 0 560px !important;
+  max-width: 560px !important;
+  min-width: 560px !important;
+  width: 560px !important;
 }
 
 .orders-bulk-delete,
@@ -1605,59 +1632,6 @@ export default {
   font-weight: var(--se-weight-bold);
   gap: 7px;
   white-space: nowrap;
-}
-
-.orders-row-signal {
-  border-radius: var(--se-radius-pill);
-  display: inline-flex;
-  height: 24px;
-  position: relative;
-  width: 6px;
-}
-
-.orders-row-signal::after {
-  border-radius: 50%;
-  content: '';
-  height: 6px;
-  left: 0;
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-}
-
-.orders-row-signal--waiting {
-  background: var(--se-color-warning-soft);
-}
-
-.orders-row-signal--waiting::after {
-  background: var(--se-color-warning);
-}
-
-.orders-row-signal--preparing {
-  background: var(--se-color-success-soft);
-}
-
-.orders-row-signal--preparing::after {
-  background: var(--se-color-success);
-}
-
-.orders-row-signal--done {
-  background: var(--se-color-primary-soft);
-}
-
-.orders-row-signal--done::after {
-  background: var(--se-color-primary);
-}
-
-.orders-row-signal--canceled,
-.orders-row-signal--neutral {
-  background: var(--se-color-danger-soft);
-}
-
-.orders-row-signal--canceled::after,
-.orders-row-signal--neutral::after {
-  background: var(--se-color-danger);
 }
 
 .order-reference__takeaway-icon {
@@ -1736,13 +1710,16 @@ export default {
 
   .orders-toolbar__actions {
     justify-content: flex-start;
+    margin-left: 0;
+    max-width: none;
     width: 100%;
   }
 
   .orders-search-field {
-    flex: 1 1 auto;
-    max-width: none;
-    min-width: 0;
+    flex: 1 1 auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    width: 100% !important;
   }
 }
 
@@ -1772,11 +1749,13 @@ export default {
 
 @media (prefers-reduced-motion: reduce) {
   .orders-lane-order,
+  .orders-lane-action,
   .orders-stat,
   ::v-deep .orders-table tbody tr {
     transition: none;
   }
 
+  .orders-lane-order:hover,
   .orders-stat:hover {
     transform: none;
   }
