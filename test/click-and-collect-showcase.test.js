@@ -13,16 +13,19 @@ const pagePath = path.join(
 )
 const pageSource = fs.readFileSync(pagePath, 'utf8')
 
-assert.match(pageSource, /class="community-section"/)
-assert.match(
-  pageSource,
-  /product-showcase__card:nth-child\(12\)[\s\S]*?grid-column: 1 \/ -1;/
-)
-assert.match(
-  pageSource,
-  /@media \(min-width: 768px\)[\s\S]*?product-showcase__card:nth-child\(11\),[\s\S]*?product-showcase__card:nth-child\(12\)[\s\S]*?grid-column: span 2;/
-)
-assert.doesNotMatch(pageSource, /product-showcase__card--offset/)
+assert.match(pageSource, /v-if="socialLinks\.length"/)
+assert.match(pageSource, /aria-label="Ouvrir Instagram"/)
+assert.match(pageSource, /aria-label="Ouvrir Facebook"/)
+assert.match(pageSource, /aria-label="Ouvrir TikTok"/)
+assert.match(pageSource, /aria-label="Ouvrir Snapchat"/)
+assert.match(pageSource, /<svg[^>]*aria-hidden="true"[^>]*focusable="false"/)
+assert.match(pageSource, /<h2 class="font-weight-bold mb-3">/)
+assert.match(pageSource, /<h2 class="text-center font-weight-bold mb-1">/)
+assert.match(pageSource, /<small>SmartEat\.fr . 2026<\/small>/)
+assert.doesNotMatch(pageSource, /@keyframes scroll-right/)
+assert.match(pageSource, /<v-icon large color="white" class="bullhorn">/)
+assert.match(pageSource, /\.product-showcase__track\s*\{[\s\S]*?display: flex;[\s\S]*?flex-wrap: wrap;/)
+assert.match(pageSource, /\.product-showcase__card\s*\{[\s\S]*?flex: 1 1/)
 const practicalIndex = pageSource.indexOf('class="establishment-practical"')
 const storyIndex = pageSource.indexOf('class="establishment-story"')
 const showcaseIndex = pageSource.indexOf('class="product-showcase"')
@@ -70,6 +73,10 @@ vm.runInNewContext(script.replace('export default', 'module.exports ='), {
 
 const page = moduleRef.exports
 
+function computed(name, context) {
+  return page.computed[name].call(context)
+}
+
 async function createMountedPage(products) {
   let requestedUrl = ''
   const instance = {
@@ -97,6 +104,73 @@ async function createMountedPage(products) {
 }
 
 ;(async () => {
+  const emptyPublicData = {
+    shopInfo: {
+      shop_hours: null,
+      shop_social_media: null,
+      shop_status: null,
+    },
+    isKitchenClosed: false,
+  }
+
+  assert.deepStrictEqual(Array.from(computed('shopHours', emptyPublicData)), [])
+  assert.deepStrictEqual(
+    { ...computed('shopSocialMedia', emptyPublicData) },
+    {}
+  )
+  assert.strictEqual(computed('shopStatus', emptyPublicData), '')
+  assert.deepStrictEqual(
+    Array.from(computed('socialLinks', {
+      ...emptyPublicData,
+      shopSocialMedia: {},
+    })),
+    []
+  )
+  assert.strictEqual(
+    computed('isRestaurantOpen', {
+      ...emptyPublicData,
+      shopHours: [],
+    }),
+    false
+  )
+  assert.strictEqual(
+    computed('isRestaurantOpen', {
+      isKitchenClosed: false,
+      currentDayIndex: 0,
+      shopHours: [{ isOpen: true, from: null, to: 24 }],
+    }),
+    false
+  )
+  assert.strictEqual(
+    page.methods.formatOpeningHours({ isOpen: true, from: null, to: 18 }),
+    'Horaires non renseignés'
+  )
+  assert.strictEqual(
+    page.methods.formatOpeningHours({ isOpen: false }),
+    'Fermé'
+  )
+  assert.strictEqual(
+    page.methods.formatOpeningHours({ dayName: 'Lundi' }),
+    'Horaires non renseignés'
+  )
+  assert.deepStrictEqual(
+    Array.from(
+      computed('socialLinks', {
+        shopSocialMedia: {
+          instagram: 'https://instagram.com/smarteat',
+          facebook: '',
+          tiktok: '   ',
+          snapchat: 'https://snapchat.com/add/smarteat',
+        },
+      }),
+      ({ name, href }) => ({ name, href })
+    ),
+    [
+      { name: 'Instagram', href: 'https://instagram.com/smarteat' },
+      { name: 'Snapchat', href: 'https://snapchat.com/add/smarteat' },
+    ]
+  )
+
   const products = [
     { id: 1, name: 'Burger', image: 'burger.jpg', price: 12.5 },
     { id: 2, name: 'Sans photo', image: '', price: 8 },

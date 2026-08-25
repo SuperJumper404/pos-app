@@ -113,17 +113,17 @@
           <section class="establishment-practical">
           <v-row class="opening-hours ma-0">
             <v-col class="pa-0">
-              <h3 class="font-weight-bold mb-3">
+              <h2 class="font-weight-bold mb-3">
                 Horaires d'ouverture :
-              </h3>
+              </h2>
               <div
-                v-for="(d, i) in shopInfo.shop_hours"
+                v-for="(d, i) in shopHours"
                 :key="i"
                 class="practical-hours__row d-flex justify-space-between align-center"
                 :class="{ 'is-today': i === currentDayIndex }"
               >
                 <span class="practical-hours__day">
-                  {{ d.dayName }}
+                  {{ d.dayName || 'Jour non renseigné' }}
                   <span
                     v-if="i === currentDayIndex"
                     class="practical-hours__today-label"
@@ -132,18 +132,7 @@
                   </span>
                 </span>
 
-                <span>
-                  <template
-                    v-if="
-                      d.isOpen && !(Number(d.from) === 0 && Number(d.to) === 0)
-                    "
-                  >
-                    {{ String(d.from).padStart(2, '0') }}:00 -
-                    {{ String(d.to).padStart(2, '0') }}:00
-                  </template>
-
-                  <template v-else> Fermé </template>
-                </span>
+                <span>{{ formatOpeningHours(d) }}</span>
               </div>
             </v-col>
           </v-row>
@@ -159,27 +148,19 @@
           </v-row>
 
           <v-row
-            v-if="shopInfo.shop_status.length > 2"
+            v-if="shopStatus"
             class="status-row ma-0"
           >
             <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
               <div class="status-container">
-                <!-- Icône fixe -->
-                <v-icon large color="primary" class="bullhorn">
+                <v-icon large color="white" class="bullhorn">
                   mdi-bullhorn
                 </v-icon>
 
-                <!-- Texte qui sort -->
                 <div class="status-wrapper">
                   <div class="status-track">
                     <span class="status-item">
-                      {{ shopInfo.shop_status }} &nbsp;&nbsp; • &nbsp;&nbsp;
-                    </span>
-                    <span class="status-item">
-                      {{ shopInfo.shop_status }} &nbsp;&nbsp; • &nbsp;&nbsp;
-                    </span>
-                    <span class="status-item">
-                      {{ shopInfo.shop_status }}
+                      {{ shopStatus }}
                     </span>
                   </div>
                 </div>
@@ -225,71 +206,77 @@
               </v-btn>
             </v-col>
           </v-row>
-          <section class="community-section">
+          <section v-if="socialLinks.length" class="community-section">
           <v-row class="community-heading ma-0">
             <v-col class="pa-0">
-              <h3 class="text-center font-weight-bold mb-1">
+              <h2 class="text-center font-weight-bold mb-1">
                 Nous rejoindre
-              </h3>
+              </h2>
             </v-col>
           </v-row>
           <v-row class="social-links justify-center ma-0">
             <v-btn
+              v-if="shopSocialMedia.instagram"
               class="social-link"
-              v-if="shopInfo.shop_social_media.instagram"
               icon
-              :href="shopInfo.shop_social_media.instagram"
+              :href="shopSocialMedia.instagram"
+              aria-label="Ouvrir Instagram"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <svg width="33" height="33" viewBox="0 0 24 24" fill="#E1306C">
+              <svg aria-hidden="true" focusable="false" width="33" height="33" viewBox="0 0 24 24" fill="#E1306C">
                 <path
                   d="M7.75 2C4.574 2 2 4.574 2 7.75v8.5C2 19.426 4.574 22 7.75 22h8.5C19.426 22 22 19.426 22 16.25v-8.5C22 4.574 19.426 2 16.25 2h-8.5zm0 2h8.5C18.321 4 20 5.679 20 7.75v8.5C20 18.321 18.321 20 16.25 20h-8.5C5.679 20 4 18.321 4 16.25v-8.5C4 5.679 5.679 4 7.75 4zm8.75 1a1 1 0 100 2 1 1 0 000-2zM12 7a5 5 0 100 10 5 5 0 000-10zm0 2a3 3 0 110 6 3 3 0 010-6z"
                 />
               </svg>
             </v-btn>
             <v-btn
+              v-if="shopSocialMedia.facebook"
               class="social-link"
-              v-if="shopInfo.shop_social_media.facebook"
               icon
-              :href="shopInfo.shop_social_media.facebook"
+              :href="shopSocialMedia.facebook"
+              aria-label="Ouvrir Facebook"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <svg width="33" height="33" viewBox="0 0 24 24" fill="#1877F2">
+              <svg aria-hidden="true" focusable="false" width="33" height="33" viewBox="0 0 24 24" fill="#1877F2">
                 <path
                   d="M22 12a10 10 0 10-11.5 9.9v-7h-2.8v-2.9h2.8V9.6c0-2.8 1.7-4.4 4.2-4.4 1.2 0 2.4.2 2.4.2v2.6h-1.3c-1.3 0-1.7.8-1.7 1.6v1.9h2.9l-.5 2.9h-2.4v7A10 10 0 0022 12z"
                 />
               </svg>
             </v-btn>
             <v-btn
-              v-if="shopInfo.shop_social_media.tiktok"
+              v-if="shopSocialMedia.tiktok"
               class="social-link"
               icon
-              :href="shopInfo.shop_social_media.tiktok"
+              :href="shopSocialMedia.tiktok"
+              aria-label="Ouvrir TikTok"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <svg width="33" height="33" viewBox="0 0 24 24" fill="#000000">
+              <svg aria-hidden="true" focusable="false" width="33" height="33" viewBox="0 0 24 24" fill="#000000">
                 <path
                   d="M16 3c.4 2.2 2.2 4 4 4v3c-1.7 0-3.3-.5-4.7-1.4v5.9a5.5 5.5 0 11-5.5-5.5c.3 0 .7 0 1 .1v3.1c-.3-.1-.6-.2-1-.2a2.4 2.4 0 102.4 2.4V3h3.8z"
                 />
               </svg>
             </v-btn>
             <v-btn
-              v-if="shopInfo.shop_social_media.snapchat"
+              v-if="shopSocialMedia.snapchat"
               class="social-link"
               icon
-              :href="shopInfo.shop_social_media.snapchat"
+              :href="shopSocialMedia.snapchat"
+              aria-label="Ouvrir Snapchat"
               target="_blank"
               rel="noopener noreferrer"
             >
               <svg
+                id="Layer_1"
+                aria-hidden="true"
+                focusable="false"
                 viewBox="147.353 39.286 514.631 514.631"
                 width="33"
                 height="33"
                 version="1.1"
-                id="Layer_1"
                 xmlns="http://www.w3.org/2000/svg"
                 xmlns:xlink="http://www.w3.org/1999/xlink"
                 xml:space="preserve"
@@ -330,7 +317,7 @@
         </v-col>
         <v-row class="page-footer ma-0">
           <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-            <h6>SmartEat.fr © 2026</h6>
+            <small>SmartEat.fr © 2026</small>
           </v-col>
         </v-row>
       </div>
@@ -392,6 +379,44 @@ export default {
         kitchen_closed: this.$store.get('shop/kitchen_closed'),
       }
     },
+    shopHours() {
+      return Array.isArray(this.shopInfo.shop_hours)
+        ? this.shopInfo.shop_hours.map(
+            (openingHours) =>
+              openingHours && typeof openingHours === 'object' ? openingHours : {}
+          )
+        : []
+    },
+    shopSocialMedia() {
+      const socialMedia = this.shopInfo.shop_social_media
+      if (!socialMedia || typeof socialMedia !== 'object') return {}
+
+      return ['instagram', 'facebook', 'tiktok', 'snapchat'].reduce(
+        (normalizedSocialMedia, network) => {
+          const href = socialMedia[network]
+          if (typeof href === 'string' && href.trim()) {
+            normalizedSocialMedia[network] = href.trim()
+          }
+          return normalizedSocialMedia
+        },
+        {}
+      )
+    },
+    shopStatus() {
+      return typeof this.shopInfo.shop_status === 'string'
+        ? this.shopInfo.shop_status.trim()
+        : ''
+    },
+    socialLinks() {
+      return [
+        { name: 'Instagram', href: this.shopSocialMedia.instagram },
+        { name: 'Facebook', href: this.shopSocialMedia.facebook },
+        { name: 'TikTok', href: this.shopSocialMedia.tiktok },
+        { name: 'Snapchat', href: this.shopSocialMedia.snapchat },
+      ].filter((socialLink) =>
+        typeof socialLink.href === 'string' && socialLink.href.trim()
+      )
+    },
     isKitchenClosed() {
       return [true, 1, '1', 'true'].includes(this.shopInfo.kitchen_closed)
     },
@@ -406,14 +431,26 @@ export default {
 
       // getDay() → 0 = Dimanche ... 6 = Samedi
       // On convertit pour que 0 = Lundi ... 6 = Dimanche
-      const todayData = this.shopInfo.shop_hours[this.currentDayIndex]
+      const todayData = this.shopHours[this.currentDayIndex]
       if (!todayData || !todayData.isOpen) return false
 
       const currentHour = now.getHours()
       const from = Number(todayData.from)
       const to = Number(todayData.to)
+      const isValidHour = (value) =>
+        value !== null &&
+        value !== undefined &&
+        String(value).trim() !== '' &&
+        Number.isFinite(Number(value)) &&
+        Number(value) >= 0 &&
+        Number(value) <= 24
 
-      return currentHour >= from && currentHour < to
+      return (
+        isValidHour(todayData.from) &&
+        isValidHour(todayData.to) &&
+        currentHour >= from &&
+        currentHour < to
+      )
     },
   },
   async mounted() {
@@ -449,6 +486,36 @@ export default {
     //   })
   },
   methods: {
+    formatOpeningHours(openingHours) {
+      if (!openingHours || typeof openingHours !== 'object') {
+        return 'Horaires non renseignés'
+      }
+      if (!Object.prototype.hasOwnProperty.call(openingHours, 'isOpen')) {
+        return 'Horaires non renseignés'
+      }
+      if (!openingHours.isOpen) return 'Fermé'
+
+      const from = Number(openingHours.from)
+      const to = Number(openingHours.to)
+      const hasValidHour = (hour) =>
+        Number.isFinite(hour) && hour >= 0 && hour <= 24
+      const hasHourValue = (hour) =>
+        hour !== null && hour !== undefined && String(hour).trim() !== ''
+      if (
+        !hasHourValue(openingHours.from) ||
+        !hasHourValue(openingHours.to) ||
+        !hasValidHour(from) ||
+        !hasValidHour(to)
+      ) {
+        return 'Horaires non renseignés'
+      }
+      if (from === 0 && to === 0) return 'Fermé'
+
+      return `${String(from).padStart(2, '0')}:00 - ${String(to).padStart(
+        2,
+        '0'
+      )}:00`
+    },
     async loadShowcaseProducts() {
       try {
         const response = await this.$axios.get(
@@ -514,20 +581,6 @@ export default {
 
 .status-item {
   font-weight: 500;
-}
-
-.status-item:not(:first-child) {
-  display: none;
-}
-
-/* Défile vers la droite */
-@keyframes scroll-right {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(0%);
-  }
 }
 
 .social-icon {
@@ -743,9 +796,9 @@ export default {
 }
 
 .product-showcase__track {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   overflow: visible;
   padding: 0;
   scroll-snap-type: none;
@@ -755,6 +808,7 @@ export default {
   border: 0;
   border-radius: 16px;
   box-shadow: 0 5px 8px rgba(20, 21, 22, 0.15);
+  flex: 1 1 calc(50% - 6px);
   min-width: 0;
   overflow: hidden;
   transform: none;
@@ -860,23 +914,8 @@ export default {
     display: inline-flex !important;
   }
 
-  .product-showcase__track {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .product-showcase__card:nth-child(n) {
-    grid-column: auto;
-  }
-
-  .product-showcase__card:nth-child(1),
-  .product-showcase__card:nth-child(8) {
-    grid-column: span 2;
-    grid-row: span 2;
-  }
-
-  .product-showcase__card:nth-child(11),
-  .product-showcase__card:nth-child(12) {
-    grid-column: span 2;
+  .product-showcase__card {
+    flex-basis: calc(25% - 9px);
   }
 
   .order-cta {
