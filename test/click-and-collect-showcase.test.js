@@ -55,6 +55,10 @@ assert.match(
   /@media \(min-width: 768px\)[\s\S]*?\.order-cta[\s\S]*?display: none !important;/
 )
 assert.match(pageSource, /@media \(prefers-reduced-motion: reduce\)/)
+assert.match(
+  pageSource,
+  /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.social-icon,[\s\S]*?\.v-btn svg[\s\S]*?transition: none !important;/
+)
 const script = pageSource.match(/<script>([\s\S]*?)<\/script>/)[1]
 const moduleRef = { exports: {} }
 

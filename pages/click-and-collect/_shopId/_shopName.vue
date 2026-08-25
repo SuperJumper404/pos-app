@@ -898,7 +898,9 @@ export default {
 
 @media (prefers-reduced-motion: reduce) {
   .status-track,
-  .product-showcase__image ::v-deep .v-image__image {
+  .product-showcase__image ::v-deep .v-image__image,
+  .social-icon,
+  .v-btn svg {
     animation: none !important;
     transition: none !important;
   }
