@@ -32,6 +32,29 @@ assert.ok(storyIndex > practicalIndex, 'la présentation suit les informations p
 assert.ok(showcaseIndex > storyIndex, 'la galerie suit la présentation')
 assert.match(pageSource, /class="hero-order-action"/)
 assert.match(pageSource, /:class="\{ 'is-today': i === currentDayIndex \}"/)
+assert.match(pageSource, /\.establishment-practical[\s\S]*?display: grid;/)
+assert.match(pageSource, /\.practical-hours__row\.is-today/)
+assert.match(
+  pageSource,
+  /@media \(min-width: 768px\)[\s\S]*?\.hero-order-action[\s\S]*?display: inline-flex;/
+)
+assert.match(
+  pageSource,
+  /\.hero-order-action\s*\{[\s\S]*?display: none !important;/
+)
+assert.match(
+  pageSource,
+  /@media \(min-width: 768px\)[\s\S]*?\.hero-order-action[\s\S]*?display: inline-flex !important;/
+)
+assert.match(
+  pageSource,
+  /@media \(min-width: 768px\)[\s\S]*?\.order-cta[\s\S]*?display: none;/
+)
+assert.match(
+  pageSource,
+  /@media \(min-width: 768px\)[\s\S]*?\.order-cta[\s\S]*?display: none !important;/
+)
+assert.match(pageSource, /@media \(prefers-reduced-motion: reduce\)/)
 const script = pageSource.match(/<script>([\s\S]*?)<\/script>/)[1]
 const moduleRef = { exports: {} }
 

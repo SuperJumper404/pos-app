@@ -119,11 +119,17 @@
               <div
                 v-for="(d, i) in shopInfo.shop_hours"
                 :key="i"
-                class="d-flex justify-space-between align-center py-1"
+                class="practical-hours__row d-flex justify-space-between align-center"
                 :class="{ 'is-today': i === currentDayIndex }"
               >
-                <span class="font-weight-medium">
+                <span class="practical-hours__day">
                   {{ d.dayName }}
+                  <span
+                    v-if="i === currentDayIndex"
+                    class="practical-hours__today-label"
+                  >
+                    Aujourd'hui
+                  </span>
                 </span>
 
                 <span>
@@ -498,17 +504,20 @@ export default {
 
 .status-wrapper {
   overflow: hidden;
-  white-space: nowrap;
+  white-space: normal;
   flex: 1;
 }
 
 .status-track {
-  display: inline-flex;
-  animation: scroll-right 15s linear infinite;
+  display: block;
 }
 
 .status-item {
   font-weight: 500;
+}
+
+.status-item:not(:first-child) {
+  display: none;
 }
 
 /* Défile vers la droite */
@@ -623,7 +632,10 @@ export default {
 }
 
 .hero-content a {
+  align-items: center;
   color: rgba(255, 255, 255, 0.9) !important;
+  display: inline-flex;
+  min-height: 44px;
   text-decoration-color: rgba(255, 255, 255, 0.4);
   text-underline-offset: 3px;
 }
@@ -637,8 +649,51 @@ export default {
 }
 
 .hero-order-action {
-  display: none;
+  display: none !important;
   margin: 16px auto 0;
+}
+
+.establishment-practical {
+  background: #fff;
+  border-bottom: 1px solid rgba(20, 21, 22, 0.1);
+  border-top: 1px solid rgba(20, 21, 22, 0.1);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 780px;
+  padding: 24px var(--cc-gutter);
+}
+
+.establishment-practical h3 {
+  text-wrap: balance;
+}
+
+.practical-hours__row {
+  border-bottom: 1px solid rgba(20, 21, 22, 0.1);
+  gap: 16px;
+  min-height: 44px;
+}
+
+.practical-hours__row:last-child {
+  border-bottom: 0;
+}
+
+.practical-hours__day {
+  align-items: baseline;
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-weight: 500;
+  gap: 4px;
+}
+
+.practical-hours__today-label {
+  color: var(--cc-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.practical-hours__row.is-today {
+  font-weight: 700;
 }
 
 .establishment-story {
@@ -762,15 +817,6 @@ export default {
   min-width: 44px;
 }
 
-.opening-hours {
-  padding: 0;
-}
-
-.opening-hours .d-flex {
-  border-bottom: 1px solid rgba(20, 21, 22, 0.1);
-  min-height: 40px;
-}
-
 .page-footer {
   color: var(--cc-muted);
   padding: 24px 0 32px;
@@ -810,7 +856,8 @@ export default {
   }
 
   .hero-order-action {
-    display: flex;
+    display: inline-flex;
+    display: inline-flex !important;
   }
 
   .product-showcase__track {
@@ -834,6 +881,7 @@ export default {
 
   .order-cta {
     display: none;
+    display: none !important;
   }
 
   .community-section {
