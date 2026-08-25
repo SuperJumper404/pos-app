@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pr-1 pl-1 pt-1 pb-1">
+  <v-container fluid class="click-collect-page pa-0">
     <!-- <v-card
       v-if="loadPage"
       outlined
@@ -9,13 +9,13 @@
       <Loading />
     </v-card> -->
     <template>
-      <div class="pr-0 pl-0 pt-0 pb-0">
-        <v-col class="pr-0 pl-0 pt-0 pb-0">
+      <div class="click-collect-shell">
+        <v-col class="click-collect-column pa-0">
+          <section class="click-collect-hero">
           <v-img
             :src="shopProfileImageSrc(shopInfo.shop_profile_image)"
-            height="220"
             position="relative"
-            class="shop-profile-image rounded-lg"
+            class="shop-profile-image"
             @error="shopProfileImageFailed = true"
           >
             <!-- Overlay -->
@@ -41,11 +41,12 @@
             </v-container> -->
           </v-img>
 
-          <v-row class="mt-2 mb-0 pt-0 pb-0">
+          <div class="hero-content">
+          <v-row class="ma-0">
             <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <h2 class="text--white font-weight-bold">
+              <h1 class="hero-title font-weight-bold">
                 {{ shopInfo.shop_name }}
-              </h2>
+              </h1>
             </v-col>
           </v-row>
           <v-row class="mt-0 mb-0 pt-0 pb-0">
@@ -94,9 +95,58 @@
               </v-chip>
             </v-col>
           </v-row>
-          <v-row class="mt-4 mb-0 pt-0 pb-0">
+          <v-btn
+            v-if="clickAndCollectServicePoint"
+            class="hero-order-action"
+            color="primary"
+            rounded
+            large
+            :loading="startingClickAndCollect"
+            @click="goToClickAndCollect"
+          >
+            Commander maintenant
+            <v-icon right>mdi-arrow-top-right</v-icon>
+          </v-btn>
+          </div>
+          </section>
+
+          <section class="establishment-practical">
+          <v-row class="opening-hours ma-0">
+            <v-col class="pa-0">
+              <h3 class="font-weight-bold mb-3">
+                Horaires d'ouverture :
+              </h3>
+              <div
+                v-for="(d, i) in shopInfo.shop_hours"
+                :key="i"
+                class="d-flex justify-space-between align-center py-1"
+                :class="{ 'is-today': i === currentDayIndex }"
+              >
+                <span class="font-weight-medium">
+                  {{ d.dayName }}
+                </span>
+
+                <span>
+                  <template
+                    v-if="
+                      d.isOpen && !(Number(d.from) === 0 && Number(d.to) === 0)
+                    "
+                  >
+                    {{ String(d.from).padStart(2, '0') }}:00 -
+                    {{ String(d.to).padStart(2, '0') }}:00
+                  </template>
+
+                  <template v-else> Fermé </template>
+                </span>
+              </div>
+            </v-col>
+          </v-row>
+          </section>
+
+          <section class="establishment-story">
+          <v-row class="ma-0">
             <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <p class="text--white description-text">
+              <p class="description-text">
                 {{ shopInfo.shop_description }}
               </p>
             </v-col>
@@ -104,7 +154,7 @@
 
           <v-row
             v-if="shopInfo.shop_status.length > 2"
-            class="ml-4 mt-0 mb-0 pt-0 pb-0"
+            class="status-row ma-0"
           >
             <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
               <div class="status-container">
@@ -130,31 +180,56 @@
               </div>
             </v-col>
           </v-row>
-          <v-row class="mt-2 mb-0 pt-0 pb-0">
+          </section>
+
+          <div
+            v-if="showcaseProducts.length"
+            class="product-showcase"
+            role="region"
+            aria-label="Aperçu des produits"
+          >
+            <div class="product-showcase__track">
+              <div
+                v-for="product in showcaseProducts"
+                :key="product.id"
+                class="product-showcase__card"
+              >
+                <v-img
+                  :src="`${staticURL}/api/v1/imgproducts/${product.image}`"
+                  :alt="product.name || 'Produit du restaurant'"
+                  aspect-ratio="1.08"
+                  class="product-showcase__image"
+                />
+              </div>
+            </div>
+          </div>
+
+          <v-row v-if="clickAndCollectServicePoint" class="order-cta ma-0">
             <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <h2 class="text--white font-weight-bold">Commander via</h2>
               <v-btn
-                v-if="clickAndCollectServicePoint"
                 color="primary"
-                class="mt-2"
+                class="order-cta__button"
                 rounded
+                large
                 :loading="startingClickAndCollect"
                 @click="goToClickAndCollect"
               >
-                Click & Collet <v-icon> mdi-arrow-top-right </v-icon>
+                Commander maintenant
+                <v-icon right>mdi-arrow-top-right</v-icon>
               </v-btn>
             </v-col>
           </v-row>
-          <v-row>
-            <v-col class="mt-2 mr-4 ml-4">
-              <h3 class="text-center text--white font-weight-bold mb-1">
+          <section class="community-section">
+          <v-row class="community-heading ma-0">
+            <v-col class="pa-0">
+              <h3 class="text-center font-weight-bold mb-1">
                 Nous rejoindre
               </h3>
             </v-col>
           </v-row>
-          <v-row class="justify-center mt-4 mb-0 pt-0 pb-0">
+          <v-row class="social-links justify-center ma-0">
             <v-btn
-              class="mr-2 ml-2"
+              class="social-link"
               v-if="shopInfo.shop_social_media.instagram"
               icon
               :href="shopInfo.shop_social_media.instagram"
@@ -168,7 +243,7 @@
               </svg>
             </v-btn>
             <v-btn
-              class="mr-2 ml-2"
+              class="social-link"
               v-if="shopInfo.shop_social_media.facebook"
               icon
               :href="shopInfo.shop_social_media.facebook"
@@ -183,7 +258,7 @@
             </v-btn>
             <v-btn
               v-if="shopInfo.shop_social_media.tiktok"
-              class="mr-2 ml-2"
+              class="social-link"
               icon
               :href="shopInfo.shop_social_media.tiktok"
               target="_blank"
@@ -197,7 +272,7 @@
             </v-btn>
             <v-btn
               v-if="shopInfo.shop_social_media.snapchat"
-              class="mr-2 ml-2"
+              class="social-link"
               icon
               :href="shopInfo.shop_social_media.snapchat"
               target="_blank"
@@ -245,39 +320,11 @@
             </v-btn>
           </v-row>
 
-          <v-row>
-            <v-col class="mt-2 mr-4 ml-4">
-              <h3 class="text--white font-weight-bold mb-1">
-                Horaires d'ouverture :
-              </h3>
-              <div
-                v-for="(d, i) in shopInfo.shop_hours"
-                :key="i"
-                class="d-flex justify-space-between align-center py-1"
-              >
-                <span class="text--white font-weight-medium">
-                  {{ d.dayName }}
-                </span>
-
-                <span class="text--white">
-                  <template
-                    v-if="
-                      d.isOpen && !(Number(d.from) === 0 && Number(d.to) === 0)
-                    "
-                  >
-                    {{ String(d.from).padStart(2, '0') }}:00 -
-                    {{ String(d.to).padStart(2, '0') }}:00
-                  </template>
-
-                  <template v-else> Fermé </template>
-                </span>
-              </div>
-            </v-col>
-          </v-row>
+          </section>
         </v-col>
-        <v-row class="mt-8 mb-0 pt-0 pb-0">
+        <v-row class="page-footer ma-0">
           <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-            <h6 class="text--white">SmartEat.fr © 2026</h6>
+            <h6>SmartEat.fr © 2026</h6>
           </v-col>
         </v-row>
       </div>
@@ -310,6 +357,7 @@ export default {
       shop_identifier: '',
       shopProfileImageFailed: false,
       startingClickAndCollect: false,
+      showcaseProducts: [],
       kitchenClosedSnackbar: false,
       kitchenClosedMessage:
         'La cuisine est fermée. Aucune nouvelle commande possible.',
@@ -341,6 +389,10 @@ export default {
     isKitchenClosed() {
       return [true, 1, '1', 'true'].includes(this.shopInfo.kitchen_closed)
     },
+    currentDayIndex() {
+      const day = new Date().getDay()
+      return day === 0 ? 6 : day - 1
+    },
     isRestaurantOpen() {
       if (this.isKitchenClosed) return false
 
@@ -348,10 +400,7 @@ export default {
 
       // getDay() → 0 = Dimanche ... 6 = Samedi
       // On convertit pour que 0 = Lundi ... 6 = Dimanche
-      const jsDay = now.getDay()
-      const index = jsDay === 0 ? 6 : jsDay - 1
-
-      const todayData = this.shopInfo.shop_hours[index]
+      const todayData = this.shopInfo.shop_hours[this.currentDayIndex]
       if (!todayData || !todayData.isOpen) return false
 
       const currentHour = now.getHours()
@@ -376,6 +425,7 @@ export default {
       'shop/getShopInfoClickAndCollect',
       this.$route.params.shopId
     )
+    await this.loadShowcaseProducts()
 
     const clickandcollectdatafromshop = this.$store.get(
       'shop/clickAndCollectServicePoint'
@@ -393,6 +443,21 @@ export default {
     //   })
   },
   methods: {
+    async loadShowcaseProducts() {
+      try {
+        const response = await this.$axios.get(
+          `/baseurl/api/v1/products/click-and-collect/${this.$route.params.shopId}`
+        )
+        const products = Array.isArray(response.data.data)
+          ? response.data.data
+          : []
+        this.showcaseProducts = products.filter(
+          (product) => product.image && product.image !== 'default.png'
+        )
+      } catch (error) {
+        this.showcaseProducts = []
+      }
+    },
     async goToClickAndCollect() {
       if (this.isKitchenClosed) {
         this.kitchenClosedSnackbar = true
@@ -500,4 +565,294 @@ export default {
     transform: translateX(-33%);
   }
 } */
+
+/* Click & Collect — cinematic vertical direction */
+.click-collect-page {
+  --cc-blue: #1976d2;
+  --cc-ink: #141516;
+  --cc-muted: #5d6268;
+  --cc-surface: #f4f6f8;
+  --cc-gutter: 16px;
+  --cc-section-space: 48px;
+  background: var(--cc-surface);
+  color: var(--cc-ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+}
+
+.click-collect-shell {
+  margin: 0 auto;
+  max-width: 1120px;
+}
+
+.click-collect-hero {
+  height: min(62svh, 560px);
+  min-height: 430px;
+  overflow: hidden;
+  position: relative;
+}
+
+.click-collect-hero::after {
+  background: linear-gradient(
+    180deg,
+    rgba(10, 12, 14, 0.05) 20%,
+    rgba(10, 12, 14, 0.88) 100%
+  );
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.shop-profile-image {
+  height: 100%;
+}
+
+.hero-content {
+  bottom: clamp(24px, 7vw, 48px);
+  color: #fff;
+  left: 50%;
+  max-width: 720px;
+  padding: 0 var(--cc-gutter);
+  position: absolute;
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 2;
+}
+
+.hero-content a {
+  color: rgba(255, 255, 255, 0.9) !important;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 3px;
+}
+
+.hero-title {
+  font-size: clamp(2rem, 9vw, 4.6rem);
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  margin-bottom: 16px;
+  text-wrap: balance;
+}
+
+.hero-order-action {
+  display: none;
+  margin: 16px auto 0;
+}
+
+.establishment-story {
+  margin: 0 auto;
+  max-width: 780px;
+  padding: var(--cc-section-space) var(--cc-gutter) 24px;
+}
+
+.description-text {
+  color: var(--cc-ink);
+  font-size: 1.02rem;
+  line-height: 1.65;
+  margin: 0 auto 24px;
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+.status-row {
+  background: var(--cc-ink);
+  border-radius: 16px;
+  color: #fff;
+  overflow: hidden;
+}
+
+.status-container {
+  width: 100%;
+}
+
+.status-row .bullhorn {
+  background: var(--cc-blue);
+  align-self: stretch;
+  display: flex;
+  margin-right: 16px;
+  padding: 0 16px;
+}
+
+.product-showcase {
+  margin: 0 auto;
+  max-width: 920px;
+  overflow: visible;
+  padding: 24px var(--cc-gutter) var(--cc-section-space);
+}
+
+.product-showcase__track,
+.product-showcase__track::-webkit-scrollbar {
+  scrollbar-width: none;
+}
+
+.product-showcase__track {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: visible;
+  padding: 0;
+  scroll-snap-type: none;
+}
+
+.product-showcase__card {
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 5px 8px rgba(20, 21, 22, 0.15);
+  min-width: 0;
+  overflow: hidden;
+  transform: none;
+}
+
+.product-showcase__card:nth-child(1),
+.product-showcase__card:nth-child(6),
+.product-showcase__card:nth-child(11),
+.product-showcase__card:nth-child(12) {
+  grid-column: 1 / -1;
+}
+
+.product-showcase__image {
+  border-radius: inherit;
+}
+
+.product-showcase__image ::v-deep .v-image__image {
+  background-position: center;
+  background-size: cover;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.order-cta {
+  background: rgba(255, 255, 255, 0.96);
+  bottom: 0;
+  box-shadow: 0 -4px 8px rgba(20, 21, 22, 0.12);
+  left: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  position: fixed;
+  right: 0;
+  z-index: 8;
+}
+
+.order-cta__button {
+  margin: 0;
+  min-height: 48px;
+  width: min(100%, 420px);
+}
+
+.community-section {
+  background: #fff;
+  border-top: 1px solid rgba(20, 21, 22, 0.08);
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: 768px;
+  padding: 32px var(--cc-gutter) 40px;
+}
+
+.community-heading {
+  margin-bottom: 16px !important;
+}
+
+.social-links {
+  gap: 8px;
+  margin-bottom: 32px !important;
+}
+
+.social-links .v-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.opening-hours {
+  padding: 0;
+}
+
+.opening-hours .d-flex {
+  border-bottom: 1px solid rgba(20, 21, 22, 0.1);
+  min-height: 40px;
+}
+
+.page-footer {
+  color: var(--cc-muted);
+  padding: 24px 0 32px;
+}
+
+@supports (animation-timeline: view()) {
+  .product-showcase__image ::v-deep .v-image__image {
+    animation: product-cinematic linear both;
+    animation-range: entry 0% cover 38%;
+    animation-timeline: view();
+  }
+}
+
+@keyframes product-cinematic {
+  from {
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (min-width: 768px) {
+  .click-collect-page {
+    --cc-gutter: 24px;
+    --cc-section-space: 64px;
+    padding: 24px 24px 0 !important;
+  }
+
+  .click-collect-shell {
+    background: #fff;
+    box-shadow: 0 8px 8px rgba(20, 21, 22, 0.1);
+  }
+
+  .click-collect-hero {
+    height: min(72vh, 680px);
+  }
+
+  .hero-order-action {
+    display: flex;
+  }
+
+  .product-showcase__track {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .product-showcase__card:nth-child(n) {
+    grid-column: auto;
+  }
+
+  .product-showcase__card:nth-child(1),
+  .product-showcase__card:nth-child(8) {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+
+  .product-showcase__card:nth-child(11),
+  .product-showcase__card:nth-child(12) {
+    grid-column: span 2;
+  }
+
+  .order-cta {
+    display: none;
+  }
+
+  .community-section {
+    padding-bottom: var(--cc-section-space);
+    padding-top: var(--cc-section-space);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .product-showcase__card:hover .product-showcase__image ::v-deep .v-image__image {
+    transform: scale(1.035);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-track,
+  .product-showcase__image ::v-deep .v-image__image {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 </style>
