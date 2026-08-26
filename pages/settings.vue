@@ -20,7 +20,7 @@
           <ImageCropper
             v-model="shopImg"
             :preview-url-prop="imageUrl"
-            :ratio="4 / 1"
+            :ratio="16 / 5"
           />
 
           <v-row class="mt-8 pt-4 d-flex justify-center">
