@@ -14,6 +14,8 @@ const clearAuthState = (state) => {
   user.access = null
   user.token = null
   user.shopid = null
+  user.module_permissions = null
+  user.is_primary_admin = false
 }
 
 const isAuthStateCleared = (state) => {
@@ -25,7 +27,9 @@ const isAuthStateCleared = (state) => {
     (user.id === null &&
       user.access === null &&
       user.token === null &&
-      user.shopid === null)
+      user.shopid === null &&
+      user.module_permissions === null &&
+      user.is_primary_admin === false)
   )
 }
 
@@ -47,6 +51,8 @@ const sanitizedAuthSnapshot = (state) => {
             access: null,
             token: null,
             shopid: null,
+            module_permissions: null,
+            is_primary_admin: false,
           },
         }),
       },
@@ -60,6 +66,8 @@ export default function ({ $axios, redirect, store }) {
     localStorage.removeItem('access')
     localStorage.removeItem('token')
     localStorage.removeItem('shopid')
+    localStorage.removeItem('module_permissions')
+    localStorage.removeItem('is_primary_admin')
   }
 
   const markAuthRedirect = async () => {

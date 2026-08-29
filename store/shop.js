@@ -1,4 +1,8 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
+import {
+  DEFAULT_DISCOUNT_PERCENTAGES,
+  normalizeDiscountPercentages,
+} from '../helpers/discount'
 const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 
 export const state = () => ({
@@ -6,12 +10,18 @@ export const state = () => ({
   shop_name: '',
   shop_adress: '',
   shop_siret: '',
+  shop_naf: '',
+  shop_vat_number: '',
+  receipt_review_qr_url: '',
+  receipt_review_qr_label: '',
+  cash_register_number: '',
   shop_phone: '',
   shop_mail: '',
   shop_description: '',
   shop_hours: '',
   shop_social_media: '',
   shop_payment_methods: '',
+  shop_discount_percentages: DEFAULT_DISCOUNT_PERCENTAGES,
   shop_profile_image: '',
   shop_status: '',
   shop_printer_ip: '',
@@ -19,7 +29,7 @@ export const state = () => ({
   auto_print_order_tickets: false,
   activate_tva: false,
   kitchen_closed: false,
-  clickAndCollectTable: '',
+  clickAndCollectServicePoint: null,
   qr_payment_mode: 'stripe_before_order',
   stripe_connected: false,
   stripe_onboarding_complete: false,
@@ -57,6 +67,23 @@ export const actions = {
         dispatch('set/shop_name', response.data.data[0].shop_name)
         dispatch('set/shop_adress', response.data.data[0].shop_adress)
         dispatch('set/shop_siret', response.data.data[0].shop_siret)
+        dispatch('set/shop_naf', response.data.data[0].shop_naf || '')
+        dispatch(
+          'set/shop_vat_number',
+          response.data.data[0].shop_vat_number || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_url',
+          response.data.data[0].receipt_review_qr_url || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_label',
+          response.data.data[0].receipt_review_qr_label || ''
+        )
+        dispatch(
+          'set/cash_register_number',
+          response.data.data[0].cash_register_number || ''
+        )
         dispatch('set/activate_tva', response.data.data[0].activate_tva)
         dispatch('set/shop_phone', response.data.data[0].shop_phone)
         dispatch('set/shop_status', response.data.data[0].shop_status)
@@ -80,6 +107,14 @@ export const actions = {
           JSON.parse(response.data.data[0].shop_payment_methods)
         )
         dispatch(
+          'set/shop_discount_percentages',
+          normalizeDiscountPercentages(
+            response.data.data[0].discount_percentages
+              ? JSON.parse(response.data.data[0].discount_percentages)
+              : DEFAULT_DISCOUNT_PERCENTAGES
+          )
+        )
+        dispatch(
           'set/shop_profile_image',
           response.data.data[0].shop_profile_image
         )
@@ -88,8 +123,8 @@ export const actions = {
           response.data.data[0].qr_payment_mode || 'stripe_before_order'
         )
         dispatch(
-          'set/clickAndCollectTable',
-          response.data.data[0].clickAndCollectTable
+          'set/clickAndCollectServicePoint',
+          response.data.data[0].clickAndCollectServicePoint
         )
         dispatch(
           'set/stripe_account_id',
@@ -124,16 +159,44 @@ export const actions = {
         dispatch('set/shop_name', response.data.data.shop_name)
         dispatch('set/shop_adress', response.data.data.shop_adress)
         dispatch('set/shop_siret', response.data.data.shop_siret)
+        dispatch('set/shop_naf', response.data.data.shop_naf || '')
+        dispatch(
+          'set/shop_vat_number',
+          response.data.data.shop_vat_number || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_url',
+          response.data.data.receipt_review_qr_url || ''
+        )
+        dispatch(
+          'set/receipt_review_qr_label',
+          response.data.data.receipt_review_qr_label || ''
+        )
+        dispatch(
+          'set/cash_register_number',
+          response.data.data.cash_register_number || ''
+        )
         dispatch('set/shop_phone', response.data.data.shop_phone)
         dispatch('set/shop_status', response.data.data.shop_status)
         dispatch('set/kitchen_closed', response.data.data.kitchen_closed)
         dispatch('set/shop_mail', response.data.data.shop_mail)
         dispatch('set/shop_description', response.data.data.shop_description)
+        dispatch('set/shop_printer_ip', response.data.data.shop_printer_ip)
+        dispatch('set/smart_print_app', response.data.data.smart_print_app)
+        dispatch('set/activate_tva', response.data.data.activate_tva)
         console.log('Open Hours', JSON.parse(response.data.data.hours))
         dispatch('set/shop_hours', JSON.parse(response.data.data.hours))
         dispatch(
           'set/shop_payment_methods',
           JSON.parse(response.data.data.shop_payment_methods)
+        )
+        dispatch(
+          'set/shop_discount_percentages',
+          normalizeDiscountPercentages(
+            response.data.data.discount_percentages
+              ? JSON.parse(response.data.data.discount_percentages)
+              : DEFAULT_DISCOUNT_PERCENTAGES
+          )
         )
         dispatch(
           'set/shop_profile_image',
@@ -144,8 +207,8 @@ export const actions = {
           response.data.data.qr_payment_mode || 'stripe_before_order'
         )
         dispatch(
-          'set/clickAndCollectTable',
-          response.data.data.clickAndCollectTable
+          'set/clickAndCollectServicePoint',
+          response.data.data.clickAndCollectServicePoint
         )
         dispatch(
           'set/shop_social_media',

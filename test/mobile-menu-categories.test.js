@@ -53,14 +53,17 @@ assert.match(
   /<v-chip[\s\S]*?mobile-category-chip/,
   'mobile category tabs must use Vuetify chips'
 )
+const mobileCategoryChip = menusSource.match(
+  /<v-chip[\s\S]*?class="mobile-category-chip"[\s\S]*?<\/v-chip>/
+)[0]
 assert.match(
   menusSource,
   /:outlined="category === activeMobileCategory"/,
   'only the active category chip must be outlined'
 )
-assert.match(
-  menusSource,
-  /:color="undefined"/,
+assert.doesNotMatch(
+  mobileCategoryChip,
+  /(^|\s):?color=/,
   'category chips must not use filled colors'
 )
 assert.match(

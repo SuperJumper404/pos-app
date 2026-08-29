@@ -24,7 +24,7 @@
     >
       <Loading />
     </v-card>
-    <v-card v-else outlined class="mt-5">
+    <v-card v-else outlined class="mt-5 history-panel-card">
       <v-app-bar flat color="grey lighten-4" light>
         <v-spacer></v-spacer>
         <v-spacer></v-spacer>
@@ -34,7 +34,8 @@
           <v-btn
             v-if="selectedOrders.length"
             color="red"
-            elevation="3"
+            depressed
+            elevation="0"
             style="color: white; height: 40px; margin: 0px 8px 2px 0px"
             :loading="deleteLoading"
             @click="deleteSelectedOrders()"
@@ -44,12 +45,12 @@
         </div>
         <v-text-field
           v-model="searchFilter"
-          class="mt-6"
+          class="se-search-field"
           placeholder="Rechercher une commande, table ou client"
-          label="Rechercher une commande, table ou client"
           outlined
           dense
-          append-icon="mdi-card-search"
+          hide-details
+          prepend-inner-icon="mdi-magnify"
         ></v-text-field>
       </v-app-bar>
       <v-data-table
@@ -73,7 +74,14 @@
               v-for="(itm, i) in getArchivedOrderDetailsByOrderId(item.id)"
               :key="i"
               outlined
-              class="mb-3 d-flex justify-space-evenly align-items-center pa-2"
+              class="
+                mb-3
+                d-flex
+                justify-space-evenly
+                align-items-center
+                pa-2
+                history-detail-card
+              "
             >
               <v-img
                 :src="productImageSrc(itm.image)"
@@ -153,6 +161,8 @@
                   fab
                   small
                   dark
+                  depressed
+                  elevation="0"
                 >
                   {{ itm.qty }}</v-btn
                 >
@@ -184,6 +194,11 @@
                 </div>
               </v-card-text>
             </v-card>
+            <VatBreakdown
+              v-if="isTvaActive"
+              :details="getArchivedOrderDetailsByOrderId(item.id)"
+              class="mt-3 mb-3"
+            />
           </td>
         </template>
         <template #[`item.created`]="{ item }">
@@ -193,6 +208,12 @@
         </template>
         <template #[`item.subtotal`]="{ item }">
           <div>{{ formatCurrency(item.subtotal) }}</div>
+        </template>
+        <template #[`item.taken_by_name`]="{ item }">
+          {{ item.taken_by_name || 'Non attribuee' }}
+        </template>
+        <template #[`item.prepared_by_name`]="{ item }">
+          {{ item.prepared_by_name || 'Non attribuee' }}
         </template>
         <template #[`item.payment_status`]="{ item }">
           <v-chip small dark :color="paymentStatusColor(item)">
@@ -236,6 +257,7 @@
 </template>
 <script>
 import TakeawayChip from '@/components/orders/TakeawayChip'
+import VatBreakdown from '@/components/orders/VatBreakdown'
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
@@ -245,7 +267,7 @@ const {
   getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
 export default {
-  components: { TakeawayChip },
+  components: { TakeawayChip, VatBreakdown },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {
@@ -267,6 +289,8 @@ export default {
         },
         { text: 'Table', value: 'username', filterable: true },
         { text: 'Client', value: 'customer', filterable: true },
+        { text: 'Prise par', value: 'taken_by_name', filterable: true },
+        { text: 'Preparee par', value: 'prepared_by_name', filterable: true },
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true },
         { text: 'Paiement', value: 'payment_status', filterable: true },
@@ -307,6 +331,11 @@ export default {
     },
     detailArchivedOrder() {
       return this.$store.get('history/detailArchivedOrder')
+    },
+    isTvaActive() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/activate_tva')
+      )
     },
     message() {
       return this.$store.get('history/message')
@@ -390,6 +419,24 @@ export default {
 }
 </script>
 <style scoped>
+.history-panel-card,
+.history-detail-card {
+  box-shadow: none !important;
+}
+
+.history-detail-card:first-child {
+  margin-top: 8px;
+}
+
+.history-panel-card ::v-deep .v-data-table,
+.history-panel-card ::v-deep .v-data-table__wrapper,
+.history-panel-card ::v-deep .v-data-table__expanded,
+.history-panel-card ::v-deep .v-data-table__expanded__content,
+.history-panel-card ::v-deep .v-toolbar,
+.history-panel-card ::v-deep .v-btn {
+  box-shadow: none !important;
+}
+
 .history-detail-image {
   flex: 0 0 auto;
   min-width: 128px;

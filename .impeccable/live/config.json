@@ -1,0 +1,6 @@
+{
+  "files": ["layouts/default.vue", "layouts/clientside.vue", "layouts/empty.vue"],
+  "insertBefore": "</v-app>",
+  "commentSyntax": "html",
+  "cspChecked": true
+}

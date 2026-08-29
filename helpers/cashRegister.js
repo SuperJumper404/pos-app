@@ -54,8 +54,23 @@ const toAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0
 }
 
+const isTemporaryCounterPayment = (order = {}) => {
+  const payment = String(order.payment || order.used_payment_method || '')
+    .trim()
+    .toLowerCase()
+  return payment.includes('comptoir') || payment.includes('encaisser')
+}
+
 const isCashRegisterOrderPaid = (order = {}) =>
-  order.payment_status === PAID_STATUS
+  order.payment_status === PAID_STATUS && !isTemporaryCounterPayment(order)
+
+const isReleasedStripeOrder = (order = {}) =>
+  order.payment_status === 'requires_payment' &&
+  order.payment_provider === 'stripe' &&
+  order.stock_reservation_status === 'released'
+
+const isCashRegisterOrderArchivable = (order = {}) =>
+  !isReleasedStripeOrder(order)
 
 const resolveRetryDueOrderIds = ({
   failedOrderIds,
@@ -109,7 +124,7 @@ const resolveRetryDueOrderIds = ({
 }
 
 const getCashRegisterPaymentSummary = (orders = []) =>
-  orders.reduce(
+  orders.filter(isCashRegisterOrderArchivable).reduce(
     (summary, order) => {
       const amount = toAmount(order.subtotal)
       const orderId = Number(order.id)
@@ -144,7 +159,7 @@ const getCashRegisterPaymentSummary = (orders = []) =>
   )
 
 const buildCashRegisterCustomerRows = (orders = []) => {
-  const groupedOrders = orders.reduce((groups, order) => {
+  const groupedOrders = orders.filter(isCashRegisterOrderArchivable).reduce((groups, order) => {
     const customer = order.customer || 'Client'
     if (!groups[customer]) groups[customer] = []
     groups[customer].push(order)
@@ -171,6 +186,7 @@ module.exports = {
   archiveOrdersSafely,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
+  isCashRegisterOrderArchivable,
   isCashRegisterOrderPaid,
   normalizeOrderIds,
   resolveRetryDueOrderIds,

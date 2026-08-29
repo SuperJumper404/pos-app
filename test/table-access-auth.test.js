@@ -40,10 +40,12 @@ const context = {
 }
 
 const responseUser = {
-  id: 21,
   access: 2,
   token: 'fresh-table-session',
   shopid: 8,
+  session_subject: 'service_point',
+  service_point_id: 31,
+  source: 'table_qr',
 }
 
 const axios = {
@@ -52,7 +54,7 @@ const axios = {
     assert.deepStrictEqual(body, { token: 'stable-qr-token' })
     return Promise.resolve({
       data: {
-        data: [responseUser],
+        data: responseUser,
         message: 'Connexion table reussie !',
       },
     })
@@ -63,12 +65,14 @@ actions.postTableAccess
   .call({ $axios: axios }, context, 'stable-qr-token')
   .then((result) => {
     assert.strictEqual(result, true)
-    assert.strictEqual(storage.idUser, '21')
+    assert.strictEqual(storage.idUser, undefined)
     assert.strictEqual(storage.access, '2')
     assert.strictEqual(storage.token, 'fresh-table-session')
     assert.strictEqual(storage.shopid, '8')
+    assert.strictEqual(storage.session_subject, 'service_point')
+    assert.strictEqual(storage.service_point_id, '31')
     assert.deepStrictEqual(dispatches.slice(0, 5), [
-      { type: 'set/user.id', payload: 21, options: undefined },
+      { type: 'set/user.id', payload: null, options: undefined },
       { type: 'set/user.access', payload: 2, options: undefined },
       {
         type: 'set/user.token',
@@ -77,6 +81,10 @@ actions.postTableAccess
       },
       { type: 'set/user.shopid', payload: 8, options: undefined },
       { type: 'setAuthentication', payload: true, options: { root: true } },
+    ])
+    assert.deepStrictEqual(dispatches.slice(5, 7), [
+      { type: 'set/user.module_permissions', payload: null, options: undefined },
+      { type: 'set/user.is_primary_admin', payload: false, options: undefined },
     ])
     console.log('table access auth tests passed')
   })

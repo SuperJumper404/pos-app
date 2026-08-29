@@ -16,6 +16,20 @@
           required
           autofocus
         ></v-text-field>
+        <div class="category-image-field mb-4">
+          <v-avatar size="72" class="mr-4 category-avatar-preview">
+            <v-img v-if="currentImagePreview" :src="currentImagePreview"></v-img>
+            <v-icon v-else>mdi-shape</v-icon>
+          </v-avatar>
+          <v-file-input
+            v-model="formcategory.image"
+            accept="image/png,image/jpeg"
+            label="Image de la catégorie"
+            prepend-icon="mdi-camera"
+            show-size
+            @change="previewImage"
+          ></v-file-input>
+        </div>
         <v-btn color="warning" @click.stop="$router.push('/categories')"
           >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
         >
@@ -46,7 +60,9 @@ export default {
       stsMsg: false,
       formcategory: {
         name: '',
+        image: null,
       },
+      imagePreview: null,
     }
   },
 
@@ -56,6 +72,16 @@ export default {
     },
     message() {
       return this.$store.get('categories/message')
+    },
+    staticurl() {
+      return this.$store.get('staticURL').replace(/\/+$/, '')
+    },
+    currentImagePreview() {
+      if (this.imagePreview) return this.imagePreview
+      const category = this.detailCategory && this.detailCategory[0]
+      return category && category.image
+        ? `${this.staticurl}/api/v1/imgcategories/${category.image}`
+        : null
     },
   },
   mounted() {
@@ -67,7 +93,14 @@ export default {
         this.formcategory.name = this.detailCategory[0].name
       })
   },
+  beforeDestroy() {
+    if (this.imagePreview) URL.revokeObjectURL(this.imagePreview)
+  },
   methods: {
+    previewImage(file) {
+      if (this.imagePreview) URL.revokeObjectURL(this.imagePreview)
+      this.imagePreview = file ? URL.createObjectURL(file) : null
+    },
     async submitEditCategory() {
       this.loadingBtn = true
       const res = await this.$store.dispatch('categories/patchCategory', {
@@ -83,3 +116,14 @@ export default {
   },
 }
 </script>
+<style scoped>
+.category-image-field {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+}
+
+.category-avatar-preview {
+  background: #eef2f7;
+}
+</style>

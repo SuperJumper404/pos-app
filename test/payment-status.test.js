@@ -85,13 +85,13 @@ assert.deepStrictEqual(
   }),
   {
     text: 'À encaisser',
-    color: 'orange',
+    color: 'warning',
   }
 )
 
 assert.deepStrictEqual(getPaymentStatusDisplay({ payment_status: 'unpaid' }), {
   text: 'À encaisser',
-  color: 'orange',
+  color: 'warning',
 })
 
 assert.strictEqual(getPaymentStatusText({ payment_status: 'failed' }), 'Échoué')
@@ -103,6 +103,30 @@ assert.strictEqual(
 assert.strictEqual(
   getPaymentStatusColor({ payment_status: 'canceled' }),
   'warning'
+)
+
+assert.deepStrictEqual(
+  getPaymentStatusDisplay({
+    payment_status: 'paid',
+    payment: 'Paiement au comptoir',
+    source: 'borne',
+  }),
+  {
+    text: 'À encaisser',
+    color: 'warning',
+  }
+)
+
+assert.deepStrictEqual(
+  getPaymentStatusDisplay({
+    payment_status: 'paid',
+    payment: 'Paiement au comptoir',
+    order_source: 'borne',
+  }),
+  {
+    text: 'À encaisser',
+    color: 'warning',
+  }
 )
 
 console.log('paymentStatus tests passed')

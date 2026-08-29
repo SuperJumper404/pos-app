@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="full-width pa-5">
+  <v-container fluid class="orders-page full-width">
     <div>
       <v-alert v-model="errMsg" outlined text type="error">
         <v-row align="center" no-gutters>
@@ -19,51 +19,79 @@
     <v-card
       v-if="loadPage"
       outlined
-      class="mt-5 overflow-y-auto"
+      class="orders-loading-card overflow-y-auto"
       style="height: 350px"
     >
       <Loading />
     </v-card>
-    <v-card v-else ref="ordersCard" outlined class="mt-5 full-width">
-      <v-app-bar flat color="grey lighten-4" light>
-        <div class="kitchen-toggle">
+    <section v-if="!loadPage" class="orders-cockpit">
+      <div class="orders-cockpit__lead">
+        <div class="orders-cockpit__icon">
+          <v-icon>mdi-format-list-checks</v-icon>
+        </div>
+        <div>
+          <div class="orders-cockpit__title">Flux service</div>
+          <div class="orders-cockpit__meta">
+            {{ servicePulseText }}
+          </div>
+        </div>
+      </div>
+      <div class="orders-cockpit__stats">
+        <div
+          v-for="stat in orderStats"
+          :key="stat.key"
+          :class="['orders-stat', `orders-stat--${stat.tone}`]"
+        >
+          <div class="orders-stat__icon">
+            <v-icon small>{{ stat.icon }}</v-icon>
+          </div>
+          <div>
+            <div class="orders-stat__value">{{ stat.value }}</div>
+            <div class="orders-stat__label">{{ stat.label }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <v-card v-if="!loadPage" ref="ordersCard" outlined class="orders-card full-width">
+      <v-app-bar flat color="white" light class="orders-toolbar">
+        <div class="orders-kitchen-control kitchen-toggle">
           <v-switch
             :input-value="isKitchenClosed"
             :loading="kitchenToggleLoading"
             :disabled="kitchenToggleLoading"
             :label="isKitchenClosed ? 'Cuisine fermée' : 'Cuisine ouverte'"
-            color="red"
+            :color="isKitchenClosed ? 'warning' : 'success'"
             dense
             hide-details
             inset
-            class="mt-0"
+            class="orders-kitchen-switch mt-0"
             @change="toggleKitchenClosed"
           ></v-switch>
         </div>
 
-        <v-spacer></v-spacer>
+        <div class="orders-toolbar__actions">
+          <v-btn
+            v-if="selectedOrders.length"
+            color="error"
+            dark
+            depressed
+            class="orders-bulk-delete text-none"
+            :loading="deleteLoading"
+            @click="deleteSelectedOrders()"
+            >Supprimer
+            <v-icon small right>mdi-trash-can-outline</v-icon>
+          </v-btn>
 
-        <v-btn
-          v-if="selectedOrders.length"
-          color="red"
-          dark
-          elevation="3"
-          class="mr-3"
-          :loading="deleteLoading"
-          @click="deleteSelectedOrders()"
-          >Supprimer
-          <v-icon small right>mdi-trash-can</v-icon>
-        </v-btn>
-
-        <v-text-field
-          v-model="searchFilter"
-          style="max-width: 320px"
-          placeholder="Rechercher une commande, table ou client"
-          outlined
-          dense
-          hide-details
-          append-icon="mdi-card-search"
-        ></v-text-field>
+          <v-text-field
+            v-model="searchFilter"
+            class="se-search-field orders-search-field"
+            placeholder="Rechercher une commande, table ou client"
+            outlined
+            dense
+            hide-details
+            prepend-inner-icon="mdi-magnify"
+          ></v-text-field>
+        </div>
       </v-app-bar>
       <v-data-table
         v-model="selectedOrders"
@@ -71,7 +99,14 @@
         :items="dataOrders"
         :search="searchFilter"
         :hide-default-header="$vuetify.breakpoint.smAndDown"
+        :items-per-page="20"
+        :footer-props="{
+          'items-per-page-options': [10, 15, 20, { text: 'ALL', value: -1 }],
+          'items-per-page-text': 'Commandes par page',
+        }"
+        class="orders-table"
         show-select
+        @click:row="openOrderDetail"
       >
         <template #[`item.ordernumber`]="{ item }">
           <div class="order-reference">
@@ -80,7 +115,7 @@
               <v-chip
                 v-if="isTakeawayOrder(item)"
                 small
-                color="orange darken-1"
+                color="warning"
                 dark
                 class="order-reference__takeaway-icon"
                 aria-label="À emporter"
@@ -95,7 +130,7 @@
           </div>
         </template>
         <template #[`item.subtotal`]="{ item }">
-          <div>{{ formatCurrency(item.subtotal) }}</div>
+          <div class="orders-total-cell">{{ formatCurrency(item.subtotal) }}</div>
         </template>
         <template #[`item.payment_status`]="{ item }">
           <v-chip
@@ -137,57 +172,57 @@
           </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
-          <v-row class="d-flex flex-nowrap" dense>
-            <v-card-actions v-if="item.status === 1">
+          <div class="orders-actions">
+            <template v-if="item.status === 1">
               <v-btn
                 outlined
                 small
                 color="success"
-                class="text-none"
-                @click="btnApprove(item)"
+                class="orders-action-btn orders-action-btn--approve text-none"
+                @click.stop="btnApprove(item)"
                 >
                 Valider <v-icon small right>mdi-check-circle</v-icon>
               </v-btn>
-            </v-card-actions>
-            <v-card-actions v-if="item.status === 2">
+            </template>
+            <template v-if="item.status === 2">
               <v-btn
                 outlined
                 small
                 color="primary"
-                class="text-none"
-                @click="btnFinish(item.id)"
+                class="orders-action-btn orders-action-btn--finish text-none"
+                @click.stop="btnFinish(item.id)"
                 >Prête <v-icon small right>mdi-check-circle</v-icon>
               </v-btn>
-            </v-card-actions>
-            <v-card-actions>
+            </template>
+            <template>
               <v-btn
                 outlined
                 small
                 color="default"
-                class="text-none"
-                @click="$router.push(`orders/detail/${item.id}`)"
+                class="orders-action-btn orders-action-btn--details text-none"
+                @click.stop="openOrderDetail(item)"
                 >Détails
                 <v-icon small right>mdi-information-outline</v-icon>
               </v-btn>
-            </v-card-actions>
-            <v-card-actions v-if="item.status !== 4 && item.status !== 3">
+            </template>
+            <template v-if="item.status !== 4 && item.status !== 3">
               <v-btn
                 outlined
                 small
                 color="primaryPurple"
-                class="text-none"
+                class="orders-action-btn orders-action-btn--print text-none"
                 :disabled="isOrderPrinting(item)"
                 :loading="isOrderPrinting(item)"
-                @click="printOrderDetails(item)"
+                @click.stop="printOrderDetails(item)"
                 >Imprimer
                 <v-icon small right>mdi-printer-outline</v-icon>
               </v-btn>
               <v-btn
                 outlined
                 small
-                color="red"
-                class="text-none"
-                @click="btnCancel(item)"
+                color="error"
+                class="orders-action-btn orders-action-btn--danger text-none"
+                @click.stop="btnCancel(item)"
                 >{{
                   item.payment_provider === 'stripe' &&
                   item.payment_status === 'paid'
@@ -196,11 +231,108 @@
                 }}
                 <v-icon small right>mdi-close-circle</v-icon>
               </v-btn>
-            </v-card-actions>
-          </v-row>
+            </template>
+          </div>
         </template>
       </v-data-table>
     </v-card>
+    <section v-if="!loadPage" class="orders-lanes" aria-label="Workflow commandes">
+      <article
+        v-for="lane in orderLanes"
+        :key="lane.key"
+        :class="['orders-lane-card', `orders-lane-card--${lane.tone}`]"
+      >
+        <header class="orders-lane-card__header">
+          <div class="orders-lane-card__title-wrap">
+            <span class="orders-lane-card__icon">
+              <v-icon small>{{ lane.icon }}</v-icon>
+            </span>
+            <div>
+              <div class="orders-lane-card__title">{{ lane.label }}</div>
+              <div class="orders-lane-card__hint">{{ lane.hint }}</div>
+            </div>
+          </div>
+          <span class="orders-lane-card__count">
+            {{ laneOrders(lane).length }}
+          </span>
+        </header>
+
+        <div v-if="laneOrders(lane).length" class="orders-lane-card__list">
+          <div
+            v-for="order in laneOrders(lane).slice(0, 4)"
+            :key="`${lane.key}-${order.id}`"
+            class="orders-lane-order"
+            role="button"
+            tabindex="0"
+            @click="openOrderDetail(order)"
+            @keydown.enter="openOrderDetail(order)"
+            @keydown.space.prevent="openOrderDetail(order)"
+          >
+            <div class="orders-lane-order__main">
+              <div class="orders-lane-order__number">
+                #{{ order.ordernumber }}
+              </div>
+              <div class="orders-lane-order__meta">
+                {{ order.service_point_name || 'Sans table' }}
+                <span v-if="order.customer">- {{ order.customer }}</span>
+              </div>
+            </div>
+            <div class="orders-lane-order__side">
+              <div class="orders-lane-order__total">
+                {{ formatCurrency(order.subtotal) }}
+              </div>
+              <v-chip
+                small
+                class="orders-data-chip orders-lane-order__chip"
+                :class="orderLaneChipClass(order)"
+              >
+                {{ orderLaneStatusText(order) }}
+              </v-chip>
+            </div>
+            <div class="orders-lane-order__actions">
+              <v-btn
+                v-if="order.status === 1"
+                small
+                depressed
+                color="success"
+                class="orders-lane-action orders-lane-action--primary text-none"
+                :aria-label="`Valider la commande ${order.ordernumber}`"
+                @click.stop="btnApprove(order)"
+              >
+                <v-icon small left>mdi-check-circle</v-icon>
+                Valider
+              </v-btn>
+              <v-btn
+                v-if="order.status === 2"
+                small
+                depressed
+                color="primary"
+                class="orders-lane-action orders-lane-action--primary text-none"
+                :aria-label="`Marquer la commande ${order.ordernumber} comme prete`"
+                @click.stop="btnFinish(order.id)"
+              >
+                <v-icon small left>mdi-check-bold</v-icon>
+                Prête
+              </v-btn>
+              <v-btn
+                small
+                outlined
+                color="primary"
+                class="orders-lane-action orders-lane-action--secondary text-none"
+                :aria-label="`Voir le detail de la commande ${order.ordernumber}`"
+                @click.stop="openOrderDetail(order)"
+              >
+                <v-icon small left>mdi-information-outline</v-icon>
+                Détails
+              </v-btn>
+            </div>
+          </div>
+        </div>
+        <div v-else class="orders-lane-card__empty">
+          Rien à traiter ici
+        </div>
+      </article>
+    </section>
     <v-dialog v-model="cancelDialog" max-width="350" persistent>
       <v-card>
         <v-card-title>{{ cancelDialogTitle }}</v-card-title>
@@ -234,6 +366,10 @@
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
+import {
+  buildOrderTicketPayload,
+  sendOrderTicket,
+} from '@/helpers/orderTicket'
 const {
   getPaymentStatusText,
   getPaymentStatusColor,
@@ -261,7 +397,7 @@ export default {
           value: 'ordernumber',
           filterable: true,
         },
-        { text: 'Table', value: 'username', filterable: true },
+        { text: 'Table', value: 'service_point_name', filterable: true },
         { text: 'Client', value: 'customer', filterable: true },
         // { text: 'Operateur', value: 'operator' },
         { text: 'Total', value: 'subtotal', filterable: true },
@@ -298,6 +434,71 @@ export default {
       return [true, 1, '1', 'true'].includes(
         this.$store.get('shop/kitchen_closed')
       )
+    },
+    orderStats() {
+      return [
+        {
+          key: 'waiting',
+          label: 'En attente',
+          value: this.countOrdersByStatus(1),
+          icon: 'mdi-timer-sand',
+          tone: 'warning',
+        },
+        {
+          key: 'preparing',
+          label: 'En cuisine',
+          value: this.countOrdersByStatus(2),
+          icon: 'mdi-chef-hat',
+          tone: 'success',
+        },
+        {
+          key: 'done',
+          label: 'Terminees',
+          value: this.countOrdersByStatus(3),
+          icon: 'mdi-check-circle-outline',
+          tone: 'primary',
+        },
+        {
+          key: 'total',
+          label: 'Total service',
+          value: this.dataOrders.length,
+          icon: 'mdi-receipt-text-outline',
+          tone: 'purple',
+        },
+      ]
+    },
+    orderLanes() {
+      return [
+        {
+          key: 'waiting',
+          label: 'En attente',
+          hint: 'Commandes a valider',
+          icon: 'mdi-timer-sand',
+          tone: 'warning',
+        },
+        {
+          key: 'preparing',
+          label: 'En préparation',
+          hint: 'Commandes en cuisine',
+          icon: 'mdi-chef-hat',
+          tone: 'success',
+        },
+        {
+          key: 'closed',
+          label: 'Terminees / Annulees',
+          hint: 'Commandes finalisees',
+          icon: 'mdi-check-circle-outline',
+          tone: 'primary',
+        },
+      ]
+    },
+    activeOrdersCount() {
+      return this.countOrdersByStatus(1) + this.countOrdersByStatus(2)
+    },
+    servicePulseText() {
+      if (this.isKitchenClosed) return 'Cuisine fermée'
+      if (!this.activeOrdersCount) return 'Service a jour'
+      return `${this.activeOrdersCount} commandes actives`
     },
     user() {
       return this.$store.get('users/user')
@@ -368,6 +569,40 @@ export default {
     if (this.fitRaf) cancelAnimationFrame(this.fitRaf)
   },
   methods: {
+    countOrdersByStatus(status) {
+      return this.dataOrders.filter((order) => order.status === status).length
+    },
+    laneOrders(lane) {
+      const laneFilters = {
+        waiting: (order) => order.status === 1,
+        preparing: (order) => order.status === 2,
+        closed: (order) => [3, 4].includes(order.status),
+      }
+      const filter = laneFilters[lane.key] || (() => false)
+      return this.dataOrders.filter(filter)
+    },
+    orderLaneStatusText(order) {
+      const labels = {
+        1: 'En attente',
+        2: 'En préparation',
+        3: 'Terminee',
+        4: 'Annulee',
+      }
+      return labels[order.status] || 'Statut inconnu'
+    },
+    orderLaneChipClass(order) {
+      const classes = {
+        1: 'orders-lane-order__chip--warning',
+        2: 'orders-lane-order__chip--success',
+        3: 'orders-lane-order__chip--primary',
+        4: 'orders-lane-order__chip--warning',
+      }
+      return classes[order.status] || 'orders-lane-order__chip--primary'
+    },
+    openOrderDetail(item) {
+      if (!item || !item.id) return
+      this.$router.push(`orders/detail/${item.id}`)
+    },
     isOrderPrinting(order) {
       return Boolean(order && this.printingOrderIds[order.id])
     },
@@ -381,16 +616,10 @@ export default {
       }
 
       this.$set(this.printingOrderIds, order.id, true)
-      this.$store.dispatch('notifications/info', {
-        message: 'Impression du ticket de commande en cours.',
-        timeout: 3000,
-      })
       return true
     },
     unlockOrderPrint(order) {
-      window.setTimeout(() => {
-        this.$delete(this.printingOrderIds, order.id)
-      }, 4000)
+      this.$delete(this.printingOrderIds, order.id)
     },
     isTakeawayOrder(item) {
       return [true, 1, '1'].includes(item && item.is_takeaway)
@@ -412,65 +641,29 @@ export default {
     },
     async printOrderDetails(order) {
       if (!this.lockOrderPrint(order)) return
-      console.log('Print order details for order', order)
       try {
         await this.$store.dispatch('orders/getDetailOrder', order.id)
         const orderDetails = await this.$store.get('orders/detailOrder')
-        const orderInfo = {
-          table: order.username,
-          client: order.customer,
-          created: order.created,
-          total: orderDetails.reduce(
-            (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
-            0
-          ),
-          paymentMethod: order.payment,
-          remark: order.remark,
-        }
+        const payload = buildOrderTicketPayload({
+          order,
+          details: orderDetails,
+          shopInfo: this.shopInfo,
+        })
 
         if (this.shopInfo.smart_print_app) {
-          // genereate ESC/POS data
-          console.log('Generating ESC/POS data for Smart Print...')
-          const escposBuffer = this.generateEscPos(
-            orderDetails,
-            this.shopInfo,
-            orderInfo
-          )
-          console.log('ESC/POS BUFFER:', escposBuffer)
-          const dataFormatESCPOS = escposBuffer.toString('base64')
-
-          const response = await fetch(
-            `http://${this.shopInfo.shop_printer_ip}:8989/print`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ticketType: 'cuisine',
-                dataFormatESCPOS,
-                dataFormatXML: null,
-              }),
-            }
-          )
-          if (!response.ok) throw new Error('Smart Print a refusé le ticket.')
-          this.$store.dispatch('notifications/success', 'Impression envoyée.')
+          sendOrderTicket({
+            payload,
+            smartPrint: true,
+            printerIp: this.shopInfo.shop_printer_ip,
+            dispatch: this.$store.dispatch,
+          })
         } else {
-          console.log('Printing via Cloud Printing Service...')
-          // Envoie au backend pour impression cloud
-          const printed = await this.printReceiptCloud(
-            orderDetails,
-            this.shopInfo,
-            orderInfo
-          )
-          if (!printed) {
-            throw new Error("Impossible d'envoyer le ticket à l'imprimante.")
-          }
+          sendOrderTicket({
+            payload,
+            smartPrint: false,
+            dispatch: this.$store.dispatch,
+          })
         }
-        console.log(
-          'printWithSmartPrint',
-          this.shopInfo.shop_printer_ip,
-          'orderDetails',
-          orderDetails
-        )
       } catch (error) {
         this.$store.dispatch('notifications/error', {
           message: error.message || "L'impression a échoué.",
@@ -961,16 +1154,465 @@ export default {
 }
 </script>
 <style scoped>
+.orders-page {
+  background: var(--se-color-bg);
+  padding: 20px;
+}
+
+.orders-cockpit {
+  align-items: stretch;
+  display: flex;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.orders-cockpit__lead,
+.orders-stat {
+  background: var(--se-color-surface);
+  border: 1px solid var(--se-color-border);
+  border-radius: var(--se-radius-md);
+}
+
+.orders-cockpit__lead {
+  align-items: center;
+  display: flex;
+  flex: 1 1 280px;
+  gap: 14px;
+  min-height: 82px;
+  padding: 16px;
+}
+
+.orders-cockpit__icon,
+.orders-stat__icon {
+  align-items: center;
+  border-radius: var(--se-radius-lg);
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+.orders-cockpit__icon {
+  background: var(--se-color-primary-soft);
+  color: var(--se-color-primary);
+  height: 46px;
+  width: 46px;
+}
+
+.orders-cockpit__icon .v-icon {
+  color: var(--se-color-primary);
+}
+
+.orders-cockpit__title {
+  color: var(--se-color-text);
+  font-size: var(--se-font-title-sm);
+  font-weight: var(--se-weight-bold);
+  line-height: var(--se-line-tight);
+}
+
+.orders-cockpit__meta {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-medium);
+  margin-top: 4px;
+}
+
+.orders-cockpit__stats {
+  display: grid;
+  flex: 2 1 640px;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(132px, 1fr));
+}
+
+.orders-stat {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-height: 82px;
+  padding: 14px;
+  transition:
+    background-color var(--se-transition-fast),
+    border-color var(--se-transition-fast),
+    transform var(--se-transition-fast);
+}
+
+.orders-stat:hover {
+  background: #fbfdff;
+  border-color: #cfd9e7;
+  transform: translateY(-1px);
+}
+
+.orders-stat__icon {
+  height: 36px;
+  width: 36px;
+}
+
+.orders-stat__value {
+  color: var(--se-color-text);
+  font-size: var(--se-font-title);
+  font-weight: var(--se-weight-bold);
+  line-height: 1;
+}
+
+.orders-stat__label {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-caption);
+  font-weight: var(--se-weight-semibold);
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.orders-stat--warning .orders-stat__icon {
+  background: var(--se-color-warning-soft);
+}
+
+.orders-stat--warning .v-icon {
+  color: var(--se-color-warning);
+}
+
+.orders-stat--success .orders-stat__icon {
+  background: var(--se-color-success-soft);
+}
+
+.orders-stat--success .v-icon {
+  color: var(--se-color-success);
+}
+
+.orders-stat--primary .orders-stat__icon {
+  background: var(--se-color-primary-soft);
+}
+
+.orders-stat--primary .v-icon {
+  color: var(--se-color-primary);
+}
+
+.orders-stat--purple .orders-stat__icon {
+  background: var(--se-color-brand-purple-soft);
+}
+
+.orders-stat--purple .v-icon {
+  color: var(--se-color-brand-purple);
+}
+
+.orders-lanes {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  margin-top: 14px;
+}
+
+.orders-lane-card {
+  background: var(--se-color-surface);
+  border: 1px solid var(--se-color-border);
+  border-radius: var(--se-radius-md);
+  overflow: hidden;
+}
+
+.orders-lane-card__header {
+  align-items: center;
+  background: var(--se-color-surface-muted);
+  border-bottom: 1px solid var(--se-color-border-soft);
+  display: flex;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 14px;
+}
+
+.orders-lane-card__title-wrap {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.orders-lane-card__icon {
+  align-items: center;
+  border-radius: var(--se-radius-lg);
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.orders-lane-card__title {
+  color: var(--se-color-text);
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-bold);
+  line-height: var(--se-line-tight);
+}
+
+.orders-lane-card__hint {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-caption);
+  font-weight: var(--se-weight-medium);
+  margin-top: 3px;
+}
+
+.orders-lane-card__count {
+  align-items: center;
+  background: var(--se-color-surface);
+  border: 1px solid var(--se-color-border-soft);
+  border-radius: var(--se-radius-pill);
+  color: var(--se-color-text);
+  display: inline-flex;
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-bold);
+  height: 30px;
+  justify-content: center;
+  min-width: 30px;
+  padding: 0 9px;
+}
+
+.orders-lane-card--warning .orders-lane-card__icon {
+  background: var(--se-color-warning-soft);
+}
+
+.orders-lane-card--warning .v-icon {
+  color: var(--se-color-warning);
+}
+
+.orders-lane-card--success .orders-lane-card__icon {
+  background: var(--se-color-success-soft);
+}
+
+.orders-lane-card--success .v-icon {
+  color: var(--se-color-success);
+}
+
+.orders-lane-card--primary .orders-lane-card__icon {
+  background: var(--se-color-primary-soft);
+}
+
+.orders-lane-card--primary .v-icon {
+  color: var(--se-color-primary);
+}
+
+.orders-lane-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.orders-lane-order {
+  background: var(--se-color-surface);
+  border: 1px solid var(--se-color-border-soft);
+  border-radius: var(--se-radius-sm);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+  transition:
+    background-color var(--se-transition-fast),
+    border-color var(--se-transition-fast);
+}
+
+.orders-lane-order:hover {
+  background: #fbfdff;
+  border-color: #cfd9e7;
+}
+
+.orders-lane-order:focus-visible {
+  border-color: var(--se-color-primary);
+  outline: 3px solid rgba(25, 118, 210, 0.22);
+  outline-offset: 2px;
+}
+
+.orders-lane-order__main {
+  min-width: 0;
+}
+
+.orders-lane-order__number {
+  align-items: center;
+  color: var(--se-color-text);
+  display: flex;
+  font-size: var(--se-font-body);
+  font-weight: var(--se-weight-bold);
+  gap: 7px;
+  line-height: var(--se-line-tight);
+}
+
+.orders-lane-order__meta {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-caption);
+  font-weight: var(--se-weight-medium);
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orders-lane-order__side {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.orders-lane-order__total {
+  color: var(--se-color-text);
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-bold);
+  white-space: nowrap;
+}
+
+.orders-lane-order__chip {
+  font-size: var(--se-font-caption);
+  min-height: 24px;
+}
+
+.orders-lane-order__chip--warning {
+  background: var(--se-color-warning-soft) !important;
+  color: var(--se-color-warning) !important;
+}
+
+.orders-lane-order__chip--success {
+  background: var(--se-color-success-soft) !important;
+  color: var(--se-color-success) !important;
+}
+
+.orders-lane-order__chip--primary {
+  background: var(--se-color-primary-soft) !important;
+  color: var(--se-color-primary) !important;
+}
+
+.orders-lane-order__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  grid-column: 1 / -1;
+}
+
+.orders-lane-action {
+  border-radius: var(--se-radius-sm) !important;
+  font-weight: var(--se-weight-semibold);
+  height: 34px !important;
+  letter-spacing: 0;
+  min-width: 92px !important;
+  padding: 0 10px !important;
+}
+
+::v-deep .orders-lane-action .v-btn__content {
+  gap: 4px;
+  justify-content: center;
+}
+
+.orders-lane-action:focus-visible {
+  outline: 3px solid rgba(25, 118, 210, 0.24);
+  outline-offset: 2px;
+}
+
+.orders-lane-card__empty {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-medium);
+  padding: 18px 14px;
+}
+
+.orders-loading-card,
+.orders-card {
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border) !important;
+  border-radius: var(--se-radius-md) !important;
+  overflow: hidden;
+}
+
+.orders-loading-card {
+  margin-top: 20px;
+}
+
+.orders-card {
+  margin-top: 20px;
+}
+
+.orders-toolbar {
+  border-bottom: 1px solid var(--se-color-border-soft) !important;
+}
+
+::v-deep .orders-toolbar .v-toolbar__content {
+  min-height: 64px;
+  padding: 10px 14px !important;
+}
+
+.orders-toolbar__actions {
+  align-items: center;
+  display: flex;
+  flex: 1 1 720px;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-left: auto;
+  max-width: 720px;
+  min-width: 0;
+}
+
+.orders-kitchen-control {
+  align-items: center;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
+  border-radius: var(--se-radius-pill);
+  display: inline-flex;
+  min-height: 42px;
+  padding: 0 14px 0 10px;
+}
+
+.orders-kitchen-switch {
+  color: var(--se-color-text-body);
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-semibold);
+}
+
+.orders-search-field {
+  flex: 0 0 560px !important;
+  max-width: 560px !important;
+  min-width: 560px !important;
+  width: 560px !important;
+}
+
+.orders-bulk-delete,
+.orders-action-btn {
+  border-radius: var(--se-radius-sm) !important;
+  font-weight: var(--se-weight-semibold);
+  letter-spacing: 0;
+}
+
+.orders-bulk-delete {
+  min-height: 38px;
+}
+
+.orders-table {
+  color: var(--se-color-text-body);
+}
+
 /* Bug connu Vuetify (#10164) : les entetes de v-data-table se desalignent
    selon la largeur quand une cellule d'entete passe sur 2 lignes. On force le
    non-retour a la ligne et un alignement vertical coherent entete/corps. */
 ::v-deep .v-data-table-header th {
+  background: var(--se-color-surface-muted);
+  color: var(--se-color-text-muted) !important;
+  font-size: var(--se-font-caption) !important;
+  font-weight: var(--se-weight-bold) !important;
+  letter-spacing: 0;
   white-space: nowrap;
   vertical-align: middle;
 }
 
 ::v-deep .v-data-table td {
+  border-bottom: 1px solid var(--se-color-border-soft) !important;
+  color: var(--se-color-text-body);
+  font-size: var(--se-font-small);
+  height: 64px;
   vertical-align: middle;
+}
+
+::v-deep .orders-table tbody tr {
+  cursor: pointer;
+  transition:
+    background-color var(--se-transition-fast),
+    box-shadow var(--se-transition-fast);
+}
+
+::v-deep .orders-table tbody tr:hover {
+  background: #fbfdff !important;
 }
 
 .kitchen-toggle {
@@ -983,9 +1625,13 @@ export default {
 }
 
 .order-reference__number {
-  font-size: 22px;
-  font-weight: 700;
-  color: rgba(0, 0, 0, 0.87);
+  align-items: center;
+  color: var(--se-color-text);
+  display: flex;
+  font-size: var(--se-font-title-sm);
+  font-weight: var(--se-weight-bold);
+  gap: 7px;
+  white-space: nowrap;
 }
 
 .order-reference__takeaway-icon {
@@ -1005,7 +1651,113 @@ export default {
 
 .order-reference__date {
   margin-top: 2px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-caption);
+  font-weight: var(--se-weight-medium);
+}
+
+.orders-total-cell {
+  color: var(--se-color-text);
+  font-weight: var(--se-weight-semibold);
+  white-space: nowrap;
+}
+
+.orders-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.orders-action-btn {
+  min-height: 32px;
+}
+
+.orders-action-btn--details {
+  color: var(--se-color-text-body) !important;
+}
+
+.orders-action-btn--danger {
+  border-color: var(--se-color-danger) !important;
+  color: var(--se-color-danger) !important;
+}
+
+@media (max-width: 900px) {
+  .orders-cockpit {
+    flex-direction: column;
+  }
+
+  .orders-cockpit__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .orders-lanes {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .orders-lane-card {
+    flex: 0 0 320px;
+  }
+
+  ::v-deep .orders-toolbar .v-toolbar__content {
+    align-items: stretch;
+    flex-direction: column;
+    height: auto !important;
+  }
+
+  .orders-toolbar__actions {
+    justify-content: flex-start;
+    margin-left: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+  .orders-search-field {
+    flex: 1 1 auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .orders-page {
+    padding: 12px;
+  }
+
+  .orders-cockpit__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .orders-lanes {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .orders-lane-card {
+    flex-basis: auto;
+  }
+
+  .orders-stat__label {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orders-lane-order,
+  .orders-lane-action,
+  .orders-stat,
+  ::v-deep .orders-table tbody tr {
+    transition: none;
+  }
+
+  .orders-lane-order:hover,
+  .orders-stat:hover {
+    transform: none;
+  }
 }
 </style>

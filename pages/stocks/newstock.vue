@@ -121,7 +121,7 @@
 <script>
 export default {
   mixins: [],
-  middleware: 'auth',
+  middleware: ['auth', 'stocks'],
   data: () => ({
     errMsg: false,
     message: '',

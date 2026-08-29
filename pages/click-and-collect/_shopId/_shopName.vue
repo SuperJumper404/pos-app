@@ -1,513 +1,811 @@
 <template>
-  <v-container fluid class="pr-1 pl-1 pt-1 pb-1">
-    <!-- <v-card
-      v-if="loadPage"
-      outlined
-      class="mt-5 overflow-y-auto"
-      style="height: 350px"
-    >
-      <Loading />
-    </v-card> -->
-    <template>
-      <div class="pr-0 pl-0 pt-0 pb-0">
-        <v-col class="pr-0 pl-0 pt-0 pb-0">
-          <v-img
-            :src="shopProfileImageSrc(shopInfo.shop_profile_image)"
-            height="220"
-            position="relative"
-            class="shop-profile-image rounded-lg"
-            @error="shopProfileImageFailed = true"
+  <v-container fluid class="click-collect-page pa-0">
+    <div class="click-collect-shell">
+      <header class="click-collect-hero" aria-labelledby="restaurant-name">
+        <v-img
+          :src="shopProfileImageSrc(shopInfo.shop_profile_image)"
+          height="100%"
+          position="center center"
+          class="hero-image-backdrop"
+          aria-hidden="true"
+        />
+        <v-img
+          :src="shopProfileImageSrc(shopInfo.shop_profile_image)"
+          height="100%"
+          position="center center"
+          contain
+          class="shop-profile-image"
+          @error="shopProfileImageFailed = true"
+        />
+      </header>
+
+      <main class="click-collect-content">
+        <section
+          class="restaurant-profile-summary"
+          aria-labelledby="restaurant-name"
+        >
+          <v-chip
+            small
+            label
+            class="restaurant-status"
+            :class="{
+              'restaurant-status--open': isRestaurantOpen && !isKitchenClosed,
+              'restaurant-status--warning': isRestaurantOpen && isKitchenClosed,
+              'restaurant-status--closed': !isRestaurantOpen,
+            }"
           >
-            <!-- Overlay -->
-            <!-- <v-container
-              fill-height
-              class="d-flex align-center justify-center mt-0 mr-0 ml-0"
-              style="
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.3);
-              "
+            <v-icon left small>
+              {{
+                isRestaurantOpen && !isKitchenClosed
+                  ? 'mdi-door-open'
+                  : 'mdi-door-closed'
+              }}
+            </v-icon>
+            <span v-if="isKitchenClosed">Cuisine fermée</span>
+            <span v-else-if="isRestaurantOpen">Ouvert</span>
+            <span v-else>Fermé actuellement</span>
+          </v-chip>
+
+          <h1 id="restaurant-name" class="restaurant-title">
+            {{ shopInfo.shop_name || 'Restaurant' }}
+          </h1>
+
+          <div class="restaurant-contact" aria-label="Coordonnees du restaurant">
+            <a
+              v-if="shopInfo.shop_adress"
+              :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                shopInfo.shop_adress
+              )}`"
+              target="_blank"
+              rel="noopener"
+              class="restaurant-contact-link restaurant-address-link"
             >
-              <v-row>
-                <v-col class="text-center">
-                  <h2 class="text--white font-weight-bold">
-                    {{ shopInfo.shop_name }}
-                  </h2>
-                </v-col>
-              </v-row>
-            </v-container> -->
-          </v-img>
+              <v-icon small> mdi-map-marker </v-icon>
+              <span>{{ shopInfo.shop_adress }}</span>
+            </a>
 
-          <v-row class="mt-2 mb-0 pt-0 pb-0">
-            <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <h2 class="text--white font-weight-bold">
-                {{ shopInfo.shop_name }}
-              </h2>
-            </v-col>
-          </v-row>
-          <v-row class="mt-0 mb-0 pt-0 pb-0">
-            <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <div class="d-flex justify-center align-center">
-                <v-icon small class="mr-2" color="primary">
-                  mdi-map-marker
-                </v-icon>
+            <a
+              v-if="shopInfo.shop_phone"
+              :href="`tel:${shopInfo.shop_phone}`"
+              class="restaurant-contact-link restaurant-phone-link"
+            >
+              <v-icon small> mdi-phone </v-icon>
+              <span>{{ shopInfo.shop_phone }}</span>
+            </a>
 
-                <a
-                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    shopInfo.shop_adress
-                  )}`"
-                  target="_blank"
-                  class="text--white"
-                >
-                  {{ shopInfo.shop_adress }}
-                </a>
-              </div>
-            </v-col>
-          </v-row>
-          <v-row class="mt-0 mb-0 pt-0 pb-0">
-            <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <div class="d-flex justify-center align-center">
-                <v-icon small class="mr-2" color="primary"> mdi-phone </v-icon>
+            <aside v-if="shopStatus" class="restaurant-status-message">
+              <v-icon color="primary"> mdi-bullhorn-outline </v-icon>
+              <p>{{ shopStatus }}</p>
+            </aside>
+          </div>
 
-                <a :href="`tel:${shopInfo.shop_phone}`" class="text--white">
-                  {{ shopInfo.shop_phone }}
-                </a>
-              </div>
-            </v-col>
-          </v-row>
-          <v-row class="mt-2 mb-0 pt-0 pb-0">
-            <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <v-chip :color="isRestaurantOpen ? 'green' : 'red'" dark small>
-                <v-icon left small>
-                  {{ isRestaurantOpen ? 'mdi-door-open' : 'mdi-door-closed' }}
-                </v-icon>
-                {{
-                  isKitchenClosed
-                    ? 'Cuisine fermée'
-                    : isRestaurantOpen
-                    ? 'Ouvert'
-                    : 'Fermé'
-                }}
-              </v-chip>
-            </v-col>
-          </v-row>
-          <v-row class="mt-4 mb-0 pt-0 pb-0">
-            <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <p class="text--white description-text">
-                {{ shopInfo.shop_description }}
-              </p>
-            </v-col>
-          </v-row>
-
-          <v-row
-            v-if="shopInfo.shop_status.length > 2"
-            class="ml-4 mt-0 mb-0 pt-0 pb-0"
+          <v-btn
+            color="primary"
+            depressed
+            large
+            class="desktop-order-action text-none"
+            :loading="loading"
+            @click="goToClickAndCollect"
           >
-            <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <div class="status-container">
-                <!-- Icône fixe -->
-                <v-icon large color="primary" class="bullhorn">
-                  mdi-bullhorn
-                </v-icon>
+            CLICK & COLLECT
+            <v-icon right> mdi-arrow-right </v-icon>
+          </v-btn>
 
-                <!-- Texte qui sort -->
-                <div class="status-wrapper">
-                  <div class="status-track">
-                    <span class="status-item">
-                      {{ shopInfo.shop_status }} &nbsp;&nbsp; • &nbsp;&nbsp;
-                    </span>
-                    <span class="status-item">
-                      {{ shopInfo.shop_status }} &nbsp;&nbsp; • &nbsp;&nbsp;
-                    </span>
-                    <span class="status-item">
-                      {{ shopInfo.shop_status }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </v-col>
-          </v-row>
-          <v-row class="mt-2 mb-0 pt-0 pb-0">
-            <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-              <h2 class="text--white font-weight-bold">Commander via</h2>
-              <v-btn
-                v-if="
-                  clickAndCollectTable &&
-                  clickAndCollectTable &&
-                  clickAndCollectTable.table_access_token
-                "
-                color="primary"
-                class="mt-2"
-                rounded
-                :href="
-                  isKitchenClosed
-                    ? undefined
-                    : tableAccessUrl(clickAndCollectTable)
-                "
-                target="_blank"
-                @click="goToClickAndCollect"
-              >
-                Click & Collet <v-icon> mdi-arrow-top-right </v-icon>
-              </v-btn>
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col class="mt-2 mr-4 ml-4">
-              <h3 class="text-center text--white font-weight-bold mb-1">
-                Nous rejoindre
-              </h3>
-            </v-col>
-          </v-row>
-          <v-row class="justify-center mt-4 mb-0 pt-0 pb-0">
-            <v-btn
-              class="mr-2 ml-2"
-              v-if="shopInfo.shop_social_media.instagram"
-              icon
-              :href="shopInfo.shop_social_media.instagram"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <svg width="33" height="33" viewBox="0 0 24 24" fill="#E1306C">
-                <path
-                  d="M7.75 2C4.574 2 2 4.574 2 7.75v8.5C2 19.426 4.574 22 7.75 22h8.5C19.426 22 22 19.426 22 16.25v-8.5C22 4.574 19.426 2 16.25 2h-8.5zm0 2h8.5C18.321 4 20 5.679 20 7.75v8.5C20 18.321 18.321 20 16.25 20h-8.5C5.679 20 4 18.321 4 16.25v-8.5C4 5.679 5.679 4 7.75 4zm8.75 1a1 1 0 100 2 1 1 0 000-2zM12 7a5 5 0 100 10 5 5 0 000-10zm0 2a3 3 0 110 6 3 3 0 010-6z"
-                />
-              </svg>
-            </v-btn>
-            <v-btn
-              class="mr-2 ml-2"
-              v-if="shopInfo.shop_social_media.facebook"
-              icon
-              :href="shopInfo.shop_social_media.facebook"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <svg width="33" height="33" viewBox="0 0 24 24" fill="#1877F2">
-                <path
-                  d="M22 12a10 10 0 10-11.5 9.9v-7h-2.8v-2.9h2.8V9.6c0-2.8 1.7-4.4 4.2-4.4 1.2 0 2.4.2 2.4.2v2.6h-1.3c-1.3 0-1.7.8-1.7 1.6v1.9h2.9l-.5 2.9h-2.4v7A10 10 0 0022 12z"
-                />
-              </svg>
-            </v-btn>
-            <v-btn
-              v-if="shopInfo.shop_social_media.tiktok"
-              class="mr-2 ml-2"
-              icon
-              :href="shopInfo.shop_social_media.tiktok"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <svg width="33" height="33" viewBox="0 0 24 24" fill="#000000">
-                <path
-                  d="M16 3c.4 2.2 2.2 4 4 4v3c-1.7 0-3.3-.5-4.7-1.4v5.9a5.5 5.5 0 11-5.5-5.5c.3 0 .7 0 1 .1v3.1c-.3-.1-.6-.2-1-.2a2.4 2.4 0 102.4 2.4V3h3.8z"
-                />
-              </svg>
-            </v-btn>
-            <v-btn
-              v-if="shopInfo.shop_social_media.snapchat"
-              class="mr-2 ml-2"
-              icon
-              :href="shopInfo.shop_social_media.snapchat"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <svg
-                viewBox="147.353 39.286 514.631 514.631"
-                width="33"
-                height="33"
-                version="1.1"
-                id="Layer_1"
-                xmlns="http://www.w3.org/2000/svg"
-                xmlns:xlink="http://www.w3.org/1999/xlink"
-                xml:space="preserve"
-                fill="#000000"
-              >
-                <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-                <g
-                  id="SVGRepo_tracerCarrier"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                ></g>
-                <g id="SVGRepo_iconCarrier">
-                  <path
-                    style="fill: #fffc00"
-                    d="M147.553,423.021v0.023c0.308,11.424,0.403,22.914,2.33,34.268 c2.042,12.012,4.961,23.725,10.53,34.627c7.529,14.756,17.869,27.217,30.921,37.396c9.371,7.309,19.608,13.111,30.94,16.771 c16.524,5.33,33.571,7.373,50.867,7.473c10.791,0.068,21.575,0.338,32.37,0.293c78.395-0.33,156.792,0.566,235.189-0.484 c10.403-0.141,20.636-1.41,30.846-3.277c19.569-3.582,36.864-11.932,51.661-25.133c17.245-15.381,28.88-34.205,34.132-56.924 c3.437-14.85,4.297-29.916,4.444-45.035v-3.016c0-1.17-0.445-256.892-0.486-260.272c-0.115-9.285-0.799-18.5-2.54-27.636 c-2.117-11.133-5.108-21.981-10.439-32.053c-5.629-10.641-12.68-20.209-21.401-28.57c-13.359-12.81-28.775-21.869-46.722-26.661 c-16.21-4.327-32.747-5.285-49.405-5.27c-0.027-0.004-0.09-0.173-0.094-0.255H278.56c-0.005,0.086-0.008,0.172-0.014,0.255 c-9.454,0.173-18.922,0.102-28.328,1.268c-10.304,1.281-20.509,3.21-30.262,6.812c-15.362,5.682-28.709,14.532-40.11,26.347 c-12.917,13.386-22.022,28.867-26.853,46.894c-4.31,16.084-5.248,32.488-5.271,49.008"
-                  ></path>
-                  <path
-                    style="fill: #ffffff"
-                    d="M407.001,473.488c-1.068,0-2.087-0.039-2.862-0.076c-0.615,0.053-1.25,0.076-1.886,0.076 c-22.437,0-37.439-10.607-50.678-19.973c-9.489-6.703-18.438-13.031-28.922-14.775c-5.149-0.854-10.271-1.287-15.22-1.287 c-8.917,0-15.964,1.383-21.109,2.389c-3.166,0.617-5.896,1.148-8.006,1.148c-2.21,0-4.895-0.49-6.014-4.311 c-0.887-3.014-1.523-5.934-2.137-8.746c-1.536-7.027-2.65-11.316-5.281-11.723c-28.141-4.342-44.768-10.738-48.08-18.484 c-0.347-0.814-0.541-1.633-0.584-2.443c-0.129-2.309,1.501-4.334,3.777-4.711c22.348-3.68,42.219-15.492,59.064-35.119 c13.049-15.195,19.457-29.713,20.145-31.316c0.03-0.072,0.065-0.148,0.101-0.217c3.247-6.588,3.893-12.281,1.926-16.916 c-3.626-8.551-15.635-12.361-23.58-14.882c-1.976-0.625-3.845-1.217-5.334-1.808c-7.043-2.782-18.626-8.66-17.083-16.773 c1.124-5.916,8.949-10.036,15.273-10.036c1.756,0,3.312,0.308,4.622,0.923c7.146,3.348,13.575,5.045,19.104,5.045 c6.876,0,10.197-2.618,11-3.362c-0.198-3.668-0.44-7.546-0.674-11.214c0-0.004-0.005-0.048-0.005-0.048 c-1.614-25.675-3.627-57.627,4.546-75.95c24.462-54.847,76.339-59.112,91.651-59.112c0.408,0,6.674-0.062,6.674-0.062 c0.283-0.005,0.59-0.009,0.908-0.009c15.354,0,67.339,4.27,91.816,59.15c8.173,18.335,6.158,50.314,4.539,76.016l-0.076,1.23 c-0.222,3.49-0.427,6.793-0.6,9.995c0.756,0.696,3.795,3.096,9.978,3.339c5.271-0.202,11.328-1.891,17.998-5.014 c2.062-0.968,4.345-1.169,5.895-1.169c2.343,0,4.727,0.456,6.714,1.285l0.106,0.041c5.66,2.009,9.367,6.024,9.447,10.242 c0.071,3.932-2.851,9.809-17.223,15.485c-1.472,0.583-3.35,1.179-5.334,1.808c-7.952,2.524-19.951,6.332-23.577,14.878 c-1.97,4.635-1.322,10.326,1.926,16.912c0.036,0.072,0.067,0.145,0.102,0.221c1,2.344,25.205,57.535,79.209,66.432 c2.275,0.379,3.908,2.406,3.778,4.711c-0.048,0.828-0.248,1.656-0.598,2.465c-3.289,7.703-19.915,14.09-48.064,18.438 c-2.642,0.408-3.755,4.678-5.277,11.668c-0.63,2.887-1.271,5.717-2.146,8.691c-0.819,2.797-2.641,4.164-5.567,4.164h-0.441 c-1.905,0-4.604-0.346-8.008-1.012c-5.95-1.158-12.623-2.236-21.109-2.236c-4.948,0-10.069,0.434-15.224,1.287 c-10.473,1.744-19.421,8.062-28.893,14.758C444.443,462.88,429.436,473.488,407.001,473.488"
-                  ></path>
-                  <path
-                    style="fill: #020202"
-                    d="M408.336,124.235c14.455,0,64.231,3.883,87.688,56.472c7.724,17.317,5.744,48.686,4.156,73.885 c-0.248,3.999-0.494,7.875-0.694,11.576l-0.084,1.591l1.062,1.185c0.429,0.476,4.444,4.672,13.374,5.017l0.144,0.008l0.15-0.003 c5.904-0.225,12.554-2.059,19.776-5.442c1.064-0.498,2.48-0.741,3.978-0.741c1.707,0,3.521,0.321,5.017,0.951l0.226,0.09 c3.787,1.327,6.464,3.829,6.505,6.093c0.022,1.28-0.935,5.891-14.359,11.194c-1.312,0.518-3.039,1.069-5.041,1.7 c-8.736,2.774-21.934,6.96-26.376,17.427c-2.501,5.896-1.816,12.854,2.034,20.678c1.584,3.697,26.52,59.865,82.631,69.111 c-0.011,0.266-0.079,0.557-0.229,0.9c-0.951,2.24-6.996,9.979-44.612,15.783c-5.886,0.902-7.328,7.5-9,15.17 c-0.604,2.746-1.218,5.518-2.062,8.381c-0.258,0.865-0.306,0.914-1.233,0.914c-0.128,0-0.278,0-0.442,0 c-1.668,0-4.2-0.346-7.135-0.922c-5.345-1.041-12.647-2.318-21.982-2.318c-5.21,0-10.577,0.453-15.962,1.352 c-11.511,1.914-20.872,8.535-30.786,15.543c-13.314,9.408-27.075,19.143-48.071,19.143c-0.917,0-1.812-0.031-2.709-0.076 l-0.236-0.01l-0.237,0.018c-0.515,0.045-1.034,0.068-1.564,0.068c-20.993,0-34.76-9.732-48.068-19.143 c-9.916-7.008-19.282-13.629-30.791-15.543c-5.38-0.896-10.752-1.352-15.959-1.352c-9.333,0-16.644,1.428-21.978,2.471 c-2.935,0.574-5.476,1.066-7.139,1.066c-1.362,0-1.388-0.08-1.676-1.064c-0.844-2.865-1.461-5.703-2.062-8.445 c-1.676-7.678-3.119-14.312-9.002-15.215c-37.613-5.809-43.659-13.561-44.613-15.795c-0.149-0.352-0.216-0.652-0.231-0.918 c56.11-9.238,81.041-65.408,82.63-69.119c3.857-7.818,4.541-14.775,2.032-20.678c-4.442-10.461-17.638-14.653-26.368-17.422 c-2.007-0.635-3.735-1.187-5.048-1.705c-11.336-4.479-14.823-8.991-14.305-11.725c0.601-3.153,6.067-6.359,10.837-6.359 c1.072,0,2.012,0.173,2.707,0.498c7.747,3.631,14.819,5.472,21.022,5.472c9.751,0,14.091-4.537,14.557-5.055l1.057-1.182 l-0.085-1.583c-0.197-3.699-0.44-7.574-0.696-11.565c-1.583-25.205-3.563-56.553,4.158-73.871 c23.37-52.396,72.903-56.435,87.525-56.435c0.36,0,6.717-0.065,6.717-0.065C407.744,124.239,408.033,124.235,408.336,124.235 M408.336,115.197h-0.017c-0.333,0-0.646,0-0.944,0.004c-2.376,0.024-6.282,0.062-6.633,0.066c-8.566,0-25.705,1.21-44.115,9.336 c-10.526,4.643-19.994,10.921-28.14,18.66c-9.712,9.221-17.624,20.59-23.512,33.796c-8.623,19.336-6.576,51.905-4.932,78.078 l0.006,0.041c0.176,2.803,0.361,5.73,0.53,8.582c-1.265,0.581-3.316,1.194-6.339,1.194c-4.864,0-10.648-1.555-17.187-4.619 c-1.924-0.896-4.12-1.349-6.543-1.349c-3.893,0-7.997,1.146-11.557,3.239c-4.479,2.63-7.373,6.347-8.159,10.468 c-0.518,2.726-0.493,8.114,5.492,13.578c3.292,3.008,8.128,5.782,14.37,8.249c1.638,0.645,3.582,1.261,5.641,1.914 c7.145,2.271,17.959,5.702,20.779,12.339c1.429,3.365,0.814,7.793-1.823,13.145c-0.069,0.146-0.138,0.289-0.201,0.439 c-0.659,1.539-6.807,15.465-19.418,30.152c-7.166,8.352-15.059,15.332-23.447,20.752c-10.238,6.617-21.316,10.943-32.923,12.855 c-4.558,0.748-7.813,4.809-7.559,9.424c0.078,1.33,0.39,2.656,0.931,3.939c0.004,0.008,0.009,0.016,0.013,0.023 c1.843,4.311,6.116,7.973,13.063,11.203c8.489,3.943,21.185,7.26,37.732,9.855c0.836,1.59,1.704,5.586,2.305,8.322 c0.629,2.908,1.285,5.898,2.22,9.074c1.009,3.441,3.626,7.553,10.349,7.553c2.548,0,5.478-0.574,8.871-1.232 c4.969-0.975,11.764-2.305,20.245-2.305c4.702,0,9.575,0.414,14.48,1.229c9.455,1.574,17.606,7.332,27.037,14 c13.804,9.758,29.429,20.803,53.302,20.803c0.651,0,1.304-0.021,1.949-0.066c0.789,0.037,1.767,0.066,2.799,0.066 c23.88,0,39.501-11.049,53.29-20.799l0.022-0.02c9.433-6.66,17.575-12.41,27.027-13.984c4.903-0.814,9.775-1.229,14.479-1.229 c8.102,0,14.517,1.033,20.245,2.15c3.738,0.736,6.643,1.09,8.872,1.09l0.218,0.004h0.226c4.917,0,8.53-2.699,9.909-7.422 c0.916-3.109,1.57-6.029,2.215-8.986c0.562-2.564,1.46-6.674,2.296-8.281c16.558-2.6,29.249-5.91,37.739-9.852 c6.931-3.215,11.199-6.873,13.053-11.166c0.556-1.287,0.881-2.621,0.954-3.979c0.261-4.607-2.999-8.676-7.56-9.424 c-51.585-8.502-74.824-61.506-75.785-63.758c-0.062-0.148-0.132-0.295-0.205-0.438c-2.637-5.354-3.246-9.777-1.816-13.148 c2.814-6.631,13.621-10.062,20.771-12.332c2.07-0.652,4.021-1.272,5.646-1.914c7.039-2.78,12.07-5.796,15.389-9.221 c3.964-4.083,4.736-7.995,4.688-10.555c-0.121-6.194-4.856-11.698-12.388-14.393c-2.544-1.052-5.445-1.607-8.399-1.607 c-2.011,0-4.989,0.276-7.808,1.592c-6.035,2.824-11.441,4.368-16.082,4.588c-2.468-0.125-4.199-0.66-5.32-1.171 c0.141-2.416,0.297-4.898,0.458-7.486l0.067-1.108c1.653-26.19,3.707-58.784-4.92-78.134c-5.913-13.253-13.853-24.651-23.604-33.892 c-8.178-7.744-17.678-14.021-28.242-18.661C434.052,116.402,416.914,115.197,408.336,115.197"
-                  ></path>
-                  <rect
-                    x="147.553"
-                    y="39.443"
-                    style="fill: none"
-                    width="514.231"
-                    height="514.23"
-                  ></rect>
-                </g>
-              </svg>
-            </v-btn>
-          </v-row>
+        </section>
 
-          <v-row>
-            <v-col class="mt-2 mr-4 ml-4">
-              <h3 class="text--white font-weight-bold mb-1">
-                Horaires d'ouverture :
-              </h3>
-              <div
-                v-for="(d, i) in shopInfo.shop_hours"
-                :key="i"
-                class="d-flex justify-space-between align-center py-1"
-              >
-                <span class="text--white font-weight-medium">
-                  {{ d.dayName }}
+        <section
+          v-if="shopInfo.shop_description"
+          class="restaurant-story"
+          aria-labelledby="restaurant-story-title"
+        >
+          <h2 id="restaurant-story-title">À propos</h2>
+
+          <p v-if="shopInfo.shop_description" class="restaurant-description">
+            {{ shopInfo.shop_description }}
+          </p>
+        </section>
+
+        <section class="opening-hours-section" aria-labelledby="opening-hours-title">
+          <div class="section-heading">
+            <v-icon color="primary"> mdi-clock-outline </v-icon>
+            <div>
+              <h2 id="opening-hours-title">Horaires d'ouverture</h2>
+              <p>Consultez les horaires avant de préparer votre commande.</p>
+            </div>
+          </div>
+
+          <div v-if="shopHours.length" class="hours-list">
+            <div
+              v-for="(day, index) in shopHours"
+              :key="index"
+              class="hours-row"
+              :class="{ 'hours-row--today': index === currentDayIndex }"
+            >
+              <span class="hours-day">
+                {{ getDayName(day, index) }}
+                <span v-if="index === currentDayIndex" class="today-label">
+                  Aujourd'hui
                 </span>
+              </span>
+              <span class="hours-time">{{ formatOpeningHours(day) }}</span>
+            </div>
+          </div>
 
-                <span class="text--white">
-                  <template
-                    v-if="
-                      d.isOpen && !(Number(d.from) === 0 && Number(d.to) === 0)
-                    "
-                  >
-                    {{ String(d.from).padStart(2, '0') }}:00 -
-                    {{ String(d.to).padStart(2, '0') }}:00
-                  </template>
+          <p v-else class="empty-hours">Horaires non renseignés.</p>
+        </section>
 
-                  <template v-else> Fermé </template>
-                </span>
-              </div>
-            </v-col>
-          </v-row>
-        </v-col>
-        <v-row class="mt-8 mb-0 pt-0 pb-0">
-          <v-col class="text-center mt-0 mb-0 pt-0 pb-0">
-            <h6 class="text--white">SmartEat.fr © 2026</h6>
-          </v-col>
-        </v-row>
-      </div>
-    </template>
-    <!-- <pre>isRestaurantOpen: {{ isRestaurantOpen }}</pre>
-    <pre type="json"> {{ shopInfo }}</pre>
-    <pre type="json">
- {{ staticURL }}/api/v1/imgprofile/{{ shopInfo.shop_profile_image }}</pre
-    > -->
-    <v-snackbar
-      v-model="kitchenClosedSnackbar"
-      color="warning"
-      timeout="4500"
-      top
-    >
-      {{ kitchenClosedMessage }}
-      <template v-slot:action="{ attrs }">
-        <v-btn text v-bind="attrs" @click="kitchenClosedSnackbar = false">
-          Fermer
-        </v-btn>
-      </template>
+        <section
+          v-if="socialLinks.length"
+          class="community-section"
+          aria-labelledby="community-title"
+        >
+          <h2 id="community-title">Nous rejoindre</h2>
+          <p>Retrouvez les nouveautes et les coulisses du restaurant.</p>
+
+          <div class="social-actions">
+            <v-btn
+              v-for="link in socialLinks"
+              :key="link.name"
+              :href="link.href"
+              target="_blank"
+              rel="noopener"
+              icon
+              :class="['social-action', link.brandClass]"
+              :style="{
+                color: link.color,
+                backgroundColor: link.backgroundColor || undefined,
+              }"
+              :aria-label="`Ouvrir ${link.name}`"
+            >
+              <v-icon>{{ link.icon }}</v-icon>
+            </v-btn>
+          </div>
+        </section>
+      </main>
+
+      <footer class="click-collect-footer">
+        Propulsé par SmartEat.fr - {{ new Date().getFullYear() }}
+      </footer>
+    </div>
+
+    <div class="mobile-order-bar">
+      <v-btn
+        color="primary"
+        depressed
+        block
+        large
+        class="text-none"
+        :loading="loading"
+        @click="goToClickAndCollect"
+      >
+        CLICK & COLLECT
+        <v-icon right> mdi-arrow-right </v-icon>
+      </v-btn>
+    </div>
+
+    <v-snackbar v-model="snackbar" color="red" text>
+      {{ snackbarMessage }}
     </v-snackbar>
   </v-container>
 </template>
-<script>
-import { buildTableAccessUrl } from '@/helpers/tableIdentity'
 
+<script>
 export default {
   layout: 'empty',
   data() {
     return {
-      shop_identifier: '',
       shopProfileImageFailed: false,
-      kitchenClosedSnackbar: false,
-      kitchenClosedMessage:
-        'La cuisine est fermée. Aucune nouvelle commande possible.',
+      loading: false,
+      snackbar: false,
+      snackbarMessage: 'Ce restaurant est actuellement fermé',
     }
   },
-
   computed: {
     staticURL() {
-      return this.$store.get('staticURL').replace(/\/+$/, '')
+      const staticURL = this.$store.get('staticURL')
+      return typeof staticURL === 'string' ? staticURL.replace(/\/+$/, '') : ''
     },
-    clickAndCollectTable() {
-      // const result = this.$store.get('tables/dataTables') || []
-      // return result.filter((x) => x.access === 3)[0]
-      const clickAndCollectTable = this.$store.get('shop/clickAndCollectTable')
-      // console.log('clickAndCollectTable', clickAndCollectTable)
-      return clickAndCollectTable
+    fallbackHeroImage() {
+      return require('@/assets/images/bg-login.jpg')
+    },
+    clickAndCollectServicePoint() {
+      return (
+        this.$store.get('shop/shop')?.shop?.click_and_collect_service_point ??
+        this.$store.get('shop/clickAndCollectServicePoint')
+      )
+    },
+    hasClickAndCollectServicePoint() {
+      return (
+        this.clickAndCollectServicePoint !== undefined &&
+        this.clickAndCollectServicePoint !== null &&
+        this.clickAndCollectServicePoint !== ''
+      )
     },
     shopInfo() {
-      return {
+      const legacyShopInfo = this.$store.get('shop/shop')?.shop?.shop_info
+
+      if (legacyShopInfo) {
+        return legacyShopInfo
+      }
+
+      const shopInfo = {
         shop_name: this.$store.get('shop/shop_name'),
         shop_adress: this.$store.get('shop/shop_adress'),
         shop_phone: this.$store.get('shop/shop_phone'),
-        shop_mail: this.$store.get('shop/shop_mail'),
         shop_description: this.$store.get('shop/shop_description'),
         shop_hours: this.$store.get('shop/shop_hours'),
-        shop_payment_methods: this.$store.get('shop/shop_payment_methods'),
+        shop_social_media: this.$store.get('shop/shop_social_media'),
         shop_profile_image: this.$store.get('shop/shop_profile_image'),
         shop_status: this.$store.get('shop/shop_status'),
-        shop_social_media: this.$store.get('shop/shop_social_media'),
-        kitchen_closed: this.$store.get('shop/kitchen_closed'),
       }
+
+      return Object.values(shopInfo).some((value) => Boolean(value)) ? shopInfo : {}
+    },
+    shopHours() {
+      return Array.isArray(this.shopInfo.shop_hours) ? this.shopInfo.shop_hours : []
+    },
+    shopSocialMedia() {
+      const socialMedia = this.shopInfo.shop_social_media
+      return socialMedia && typeof socialMedia === 'object' ? socialMedia : {}
+    },
+    socialLinks() {
+      const links = [
+        {
+          name: 'Instagram',
+          href: this.shopSocialMedia.instagram,
+          icon: 'mdi-instagram',
+          brandClass: 'social-action--instagram',
+          color: '#E1306C',
+          backgroundColor: '',
+        },
+        {
+          name: 'Facebook',
+          href: this.shopSocialMedia.facebook,
+          icon: 'mdi-facebook',
+          brandClass: 'social-action--facebook',
+          color: '#1877F2',
+          backgroundColor: '',
+        },
+        {
+          name: 'TikTok',
+          href: this.shopSocialMedia.tiktok,
+          icon: 'mdi-music-note',
+          brandClass: 'social-action--tiktok',
+          color: '#000000',
+          backgroundColor: '',
+        },
+        {
+          name: 'Snapchat',
+          href: this.shopSocialMedia.snapchat,
+          icon: 'mdi-snapchat',
+          brandClass: 'social-action--snapchat',
+          color: '#000000',
+          backgroundColor: '#FFFC00',
+        },
+      ]
+
+      return links
+        .map((link) => ({
+          ...link,
+          href: typeof link.href === 'string' ? link.href.trim() : '',
+        }))
+        .filter((link) => link.href)
+    },
+    shopStatus() {
+      const status = this.shopInfo.shop_status
+      return typeof status === 'string' ? status.trim() : ''
     },
     isKitchenClosed() {
-      return [true, 1, '1', 'true'].includes(this.shopInfo.kitchen_closed)
+      return (
+        this.$store.get('shop/shop')?.shop?.is_kitchen_close ??
+        this.$store.get('shop/kitchen_closed')
+      )
+    },
+    currentDayIndex() {
+      const jsDay = new Date().getDay()
+      return jsDay === 0 ? 6 : jsDay - 1
     },
     isRestaurantOpen() {
-      if (this.isKitchenClosed) return false
+      const today = this.shopHours[this.currentDayIndex]
 
-      const now = new Date()
+      if (!today || !today.isOpen) {
+        return false
+      }
 
-      // getDay() → 0 = Dimanche ... 6 = Samedi
-      // On convertit pour que 0 = Lundi ... 6 = Dimanche
-      const jsDay = now.getDay()
-      const index = jsDay === 0 ? 6 : jsDay - 1
+      const openingHour = Number(today.from)
+      const closingHour = Number(today.to)
 
-      const todayData = this.shopInfo.shop_hours[index]
-      if (!todayData || !todayData.isOpen) return false
+      if (
+        !Number.isFinite(openingHour) ||
+        !Number.isFinite(closingHour) ||
+        today.from == null ||
+        today.to == null ||
+        openingHour < 0 ||
+        closingHour > 24 ||
+        openingHour === closingHour
+      ) {
+        return false
+      }
 
-      const currentHour = now.getHours()
-      const from = Number(todayData.from)
-      const to = Number(todayData.to)
-
-      return currentHour >= from && currentHour < to
+      const currentHour = new Date().getHours()
+      return currentHour >= openingHour && currentHour < closingHour
     },
   },
-  async mounted() {
-    console.log('params route', this.$route.params)
-    console.log('params route', this.$route.params)
-    if (!this.$route.params.shopId)
-      this.$nuxt.error({ statusCode: 500, message: 'Shop Id Absent dans URL' })
-    if (!this.$route.params.shopName)
-      this.$nuxt.error({
-        statusCode: 500,
-        message: 'Shop Name Absent dans URL',
-      })
+  watch: {
+    'shopInfo.shop_profile_image'() {
+      this.shopProfileImageFailed = false
+    },
+  },
+  mounted() {
+    const { shopId, shopName } = this.$route.params
 
-    await this.$store.dispatch(
-      'shop/getShopInfoClickAndCollect',
-      this.$route.params.shopId
-    )
+    if (!shopId || !shopName) {
+      this.$router.push('/')
+      return
+    }
 
-    const clickandcollectdatafromshop = this.$store.get(
-      'shop/clickAndCollectTable'
-    )
-    console.log('clickandcollectdatafromshop', clickandcollectdatafromshop)
-
-    // this.$store
-    //   .dispatch('history/getOrderByToken', this.receipToken)
-    //   .finally(() => {
-    //     console.log('data order', this.$route)
-    //     console.log('Query', this.$route)
-    //     console.log('Current DAte', this.detailArchivedOrder[0].updated)
-    //     const size = this.generateCleanTicketPDF(0)
-    //     this.generateCleanTicketPDF(size)
-    //   })
+    this.$store.dispatch('shop/getShopInfoClickAndCollect', shopId)
   },
   methods: {
-    tableAccessUrl(item) {
-      return buildTableAccessUrl(window.location.origin, item.table_access_token)
-    },
-    goToClickAndCollect(event) {
-      if (!this.isKitchenClosed) return
+    formatOpeningHours(day) {
+      if (!day || !day.isOpen) {
+        return 'Fermé'
+      }
 
-      if (event) event.preventDefault()
-      this.kitchenClosedSnackbar = true
+      const openingHour = Number(day.from)
+      const closingHour = Number(day.to)
+
+      if (
+        day.from == null ||
+        day.to == null ||
+        !Number.isFinite(openingHour) ||
+        !Number.isFinite(closingHour)
+      ) {
+        return 'Horaires non renseign\u00E9s'
+      }
+
+      if (openingHour === closingHour) {
+        return 'Fermé'
+      }
+
+      return `${String(openingHour).padStart(2, '0')}:00 - ${String(
+        closingHour
+      ).padStart(2, '0')}:00`
     },
-    shopProfileImageSrc(image) {
-      if (this.shopProfileImageFailed || !image) return '/logo.png'
-      return `${this.staticURL}/api/v1/imgprofile/${image}`
+    getDayName(day, index) {
+      const weekDays = [
+        'Lundi',
+        'Mardi',
+        'Mercredi',
+        'Jeudi',
+        'Vendredi',
+        'Samedi',
+        'Dimanche',
+      ]
+
+      return day?.day_name || day?.name || day?.day || weekDays[index] || ''
+    },
+    goToClickAndCollect() {
+      if (this.isRestaurantOpen && !this.isKitchenClosed) {
+        this.loading = true
+        this.$store
+          .dispatch('users/postClickAndCollectAccess', this.$route.params.shopId)
+          .then((connected) => {
+            if (connected) {
+              this.$router.push('/menus')
+            } else {
+              this.snackbar = true
+              this.snackbarMessage =
+                this.$store.get('users/message') ||
+                'Click & Collect indisponible.'
+            }
+          })
+          .finally(() => {
+            this.loading = false
+          })
+      } else {
+        this.snackbar = true
+        this.snackbarMessage = this.isKitchenClosed
+          ? 'La cuisine est actuellement fermée'
+          : 'Ce restaurant est actuellement fermé'
+      }
+    },
+    shopProfileImageSrc(profileImage) {
+      if (this.shopProfileImageFailed || !profileImage) {
+        return this.fallbackHeroImage
+      }
+
+      return `${this.staticURL}/api/v1/imgprofile/${profileImage}`
     },
   },
 }
 </script>
-<style>
-.shop-profile-image .v-image__image {
-  background-position: center;
-  background-size: cover;
+
+<style scoped>
+.click-collect-page {
+  --cc-sticky-z: 90;
+  min-height: 100vh;
+  padding-bottom: 148px !important;
+  background: var(--se-color-bg);
+  color: var(--se-color-text-body);
 }
 
-.status-container {
+.click-collect-shell {
+  min-height: 100vh;
+  background: var(--se-color-surface);
+}
+
+.click-collect-hero {
+  position: relative;
+  aspect-ratio: 16 / 5;
+  height: auto;
+  min-height: 180px;
+  max-height: 380px;
+  overflow: hidden;
+  background: var(--se-color-surface-muted);
+}
+
+.hero-image-backdrop,
+.shop-profile-image {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+
+.hero-image-backdrop {
+  transform: scale(1.08);
+  opacity: 0.42;
+  filter: blur(12px) saturate(1.08);
+}
+
+.shop-profile-image {
+  z-index: 1;
+}
+
+.restaurant-profile-summary {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  overflow: hidden;
-  width: 90%;
+  margin-bottom: 34px;
+  text-align: center;
 }
 
-.bullhorn {
-  z-index: 2;
-  margin-right: 8px;
+.restaurant-status {
+  height: 34px;
+  margin-bottom: 14px;
+  border: 1px solid var(--se-color-border) !important;
+  background: var(--se-color-surface) !important;
+  color: var(--se-color-text-body) !important;
+  font-weight: 700;
 }
 
-.status-wrapper {
-  overflow: hidden;
-  white-space: nowrap;
-  flex: 1;
+.restaurant-status--open {
+  border-color: var(--se-color-success) !important;
+  background: var(--se-color-success) !important;
+  color: var(--se-color-surface) !important;
 }
 
-.status-track {
+.restaurant-status--warning {
+  color: var(--se-color-warning) !important;
+}
+
+.restaurant-status--closed {
+  color: var(--se-color-danger) !important;
+}
+
+.restaurant-title {
+  max-width: 16ch;
+  margin: 0 0 12px;
+  font-size: clamp(2rem, 8vw, 3rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--se-color-text);
+}
+
+.restaurant-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.restaurant-contact-link {
   display: inline-flex;
-  animation: scroll-right 15s linear infinite;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  color: var(--se-color-primary) !important;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
 }
 
-.status-item {
-  font-weight: 500;
+.restaurant-contact-link:focus-visible,
+.desktop-order-action:focus-visible,
+.social-action:focus-visible,
+.mobile-order-bar .v-btn:focus-visible {
+  outline: 3px solid var(--se-color-primary);
+  outline-offset: 3px;
 }
 
-/* Défile vers la droite */
-@keyframes scroll-right {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(0%);
-  }
+.restaurant-contact-link .v-icon {
+  flex: 0 0 auto;
+  color: var(--se-color-primary);
 }
 
-.social-icon {
-  font-size: 22px;
-  margin: 0 12px;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+.restaurant-address-link {
+  max-width: min(320px, 100%);
+  align-items: flex-start;
 }
 
-.social-icon:hover {
-  transform: scale(1.2);
-  opacity: 0.8;
+.restaurant-address-link .v-icon {
+  margin-top: 2px;
 }
 
-.v-btn svg {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+.restaurant-address-link span {
+  display: block;
+  text-align: left;
 }
 
-.v-btn:hover svg {
-  transform: scale(1.15);
-  opacity: 0.85;
-}
-
-/* Couleurs officielles */
-
-/* .status-wrapper {
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.status-track {
+.desktop-order-action {
   display: inline-flex;
-  animation: scroll-loop 18s linear infinite;
+  width: min(100%, 260px);
+  min-height: 48px;
+  padding: 0 22px !important;
+  border-radius: var(--se-radius-md);
+  font-weight: 800;
 }
 
-.status-item {
-  font-weight: 500;
+.order-unavailable {
+  max-width: 340px;
+  margin: 0;
+  color: var(--se-color-text-muted);
+  font-weight: 600;
 }
 
-@keyframes scroll-loop {
-  0% {
-    transform: translateX(0);
+.click-collect-content {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 32px 20px 22px;
+}
+
+.opening-hours-section,
+.restaurant-story,
+.community-section {
+  width: 100%;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.section-heading h2,
+.restaurant-story h2,
+.community-section h2 {
+  margin: 0 0 4px;
+  font-size: var(--se-font-title);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: var(--se-color-text-body);
+}
+
+.section-heading p,
+.community-section p {
+  margin: 0;
+  color: var(--se-color-text-muted);
+  line-height: 1.5;
+}
+
+.hours-list {
+  overflow: hidden;
+  border: 1px solid var(--se-color-border);
+  border-radius: var(--se-radius-lg);
+  background: var(--se-color-surface);
+}
+
+.hours-row {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--se-color-border-soft);
+}
+
+.hours-row:last-child {
+  border-bottom: 0;
+}
+
+.hours-row--today {
+  background: var(--se-color-primary-soft);
+}
+
+.hours-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: var(--se-color-text-body);
+}
+
+.today-label {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--se-color-primary);
+  color: #ffffff;
+  font-size: var(--se-font-caption);
+  font-weight: 800;
+}
+
+.hours-time {
+  flex: 0 0 auto;
+  color: var(--se-color-text-body);
+  font-weight: 700;
+  text-align: right;
+}
+
+.empty-hours {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--se-color-border);
+  border-radius: var(--se-radius-lg);
+  color: var(--se-color-text-muted);
+}
+
+.restaurant-story,
+.community-section {
+  margin-top: 38px;
+  padding-top: 34px;
+  border-top: 1px solid var(--se-color-border-soft);
+}
+
+.restaurant-description {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--se-color-text-body);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.restaurant-status-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(360px, 100%);
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--se-color-border);
+  border-radius: var(--se-radius-lg);
+  background: var(--se-color-primary-soft);
+  text-align: left;
+}
+
+.restaurant-status-message p {
+  margin: 0;
+  color: var(--se-color-text-body);
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.social-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.social-action {
+  width: 46px;
+  min-width: 46px !important;
+  height: 46px !important;
+  border-radius: var(--se-radius-md);
+  background: var(--se-color-surface);
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease;
+}
+
+.social-action .v-icon {
+  color: currentColor;
+}
+
+.social-action:hover {
+  transform: translateY(-2px);
+  background: var(--se-color-surface-muted) !important;
+}
+
+.click-collect-footer {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 18px 20px 28px;
+  color: var(--se-color-text-muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.mobile-order-bar {
+  position: fixed;
+  right: 14px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 14px;
+  z-index: var(--cc-sticky-z);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.mobile-order-bar .v-btn {
+  min-height: 52px;
+  border-radius: var(--se-radius-md);
+  box-shadow: 0 14px 32px rgba(25, 118, 210, 0.26);
+  font-weight: 800;
+  pointer-events: auto;
+}
+
+@media (min-width: 960px) {
+  .click-collect-page {
+    padding: 24px !important;
   }
-  100% {
-    transform: translateX(-33%);
+
+  .click-collect-shell {
+    max-width: 1120px;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--se-color-border);
+    border-radius: var(--se-radius-lg);
   }
-} */
+
+  .click-collect-hero {
+    min-height: 300px;
+  }
+
+  .restaurant-profile-summary {
+    margin-bottom: 42px;
+  }
+
+  .restaurant-title {
+    max-width: 16ch;
+  }
+
+  .click-collect-content {
+    padding: 44px 24px 28px;
+  }
+
+  .mobile-order-bar {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .hours-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .hours-time {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social-action {
+    transition: none;
+  }
+
+  .social-action:hover {
+    transform: none;
+  }
+}
 </style>

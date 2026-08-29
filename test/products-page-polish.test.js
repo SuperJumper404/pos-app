@@ -1,0 +1,23 @@
+const assert = require('assert')
+const fs = require('fs')
+
+const source = fs.readFileSync('pages/products/index.vue', 'utf8')
+
+assert.doesNotMatch(source, /<SePageHeader/)
+assert.doesNotMatch(source, /title="Produits"/)
+assert.doesNotMatch(source, /subtitle="Catalogue/)
+assert.doesNotMatch(source, /import SePageHeader/)
+assert.match(source, /class="products-action-bar"/)
+assert.match(source, /min-height:\s*56px/)
+assert.match(source, /padding:\s*10px 16px/)
+assert.doesNotMatch(source, /color="grey lighten-4"/)
+assert.doesNotMatch(source, /primaryPurple lighten-1/)
+assert.doesNotMatch(source, /#66bb6a|#1b5e20|#d7efd9/)
+assert.match(source, /background:\s*var\(--se-color-success-soft\)/)
+assert.match(source, /border:\s*1px solid var\(--se-color-success\)/)
+assert.match(source, /aria-label="Monter le produit"/)
+assert.match(source, /aria-label="Descendre le produit"/)
+assert.match(source, /class="products-empty-state/)
+assert.match(source, /class="product-mobile-card/)
+
+console.log('products page polish tests passed')

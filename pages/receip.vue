@@ -74,9 +74,26 @@ export default {
       }
     },
     totalAmount() {
+      if (this.dataArchivedOrder && this.dataArchivedOrder.subtotal != null) {
+        return this.roundPrice(this.dataArchivedOrder.subtotal)
+      }
       return this.detailArchivedOrder.reduce(
         (sum, item) => this.roundPrice(sum + this.parsePrice(item.total)),
         0
+      )
+    },
+    subtotalBeforeDiscount() {
+      return this.roundPrice(
+        this.dataArchivedOrder && this.dataArchivedOrder.subtotal_before_discount != null
+          ? this.dataArchivedOrder.subtotal_before_discount
+          : this.totalAmount
+      )
+    },
+    discountAmount() {
+      return this.roundPrice(
+        this.dataArchivedOrder && this.dataArchivedOrder.discount_amount != null
+          ? this.dataArchivedOrder.discount_amount
+          : Math.max(0, this.subtotalBeforeDiscount - this.totalAmount)
       )
     },
     isTvaActive() {
@@ -203,6 +220,20 @@ export default {
             { align: 'right' }
           )
         })
+      }
+      if (this.discountAmount > 0) {
+        doc.text(
+          `SOUS-TOTAL: ${this.formatPrice(this.subtotalBeforeDiscount)}`,
+          53,
+          (y += bigGap),
+          { align: 'right' }
+        )
+        doc.text(
+          `REMISE: -${this.formatPrice(this.discountAmount)}`,
+          53,
+          (y += bigGap),
+          { align: 'right' }
+        )
       }
       doc.setFontSize(10)
       doc.setFont('courier', 'bold')
