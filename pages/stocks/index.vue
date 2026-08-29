@@ -1,5 +1,5 @@
 <template>
-  <v-container>
+  <v-container fluid class="stock-page full-width pa-5">
     <v-card outlined class="stock-panel">
       <SePageHeader
         title="Stock"
@@ -7,15 +7,6 @@
         icon="mdi-warehouse"
       >
         <template #actions>
-          <v-btn
-            color="primary"
-            class="text-none stock-action"
-            depressed
-            @click="openIngredient()"
-          >
-            <v-icon left>mdi-plus</v-icon>
-            Ajouter un ingrédient
-          </v-btn>
           <v-text-field
             v-model="search"
             placeholder="Rechercher un ingrédient ou produit"
@@ -28,17 +19,71 @@
         </template>
       </SePageHeader>
 
+      <div class="stock-cockpit">
+        <v-card
+          v-for="card in stockKpiCards"
+          :key="card.label"
+          outlined
+          class="stock-kpi"
+          :class="card.className"
+          role="button"
+          tabindex="0"
+          @click="applyStockFilter(card.filter)"
+          @keydown.enter.prevent="applyStockFilter(card.filter)"
+          @keydown.space.prevent="applyStockFilter(card.filter)"
+        >
+          <div class="stock-kpi__icon">
+            <v-icon>{{ card.icon }}</v-icon>
+          </div>
+          <div>
+            <div class="stock-kpi__label">{{ card.label }}</div>
+            <div class="stock-kpi__value">{{ card.value }}</div>
+            <div class="stock-kpi__hint">{{ card.hint }}</div>
+          </div>
+        </v-card>
+      </div>
+
+      <div class="stock-quick-filters">
+        <v-btn
+          v-for="filter in stockQuickFilters"
+          :key="filter.value"
+          small
+          depressed
+          class="text-none stock-filter"
+          :outlined="activeStockFilter !== filter.value"
+          :color="activeStockFilter === filter.value ? filter.color : undefined"
+          @click="applyStockFilter(filter.value)"
+        >
+          <v-icon small left>{{ filter.icon }}</v-icon>
+          {{ filter.label }}
+          <span class="stock-filter__count">{{ filter.count }}</span>
+        </v-btn>
+      </div>
+
       <v-tabs v-model="activeTab" show-arrows class="stock-tabs">
-        <v-tab><v-icon left small>mdi-package-variant-closed</v-icon>Produits</v-tab>
-        <v-tab><v-icon left small>mdi-food-apple-outline</v-icon>Ingrédients</v-tab>
-        <v-tab><v-icon left small>mdi-alert-circle-outline</v-icon>Stocks bas</v-tab>
-        <v-tab><v-icon left small>mdi-cart-outline</v-icon>Liste de courses</v-tab>
-        <v-tab><v-icon left small>mdi-clipboard-check-outline</v-icon>Inventaire</v-tab>
+        <v-tab><v-icon left small>mdi-package-variant-closed</v-icon>Produits <span class="stock-tab-count">{{ filteredProducts.length }}</span></v-tab>
+        <v-tab><v-icon left small>mdi-food-apple-outline</v-icon>Ingrédients <span class="stock-tab-count">{{ filteredIngredients.length }}</span></v-tab>
+        <v-tab><v-icon left small>mdi-alert-circle-outline</v-icon>Stocks bas <span class="stock-tab-count">{{ lowItems.length }}</span></v-tab>
+        <v-tab><v-icon left small>mdi-cart-outline</v-icon>Liste de courses <span class="stock-tab-count">{{ filteredShoppingList.length }}</span></v-tab>
+        <v-tab><v-icon left small>mdi-clipboard-check-outline</v-icon>Inventaire <span class="stock-tab-count">{{ inventoryItems.length }}</span></v-tab>
       </v-tabs>
 
       <v-tabs-items v-model="activeTab">
         <v-tab-item>
           <v-data-table class="stock-table" :headers="productHeaders" :items="filteredProducts" :loading="loading">
+            <template #[`item.current_stock`]="{ item }">
+              <div class="stock-level-cell">
+                <strong>{{ item.current_stock }}</strong>
+                <v-progress-linear
+                  class="stock-level-meter"
+                  :value="stockLevelPercent(item)"
+                  :color="statusColor(item)"
+                  height="7"
+                  rounded
+                  background-color="#e8edf3"
+                />
+              </div>
+            </template>
             <template #[`item.track_stock`]="{ item }">
               <v-icon :color="Number(item.track_stock) === 1 ? 'success' : 'grey'">
                 {{ Number(item.track_stock) === 1 ? 'mdi-check-circle' : 'mdi-minus-circle' }}
@@ -62,7 +107,31 @@
         </v-tab-item>
 
         <v-tab-item>
+          <div class="stock-ingredient-actions">
+            <v-btn
+              color="primary"
+              class="text-none stock-action"
+              depressed
+              @click="openIngredient()"
+            >
+              <v-icon left>mdi-plus</v-icon>
+              Ajouter un ingrédient
+            </v-btn>
+          </div>
           <v-data-table class="stock-table" :headers="itemHeaders" :items="filteredIngredients" :loading="loading">
+            <template #[`item.current_stock`]="{ item }">
+              <div class="stock-level-cell">
+                <strong>{{ item.current_stock }}</strong>
+                <v-progress-linear
+                  class="stock-level-meter"
+                  :value="stockLevelPercent(item)"
+                  :color="statusColor(item)"
+                  height="7"
+                  rounded
+                  background-color="#e8edf3"
+                />
+              </div>
+            </template>
             <template #[`item.status`]="{ item }">
               <v-chip small :color="statusColor(item)" label>{{ statusLabel(item) }}</v-chip>
             </template>
@@ -77,6 +146,19 @@
 
         <v-tab-item>
           <v-data-table class="stock-table" :headers="itemHeaders" :items="lowItems" :loading="loading">
+            <template #[`item.current_stock`]="{ item }">
+              <div class="stock-level-cell">
+                <strong>{{ item.current_stock }}</strong>
+                <v-progress-linear
+                  class="stock-level-meter"
+                  :value="stockLevelPercent(item)"
+                  :color="statusColor(item)"
+                  height="7"
+                  rounded
+                  background-color="#e8edf3"
+                />
+              </div>
+            </template>
             <template #[`item.status`]="{ item }"><v-chip small :color="statusColor(item)" label>{{ statusLabel(item) }}</v-chip></template>
             <template #[`item.actions`]="{ item }"><v-btn icon aria-label="Réapprovisionner" title="Réapprovisionner" @click="openReplenish(item)"><v-icon>mdi-package-up</v-icon></v-btn></template>
           </v-data-table>
@@ -109,15 +191,25 @@
         </v-tab-item>
 
         <v-tab-item>
-          <div class="stock-section-actions">
+          <div class="stock-inventory-express">
+            <div>
+              <div class="stock-section-title">
+                <v-icon color="primary" left>mdi-clipboard-check-outline</v-icon>
+                Inventaire express
+              </div>
+              <div class="stock-section-subtitle">
+                {{ inventorySummary }}
+              </div>
+            </div>
             <v-btn color="primary" class="text-none stock-action" depressed :disabled="!hasInventoryCounts" @click="bulkInventory">
               <v-icon left>mdi-content-save</v-icon>
               Enregistrer les lignes remplies
             </v-btn>
           </div>
-          <v-data-table class="stock-table" :headers="inventoryHeaders" :items="inventoryItems" :loading="loading">
+          <v-data-table class="stock-table stock-inventory-table" :headers="inventoryHeaders" :items="inventoryItems" :loading="loading" :item-class="inventoryRowClass">
             <template #[`item.counted_stock`]="{ item }">
               <v-text-field
+                :ref="`inventory-${item.id}`"
                 :value="inventoryCounts[item.id]"
                 type="number"
                 min="0"
@@ -128,7 +220,13 @@
                 prepend-icon="mdi-counter"
                 aria-label="Stock compté"
                 @input="$set(inventoryCounts, item.id, $event)"
+                @keydown.enter.prevent="focusNextInventoryField(item)"
               />
+            </template>
+            <template #[`item.deviation`]="{ item }">
+              <v-chip small label :color="inventoryDeviationColor(item)">
+                {{ inventoryDeviationLabel(item) }}
+              </v-chip>
             </template>
             <template #[`item.actions`]="{ item }"><v-btn icon aria-label="Inventaire rapide" title="Inventaire rapide" @click="openInventory(item)"><v-icon>mdi-clipboard-check</v-icon></v-btn></template>
           </v-data-table>
@@ -214,6 +312,7 @@ export default {
   data: () => ({
     activeTab: 0,
     search: '',
+    activeStockFilter: 'all',
     loading: false,
     ingredientDialog: false,
     replenishDialog: false,
@@ -243,6 +342,7 @@ export default {
     inventoryHeaders: [
       { text: 'Article', value: 'name' }, { text: 'Stock théorique', value: 'current_stock' },
       { text: 'Unité', value: 'unit' }, { text: 'Stock compté', value: 'counted_stock', sortable: false },
+      { text: 'Écart', value: 'deviation', sortable: false },
       { text: '', value: 'actions', sortable: false },
     ],
     ingredientForm: emptyIngredientForm(),
@@ -251,18 +351,71 @@ export default {
   }),
   computed: {
     items() { return this.$store.get('stockInventory/dataItems') || [] },
-    filteredItems() { return filterStockItems(this.items, this.search) },
+    trackedItems() { return this.items.filter(isOperationalStockItem) },
+    criticalItems() { return this.trackedItems.filter((item) => getStockStatus(item) === 'red') },
+    warningItems() { return this.trackedItems.filter((item) => getStockStatus(item) === 'orange') },
+    normalItems() { return this.trackedItems.filter((item) => getStockStatus(item) === 'normal') },
+    filteredItems() {
+      const searchedItems = filterStockItems(this.items, this.search)
+      if (this.activeStockFilter === 'critical') return searchedItems.filter((item) => getStockStatus(item) === 'red')
+      if (this.activeStockFilter === 'warning') return searchedItems.filter((item) => getStockStatus(item) === 'orange')
+      if (this.activeStockFilter === 'tracked') return searchedItems.filter(isOperationalStockItem)
+      return searchedItems
+    },
     filteredProducts() { return this.filteredItems.filter((item) => item.item_type === 'product') },
     filteredIngredients() { return this.filteredItems.filter((item) => item.item_type === 'ingredient') },
     lowItems() { return filterStockItems(this.$store.get('stockInventory/lowItems') || [], this.search) },
     shoppingList() { return sortShoppingListItems(this.$store.get('stockInventory/shoppingList') || []) },
     filteredShoppingList() { return filterStockItems(this.shoppingList, this.search) },
     inventoryItems() { return this.filteredItems.filter(isOperationalStockItem) },
+    stockKpiCards() {
+      return [
+        {
+          label: 'Critiques',
+          value: this.criticalItems.length,
+          hint: 'Sous le minimum',
+          icon: 'mdi-alert-circle-outline',
+          className: 'stock-kpi--critical',
+          filter: 'critical',
+        },
+        {
+          label: 'À surveiller',
+          value: this.warningItems.length,
+          hint: 'Sous la cible',
+          icon: 'mdi-bell-ring-outline',
+          className: 'stock-kpi--warning',
+          filter: 'warning',
+        },
+        {
+          label: 'Suivis',
+          value: this.trackedItems.length,
+          hint: 'Articles inventoriables',
+          icon: 'mdi-radar',
+          className: 'stock-kpi--tracked',
+          filter: 'tracked',
+        },
+      ]
+    },
+    stockQuickFilters() {
+      return [
+        { label: 'Tout', value: 'all', count: this.items.length, icon: 'mdi-view-list-outline', color: 'primary' },
+        { label: 'Critiques', value: 'critical', count: this.criticalItems.length, icon: 'mdi-alert-circle-outline', color: 'red' },
+        { label: 'À surveiller', value: 'warning', count: this.warningItems.length, icon: 'mdi-bell-ring-outline', color: 'warning' },
+        { label: 'Suivis', value: 'tracked', count: this.trackedItems.length, icon: 'mdi-radar', color: 'primary' },
+      ]
+    },
+    inventoryReadyCount() {
+      return Object.values(this.inventoryCounts).filter((value) => value !== '' && value !== null && value !== undefined).length
+    },
+    inventorySummary() {
+      if (!this.inventoryReadyCount) return `${this.inventoryItems.length} lignes à compter`
+      return `${this.inventoryReadyCount} ligne${this.inventoryReadyCount > 1 ? 's' : ''} prête${this.inventoryReadyCount > 1 ? 's' : ''} à enregistrer`
+    },
     ingredientCategories() {
       return [...new Set(this.items.filter((item) => item.item_type === 'ingredient').map((item) => item.category_label).filter(Boolean))]
     },
     hasInventoryCounts() {
-      return Object.values(this.inventoryCounts).some((value) => value !== '' && value !== null && value !== undefined)
+      return this.inventoryReadyCount > 0
     },
   },
   mounted() { this.loadStock() },
@@ -276,7 +429,47 @@ export default {
       const status = getStockStatus(item)
       return status === 'red' ? 'Sous le minimum' : status === 'orange' ? 'Sous la cible' : 'Normal'
     },
+    applyStockFilter(filter) {
+      this.activeStockFilter = filter || 'all'
+    },
+    stockLevelPercent(item) {
+      const current = Number(item.current_stock) || 0
+      const target = Number(item.target_stock) || Number(item.minimum_stock) || 1
+      return Math.min(100, Math.max(0, (current / target) * 100))
+    },
     shoppingRowClass(item) { return Number(item.taken) === 1 ? 'shopping-taken' : '' },
+    inventoryRowClass(item) {
+      return this.hasInventoryValue(item) ? 'inventory-row--filled' : ''
+    },
+    hasInventoryValue(item) {
+      const value = this.inventoryCounts[item.id]
+      return value !== '' && value !== null && value !== undefined
+    },
+    inventoryDeviation(item) {
+      if (!this.hasInventoryValue(item)) return null
+      return (Number(this.inventoryCounts[item.id]) || 0) - (Number(item.current_stock) || 0)
+    },
+    inventoryDeviationLabel(item) {
+      const deviation = this.inventoryDeviation(item)
+      if (deviation === null) return 'À compter'
+      if (deviation === 0) return 'OK'
+      return deviation > 0 ? `+${deviation}` : `${deviation}`
+    },
+    inventoryDeviationColor(item) {
+      const deviation = this.inventoryDeviation(item)
+      if (deviation === null || deviation === 0) return 'grey'
+      return deviation > 0 ? 'success' : 'warning'
+    },
+    focusNextInventoryField(item) {
+      const index = this.inventoryItems.findIndex((inventoryItem) => inventoryItem.id === item.id)
+      const nextItem = this.inventoryItems[index + 1]
+      if (!nextItem) return
+      this.$nextTick(() => {
+        const field = this.$refs[`inventory-${nextItem.id}`]
+        const input = Array.isArray(field) ? field[0] : field
+        if (input && input.focus) input.focus()
+      })
+    },
     async loadStock() {
       this.loading = true
       await Promise.all([
@@ -375,14 +568,102 @@ export default {
 </script>
 
 <style scoped>
-.stock-panel { overflow: hidden; }
+.stock-page {
+  background: #f7f9fc;
+  min-height: calc(100vh - 64px);
+}
+.stock-panel {
+  border-color: var(--se-color-border) !important;
+  overflow: hidden;
+}
 .stock-action {
   min-height: 38px;
+}
+.stock-cockpit {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 18px 20px 12px;
+}
+.stock-kpi {
+  align-items: center;
+  border-color: var(--se-color-border) !important;
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  min-height: 104px;
+  padding: 16px;
+}
+.stock-kpi__icon {
+  align-items: center;
+  border-radius: 12px;
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+.stock-kpi__label {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-meta);
+  font-weight: var(--se-weight-semibold);
+}
+.stock-kpi__value {
+  color: var(--se-color-text);
+  font-size: 26px;
+  font-weight: var(--se-weight-bold);
+  line-height: 1.1;
+  margin-top: 4px;
+}
+.stock-kpi__hint {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-caption);
+  margin-top: 4px;
+}
+.stock-kpi--critical .stock-kpi__icon {
+  background: var(--se-color-danger-soft);
+  color: var(--se-color-danger);
+}
+.stock-kpi--warning .stock-kpi__icon {
+  background: var(--se-color-warning-soft);
+  color: var(--se-color-warning);
+}
+.stock-kpi--tracked .stock-kpi__icon {
+  background: var(--se-color-primary-soft);
+  color: var(--se-color-primary);
+}
+.stock-quick-filters {
+  align-items: center;
+  border-top: 1px solid var(--se-color-border-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 20px;
+}
+.stock-filter {
+  border-radius: var(--se-radius-sm) !important;
+  min-height: 34px;
+}
+.stock-filter__count,
+.stock-tab-count {
+  align-items: center;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
+  border-radius: var(--se-radius-pill);
+  color: var(--se-color-text-muted);
+  display: inline-flex;
+  font-size: var(--se-font-caption);
+  font-weight: var(--se-weight-bold);
+  height: 20px;
+  justify-content: center;
+  margin-left: 8px;
+  min-width: 24px;
+  padding: 0 7px;
 }
 .stock-tabs {
   border-bottom: 1px solid var(--se-color-border-soft);
 }
-.stock-section-actions {
+.stock-section-actions,
+.stock-ingredient-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -398,12 +679,45 @@ export default {
 .stock-dialog-actions {
   padding: 12px 24px 20px;
 }
+.stock-level-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 110px;
+}
+.stock-level-meter {
+  max-width: 132px;
+}
+.stock-inventory-express {
+  align-items: center;
+  background: var(--se-color-surface-muted);
+  border-bottom: 1px solid var(--se-color-border-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+.stock-section-title {
+  align-items: center;
+  color: var(--se-color-text);
+  display: flex;
+  font-size: var(--se-font-title-sm);
+  font-weight: var(--se-weight-semibold);
+}
+.stock-section-subtitle {
+  color: var(--se-color-text-muted);
+  font-size: var(--se-font-meta);
+  margin-top: 4px;
+}
 .stock-table ::v-deep th {
   color: var(--se-color-text-muted) !important;
   font-weight: 600 !important;
 }
 .stock-table ::v-deep td {
   color: var(--se-color-text-body);
+}
+.stock-inventory-table ::v-deep .inventory-row--filled {
+  background: var(--se-color-primary-soft);
 }
 ::v-deep .shopping-taken {
   color: var(--se-color-text-muted);
@@ -416,12 +730,45 @@ export default {
   ::v-deep .v-window-item { display: none !important; }
   ::v-deep .v-window-item--active { display: block !important; }
 }
+@media (max-width: 1180px) {
+  .stock-cockpit {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 720px) {
+  .stock-page {
+    padding: 12px !important;
+  }
   .se-page-header {
     align-items: stretch;
   }
+  .stock-cockpit {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+  .stock-quick-filters,
+  .stock-inventory-express {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 14px;
+  }
+  .stock-filter,
   .stock-action {
     width: 100%;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stock-kpi,
+  .stock-filter {
+    transition:
+      border-color var(--se-transition-fast),
+      transform var(--se-transition-fast);
+  }
+
+  .stock-kpi:hover,
+  .stock-filter:hover {
+    border-color: var(--se-color-primary) !important;
+    transform: translateY(-1px);
   }
 }
 </style>
