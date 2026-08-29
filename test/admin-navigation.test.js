@@ -96,6 +96,21 @@ assert.doesNotMatch(
   'Comptoir express doit rester un mode de Menus, pas une entrée séparée'
 )
 assert.match(
+  dashboardSource,
+  /title:\s*['"]Menu['"][\s\S]*?routeName:\s*['"]caisse-menu['"][\s\S]*?to:\s*['"]\/caisse\/menu['"][\s\S]*?moduleKey:\s*['"]orders['"][\s\S]*?legacyModuleKey:\s*['"]menus['"]/,
+  'le menu interne de la caisse doit avoir sa propre route de navigation'
+)
+assert.match(
+  dashboardSource,
+  /title:\s*['"]Menus['"][\s\S]*?routeName:\s*['"]menus['"][\s\S]*?to:\s*['"]\/menus['"][\s\S]*?hiddenFromMainNavigation:\s*true/,
+  'le menu client doit rester sur /menus sans apparaitre dans la navigation interne'
+)
+assert.match(
+  defaultLayoutSource,
+  /routeNames:\s*\[[^\]]*'caisse-menu'/,
+  'le groupe Service doit afficher la route interne Menu caisse'
+)
+assert.match(
   defaultLayoutSource,
   /class="[^"]*top-bar-menu-button[^"]*"[\s\S]*?@click\.stop="cycleDrawerState"/,
   'staff users must receive a single menu button that cycles drawer states'

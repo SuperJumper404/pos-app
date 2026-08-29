@@ -23,6 +23,21 @@ const expressSource = menusSource.slice(expressStart, expressEnd)
 const cartStart = menusSource.indexOf('class="express-checkout"')
 const cartEnd = menusSource.indexOf('class="express-payment-grid"', cartStart)
 const expressCartSource = menusSource.slice(cartStart, cartEnd)
+const cartHeaderStart = menusSource.indexOf('class="express-cart-summary"')
+const cartHeaderEnd = menusSource.indexOf(
+  'class="express-cart-items-scroll"',
+  cartHeaderStart
+)
+const expressCartHeaderSource = menusSource.slice(cartHeaderStart, cartHeaderEnd)
+const commandActionsStart = menusSource.indexOf('class="express-command-actions"')
+const commandActionsEnd = menusSource.indexOf(
+  '<div class="express-products-scroll">',
+  commandActionsStart
+)
+const expressCommandActionsSource = menusSource.slice(
+  commandActionsStart,
+  commandActionsEnd
+)
 const tableDialogStart = menusSource.indexOf('v-model="expressTableDialog"')
 const tableDialogEnd = menusSource.indexOf(
   'v-model="expressServiceDialog"',
@@ -74,8 +89,23 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /v-if="isAdminView" class="express-command-bar"[\s\S]*?express-filter-row[\s\S]*?express-all-chip[\s\S]*?setExpressCategory\(null\)[\s\S]*?v-for="category in categories"[\s\S]*?setExpressCategory\(category\)[\s\S]*?to="\/orders"[\s\S]*?Commandes[\s\S]*?to="\/cashregister"[\s\S]*?Tiroir caisse/,
-  'express admin mode must show All, orders, and cash-register shortcuts above categories'
+  /v-if="isAdminView" class="express-command-bar"[\s\S]*?express-filter-row[\s\S]*?express-all-chip[\s\S]*?setExpressCategory\(null\)[\s\S]*?v-for="category in categories"[\s\S]*?setExpressCategory\(category\)[\s\S]*?express-command-actions/,
+  'express admin mode must show All and admin shortcuts above categories'
+)
+assert.match(
+  expressCommandActionsSource,
+  /to="\/orders"[\s\S]*?aria-label="Voir les commandes"[\s\S]*?mdi-clipboard-list-outline[\s\S]*?to="\/cashregister"[\s\S]*?aria-label="Ouvrir le tiroir caisse"[\s\S]*?mdi-cash-register/,
+  'express admin shortcuts must be icon-only buttons with accessible labels'
+)
+assert.match(
+  expressCommandActionsSource,
+  /<v-tooltip[\s\S]*?Commandes[\s\S]*?<v-tooltip[\s\S]*?Tiroir caisse/,
+  'express admin shortcut icons must keep visible hover labels'
+)
+assert.doesNotMatch(
+  expressCommandActionsSource,
+  /<v-icon left>|class="express-command-button text-none"/,
+  'express admin shortcuts must render icon-only buttons'
 )
 assert.match(
   menusSource,
@@ -504,8 +534,13 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /express-cart-summary[\s\S]*?idxCart[\s\S]*?formatCurrency\(total\)/,
-  'express cart must give staff a compact order summary before the line items'
+  /express-cart-summary[\s\S]*?express-cart-summary-meta[\s\S]*?idxCart[\s\S]*?menu-panel-actions[\s\S]*?menu-panel-cart-button/,
+  'express cart header must show the item count before the cart shortcut'
+)
+assert.doesNotMatch(
+  expressCartHeaderSource,
+  /express-cart-summary-title|Commande|formatCurrency\(total\)/,
+  'express cart header must not show a title or total price'
 )
 assert.match(
   menusSource,
@@ -526,6 +561,16 @@ assert.match(
   menusSource,
   /\.express-command-button[\s\S]*?min-height:\s*48px/,
   'express admin shortcut buttons must remain touch-friendly'
+)
+assert.match(
+  menusSource,
+  /\.express-command-actions\s*\{[^}]*gap:\s*12px/,
+  'express admin shortcut buttons must keep enough spacing to avoid fat-finger taps'
+)
+assert.match(
+  menusSource,
+  /\.express-command-button \.express-command-icon\s*\{[^}]*font-size:\s*32px/,
+  'express admin shortcut icons must be large enough for quick recognition'
 )
 assert.match(
   menusSource,
