@@ -53,7 +53,7 @@ export default {
       this.loadingBtn = true
       console.log('Id to delete', this.id)
       const res = await this.$axios
-        .delete(`/baseurl/api/v1/user/${this.id}`, {
+        .delete(`/baseurl/api/v1/service-points/tables/${this.id}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },

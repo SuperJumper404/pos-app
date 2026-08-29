@@ -1,4 +1,5 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
+const { sortArchivedOrdersByArchiveDate } = require('@/helpers/history')
 export const state = () => ({
   dataArchivedOrders: [],
   // dataArchivedOrdersByUserId: [],
@@ -20,15 +21,18 @@ export const actions = {
         },
       })
       .then((response) => {
-        const lastCreatedOrder = response.data.data
+        const sortedArchivedOrders = sortArchivedOrdersByArchiveDate(
+          response.data.data
+        )
+        const lastCreatedOrder = sortedArchivedOrders
           .map(function (e) {
-            return e.created
+            return e.archived_at || e.created
           })
           .sort()
           .reverse()[0]
 
         dispatch('set/lastCreatedOrder', lastCreatedOrder)
-        dispatch('set/dataArchivedOrders', response.data.data)
+        dispatch('set/dataArchivedOrders', sortedArchivedOrders)
         return true
       })
       .catch((error) => {

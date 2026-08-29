@@ -39,7 +39,7 @@ export const actions = {
   },
   getOrdersByUserId({ dispatch }, params) {
     return this.$axios
-      .get(`/baseurl/api/v1/ordersbyUserId?userId=${params.userId}`, {
+      .get(`/baseurl/api/v1/ordersbyUserId?servicePointId=${params.servicePointId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -148,7 +148,15 @@ export const actions = {
     return this.$axios
       .post(
         `/baseurl/api/v1/orders/archive/${params.id}`,
-        { payment_method: params.payment_method },
+        {
+          payment_method: params.payment_method,
+          ...(params.discountType
+            ? { discount_type: params.discountType }
+            : {}),
+          ...(params.discountValue != null
+            ? { discount_value: params.discountValue }
+            : {}),
+        },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -170,6 +178,47 @@ export const actions = {
           error.response?.data?.message ||
           error.message ||
           "Impossible d'archiver la commande."
+        dispatch('set/message', message)
+        if (params.notify !== false) {
+          dispatch('notifications/error', message, { root: true })
+        }
+        return false
+      })
+  },
+  collectOrderPayment({ dispatch }, params) {
+    return this.$axios
+      .post(
+        `/baseurl/api/v1/orders/collect/${params.id}`,
+        {
+          payment_method: params.payment_method,
+          ...(params.discountType
+            ? { discount_type: params.discountType }
+            : {}),
+          ...(params.discountValue != null
+            ? { discount_value: params.discountValue }
+            : {}),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          skipGlobalErrorNotification: params.notify === false,
+        }
+      )
+      .then((response) => {
+        dispatch('set/message', response.data.message)
+        if (params.notify !== false) {
+          dispatch('notifications/success', response.data.message, {
+            root: true,
+          })
+        }
+        return true
+      })
+      .catch((error) => {
+        const message =
+          error.response?.data?.message ||
+          error.message ||
+          "Impossible d'encaisser la commande."
         dispatch('set/message', message)
         if (params.notify !== false) {
           dispatch('notifications/error', message, { root: true })

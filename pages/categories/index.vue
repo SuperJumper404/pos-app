@@ -26,15 +26,37 @@
         <h4>Aucune catégorie</h4>
       </v-card-title>
       <v-card
-        v-for="items in dataCategories"
+        v-for="(items, index) in dataCategories"
         :key="items.id"
         outlined
         class="pa-2 d-flex justify-space-between align-center ma-3"
       >
-        <v-card-text class="d-block justify-space-between mt-5">
-          <p class="font-weight-bold">{{ items.name }}</p>
+        <v-card-text class="category-list-main">
+          <v-avatar size="56" class="category-list-avatar">
+            <v-img v-if="items.image" :src="categoryImageSrc(items.image)"></v-img>
+            <v-icon v-else>mdi-shape</v-icon>
+          </v-avatar>
+          <p class="font-weight-bold mb-0">{{ items.name }}</p>
         </v-card-text>
         <v-card-actions class="d-block">
+          <div class="category-order-buttons mb-3">
+            <v-btn
+              icon
+              small
+              :disabled="index === 0 || orderLoading"
+              @click="moveCategory(index, -1)"
+            >
+              <v-icon small>mdi-arrow-up</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              small
+              :disabled="index === dataCategories.length - 1 || orderLoading"
+              @click="moveCategory(index, 1)"
+            >
+              <v-icon small>mdi-arrow-down</v-icon>
+            </v-btn>
+          </div>
           <!-- md to sm -->
           <v-btn
             color="primary"
@@ -90,12 +112,16 @@ export default {
   data() {
     return {
       loadPage: false,
+      orderLoading: false,
     }
   },
 
   computed: {
     dataCategories() {
       return this.$store.get('categories/dataCategories')
+    },
+    staticurl() {
+      return this.$store.get('staticURL').replace(/\/+$/, '')
     },
     showModal() {
       return this.$route.name === 'categorie-edit-id'
@@ -111,6 +137,40 @@ export default {
     searchData() {
       this.$store.dispatch('categories/getAllCategories')
     },
+    categoryImageSrc(image) {
+      return `${this.staticurl}/api/v1/imgcategories/${image}`
+    },
+    async moveCategory(index, direction) {
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= this.dataCategories.length) return
+
+      const ordered = [...this.dataCategories]
+      const [moved] = ordered.splice(index, 1)
+      ordered.splice(targetIndex, 0, moved)
+      this.orderLoading = true
+      await this.$store.dispatch(
+        'categories/reorderCategories',
+        ordered.map((category) => category.id)
+      )
+      this.orderLoading = false
+    },
   },
 }
 </script>
+<style scoped>
+.category-order-buttons {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.category-list-main {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+}
+
+.category-list-avatar {
+  background: #eef2f7;
+  flex: 0 0 auto;
+}
+</style>

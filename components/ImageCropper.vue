@@ -41,7 +41,7 @@
           class="cropper"
           :src="src"
           :stencil-props="{ aspectRatio: ratioLocal }"
-          :canvas="{ width: 1600, height: 1200 }"
+          :canvas="canvasSize"
         />
       </div>
     </client-only>
@@ -116,6 +116,15 @@ export default {
   computed: {
     inputId() {
       return createComponentInputId('image-cropper', this._uid)
+    },
+    canvasSize() {
+      const width = 1600
+      const ratio = Number(this.ratioLocal) || Number(this.ratio) || 4 / 3
+
+      return {
+        width,
+        height: Math.round(width / ratio),
+      }
     },
   },
   watch: {

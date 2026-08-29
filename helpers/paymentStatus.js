@@ -9,7 +9,7 @@ const PAYMENT_STATUS_DISPLAY = {
   },
   unpaid: {
     text: 'À encaisser',
-    color: 'orange',
+    color: 'warning',
   },
   failed: {
     text: 'Échoué',
@@ -47,7 +47,25 @@ const isCounterPayment = (order = {}) =>
     .toLowerCase()
     .includes('comptoir')
 
+const isKioskPayAtCounterOrder = (order = {}) => {
+  const source = String(order.source || order.order_source || '').toLowerCase()
+  const payment = String(order.payment || order.used_payment_method || '')
+    .toLowerCase()
+    .trim()
+  return (
+    source === 'borne' &&
+    (payment.includes('comptoir') || payment.includes('encaisser'))
+  )
+}
+
 const getPaymentStatusDisplay = (order = {}) => {
+  if (isKioskPayAtCounterOrder(order)) {
+    return {
+      text: 'À encaisser',
+      color: 'warning',
+    }
+  }
+
   if (order.payment_status === 'paid') {
     return {
       text: getPaymentMethodText(order),
@@ -58,7 +76,7 @@ const getPaymentStatusDisplay = (order = {}) => {
   if (order.payment_status === 'unpaid' && isCounterPayment(order)) {
     return {
       text: 'À encaisser',
-      color: 'orange',
+      color: 'warning',
     }
   }
 

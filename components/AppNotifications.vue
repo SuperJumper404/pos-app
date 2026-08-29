@@ -84,11 +84,11 @@ export default {
 }
 
 .app-notification ::v-deep .v-snack__wrapper {
-  background: #ffffff !important;
-  border: 1px solid #e4e4e7;
-  border-radius: 8px;
-  box-shadow: 0 10px 18px rgba(24, 24, 27, 0.12);
-  color: #27272a;
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border);
+  border-radius: var(--se-radius-md);
+  box-shadow: var(--se-shadow-floating);
+  color: var(--se-color-text-body);
   max-width: calc(100vw - 48px);
   min-height: 0;
   overflow: hidden;
@@ -124,16 +124,16 @@ export default {
 }
 
 .app-notification-message {
-  color: #27272a;
+  color: var(--se-color-text-body);
   flex: 1 1 auto;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-medium);
   line-height: 1.3;
   padding-right: 0;
 }
 
 .app-notification-close {
-  color: #71717a !important;
+  color: var(--se-color-text-muted) !important;
   height: 22px;
   margin-right: -2px;
   opacity: 0.65;
@@ -158,39 +158,39 @@ export default {
 }
 
 .app-notification--success ::v-deep .v-snack__wrapper {
-  border-color: #00e676;
+  border-color: var(--se-color-success);
 }
 
 .app-notification--success .app-notification-icon,
 .app-notification--success .app-notification-progress {
-  color: #00e676 !important;
+  color: var(--se-color-success) !important;
 }
 
 .app-notification--error ::v-deep .v-snack__wrapper {
-  border-color: #ffc107;
+  border-color: var(--se-color-danger);
 }
 
 .app-notification--error .app-notification-icon,
 .app-notification--error .app-notification-progress {
-  color: #ffc107 !important;
+  color: var(--se-color-danger) !important;
 }
 
 .app-notification--warning ::v-deep .v-snack__wrapper {
-  border-color: #ffc107;
+  border-color: var(--se-color-warning);
 }
 
 .app-notification--warning .app-notification-icon,
 .app-notification--warning .app-notification-progress {
-  color: #ffc107 !important;
+  color: var(--se-color-warning) !important;
 }
 
 .app-notification--info ::v-deep .v-snack__wrapper {
-  border-color: #1976d2;
+  border-color: var(--se-color-info);
 }
 
 .app-notification--info .app-notification-icon,
 .app-notification--info .app-notification-progress {
-  color: #1976d2 !important;
+  color: var(--se-color-info) !important;
 }
 
 @keyframes notification-progress {

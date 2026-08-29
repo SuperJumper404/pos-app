@@ -18,6 +18,7 @@ const listdashboard = {
           title: 'Accueil',
           routeName: 'index',
           to: '/',
+          moduleKey: 'home',
           isAdmin: true,
         },
         {
@@ -25,7 +26,9 @@ const listdashboard = {
           title: 'Catégories',
           routeName: 'categories',
           to: '/categories',
-          isAdmin: true,
+          moduleKey: 'categories',
+          hiddenFromMainNavigation: true,
+          isAdmin: false,
         },
         {
           icon: 'mdi-shape-plus',
@@ -38,6 +41,8 @@ const listdashboard = {
           title: 'Produits',
           routeName: 'products',
           to: '/products',
+          moduleKey: 'catalog',
+          legacyModuleKey: 'products',
           isAdmin: true,
         },
         {
@@ -45,6 +50,7 @@ const listdashboard = {
           title: 'Étapes produits',
           routeName: 'customizations',
           to: '/customizations',
+          hiddenFromMainNavigation: true,
           isAdmin: false,
         },
         {
@@ -69,18 +75,22 @@ const listdashboard = {
           title: 'Menus',
           routeName: 'menus',
           to: '/menus',
+          moduleKey: 'orders',
+          legacyModuleKey: 'menus',
           isAdmin: true,
         },
         {
           icon: 'mdi-basket-check',
           title: 'Commande',
           routeName: 'cart',
+          moduleKey: 'cart',
         },
         {
           icon: 'mdi-order-bool-descending',
           title: 'Commandes',
           routeName: 'orders',
           to: '/orders',
+          moduleKey: 'orders',
           isAdmin: true,
         },
         {
@@ -93,6 +103,7 @@ const listdashboard = {
           title: 'Tiroir-caisse',
           routeName: 'cashregister',
           to: '/cashregister',
+          moduleKey: 'cashregister',
           isAdmin: true,
         },
         {
@@ -110,6 +121,23 @@ const listdashboard = {
           title: 'Historique',
           routeName: 'history',
           to: '/history',
+          moduleKey: 'history',
+          isAdmin: true,
+        },
+        {
+          icon: 'mdi-poll',
+          title: 'Statistiques',
+          routeName: 'statistics',
+          to: '/statistics',
+          moduleKey: 'home',
+          isAdmin: true,
+        },
+        {
+          icon: 'mdi-account-multiple',
+          title: 'Mes clients',
+          routeName: 'clients',
+          to: '/clients',
+          moduleKey: 'clients',
           isAdmin: true,
         },
         {
@@ -122,6 +150,7 @@ const listdashboard = {
           title: 'Stocks',
           routeName: 'stocks',
           to: '/stocks',
+          moduleKey: 'stocks',
           isAdmin: false,
         },
         {
@@ -129,13 +158,23 @@ const listdashboard = {
           title: 'Rapports',
           routeName: 'reports',
           to: '/reports',
+          moduleKey: 'reports',
           isAdmin: false,
+        },
+        {
+          icon: 'mdi-account-group',
+          title: 'Equipe',
+          routeName: 'staff',
+          to: '/staff',
+          moduleKey: 'staff',
+          isAdmin: true,
         },
         {
           icon: 'mdi-table-chair',
           title: 'Tables',
           routeName: 'tables',
           to: '/tables',
+          moduleKey: 'tables',
           isAdmin: true,
         },
         {
@@ -153,6 +192,7 @@ const listdashboard = {
           title: 'Réglages',
           routeName: 'settings',
           to: '/settings',
+          moduleKey: 'settings',
           isAdmin: true,
         },
 
@@ -163,6 +203,16 @@ const listdashboard = {
             shopId && shopName
               ? `/click-and-collect/${shopId}/${shopName}`
               : '/click-and-collect',
+          moduleKey: 'website',
+          isAdmin: true,
+        },
+
+        {
+          icon: 'mdi-tablet-dashboard',
+          title: 'Bornes',
+          routeName: 'bornes',
+          to: '/bornes',
+          moduleKey: 'settings',
           isAdmin: true,
         },
 

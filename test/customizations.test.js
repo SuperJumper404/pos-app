@@ -1617,6 +1617,7 @@ menusVm.cartItem[1].subtotal = 20
 
 menusOptions.methods.editCartLine.call(menusVm, 1)
 assert.strictEqual(menusVm.editingCartIndex, 1)
+assert.strictEqual(menusVm.selectedItem.id, menuProduct.id)
 assert.deepStrictEqual(menusVm.selectedChoiceIds, [30])
 assert.strictEqual(menusVm.customizationDialog, true)
 
@@ -2417,6 +2418,11 @@ const runReviewRegressionTests = async () => {
     ['set/user.access', null],
     ['set/user.token', null],
     ['set/user.shopid', null],
+    ['set/user.module_permissions', null],
+    ['set/user.is_primary_admin', false],
+    ['set/user.session_subject', null],
+    ['set/user.service_point_id', null],
+    ['set/user.order_source', null],
   ])
 
   const originalRecovery = {
@@ -2432,7 +2438,14 @@ const runReviewRegressionTests = async () => {
   const createAuthState = (bearer) => ({
     authenticated: true,
     users: {
-      user: { id: 12, access: 1, token: bearer, shopid: 4 },
+      user: {
+        id: 12,
+        access: 1,
+        token: bearer,
+        shopid: 4,
+        module_permissions: ['orders'],
+        is_primary_admin: true,
+      },
     },
     cart: {
       ...JSON.parse(JSON.stringify(originalRecovery)),
@@ -2445,6 +2458,8 @@ const runReviewRegressionTests = async () => {
       ['access', String(state.users.user.access)],
       ['token', state.users.user.token],
       ['shopid', String(state.users.user.shopid)],
+      ['module_permissions', JSON.stringify(state.users.user.module_permissions)],
+      ['is_primary_admin', String(state.users.user.is_primary_admin)],
       ['vuex', serializePersistedState(state)],
     ])
     return {
@@ -2563,10 +2578,25 @@ const runReviewRegressionTests = async () => {
     access: null,
     token: null,
     shopid: null,
+    module_permissions: null,
+    is_primary_admin: false,
+    session_subject: null,
+    service_point_id: null,
+    order_source: null,
   })
   assert.strictEqual(persistedAuthState.authenticated, false)
   assert.deepStrictEqual(persistedAuthState.users.user, authState.users.user)
-  for (const key of ['idUser', 'access', 'token', 'shopid']) {
+  for (const key of [
+    'idUser',
+    'access',
+    'token',
+    'shopid',
+    'module_permissions',
+    'is_primary_admin',
+    'session_subject',
+    'service_point_id',
+    'order_source',
+  ]) {
     assert.strictEqual(authStorage.getItem(key), null)
   }
   assert.ok(!authStorage.getItem('vuex').includes('secret-bearer-success'))
@@ -2602,6 +2632,11 @@ const runReviewRegressionTests = async () => {
     access: null,
     token: null,
     shopid: null,
+    module_permissions: null,
+    is_primary_admin: false,
+    session_subject: null,
+    service_point_id: null,
+    order_source: null,
   })
   assert.strictEqual(failedAuthState.cart.clientOrderAuthRedirect, true)
   assert.deepStrictEqual(

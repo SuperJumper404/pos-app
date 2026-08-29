@@ -241,6 +241,14 @@ export default {
     user() {
       return this.$store.get('users/user')
     },
+    clientServicePointId() {
+      const user = this.user || {}
+      return (
+        user.service_point_id ||
+        localStorage.getItem('service_point_id') ||
+        user.id
+      )
+    },
     allOrdersSent() {
       return this.$store.get('cart/allOrdersSent')
     },
@@ -307,7 +315,7 @@ export default {
     this.pollData()
     this.$store
       .dispatch('orders/getOrdersByUserId', {
-        userId: this.user.id,
+        servicePointId: this.clientServicePointId,
       })
       .finally(() => {
         this.loadPage = false
@@ -317,7 +325,7 @@ export default {
     pollData() {
       this.polling = setInterval(() => {
         this.$store.dispatch('orders/getOrdersByUserId', {
-          userId: this.user.id,
+          servicePointId: this.clientServicePointId,
         })
         this.lastUpdate = this.updateTimeStamp
       }, 15000)

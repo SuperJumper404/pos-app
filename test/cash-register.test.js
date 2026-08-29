@@ -5,6 +5,7 @@ const {
   archiveOrdersSafely,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
+  isCashRegisterOrderArchivable,
   normalizeOrderIds,
   resolveRetryDueOrderIds,
   summarizeArchiveResults,
@@ -71,6 +72,58 @@ assert.deepStrictEqual(buildCashRegisterCustomerRows(orders), [
     hasAlreadyPaidAmount: false,
   },
 ])
+
+assert.deepStrictEqual(
+  getCashRegisterPaymentSummary([
+    {
+      id: 6,
+      customer: 'Counter Bug',
+      subtotal: 4,
+      payment_status: 'paid',
+      payment: 'Paiement au comptoir',
+    },
+  ]),
+  {
+    dueAmount: 4,
+    paidAmount: 0,
+    totalAmount: 4,
+    dueOrderIds: [6],
+    paidOrderIds: [],
+    allOrderIds: [6],
+    hasAmountDue: true,
+    hasAlreadyPaidAmount: false,
+  }
+)
+
+assert.strictEqual(
+  isCashRegisterOrderArchivable({
+    payment_status: 'requires_payment',
+    payment_provider: 'stripe',
+    stock_reservation_status: 'released',
+  }),
+  false
+)
+assert.strictEqual(
+  isCashRegisterOrderArchivable({
+    payment_status: 'requires_payment',
+    payment_provider: 'stripe',
+    stock_reservation_status: 'reserved',
+  }),
+  true
+)
+assert.deepStrictEqual(
+  buildCashRegisterCustomerRows([
+    {
+      id: 5,
+      customer: 'Expired Stripe',
+      subtotal: 15,
+      payment_status: 'requires_payment',
+      payment_provider: 'stripe',
+      stock_reservation_status: 'released',
+    },
+  ]),
+  []
+)
 
 assert.deepStrictEqual(
   buildCashRegisterCustomerRows([
@@ -237,15 +290,67 @@ const runAsyncAssertions = async () => {
   assert.ok(!payoutSource.includes('retryRequiresPaymentMethod'))
   assert.ok(!payoutSource.includes('paymentSummary.dueOrderIds.length'))
   assert.ok(payoutSource.includes('selectedPaymentMethod'))
+  assert.ok(payoutSource.includes('paymentMethodIcon'))
+  assert.ok(payoutSource.includes('discountDialog'))
+  assert.ok(payoutSource.includes('applyDiscount'))
+  assert.ok(payoutSource.includes('discountType: this.effectiveDiscountType'))
+  assert.ok(payoutSource.includes('discountValue: this.effectiveDiscountValue'))
   assert.ok(payoutSource.includes(':disabled="loadingBtn"'))
   assert.ok(payoutSource.includes('if (this.loadingBtn) return'))
   assert.ok(payoutSource.includes("this.$route.path !== '/cashregister'"))
+  assert.ok(payoutSource.includes('displayOrderNumbers'))
+  assert.ok(payoutSource.includes('ordernumber'))
+  assert.ok(payoutSource.includes('cashregister-payout-total__orders'))
+  assert.ok(payoutSource.includes('cashregister-payout-order'))
+  assert.ok(payoutSource.includes('cashregister-payout-order__numbers'))
+  assert.ok(payoutSource.includes('mdi-tag-percent-outline'))
+  assert.ok(payoutSource.includes('mdi-percent'))
+  assert.ok(payoutSource.includes('cashregister-discount-title'))
+  assert.ok(payoutSource.includes('.normalize(\'NFD\')'))
+  assert.ok(payoutSource.includes("return 'mdi-cash-multiple'"))
+  assert.ok(!payoutSource.includes("ordersToArchive.join(', ')"))
+  assert.ok(payoutSource.includes('receiptDialog'))
+  assert.ok(payoutSource.includes('@click="requestReceiptChoice"'))
+  assert.ok(payoutSource.includes('confirmReceiptChoice(true)'))
+  assert.ok(payoutSource.includes('confirmReceiptChoice(false)'))
+  assert.ok(payoutSource.includes('buildCashierReceiptPayload'))
+  assert.ok(payoutSource.includes('sendCashierReceipt'))
+  assert.ok(payoutSource.includes('pendingPaymentMethod'))
   const btnYesSource = payoutSource.slice(payoutSource.indexOf('async btnYes'))
-  assert.ok(btnYesSource.includes('? this.selectedPaymentMethod'))
+  assert.ok(btnYesSource.includes('? this.pendingPaymentMethod'))
+  assert.ok(btnYesSource.includes('wantsReceipt'))
   assert.ok(
     btnYesSource.indexOf('this.ordersToArchive = archiveSummary.failedOrderIds') <
       btnYesSource.indexOf("dispatch('orders/getAllOrder'")
   )
+
+  const cashRegisterSource = fs.readFileSync(
+    path.join(__dirname, '../pages/cashregister/index.vue'),
+    'utf8'
+  )
+  assert.ok(cashRegisterSource.includes('tableDisplayName(table)'))
+  assert.ok(cashRegisterSource.includes('tableServicePointId(table)'))
+  assert.ok(cashRegisterSource.includes('x.service_point_id'))
+  assert.ok(cashRegisterSource.includes("'servicePoints/getAll'"))
+  assert.ok(cashRegisterSource.includes("this.$store.get('servicePoints/items')"))
+  const cashRegisterDetailSource = fs.readFileSync(
+    path.join(__dirname, '../pages/cashregister/details/_id.vue'),
+    'utf8'
+  )
+  assert.ok(cashRegisterDetailSource.includes('servicePointId: this.user.id'))
+  assert.ok(!cashRegisterDetailSource.includes('userId: this.user.id'))
+
+  const ordersStoreSource = fs.readFileSync(
+    path.join(__dirname, '../store/orders.js'),
+    'utf8'
+  )
+  assert.match(ordersStoreSource, /servicePointId=\$\{params\.servicePointId\}/)
+  assert.ok(
+    !cashRegisterSource.includes(
+      'x.access === 2 || x.access === 0 || x.access === 3'
+    )
+  )
+  assert.ok(cashRegisterSource.includes("table.name || table.username"))
 
   const ordersSource = fs.readFileSync(
     path.join(__dirname, '../store/orders.js'),

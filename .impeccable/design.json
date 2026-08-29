@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-23T00:00:00.000Z",
+  "title": "Design System: Smart Eat POS",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Bleu Action",
+        "canonical": "#1976d2",
+        "tonalRamp": ["#0d325a", "#104f8f", "#1976d2", "#5fa7e8", "#e8f2ff"]
+      },
+      "brand-purple": {
+        "role": "secondary",
+        "displayName": "Violet Smart Eat",
+        "canonical": "#7e22ce",
+        "tonalRamp": ["#341054", "#581894", "#7e22ce", "#a564dd", "#f3e8ff"]
+      },
+      "success": {
+        "role": "success",
+        "displayName": "Vert Service",
+        "canonical": "#00e676",
+        "tonalRamp": ["#003d1f", "#007a3d", "#00e676", "#6dffad", "#e8f8ef"]
+      },
+      "warning": {
+        "role": "warning",
+        "displayName": "Ambre Attention",
+        "canonical": "#ffa014",
+        "tonalRamp": ["#5a3b00", "#9b5f00", "#ffa014", "#ffc267", "#fff4df"]
+      },
+      "danger": {
+        "role": "danger",
+        "displayName": "Rouge Critique",
+        "canonical": "#d83b3b",
+        "tonalRamp": ["#5f1616", "#9d2727", "#d83b3b", "#f37b7b", "#ffecec"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Titre fort de page ou module." },
+      "headline": { "displayName": "Headline", "purpose": "Titre de section principale." },
+      "title": { "displayName": "Title", "purpose": "Cartes importantes et dialogues." },
+      "body": { "displayName": "Body", "purpose": "Lecture courante et contenus operationnels." },
+      "label": { "displayName": "Label", "purpose": "Boutons, champs, colonnes et meta." }
+    },
+    "shadows": [
+      { "name": "panel", "value": "0 2px 8px rgba(25, 39, 52, 0.04)", "purpose": "Elevation basse pour panneau dense." },
+      { "name": "floating", "value": "0 10px 18px rgba(24, 24, 27, 0.12)", "purpose": "Notification ou surface flottante." },
+      { "name": "focus", "value": "0 0 0 3px rgba(25, 118, 210, 0.24)", "purpose": "Focus clavier et selection tactile." }
+    ],
+    "motion": [
+      { "name": "state-fast", "value": "150ms ease-out", "purpose": "Feedback rapide hover/active." },
+      { "name": "state-standard", "value": "220ms ease-out", "purpose": "Transition standard non bloquante." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "600px" },
+      { "name": "tablet", "value": "960px" },
+      { "name": "desktop", "value": "1264px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Action principale d'un ecran de service.",
+      "html": "<button class=\"ds-btn-primary\">Enregistrer</button>",
+      "css": ".ds-btn-primary{height:44px;padding:0 16px;border:0;border-radius:8px;background:#1976d2;color:#fff;font-family:Poppins,sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:background 150ms ease-out,box-shadow 150ms ease-out}.ds-btn-primary:hover{background:#155fa8}.ds-btn-primary:focus-visible{outline:0;box-shadow:0 0 0 3px rgba(25,118,210,.24)}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Action secondaire ou retour.",
+      "html": "<button class=\"ds-btn-secondary\">Annuler</button>",
+      "css": ".ds-btn-secondary{height:44px;padding:0 16px;border:1px solid #dfe5ee;border-radius:8px;background:#fff;color:#1f2933;font-family:Poppins,sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:background 150ms ease-out,border-color 150ms ease-out}.ds-btn-secondary:hover{background:#f8fafc;border-color:#1976d2}.ds-btn-secondary:focus-visible{outline:0;box-shadow:0 0 0 3px rgba(25,118,210,.24)}"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "status-success",
+      "description": "Statut lisible avec fond doux et texte fort.",
+      "html": "<span class=\"ds-status-chip ds-status-chip-success\">Payee</span>",
+      "css": ".ds-status-chip{display:inline-flex;align-items:center;min-height:24px;padding:0 10px;border-radius:999px;font-family:Poppins,sans-serif;font-size:12px;font-weight:700}.ds-status-chip-success{background:#e8f8ef;color:#00e676}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Surface de travail plate avec bordure structurelle.",
+      "html": "<section class=\"ds-panel\"><h3>Commandes</h3><p>Zone de travail claire et compacte.</p></section>",
+      "css": ".ds-panel{padding:16px;border:1px solid #dfe5ee;border-radius:8px;background:#fff;color:#1f2933;font-family:Poppins,sans-serif}.ds-panel h3{margin:0 0 8px;color:#121826;font-size:20px;line-height:1.25}.ds-panel p{margin:0;color:#687386;font-size:14px;line-height:1.5}"
+    }
+  ],
+  "narrative": {
+    "northStar": "La Caisse Calme",
+    "overview": "Smart Eat POS doit ressembler a un outil de service, pas a une vitrine marketing. Le systeme visuel privilegie une structure claire, des contrastes lisibles et des etats impossibles a confondre pendant un rush restaurant.",
+    "keyCharacteristics": [
+      "Interface produit dense mais scannable.",
+      "Une couleur primaire pour les actions et la selection.",
+      "Couleurs semantiques stables pour commande, paiement, cuisine, stock et impression.",
+      "Panneaux plats ou legerement eleves, jamais decoratifs.",
+      "Touch targets adaptees au clavier, a la souris et a la tablette."
+    ],
+    "rules": [
+      { "name": "The Semantic First Rule", "body": "Une couleur visible doit porter un role : action, selection, statut ou alerte.", "section": "colors" },
+      { "name": "The Purple Restraint Rule", "body": "Le violet Smart Eat ne remplace pas le bleu action.", "section": "colors" },
+      { "name": "The Short Ramp Rule", "body": "Une app POS n'a pas besoin de vingt tailles.", "section": "typography" },
+      { "name": "The Flat By Default Rule", "body": "Une carte au repos n'a pas besoin d'ombre.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do utiliser le bleu action pour les actions primaires, selections et focus.",
+      "Do garder Poppins comme famille unique et stabiliser les tailles par tokens.",
+      "Do associer chaque couleur de statut a un libelle textuel explicite."
+    ],
+    "donts": [
+      "Don't rendre l'interface trop ludique, trop corporate, trop sombre, trop chargee ou trop generique SaaS.",
+      "Don't utiliser des couleurs hard-codees quand un token existe.",
+      "Don't utiliser large, medium, x-large pour dimensionner du texte."
+    ]
+  }
+}

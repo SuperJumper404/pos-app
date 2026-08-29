@@ -314,6 +314,7 @@ const buildCheckoutPayloadSignature = (input = {}) => {
       input.customerID ||
         (customer && typeof customer === 'object' ? customer.id : 0)
     ),
+    service_point_id: Number(input.servicePointId || input.service_point_id || 0),
     phone: normalizedText(input.phone),
     remark: normalizedText(input.remark),
     payment: normalizedText(input.payment).toLowerCase(),
@@ -321,6 +322,10 @@ const buildCheckoutPayloadSignature = (input = {}) => {
     flow: input.stripe === true ? 'stripe' : 'order',
     expected_total: roundPrice(
       input.total == null ? input.expected_total : input.total
+    ),
+    discount_type: normalizedText(input.discountType || input.discount_type),
+    discount_value: roundPrice(
+      input.discountValue == null ? input.discount_value : input.discountValue
     ),
     items,
   })
