@@ -21,7 +21,7 @@ const PAYMENT_METHOD_OPTIONS = [
     text: 'Chèque',
     value: 'Chèque',
     icon: 'mdi-file-document-outline',
-    aliases: [],
+    aliases: ['Cheque', 'Cheques', 'Chèques'],
   },
 ]
 
@@ -54,6 +54,47 @@ const normalizePaymentMethods = (methods) => {
   return [...new Set(normalized)]
 }
 
+const normalizePaymentSummary = (rows) => {
+  const source = Array.isArray(rows) ? rows : []
+  const grouped = new Map()
+
+  source.forEach((row) => {
+    const payment = normalizePaymentMethod(row && row.payment)
+    if (!payment) return
+
+    const key = normalizeText(payment)
+    const hasOrderCount =
+      Object.prototype.hasOwnProperty.call(row || {}, 'orders_count')
+    const existing = grouped.get(key) || {
+      ...row,
+      payment,
+      total: 0,
+      ...(hasOrderCount ? { orders_count: 0 } : {}),
+    }
+    const next = {
+      ...existing,
+      payment,
+      total:
+        Math.round(
+          ((Number(existing.total) || 0) + (Number(row.total) || 0)) * 100
+        ) / 100,
+    }
+
+    if (
+      hasOrderCount ||
+      Object.prototype.hasOwnProperty.call(existing, 'orders_count')
+    ) {
+      next.orders_count =
+        (Number(existing.orders_count) || 0) +
+        (Number(row && row.orders_count) || 0)
+    }
+
+    grouped.set(key, next)
+  })
+
+  return Array.from(grouped.values())
+}
+
 const getPaymentMethodOptions = (methods) => {
   const normalized = normalizePaymentMethods(methods)
   const active = normalized.length
@@ -69,4 +110,5 @@ module.exports = {
   getPaymentMethodOptions,
   normalizePaymentMethod,
   normalizePaymentMethods,
+  normalizePaymentSummary,
 }

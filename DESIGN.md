@@ -143,6 +143,12 @@ components:
     preparingBackground: "{colors.success-soft}"
     canceledBackground: "{colors.warning-soft}"
     readyBackground: "{colors.primary-soft}"
+  reorder-handle:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text-muted}"
+    rounded: "{rounded.sm}"
+    width: "44px"
+    padding: "0 8px"
 ---
 
 # Design System: Smart Eat POS
@@ -254,6 +260,18 @@ Le systeme est plat par defaut et utilise la separation tonale avant les ombres.
 - **Analytics Page Background:** utiliser `analytics-bg` (`#f7f9fc`) sur les pages de reporting afin que les cartes blanches ressortent sans ombre lourde.
 - **Analytics Card Surface:** les cartes KPI et panneaux restent en `surface` (`#ffffff`) avec bordure `border`; ne pas teinter le fond de la carte elle-meme.
 
+### Reorder Handles
+
+La poignee d'ordre est le pattern standard pour monter ou descendre un element dans une liste administrable.
+
+- **Placement:** bord gauche de la carte ou de la ligne, avant le contenu principal.
+- **Structure:** deux boutons icon-only empiles, `mdi-arrow-up` puis `mdi-arrow-down`, dans une colonne de `44px` minimum.
+- **Divider:** separateur vertical `1px solid border-soft` entre la poignee et le contenu; jamais de bande coloree.
+- **Buttons:** Vuetify `v-btn icon small`, couleur neutre au repos, disabled visible sur le premier/dernier element et pendant l'enregistrement.
+- **Spacing:** `padding: 0 8px` dans la poignee et `16px` minimum entre la poignee et le contenu.
+- **Motion:** sur les listes qui l'autorisent, transition de reordre courte (`150-220ms`) sous `prefers-reduced-motion: no-preference`; sinon deplacement instantane.
+- **Responsive:** sur mobile, garder les fleches visibles et tactiles. Ne pas cacher le controle si l'ordre reste modifiable.
+
 ### Inputs / Fields
 
 - **Style:** Vuetify `outlined dense` reste la base.
@@ -347,6 +365,7 @@ Les notifications sont des surfaces flottantes compactes avec icone semantique, 
 - **Do** utiliser MDI de facon coherente : une icone par role.
 - **Do** reutiliser le pattern Statistiques pour les ecrans de reporting : toolbar de filtres, KPI, panneaux details.
 - **Do** reutiliser le cockpit caisse pour les ecrans ou l'utilisateur doit choisir une table ou un groupe avant une action critique.
+- **Do** utiliser la poignee d'ordre standard avec `mdi-arrow-up` / `mdi-arrow-down` pour les cartes ou lignes reordonnables.
 
 ### Don't:
 
@@ -357,3 +376,4 @@ Les notifications sont des surfaces flottantes compactes avec icone semantique, 
 - **Don't** bloquer l'encaissement, l'envoi de commande ou l'impression avec des integrations externes lentes.
 - **Don't** coller les filtres de date au bouton primaire dans les toolbars de reporting.
 - **Don't** utiliser des cartes `max-content` pour les surfaces de caisse; elles doivent former une grille stable.
+- **Don't** remplacer les fleches de reordre par du drag-and-drop seul ou par des controles differents selon les pages.

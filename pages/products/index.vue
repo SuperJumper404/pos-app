@@ -101,6 +101,27 @@
           @drop="dropProduct(items)"
           @dragend="clearProductDrag"
         >
+          <div v-if="items.archived === 0" class="product-card__handle">
+            <v-btn
+              icon
+              small
+              aria-label="Monter le produit"
+              :disabled="index === 0 || orderLoading"
+              @click="moveVisibleProduct(index, -1)"
+            >
+              <v-icon small>mdi-arrow-up</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              small
+              aria-label="Descendre le produit"
+              :disabled="index === lastVisibleActiveProductIndex || orderLoading"
+              @click="moveVisibleProduct(index, 1)"
+            >
+              <v-icon small>mdi-arrow-down</v-icon>
+            </v-btn>
+          </div>
+          <div v-else class="product-card__handle product-card__handle--empty" />
           <v-img
             :src="productImageSrc(items.image)"
             class="product-list-image"
@@ -134,26 +155,6 @@
             </div>
 
             <div v-if="items.archived === 0" class="product-action-buttons">
-              <div class="product-order-buttons">
-                <v-btn
-                  icon
-                  small
-                  aria-label="Monter le produit"
-                  :disabled="index === 0 || orderLoading"
-                  @click="moveVisibleProduct(index, -1)"
-                >
-                  <v-icon small>mdi-arrow-up</v-icon>
-                </v-btn>
-                <v-btn
-                  icon
-                  small
-                  aria-label="Descendre le produit"
-                  :disabled="index === lastVisibleActiveProductIndex || orderLoading"
-                  @click="moveVisibleProduct(index, 1)"
-                >
-                  <v-icon small>mdi-arrow-down</v-icon>
-                </v-btn>
-              </div>
               <v-btn
                 color="primary"
                 class="text-none"
@@ -209,41 +210,45 @@
           @drop="dropProduct(itm)"
           @dragend="clearProductDrag"
         >
-          <v-img
-            :src="productImageSrc(itm.image)"
-            class="product-mobile-image"
-            :aspect-ratio="4 / 3"
-            width="100%"
-          ></v-img>
-          <v-card-text>
-            <p class="font-weight-bold">{{ itm.name }}</p>
-            <p>{{ itm.category }}</p>
-            <p>{{ formatCurrency(itm.price) }}</p>
-            <p>Stock: {{ itm.stock }}</p>
-          </v-card-text>
+          <div class="product-mobile-card__frame">
+            <div v-if="itm.archived === 0" class="product-card__handle">
+              <v-btn
+                icon
+                small
+                aria-label="Monter le produit"
+                :disabled="index === 0 || orderLoading"
+                @click="moveVisibleProduct(index, -1)"
+              >
+                <v-icon small>mdi-arrow-up</v-icon>
+              </v-btn>
+              <v-btn
+                icon
+                small
+                aria-label="Descendre le produit"
+                :disabled="index === lastVisibleActiveProductIndex || orderLoading"
+                @click="moveVisibleProduct(index, 1)"
+              >
+                <v-icon small>mdi-arrow-down</v-icon>
+              </v-btn>
+            </div>
+            <div class="product-mobile-card__content">
+              <v-img
+                :src="productImageSrc(itm.image)"
+                class="product-mobile-image"
+                :aspect-ratio="4 / 3"
+                width="100%"
+              ></v-img>
+              <v-card-text>
+                <p class="font-weight-bold">{{ itm.name }}</p>
+                <p>{{ itm.category }}</p>
+                <p>{{ formatCurrency(itm.price) }}</p>
+                <p>Stock: {{ itm.stock }}</p>
+              </v-card-text>
+            </div>
+          </div>
           <v-card-actions class="product-actions d-md-flex">
             <!-- Si pas archivé : boutons visibles -->
             <template v-if="itm.archived === 0">
-              <div class="product-order-buttons">
-                <v-btn
-                  icon
-                  small
-                  aria-label="Monter le produit"
-                  :disabled="index === 0 || orderLoading"
-                  @click="moveVisibleProduct(index, -1)"
-                >
-                  <v-icon small>mdi-arrow-up</v-icon>
-                </v-btn>
-                <v-btn
-                  icon
-                  small
-                  aria-label="Descendre le produit"
-                  :disabled="index === lastVisibleActiveProductIndex || orderLoading"
-                  @click="moveVisibleProduct(index, 1)"
-                >
-                  <v-icon small>mdi-arrow-down</v-icon>
-                </v-btn>
-              </div>
               <v-switch
                 :input-value="!isProductHidden(itm)"
                 :loading="visibilityLoadingId === itm.id"
@@ -605,7 +610,7 @@ export default {
   border-radius: var(--se-radius-md) !important;
   display: grid !important;
   gap: 16px;
-  grid-template-columns: 128px minmax(0, 1fr);
+  grid-template-columns: 44px 128px minmax(0, 1fr);
   min-height: 116px;
   padding: 12px !important;
   width: auto;
@@ -681,17 +686,22 @@ export default {
   padding-right: 14px !important;
 }
 
-.product-order-buttons {
+.product-card__handle {
   align-items: center;
-  background: var(--se-color-surface-muted);
-  border: 1px solid var(--se-color-border-soft);
-  border-radius: var(--se-radius-pill);
+  align-self: stretch;
+  border-right: 1px solid var(--se-color-border-soft);
   display: flex;
-  gap: 2px;
-  padding: 2px;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 44px;
+  padding: 0 8px 0 0;
 }
 
-.product-order-buttons ::v-deep .v-btn {
+.product-card__handle--empty {
+  visibility: hidden;
+}
+
+.product-card__handle ::v-deep .v-btn {
   height: 32px !important;
   min-height: 32px !important;
   min-width: 32px !important;
@@ -722,6 +732,15 @@ export default {
   border-color: var(--se-color-border-soft) !important;
   border-radius: var(--se-radius-md) !important;
   overflow: hidden;
+}
+
+.product-mobile-card__frame {
+  display: flex;
+}
+
+.product-mobile-card__content {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .product-mobile-card ::v-deep .v-card__text {

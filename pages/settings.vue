@@ -1,5 +1,5 @@
 <template>
-  <v-container>
+  <v-container fluid class="settings-page">
     <v-form ref="form" v-model="valid" @submit.prevent="submitShopEdit">
     <v-card
       v-if="loadPage"
@@ -10,55 +10,107 @@
       <Loading />
     </v-card>
 
-    <div class="mt-5 mb-5">
-      <h2>Informations & Réglages de votre établissment</h2>
-    </div>
-    <v-row style="justify-content: space-between">
-      <v-col md="4" sm="5" cols="12">
-        <v-card outlined class="pa-4 fill-height">
-          <h3 class="mb-4">Photo de votre établissement</h3>
+    <section class="settings-hero">
+      <div class="settings-hero__title">
+        <span class="settings-hero__icon" aria-hidden="true">
+          <v-icon color="primary">mdi-tune-variant</v-icon>
+        </span>
+        <div>
+          <h1>Informations & Reglages de votre etablissement</h1>
+          <p>
+            Identite, horaires, paiements, impression et ticket de caisse dans
+            une console plus rapide a scanner.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <v-row class="settings-main-grid">
+      <v-col cols="12" md="6" lg="6">
+        <v-card id="media" outlined class="pa-4 fill-height settings-card">
+          <h3 class="mb-4 settings-section-title">
+            <v-icon small color="primary">mdi-image-outline</v-icon>
+            Photo de votre établissement
+          </h3>
           <ImageCropper
             v-model="shopImg"
             :preview-url-prop="imageUrl"
             :ratio="16 / 5"
           />
 
-          <v-row class="mt-8 pt-4 d-flex justify-center">
+          <v-row class="mt-6 settings-public-actions">
             <v-btn
               color="primary"
               rounded
-              :href="`/click-and-collect/${shopId}/${shop_name}`"
+              class="settings-site-link text-none"
+              :href="clickAndCollectPath"
               target="_blank"
             >
               Voir le site de mon restaurant
-              <v-icon> mdi-arrow-top-right </v-icon>
+              <v-icon small right>mdi-open-in-new</v-icon>
+            </v-btn>
+            <v-btn
+              color="primary"
+              outlined
+              rounded
+              class="settings-site-link text-none"
+              @click="copyPublicUrl('site')"
+            >
+              Copier l'URL du site
+              <v-icon small right>
+                {{
+                  copiedPublicUrlType === 'site'
+                    ? 'mdi-check'
+                    : 'mdi-content-copy'
+                }}
+              </v-icon>
+            </v-btn>
+            <v-btn
+              color="primary"
+              outlined
+              rounded
+              class="settings-site-link text-none"
+              @click="copyPublicUrl('click-and-collect')"
+            >
+              Copier l'URL click and collect
+              <v-icon small right>
+                {{
+                  copiedPublicUrlType === 'click-and-collect'
+                    ? 'mdi-check'
+                    : 'mdi-content-copy'
+                }}
+              </v-icon>
             </v-btn>
           </v-row>
         </v-card>
       </v-col>
 
-      <v-col cols="6">
-        <v-card outlined class="pa-4 fill-height">
-          <h3 class="mb-4">Horaires d'ouvertures</h3>
-          <div v-for="(day, i) in formShop.shop_hours" :key="i">
-            <v-row
-              style="
-                display: flex;
-                justify-content: space-evenly;
-                align-items: baseline;
-              "
-            >
-              <h3 style="width: 100px">{{ day.dayName }}</h3>
-              <v-switch
-                v-model="day.isOpen"
-                :label="day.isOpen ? 'Ouvert' : 'Fermé'"
-                color="success"
-              ></v-switch>
-              <v-col cols="6" md="2">
+      <v-col cols="12" md="6" lg="6">
+        <v-card
+          id="horaires"
+          outlined
+          class="pa-4 fill-height settings-card settings-hours-card"
+        >
+          <h3 class="mb-4 settings-section-title">
+            <v-icon small color="primary">mdi-clock-outline</v-icon>
+            Horaires d'ouvertures
+          </h3>
+          <div class="settings-hours-list">
+            <div v-for="(day, i) in formShop.shop_hours" :key="i">
+              <div class="settings-hours-row">
+                <div class="settings-hours-day">{{ day.dayName }}</div>
+                <v-switch
+                  v-model="day.isOpen"
+                  class="settings-hours-switch"
+                  :label="day.isOpen ? 'Ouvert' : 'Fermé'"
+                  color="success"
+                  dense
+                  hide-details
+                ></v-switch>
                 <v-text-field
                   v-if="day.isOpen"
                   v-model="day.from"
-                  style="width: 60px"
+                  class="settings-hours-time"
                   hide-details
                   single-line
                   type="text"
@@ -69,12 +121,10 @@
                   label="De"
                   @keypress="validateInput"
                 ></v-text-field>
-              </v-col>
-              <v-col cols="6" md="2">
                 <v-text-field
                   v-if="day.isOpen"
                   v-model="day.to"
-                  style="width: 60px"
+                  class="settings-hours-time"
                   hide-details
                   single-line
                   outlined
@@ -84,8 +134,9 @@
                   :disabled="!day.isOpen"
                   label="À"
                 ></v-text-field>
-              </v-col>
-            </v-row>
+                <div v-else class="settings-hours-closed"></div>
+              </div>
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -93,79 +144,115 @@
 
       <v-row>
         <v-col cols="12">
-          <v-card outlined class="pa-4 mb-4">
-            <h3 class="mb-4">Informations de l'établissement</h3>
+          <v-card id="identite" outlined class="pa-4 mb-4 settings-card">
+            <h3 class="mb-4 settings-section-title">
+              <v-icon small color="primary">mdi-storefront-outline</v-icon>
+              Informations de l'établissement
+            </h3>
             <v-row>
-              <v-col cols="6">
+              <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formShop.shop_name"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-store-outline"
                   label="Nom du restaurant"
                   type="text"
                   :rules="[(v) => !!v || 'Nom du restaurant requis']"
                   placeholder="Insérez le nom du restaurant"
                   required
                   autofocus
+                  dense
+                  outlined
                 ></v-text-field>
               </v-col>
 
-              <v-col cols="6">
-                <v-text-field
+              <v-col cols="12" md="6">
+                <v-textarea
                   v-model="formShop.shop_description"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-text-box-outline"
                   label="Description"
-                  :rules="[(v) => !!v || 'Description requise']"
+                  :rules="descriptionRules"
                   placeholder="Insérez la description"
+                  rows="3"
+                  auto-grow
+                  no-resize
+                  counter="255"
+                  maxlength="255"
                   required
-                ></v-text-field>
+                  dense
+                  outlined
+                ></v-textarea>
               </v-col>
             </v-row>
             <v-row>
-              <v-col cols="6">
+              <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formShop.shop_phone"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-phone-outline"
                   label="Numéro de téléphone"
                   type="text"
                   :rules="[(v) => !!v || 'Numéro de téléphone requis']"
                   placeholder="Insérez le numéro de téléphone"
                   required
+                  dense
+                  outlined
                 ></v-text-field>
               </v-col>
-              <v-col cols="6">
+              <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formShop.shop_status"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-bullhorn-outline"
                   label="Statut / Message d'information pour vos clients"
                   type="text"
                   placeholder="Un statut particulier, événements..."
                   required
+                  dense
+                  outlined
                 ></v-text-field>
               </v-col>
             </v-row>
             <v-row>
-              <v-col cols="6">
+              <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formShop.shop_adress"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-map-marker-outline"
                   label="Adresse"
                   type="text"
                   :rules="[(v) => !!v || 'Adresse requise']"
                   placeholder="Insérez l'adresse de votre établissement "
                   required
+                  dense
+                  outlined
                 ></v-text-field>
               </v-col>
-              <v-col cols="6">
+              <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formShop.shop_siret"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-card-account-details-outline"
                   label="Numéro de SIRET"
                   type="text"
                   :rules="[(v) => !!v || 'Numéro de SIRET requis']"
                   placeholder="Insérez le numéro de SIRET"
                   required
+                  dense
+                  outlined
                 ></v-text-field>
               </v-col>
-              <v-col cols="6">
+              <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formShop.shop_naf"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-identifier"
                   label="Code NAF"
                   type="text"
                   placeholder="Ex. 5610A"
+                  dense
+                  outlined
                 ></v-text-field>
               </v-col>
             </v-row>
@@ -174,23 +261,32 @@
       </v-row>
       <v-row>
         <v-col cols="12">
-          <v-card outlined class="pa-4">
-            <h3 class="mb-4">Ventes, TVA et paiements</h3>
+          <v-card id="paiements" outlined class="pa-4 settings-card">
+            <h3 class="mb-4 settings-section-title">
+              <v-icon small color="primary">mdi-credit-card-outline</v-icon>
+              Ventes, TVA et paiements
+            </h3>
             <v-row>
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="formShop.shop_payment_methods"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-credit-card-multiple-outline"
                   :items="PAYMENT_METHOD_OPTIONS"
                   item-text="text"
                   item-value="value"
                   label="Moyens de paiement disponibles"
                   multiple
                   chips
+                  dense
+                  outlined
                 ></v-combobox>
               </v-col>
               <v-col cols="12" md="6">
                 <v-combobox
                   v-model="formShop.discount_percentages"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-percent-outline"
                   :items="DISCOUNT_PERCENTAGE_OPTIONS"
                   label="Remises en pourcentage disponibles"
                   suffix="%"
@@ -200,14 +296,20 @@
                   small-chips
                   hint="Ces remises seront proposées au moment de l'encaissement."
                   persistent-hint
+                  dense
+                  outlined
                 ></v-combobox>
               </v-col>
               <v-col cols="12" md="6">
                 <v-text-field
                   v-model="formShop.shop_vat_number"
+                  class="settings-field"
+                  prepend-inner-icon="mdi-receipt-text-outline"
                   label="Numéro de TVA intracommunautaire"
                   type="text"
                   placeholder="Ex. FR12345678901"
+                  dense
+                  outlined
                 ></v-text-field>
               </v-col>
               <v-col cols="12" md="6">
@@ -220,23 +322,29 @@
             </v-row>
           </v-card>
         </v-col>
-        <v-col cols="6">
-          <v-card outlined class="pa-4 fill-height">
-            <h3 class="mb-4">Réglages de l'imprimante</h3>
-            <div class="d-inline-flex">
+        <v-col cols="12" md="6">
+          <v-card id="impression" outlined class="pa-4 fill-height settings-card">
+            <h3 class="mb-4 settings-section-title">
+              <v-icon small color="primary">mdi-printer-outline</v-icon>
+              Réglages de l'imprimante
+            </h3>
+            <div class="settings-printer-row">
               <v-text-field
                 v-model="formShop.shop_printer_ip"
+                class="settings-field"
+                prepend-inner-icon="mdi-ip-network-outline"
                 label="Adresse IP de l'imprimante"
                 type="text"
                 :disabled="!formShop.smart_print_app"
-                max-width="20%"
                 :rules="[(v) => !!v || 'Adresse IP requise']"
                 placeholder="Insérez l'adresse IP de l'imprimante"
                 required
+                dense
+                outlined
               ></v-text-field>
               <v-switch
                 v-model="formShop.smart_print_app"
-                class="ml-8"
+                class="mt-0"
                 label="Imprimer avec Smart Print App"
                 color="success"
               ></v-switch>
@@ -251,9 +359,12 @@
           </v-card>
         </v-col>
 
-        <v-col cols="6">
-          <v-card outlined class="pa-4 fill-height">
-            <h3 class="mb-4">Encaissement à table via mobile</h3>
+        <v-col cols="12" md="6">
+          <v-card outlined class="pa-4 fill-height settings-card">
+            <h3 class="mb-4 settings-section-title">
+              <v-icon small color="primary">mdi-cellphone-check</v-icon>
+              Encaissement à table via mobile
+            </h3>
 
             <h4 class="mb-3">Encaissement avant la commande</h4>
             <v-switch
@@ -298,45 +409,44 @@
             </v-btn>
           </v-card>
         </v-col>
-        <v-col cols="6">
-          <v-card outlined class="pa-4 fill-height">
-            <h3 class="mb-4">Réseaux Sociaux</h3>
-            <div class="d-flex justify-center">
+        <v-col cols="12" md="6">
+          <v-card id="reseaux" outlined class="pa-4 fill-height settings-card">
+            <h3 class="mb-4 settings-section-title">
+              <v-icon small color="primary">mdi-share-variant-outline</v-icon>
+              Réseaux Sociaux
+            </h3>
+            <div class="settings-social-grid">
               <v-text-field
                 v-model="formShop.shop_social_media.instagram"
+                class="settings-field"
                 prepend-icon="mdi-instagram"
                 label="Instagram"
                 type="text"
-                class="d-inline-flex"
-                style="max-width: 50%"
-                max-width="50%"
                 placeholder="Insérez le lien Instagram"
+                dense
+                outlined
               ></v-text-field>
-            </div>
-            <div class="d-flex justify-center">
               <v-text-field
                 v-model="formShop.shop_social_media.facebook"
+                class="settings-field"
                 prepend-icon="mdi-facebook"
                 label="Facebook"
                 type="text"
-                class="d-inline-flex"
-                style="max-width: 50%"
-                max-width="50%"
                 placeholder="Insérez le lien Facebook"
+                dense
+                outlined
               ></v-text-field>
-            </div>
-            <div class="d-flex justify-center">
               <v-text-field
                 v-model="formShop.shop_social_media.tiktok"
+                class="settings-field"
                 prepend-icon="mdi-music-note"
                 label="TikTok"
                 type="text"
-                class="d-inline-flex"
-                style="max-width: 50%"
-                max-width="50%"
                 placeholder="Insérez le lien TikTok"
+                dense
+                outlined
               >
-                <template v-slot:prepend>
+                <template #prepend>
                   <div class="mt-2">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -353,62 +463,87 @@
                   </div>
                 </template>
               </v-text-field>
-            </div>
-            <div class="d-flex justify-center">
               <v-text-field
                 v-model="formShop.shop_social_media.snapchat"
+                class="settings-field"
                 prepend-icon="mdi-snapchat"
                 label="Snapchat"
                 type="text"
-                class="d-inline-flex"
-                style="max-width: 50%"
-                max-width="50%"
                 placeholder="Insérez le lien Snapchat"
+                dense
+                outlined
               ></v-text-field>
             </div>
           </v-card>
         </v-col>
-        <v-col cols="6">
-          <v-card outlined class="pa-4 fill-height">
-            <h3 class="mb-4">Avis client sur le ticket de caisse</h3>
+        <v-col cols="12" md="6">
+          <v-card id="ticket" outlined class="pa-4 fill-height settings-card">
+            <h3 class="mb-4 settings-section-title">
+              <v-icon small color="primary">mdi-qrcode</v-icon>
+              Avis client sur le ticket de caisse
+            </h3>
             <v-text-field
               v-model="formShop.receipt_review_qr_url"
+              class="settings-field"
+              prepend-inner-icon="mdi-link-variant"
               label="Lien de l'avis client"
               type="url"
               placeholder="https://..."
               hint="Le QR Code sera imprimé uniquement si ce lien est renseigné."
               persistent-hint
+              dense
+              outlined
             ></v-text-field>
             <v-text-field
               v-model="formShop.receipt_review_qr_label"
+              class="settings-field"
+              prepend-inner-icon="mdi-format-title"
               label="Texte au-dessus du QR Code"
               type="text"
               placeholder="Votre avis nous intéresse"
+              dense
+              outlined
             ></v-text-field>
             <v-text-field
               v-model="formShop.cash_register_number"
+              class="settings-field"
+              prepend-inner-icon="mdi-cash-register"
               label="Numéro de caisse"
               type="text"
               placeholder="Ex. Caisse 1"
+              dense
+              outlined
             ></v-text-field>
           </v-card>
         </v-col>
       </v-row>
 
-      <v-btn
-        :disabled="!isValue || !isDirty"
-        :loading="loadingBtn"
-        class="ml-4 text-none"
-        type="submit"
-        color="primary"
-        >Enregistrer <v-icon small right>mdi-content-save</v-icon></v-btn
-      >
-      <v-btn
-        class="text-none"
-        color="warning"
-        @click.stop="$router.push('/restaurants')"
-        >Annuler <v-icon small right>mdi-close-circle</v-icon></v-btn
-      >
+      <div class="settings-actionbar">
+        <div>
+          <strong>{{ settingsDirtyLabel }}</strong>
+          <span>{{ savebarHint }}</span>
+        </div>
+        <div class="settings-actionbar__actions">
+          <v-btn
+            :disabled="!isValue || !isDirty"
+            :loading="loadingBtn"
+            class="text-none"
+            type="submit"
+            color="primary"
+            depressed
+          >
+            Enregistrer <v-icon small right>mdi-content-save</v-icon>
+          </v-btn>
+          <v-btn
+            class="text-none"
+            color="warning"
+            outlined
+            @click.stop="$router.push('/restaurants')"
+          >
+            Annuler <v-icon small right>mdi-close-circle</v-icon>
+          </v-btn>
+        </div>
+      </div>
     </v-form>
     <!-- <pre type="json">{{ formShop }}</pre>
     <pre type="json">{{ staticURL }}</pre>
@@ -433,12 +568,12 @@ export default {
 
     // QrcodeVue,
   },
+  mixins: [formatdate],
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
       : 'clientside'
   },
-  mixins: [formatdate],
   middleware: 'auth',
   data: () => ({
     errMsg: false,
@@ -451,6 +586,8 @@ export default {
     formReady: false,
     loadingBtn: false,
     shopId: localStorage.getItem('shopid'),
+    copiedPublicUrlType: null,
+    copyPublicUrlResetTimer: null,
     PAYMENT_METHOD_OPTIONS,
     DISCOUNT_PERCENTAGE_OPTIONS,
     DEFAULT_DISCOUNT_PERCENTAGES,
@@ -592,6 +729,31 @@ export default {
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
+    publicOrigin() {
+      return window.location.origin.replace(/\/+$/, '')
+    },
+    encodedShopName() {
+      return this.shop_name ? encodeURIComponent(this.shop_name) : ''
+    },
+    clickAndCollectPath() {
+      return this.shopId && this.encodedShopName
+        ? `/click-and-collect/${this.shopId}/${this.encodedShopName}`
+        : '/click-and-collect'
+    },
+    publicWebsiteUrl() {
+      return `${this.publicOrigin}${this.clickAndCollectPath}`
+    },
+    clickAndCollectUrl() {
+      return this.publicWebsiteUrl
+    },
+    settingsDirtyLabel() {
+      return this.isDirty ? 'Modifications non enregistrees' : 'Reglages a jour'
+    },
+    savebarHint() {
+      return this.isDirty
+        ? 'Enregistrez avant de quitter cette page.'
+        : 'Aucune action necessaire pour le moment.'
+    },
   },
   watch: {
     formShop: {
@@ -639,6 +801,11 @@ export default {
       },
     },
   },
+  beforeDestroy() {
+    if (this.copyPublicUrlResetTimer) {
+      clearTimeout(this.copyPublicUrlResetTimer)
+    }
+  },
   mounted() {
     this.loadPage = true
     const calls = [
@@ -659,11 +826,6 @@ export default {
         this.formShop.discount_percentages = normalizeDiscountPercentages(
           this.shop_discount_percentages
         )
-        console.log(
-          ' shop_hours',
-          this.shop_hours,
-          JSON.stringify(this.shop_hours)
-        )
         this.formShop.shop_hours = JSON.parse(JSON.stringify(this.shop_hours))
         this.formShop.shop_social_media = JSON.parse(
           JSON.stringify(this.shop_social_media)
@@ -682,9 +844,7 @@ export default {
         this.formShop.activate_tva = this.activate_tva
         this.formShop.qr_payment_mode = this.qr_payment_mode
 
-        console.log('Form Shop', this.formShop)
         this.imageUrl = `${this.staticURL}/api/v1/imgprofile/${this.formShop.shop_profile_image}`
-        console.log(this.imageUrl)
 
         // Active le suivi des modifications une fois le pré-remplissage terminé
         this.$nextTick(() => {
@@ -696,6 +856,53 @@ export default {
       })
   },
   methods: {
+    async copyPublicUrl(type) {
+      const url =
+        type === 'click-and-collect'
+          ? this.clickAndCollectUrl
+          : this.publicWebsiteUrl
+      const copied = await this.copyTextToClipboard(url)
+
+      if (!copied) {
+        this.$store.dispatch('notifications/error', {
+          message: "Impossible de copier l'URL.",
+        })
+        return
+      }
+
+      this.copiedPublicUrlType = type
+      if (this.copyPublicUrlResetTimer) {
+        clearTimeout(this.copyPublicUrlResetTimer)
+      }
+      this.copyPublicUrlResetTimer = setTimeout(() => {
+        this.copiedPublicUrlType = null
+      }, 1400)
+      this.$store.dispatch('notifications/success', {
+        message: 'URL copiée dans le presse-papiers.',
+      })
+    },
+    async copyTextToClipboard(text) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text)
+          return true
+        }
+      } catch (error) {
+        // Fallback ci-dessous pour les navigateurs sans Clipboard API.
+      }
+
+      try {
+        const input = document.createElement('textarea')
+        input.value = text
+        document.body.appendChild(input)
+        input.select()
+        const copied = document.execCommand('copy')
+        document.body.removeChild(input)
+        return copied
+      } catch (error) {
+        return false
+      }
+    },
     async connectStripe() {
       this.stripeLoading = true
       const link = await this.$store.dispatch('shop/createStripeOnboardingLink')
@@ -753,3 +960,306 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.settings-page {
+  background: var(--se-color-bg, #f3f5f8);
+  color: var(--se-color-text-body, #1f2933);
+  padding-bottom: 96px;
+}
+
+.settings-loading,
+.settings-hero,
+.settings-card,
+.settings-actionbar {
+  border-color: var(--se-color-border, #dfe5ee) !important;
+  border-radius: var(--se-radius-md, 8px) !important;
+}
+
+.settings-hero {
+  align-items: flex-start;
+  background: var(--se-color-surface, #fff);
+  border: 1px solid var(--se-color-border, #dfe5ee);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 18px 0 14px;
+  padding: 16px 18px;
+}
+
+.settings-hero__title {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  min-width: 240px;
+}
+
+.settings-hero__icon {
+  align-items: center;
+  background: var(--se-color-primary-soft, #e8f2ff);
+  border-radius: var(--se-radius-md, 8px);
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.settings-hero h1 {
+  color: var(--se-color-text, #121826);
+  font-size: var(--se-font-page-title, 1.5rem);
+  font-weight: var(--se-weight-bold, 700);
+  letter-spacing: 0;
+  line-height: 1.15;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.settings-hero p {
+  color: var(--se-color-text-muted, #687386);
+  font-size: var(--se-font-small, 0.875rem);
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.settings-actionbar__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-card {
+  background: var(--se-color-surface, #fff) !important;
+  scroll-margin-top: 140px;
+  transition:
+    border-color var(--se-transition-fast, 150ms ease-out),
+    box-shadow var(--se-transition-fast, 150ms ease-out);
+}
+
+.settings-card:hover {
+  border-color: var(--se-color-border, #dfe5ee) !important;
+  box-shadow: var(--se-shadow-panel, 0 2px 8px rgba(25, 39, 52, 0.04));
+}
+
+.settings-card h3 {
+  color: var(--se-color-text, #121826);
+  font-size: var(--se-font-title, 1.25rem);
+  font-weight: var(--se-weight-semibold, 600);
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.settings-section-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.settings-section-title .v-icon {
+  background: var(--se-color-primary-soft, #e8f2ff);
+  border-radius: var(--se-radius-sm, 6px);
+  height: 28px;
+  width: 28px;
+}
+
+.settings-card ::v-deep .v-input__slot {
+  border-radius: var(--se-radius-sm, 6px) !important;
+  min-height: 40px !important;
+}
+
+.settings-card ::v-deep .v-input__prepend-inner {
+  margin-right: 8px;
+}
+
+.settings-card ::v-deep .v-input__prepend-inner .v-icon {
+  color: var(--se-color-primary, #1976d2) !important;
+  opacity: 0.9;
+}
+
+.settings-card ::v-deep .v-label {
+  color: var(--se-color-text-muted, #687386) !important;
+}
+
+.settings-card ::v-deep input,
+.settings-card ::v-deep textarea {
+  color: var(--se-color-text-body, #1f2933) !important;
+}
+
+.settings-field {
+  margin-top: 0 !important;
+}
+
+.settings-field ::v-deep .v-input__append-inner,
+.settings-field ::v-deep .v-input__prepend-inner {
+  margin-top: 8px !important;
+}
+
+.settings-site-link {
+  min-height: 40px;
+  padding: 0 16px !important;
+}
+
+.settings-public-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.settings-main-grid {
+  align-items: stretch;
+}
+
+.settings-hours-card {
+  min-height: 100%;
+}
+
+.settings-hours-list {
+  margin: 0 auto;
+  max-width: 620px;
+}
+
+.settings-hours-row {
+  align-items: center;
+  column-gap: 18px;
+  display: grid;
+  grid-template-columns: 112px 104px 72px 72px;
+  min-height: 52px;
+}
+
+.settings-hours-day {
+  color: var(--se-color-text, #121826);
+  font-size: 0.95rem;
+  font-weight: var(--se-weight-semibold, 600);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.settings-hours-switch {
+  align-items: center;
+  display: flex;
+}
+
+.settings-hours-time {
+  margin-top: 0 !important;
+  max-width: 72px;
+}
+
+.settings-hours-closed {
+  grid-column: span 2;
+}
+
+.settings-hours-card ::v-deep .v-input--selection-controls {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.settings-hours-card ::v-deep .v-input__slot {
+  min-height: 36px !important;
+}
+
+.settings-hours-card ::v-deep .v-text-field__suffix {
+  color: var(--se-color-text, #121826);
+  padding-left: 4px;
+}
+
+.settings-printer-row {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 0.9fr);
+}
+
+.settings-social-grid {
+  display: grid;
+  gap: 4px 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-actionbar {
+  align-items: center;
+  background: var(--se-color-surface, #fff);
+  border: 1px solid var(--se-color-border, #dfe5ee);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+}
+
+.settings-actionbar strong {
+  color: var(--se-color-text, #121826);
+  display: block;
+  font-size: var(--se-font-small, 0.875rem);
+  line-height: 1.3;
+}
+
+.settings-actionbar span {
+  color: var(--se-color-text-muted, #687386);
+  display: block;
+  font-size: var(--se-font-caption, 0.75rem);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+@media (max-width: 960px) {
+  .settings-printer-row,
+  .settings-social-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-actionbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-actionbar__actions .v-btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-hero,
+  .settings-hero__title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-hours-list {
+    max-width: 100%;
+  }
+
+  .settings-hours-row {
+    column-gap: 6px;
+    grid-template-columns: minmax(74px, 1fr) 86px 58px 58px;
+  }
+
+  .settings-hours-day {
+    font-size: 0.875rem;
+  }
+
+  .settings-hours-time {
+    max-width: 58px;
+  }
+
+  .settings-public-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-public-actions .v-btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-card {
+    transition: none;
+  }
+
+  .settings-card:hover {
+    box-shadow: none;
+  }
+}
+</style>

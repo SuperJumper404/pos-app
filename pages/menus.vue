@@ -33,59 +33,55 @@
           </v-card-text>
         </v-card>
         <v-card v-else class="menu-panel-card">
-          <v-card-title
-            v-if="canUseLargeProductView && !isOrderEditActive"
-            class="menu-view-toolbar d-flex align-center justify-space-between"
-          >
-            <div>
-              <div class="text-subtitle-1 font-weight-bold">
-                {{ isLargeProductView ? 'Vue express' : 'Produits par catégorie' }}
-              </div>
-              <div class="text-caption text--secondary">
-                {{
-                  isLargeProductView
-                    ? 'Prise de commande et encaissement sur le même écran.'
-                    : 'Vue organisée par catégories.'
-                }}
-              </div>
-            </div>
-            <v-btn
-              color="primary"
-              outlined
-              class="text-none"
-              @click="toggleProductViewMode"
-            >
-              <v-icon left>
-                {{ isLargeProductView ? 'mdi-format-list-group' : 'mdi-lightning-bolt' }}
-              </v-icon>
-              {{
-                isLargeProductView
-                  ? 'Vue classique'
-                  : 'Vue express'
-              }}
-            </v-btn>
-          </v-card-title>
-
           <div
             v-if="isLargeProductView && !isOrderEditActive"
             class="express-workspace"
           >
-            <div class="express-category-bar">
-              <v-btn
-                v-for="category in categories"
-                :key="category"
-                depressed
-                class="express-category-btn text-none"
-                :color="
-                  category === activeExpressCategory
-                    ? 'primary'
-                    : 'grey lighten-3'
-                "
-                :dark="category === activeExpressCategory"
-                @click="setExpressCategory(category)"
-              >
-                {{ category }}
-              </v-btn>
+            <div v-if="isAdminView" class="express-command-bar">
+              <div class="express-filter-row">
+                <v-btn
+                  depressed
+                  class="express-filter-button express-all-chip text-none"
+                  :class="{
+                    'express-filter-button--active': !activeExpressCategory,
+                    'express-all-chip--active': !activeExpressCategory,
+                  }"
+                  @click="setExpressCategory(null)"
+                >
+                  All
+                </v-btn>
+                <v-btn
+                  v-for="category in categories"
+                  :key="category"
+                  depressed
+                  class="express-filter-button express-category-btn text-none"
+                  :class="{
+                    'express-filter-button--active':
+                      category === activeExpressCategory,
+                  }"
+                  @click="setExpressCategory(category)"
+                >
+                  {{ category }}
+                </v-btn>
+              </div>
+              <div class="express-command-actions">
+                <v-btn
+                  outlined
+                  class="express-command-button text-none"
+                  to="/orders"
+                >
+                  <v-icon left>mdi-clipboard-list-outline</v-icon>
+                  Commandes
+                </v-btn>
+                <v-btn
+                  outlined
+                  class="express-command-button text-none"
+                  to="/cashregister"
+                >
+                  <v-icon left>mdi-cash-register</v-icon>
+                  Tiroir caisse
+                </v-btn>
+              </div>
             </div>
             <div class="express-products-scroll">
               <div class="product-grid product-grid--large">
@@ -405,11 +401,47 @@
         </v-card>
         <div v-else>
           <v-card
+            ref="expressCartCard"
             outlined
             height="100%"
             class="pa-2 menu-panel-card"
             :class="{ 'express-cart-card': isLargeProductView }"
+            tabindex="-1"
           >
+            <div
+              v-if="isLargeProductView && !isOrderEditActive"
+              class="express-cart-summary"
+            >
+              <div>
+                <div class="express-cart-summary-title">Commande</div>
+                <div class="express-cart-summary-meta">
+                  {{ idxCart }} article{{ idxCart > 1 ? 's' : '' }}
+                </div>
+              </div>
+              <div
+                v-if="canUseLargeProductView && !isOrderEditActive"
+                class="menu-panel-actions"
+              >
+                <v-badge
+                  :content="idxCart"
+                  :value="idxCart > 0"
+                  color="success"
+                  bordered
+                  overlap
+                >
+                  <v-btn
+                    icon
+                    outlined
+                    class="menu-panel-cart-button"
+                    aria-label="Ouvrir le panier"
+                    @click.stop="openCart"
+                  >
+                    <v-icon small>mdi-cart-outline</v-icon>
+                  </v-btn>
+                </v-badge>
+              </div>
+              <strong>{{ formatCurrency(total) }}</strong>
+            </div>
             <div class="express-cart-items-scroll">
             <div
               v-if="cartItem.length === 0"
@@ -472,14 +504,10 @@
                     <div class="cart-item-text">
                       <div
                         class="cart-item-name text-truncate font-weight-bold"
-                        style="font-size: large; color: rgba(0, 0, 0, 0.8)"
                       >
                         {{ itm.name }}
                       </div>
-                      <div
-                        class="font-weight-bold"
-                        style="color: rgba(0, 0, 0, 0.8)"
-                      >
+                      <div class="cart-item-price font-weight-bold">
                         {{ formatCurrency(itm.price) }}
                       </div>
                     </div>
@@ -503,7 +531,6 @@
 
                     <v-btn
                       class="cart-qty-btn mx-1"
-                      style="font-size: x-large"
                       color="success"
                       fab
                       small
@@ -591,6 +618,7 @@
               </div>
               <v-textarea
                 v-model="expressRemark"
+                class="express-note-field"
                 dense
                 outlined
                 hide-details
@@ -600,20 +628,23 @@
                 placeholder="Optionnel"
                 prepend-inner-icon="mdi-note-text-outline"
               />
-              <div class="express-total-row">
-                <span>Total</span>
-                <strong>{{ formatCurrency(total) }}</strong>
+              <div class="express-checkout-actions">
+                <v-btn
+                  color="success"
+                  class="express-cashout-button text-none font-weight-bold"
+                  :disabled="expressSubmitDisabled"
+                  depressed
+                  @click="openExpressPaymentDialog"
+                >
+                  <span class="express-cashout-label">
+                    <v-icon left>mdi-cash-register</v-icon>
+                    Encaisser
+                  </span>
+                  <span class="express-cashout-total">
+                    {{ formatCurrency(total) }}
+                  </span>
+                </v-btn>
               </div>
-              <v-btn
-                color="success"
-                class="express-cashout-button text-none font-weight-bold"
-                :disabled="expressSubmitDisabled"
-                depressed
-                @click="openExpressPaymentDialog"
-              >
-                <v-icon left>mdi-cash-register</v-icon>
-                Encaisser
-              </v-btn>
             </div>
             <v-card-actions
               v-if="cartItem.length > 0 && !isLargeProductView"
@@ -1181,7 +1212,7 @@ export default {
       return this.canUseLargeProductView && this.productViewMode === 'all'
     },
     canUseLargeProductView() {
-      return this.isAdminView && this.$vuetify.breakpoint.mdAndUp
+      return this.isAdminView && this.$vuetify.breakpoint.smAndUp
     },
     expressProducts() {
       if (!this.activeExpressCategory) return this.dataProduct
@@ -1476,8 +1507,11 @@ export default {
         this.activeExpressCategory = null
         return
       }
-      if (!this.categories.includes(this.activeExpressCategory)) {
-        this.activeExpressCategory = this.categories[0]
+      if (
+        this.activeExpressCategory &&
+        !this.categories.includes(this.activeExpressCategory)
+      ) {
+        this.activeExpressCategory = null
       }
     },
     setExpressCategory(category) {
@@ -1896,8 +1930,29 @@ export default {
   cursor: pointer;
 }
 
-.menu-view-toolbar {
-  gap: 12px;
+.menu-panel-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-left: 12px;
+  min-width: 0;
+}
+
+.menu-panel-cart-button {
+  background: #ffffff !important;
+  border-color: #dfe5ee !important;
+  color: #121826 !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  width: 40px !important;
+}
+
+.menu-panel-cart-button:hover,
+.menu-panel-cart-button:focus-visible {
+  background: #f8fafc !important;
+  border-color: #1976d2 !important;
+  color: #1976d2 !important;
 }
 
 .product-grid {
@@ -1911,8 +1966,8 @@ export default {
 }
 
 .product-grid--large {
-  --product-card-min-width: 130px;
-  gap: 8px;
+  --product-card-min-width: 150px;
+  gap: 12px;
 }
 
 .menu-page-container--express {
@@ -1930,16 +1985,107 @@ export default {
   height: calc(100vh - 126px);
   min-height: 520px;
   overflow: hidden;
+  padding: 12px;
+}
+
+.express-filter-row {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.express-filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.express-command-bar {
+  align-items: stretch;
+  background: #f8fafc;
+  border: 1px solid #e8edf3;
+  border-radius: 8px;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
   padding: 8px;
 }
 
-.express-category-bar {
+.express-command-actions {
   display: flex;
+  flex: 0 1 auto;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.express-filter-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.express-filter-button {
+  background: #ffffff !important;
+  border: 1px solid #dfe5ee !important;
+  border-radius: 8px !important;
+  color: #121826 !important;
+  cursor: pointer;
   flex: 0 0 auto;
-  gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 14px;
-  white-space: nowrap;
+  font-size: 0.98rem !important;
+  font-weight: 700 !important;
+  height: 48px !important;
+  justify-content: center;
+  letter-spacing: 0 !important;
+  padding: 0 16px !important;
+  transition: background-color 140ms ease, border-color 140ms ease,
+    color 140ms ease, transform 120ms ease;
+}
+
+.express-all-chip {
+  min-width: 76px !important;
+}
+
+.express-filter-button:hover,
+.express-filter-button:focus-visible {
+  background: #f8fafc !important;
+  border-color: #b9c8dc !important;
+}
+
+.express-filter-button:active {
+  transform: scale(0.98);
+}
+
+.express-filter-button--active,
+.express-all-chip--active {
+  background: #1976d2 !important;
+  border-color: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+.express-command-button {
+  background: #ffffff !important;
+  border-color: #dfe5ee !important;
+  color: #121826 !important;
+  font-size: 0.92rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  min-height: 48px !important;
+  min-width: 136px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+.express-command-button:hover,
+.express-command-button:focus-visible {
+  background: #f8fafc !important;
+  border-color: #1976d2 !important;
+  color: #1976d2 !important;
 }
 
 .express-products-scroll {
@@ -1950,13 +2096,38 @@ export default {
 }
 
 .express-category-btn {
-  border-radius: 8px !important;
-  flex: 0 0 auto;
-  font-size: 1rem !important;
-  font-weight: 700 !important;
   min-height: 48px !important;
-  padding-left: 18px !important;
-  padding-right: 18px !important;
+  min-width: 112px !important;
+}
+
+.express-category-btn:hover,
+.express-category-btn:focus-visible {
+  background: #f8fafc !important;
+  border-color: #b9c8dc !important;
+}
+
+.express-category-btn:active {
+  transform: scale(0.98);
+}
+
+.express-category-btn.primary {
+  background: #1976d2 !important;
+  border-color: #1976d2 !important;
+  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.18) !important;
+  color: #ffffff !important;
+}
+
+.express-category-btn.primary:hover,
+.express-category-btn.primary:focus-visible {
+  background: #1769bd !important;
+  border-color: #1769bd !important;
+}
+
+.express-filter-button ::v-deep .v-btn__content,
+.express-category-btn ::v-deep .v-btn__content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .product-grid-col {
@@ -1965,9 +2136,15 @@ export default {
 }
 
 .product-card {
+  background: #ffffff !important;
+  border-color: #e1e7ef !important;
+  border-radius: 8px !important;
   box-shadow: none !important;
   height: 100%;
   min-height: 320px;
+  overflow: hidden;
+  transition: border-color 140ms ease, background-color 140ms ease,
+    transform 120ms ease;
   width: 100%;
 }
 
@@ -1978,31 +2155,45 @@ export default {
   box-shadow: none !important;
 }
 
+.product-clickable:hover,
+.product-clickable:focus-visible {
+  border-color: #1976d2 !important;
+  background: #ffffff !important;
+}
+
+.product-clickable:active {
+  transform: scale(0.985);
+}
+
 .product-card--compact {
-  min-height: 188px;
+  min-height: 208px;
+}
+
+.product-card--compact:active {
+  transform: scale(0.98);
 }
 
 .product-card--compact .product-card-title {
-  min-height: 42px;
+  min-height: 46px;
 }
 
 .product-card--compact .product-card-title-text {
-  font-size: 0.9rem;
-  line-height: 1.15;
+  font-size: 0.98rem;
+  line-height: 1.2;
 }
 
 .product-card--compact .product-card-content {
-  min-height: 28px;
+  min-height: 42px;
 }
 
 .product-card--compact ::v-deep .v-card__title {
-  padding-left: 8px !important;
-  padding-right: 8px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
 }
 
 .product-card--compact ::v-deep .v-card__text {
-  padding-left: 8px !important;
-  padding-right: 8px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
 }
 
 .product-card--compact ::v-deep .v-card__actions {
@@ -2019,7 +2210,12 @@ export default {
 }
 
 .product-card-image {
+  background: #f8fafc;
+  border-radius: 6px !important;
   flex: 0 0 auto;
+  margin: 6px 6px 0;
+  overflow: hidden;
+  width: calc(100% - 12px);
 }
 
 .product-card-image ::v-deep .v-image__image {
@@ -2036,6 +2232,7 @@ export default {
 }
 
 .product-card-title-text {
+  color: #121826;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -2061,14 +2258,25 @@ export default {
 }
 
 .product-card-price {
-  color: rgba(0, 0, 0, 0.9);
+  align-items: center;
+  border-top: 1px solid #e8edf3;
+  color: #121826;
+  display: inline-flex;
   font-size: 1.12rem;
   font-weight: 800;
+  justify-content: flex-start;
   line-height: 1.2;
   margin-top: auto;
   margin-bottom: 0px;
   min-height: 1.35em;
-  padding-top: 12px;
+  padding: 9px 0 0;
+  width: 100%;
+}
+
+.product-card--compact .product-card-price {
+  font-size: 1.08rem;
+  min-height: 34px;
+  padding: 8px 0 0;
 }
 
 .cart-item-row {
@@ -2099,7 +2307,17 @@ export default {
 }
 
 .cart-item-name {
+  color: #121826;
+  font-size: 1rem !important;
+  line-height: 1.2;
   max-width: 100%;
+}
+
+.cart-item-price {
+  color: rgba(18, 24, 38, 0.78);
+  font-size: 0.92rem;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
 .cart-item-actions {
@@ -2108,15 +2326,16 @@ export default {
 }
 
 .cart-action-btn {
-  height: 30px !important;
-  width: 30px !important;
+  height: 40px !important;
+  width: 40px !important;
 }
 
 .cart-qty-btn {
   box-shadow: none !important;
-  height: 34px !important;
-  min-width: 34px !important;
-  width: 34px !important;
+  font-size: 1.08rem !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  width: 42px !important;
 }
 
 .express-empty-cart {
@@ -2133,6 +2352,40 @@ export default {
   height: calc(100vh - 126px) !important;
   min-height: 520px;
   overflow: hidden;
+}
+
+.express-cart-summary {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e8edf3;
+  border-radius: 8px;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  min-height: 56px;
+  padding: 8px 12px;
+}
+
+.express-cart-summary-title {
+  color: #121826;
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.express-cart-summary-meta {
+  color: rgba(18, 24, 38, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.express-cart-summary strong {
+  color: #121826;
+  font-size: 1.12rem;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .express-cart-items-scroll {
@@ -2166,22 +2419,29 @@ export default {
 }
 
 .express-checkout {
-  border-top: 1px solid #eeeeee;
+  background: #f8fafc;
+  border: 1px solid #e8edf3;
+  border-radius: 8px;
   display: grid;
   flex: 0 0 auto;
-  gap: 14px;
-  padding: 16px 8px 8px;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
 }
 
 .express-table-button {
   flex: 1 1 0;
-  min-height: 58px !important;
+  background: #ffffff !important;
+  border: 1px solid #dfe5ee !important;
+  min-height: 64px !important;
   min-width: 0 !important;
 }
 
 .express-service-button {
   flex: 1 1 0;
-  min-height: 58px !important;
+  background: #ffffff !important;
+  border: 1px solid #dfe5ee !important;
+  min-height: 64px !important;
   min-width: 0 !important;
 }
 
@@ -2192,8 +2452,18 @@ export default {
 
 .express-customer-fields {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   grid-template-columns: 1fr;
+}
+
+.express-checkout ::v-deep .v-input__slot {
+  background: #ffffff !important;
+  min-height: 44px !important;
+}
+
+.express-note-field ::v-deep textarea {
+  line-height: 1.25;
+  min-height: 34px;
 }
 
 .express-choice-row,
@@ -2232,19 +2502,9 @@ export default {
   text-transform: uppercase;
 }
 
-.express-total-row {
-  align-items: center;
-  background: #f5f5f5;
-  border-radius: 8px;
-  display: flex;
-  font-size: 1rem;
-  justify-content: space-between;
-  min-height: 54px;
-  padding: 0 14px;
-}
-
-.express-total-row strong {
-  font-size: 1.25rem;
+.express-checkout-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .express-payment-grid ::v-deep .v-btn {
@@ -2255,8 +2515,30 @@ export default {
 }
 
 .express-cashout-button {
-  min-height: 64px !important;
+  min-height: 68px !important;
   min-width: 0 !important;
+}
+
+.express-cashout-button ::v-deep .v-btn__content {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+  width: 100%;
+}
+
+.express-cashout-label {
+  align-items: center;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.express-cashout-total {
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-left: 12px;
+  white-space: nowrap;
 }
 
 .express-payment-tile {
@@ -2416,8 +2698,17 @@ export default {
     --product-card-min-width: 185px;
   }
 
+  .product-grid--large {
+    --product-card-min-width: 150px;
+    gap: 10px;
+  }
+
   .product-card {
     min-height: 296px !important;
+  }
+
+  .product-card--compact {
+    min-height: 208px !important;
   }
 
   .product-card ::v-deep .v-card__title {
@@ -2457,7 +2748,7 @@ export default {
   .product-card-price {
     font-size: 1rem;
     margin-top: auto;
-    padding-top: 8px;
+    padding: 8px 0 0;
   }
 
   .product-card ::v-deep .v-btn {
@@ -2481,19 +2772,19 @@ export default {
   }
 
   .cart-item-actions {
-    margin-left: 6px;
+    margin-left: 8px;
   }
 
   .cart-action-btn {
-    height: 26px !important;
-    width: 26px !important;
+    height: 40px !important;
+    width: 40px !important;
   }
 
   .cart-qty-btn {
-    font-size: 0.95rem !important;
-    height: 28px !important;
-    min-width: 28px !important;
-    width: 28px !important;
+    font-size: 1.08rem !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    width: 42px !important;
   }
 
   .cart-order-actions {
@@ -2505,6 +2796,20 @@ export default {
     font-size: 0.78rem !important;
     padding-left: 8px !important;
     padding-right: 8px !important;
+  }
+
+  .express-command-bar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .express-command-actions {
+    flex: 1 1 260px;
+  }
+
+  .express-command-button {
+    flex: 1 1 0;
+    min-width: 0 !important;
   }
 }
 
@@ -2544,7 +2849,7 @@ export default {
 
   .product-card-price {
     font-size: 0.95rem;
-    padding-top: 8px;
+    padding: 8px 0 0;
   }
 }
 
@@ -2566,6 +2871,10 @@ export default {
 @media (min-width: 768px) and (max-width: 1263px) {
   .product-card {
     min-height: 284px !important;
+  }
+
+  .product-card--compact {
+    min-height: 208px !important;
   }
 
   .product-card ::v-deep .v-card__title {
@@ -2603,7 +2912,7 @@ export default {
     font-size: 0.98rem;
     line-height: 1.12;
     margin-top: auto;
-    padding-top: 8px;
+    padding: 8px 0 0;
   }
 
   .product-card ::v-deep .v-card__actions {
@@ -2619,6 +2928,22 @@ export default {
 
   .product-card ::v-deep .v-btn .v-icon {
     font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card,
+  .product-card--compact,
+  .express-all-chip,
+  .express-category-btn {
+    transition: none !important;
+  }
+
+  .product-clickable:active,
+  .product-card--compact:active,
+  .express-all-chip:active,
+  .express-category-btn:active {
+    transform: none !important;
   }
 }
 

@@ -32,6 +32,29 @@ Ne pas transformer l'interface en experience trop ludique, trop corporate, trop 
 4. Proteger les actions critiques : confirmations, chargements et etats d'erreur doivent eviter les doubles actions et les pertes de contexte.
 5. Preserver la continuite operationnelle : les integrations lentes ou externes ne doivent pas bloquer le travail principal.
 
+## Reorder Handle Pattern
+
+Les listes administrables qui exposent un ordre manuel doivent utiliser une poignee d'ordre standardisee, visible et stable. Ce pattern concerne les tables, produits, categories, choix, etapes produits, statuts ou toute carte/ligne que le staff peut monter ou descendre.
+
+### Reusable Layout
+
+1. Placer la poignee sur le bord gauche de la carte ou de la ligne, avant le contenu principal.
+2. Utiliser deux boutons icon-only empiles : `mdi-arrow-up` puis `mdi-arrow-down`.
+3. Separer la poignee du contenu par un trait vertical `border-soft`, sans bande coloree.
+4. Garder le contenu principal independant de la poignee : le deplacement ne doit pas comprimer les libelles, prix, URLs, images ou QR codes.
+5. Sous mobile, conserver les fleches lisibles et tactiles; ne pas cacher le controle si l'ordre reste modifiable.
+
+### Interaction Rules
+
+- Desactiver la fleche haut sur le premier element et la fleche bas sur le dernier.
+- Desactiver les deux fleches pendant l'enregistrement de l'ordre pour eviter les doubles actions.
+- Apres deplacement, garder la liste stable et lisible; une transition courte est autorisee seulement si `prefers-reduced-motion` ne demande pas de reduction.
+- Ne pas remplacer cette poignee par du drag-and-drop seul : les fleches restent le controle fiable, clavier/tactile et explicite.
+
+### Visual Reuse
+
+Reutiliser cette poignee partout ou l'ordre visible est un parametre metier. Elle devient le vocabulaire standard Smart Eat pour "monter / descendre" un element.
+
 ## Analytics Page Pattern
 
 La page Statistiques sert de reference pour les ecrans de pilotage et de reporting. Elle doit rester operationnelle : les filtres sont en haut, les indicateurs importants arrivent juste dessous, puis les tableaux de detail expliquent les chiffres.

@@ -148,8 +148,8 @@
           v-if="showFloatingHomeButton"
           class="toolbar-home-button"
           fab
-          width="48"
-          height="48"
+          width="52"
+          height="52"
           color="primary"
           aria-label="Retour a l'accueil"
           @click="goToInternalHome"
@@ -785,7 +785,7 @@ export default {
 }
 
 .toolbar-home-button .v-icon {
-  font-size: 26px;
+  font-size: 28px;
 }
 
 @media (max-width: 720px) {

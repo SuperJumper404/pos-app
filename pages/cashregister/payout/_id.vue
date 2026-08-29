@@ -29,17 +29,17 @@
               Verifiez l'encaissement avant de valider.
             </small>
             <small v-else>
-              Ces commandes sont deja payees. Vous pouvez les cloturer.
+              Ces commandes sont déjà payées. Vous pouvez les clôturer.
             </small>
           </section>
 
           <div class="cashregister-payout-summary">
             <div class="cashregister-payout-summary__item">
-              <span>A encaisser</span>
+              <span>À encaisser</span>
               <strong>{{ formatCurrency(effectiveDueAmount) }}</strong>
             </div>
             <div class="cashregister-payout-summary__item">
-              <span>Deja paye</span>
+              <span>Déjà payé</span>
               <strong>{{ formatCurrency(paymentSummary.paidAmount) }}</strong>
             </div>
             <div
@@ -381,10 +381,10 @@ export default {
     actionTitle() {
       return this.requiresPaymentMethod
         ? 'Encaisser la table'
-        : 'Cloturer la table'
+        : 'Clôturer la table'
     },
     actionButtonLabel() {
-      return this.requiresPaymentMethod ? 'Encaisser' : 'Cloturer'
+      return this.requiresPaymentMethod ? 'Encaisser' : 'Clôturer'
     },
   },
   mounted() {

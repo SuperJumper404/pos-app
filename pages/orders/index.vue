@@ -478,7 +478,7 @@ export default {
         },
         {
           key: 'preparing',
-          label: 'En preparation',
+          label: 'En préparation',
           hint: 'Commandes en cuisine',
           icon: 'mdi-chef-hat',
           tone: 'success',
@@ -496,7 +496,7 @@ export default {
       return this.countOrdersByStatus(1) + this.countOrdersByStatus(2)
     },
     servicePulseText() {
-      if (this.isKitchenClosed) return 'Cuisine fermee'
+      if (this.isKitchenClosed) return 'Cuisine fermée'
       if (!this.activeOrdersCount) return 'Service a jour'
       return `${this.activeOrdersCount} commandes actives`
     },
@@ -584,7 +584,7 @@ export default {
     orderLaneStatusText(order) {
       const labels = {
         1: 'En attente',
-        2: 'En preparation',
+        2: 'En préparation',
         3: 'Terminee',
         4: 'Annulee',
       }

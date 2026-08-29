@@ -80,7 +80,6 @@
           </div>
 
           <v-btn
-            v-if="clickAndCollectServicePoint"
             color="primary"
             depressed
             large
@@ -92,9 +91,6 @@
             <v-icon right> mdi-arrow-right </v-icon>
           </v-btn>
 
-          <p v-else class="order-unavailable">
-            La commande en ligne sera bientôt disponible.
-          </p>
         </section>
 
         <section
@@ -172,7 +168,7 @@
       </footer>
     </div>
 
-    <div v-if="clickAndCollectServicePoint" class="mobile-order-bar">
+    <div class="mobile-order-bar">
       <v-btn
         color="primary"
         depressed
@@ -216,6 +212,13 @@ export default {
       return (
         this.$store.get('shop/shop')?.shop?.click_and_collect_service_point ??
         this.$store.get('shop/clickAndCollectServicePoint')
+      )
+    },
+    hasClickAndCollectServicePoint() {
+      return (
+        this.clickAndCollectServicePoint !== undefined &&
+        this.clickAndCollectServicePoint !== null &&
+        this.clickAndCollectServicePoint !== ''
       )
     },
     shopInfo() {
@@ -385,9 +388,21 @@ export default {
     goToClickAndCollect() {
       if (this.isRestaurantOpen && !this.isKitchenClosed) {
         this.loading = true
-        this.$router.push({
-          path: `/services/click-and-collect/${this.clickAndCollectServicePoint}`,
-        })
+        this.$store
+          .dispatch('users/postClickAndCollectAccess', this.$route.params.shopId)
+          .then((connected) => {
+            if (connected) {
+              this.$router.push('/menus')
+            } else {
+              this.snackbar = true
+              this.snackbarMessage =
+                this.$store.get('users/message') ||
+                'Click & Collect indisponible.'
+            }
+          })
+          .finally(() => {
+            this.loading = false
+          })
       } else {
         this.snackbar = true
         this.snackbarMessage = this.isKitchenClosed
@@ -408,9 +423,9 @@ export default {
 
 <style scoped>
 .click-collect-page {
-  --cc-sticky-z: 60;
+  --cc-sticky-z: 90;
   min-height: 100vh;
-  padding-bottom: 132px !important;
+  padding-bottom: 148px !important;
   background: var(--se-color-bg);
   color: var(--se-color-text-body);
 }
@@ -536,7 +551,8 @@ export default {
 }
 
 .desktop-order-action {
-  display: none;
+  display: inline-flex;
+  width: min(100%, 260px);
   min-height: 48px;
   padding: 0 22px !important;
   border-radius: var(--se-radius-md);
@@ -719,19 +735,22 @@ export default {
 
 .mobile-order-bar {
   position: fixed;
-  right: 0;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  left: 0;
+  right: 14px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 14px;
   z-index: var(--cc-sticky-z);
-  padding: 0 16px;
+  padding: 0;
   border: 0;
-  background: rgba(255, 255, 255, 0.96);
+  background: transparent;
+  pointer-events: none;
 }
 
 .mobile-order-bar .v-btn {
-  min-height: 48px;
+  min-height: 52px;
   border-radius: var(--se-radius-md);
+  box-shadow: 0 14px 32px rgba(25, 118, 210, 0.26);
   font-weight: 800;
+  pointer-events: auto;
 }
 
 @media (min-width: 960px) {
@@ -757,10 +776,6 @@ export default {
 
   .restaurant-title {
     max-width: 16ch;
-  }
-
-  .desktop-order-action {
-    display: inline-flex;
   }
 
   .click-collect-content {

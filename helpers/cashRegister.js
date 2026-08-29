@@ -54,8 +54,15 @@ const toAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0
 }
 
+const isTemporaryCounterPayment = (order = {}) => {
+  const payment = String(order.payment || order.used_payment_method || '')
+    .trim()
+    .toLowerCase()
+  return payment.includes('comptoir') || payment.includes('encaisser')
+}
+
 const isCashRegisterOrderPaid = (order = {}) =>
-  order.payment_status === PAID_STATUS
+  order.payment_status === PAID_STATUS && !isTemporaryCounterPayment(order)
 
 const isReleasedStripeOrder = (order = {}) =>
   order.payment_status === 'requires_payment' &&

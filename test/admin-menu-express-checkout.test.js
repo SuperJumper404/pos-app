@@ -42,10 +42,20 @@ const paymentDialogEnd = menusSource.indexOf(
 )
 const paymentDialogSource = menusSource.slice(paymentDialogStart, paymentDialogEnd)
 
+assert.doesNotMatch(
+  menusSource,
+  /Vue express|Vue classique|menu-view-toolbar/,
+  'admin menus must not spend tablet space on the old express/classic header'
+)
 assert.match(
   menusSource,
-  /Vue express/,
-  'admin menus must expose the express mode through the existing mode button'
+  /express-cart-summary[\s\S]*?menu-panel-actions[\s\S]*?menu-panel-cart-button[\s\S]*?@click\.stop="openCart"[\s\S]*?mdi-cart-outline/,
+  'admin menus must expose a compact cart shortcut inside the cart header'
+)
+assert.doesNotMatch(
+  menusSource,
+  /Voir les cards en grand|Retour prise rapide|menu-panel-mode-button|openMenuCart/,
+  'admin menus must not show the large-card toggle in the cart header'
 )
 assert.match(
   menusSource,
@@ -54,8 +64,18 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /express-category-bar/,
+  /canUseLargeProductView\(\)[\s\S]*?this\.\$vuetify\.breakpoint\.smAndUp/,
+  'admin express mode must be available on tablet breakpoints'
+)
+assert.match(
+  menusSource,
+  /express-filter-row/,
   'express mode must keep categories as small rectangular choices at the top'
+)
+assert.match(
+  menusSource,
+  /v-if="isAdminView" class="express-command-bar"[\s\S]*?express-filter-row[\s\S]*?express-all-chip[\s\S]*?setExpressCategory\(null\)[\s\S]*?v-for="category in categories"[\s\S]*?setExpressCategory\(category\)[\s\S]*?to="\/orders"[\s\S]*?Commandes[\s\S]*?to="\/cashregister"[\s\S]*?Tiroir caisse/,
+  'express admin mode must show All, orders, and cash-register shortcuts above categories'
 )
 assert.match(
   menusSource,
@@ -129,6 +149,16 @@ assert.match(
 )
 assert.match(
   menusSource,
+  /expressProducts\(\)[\s\S]*?if \(!this\.activeExpressCategory\) return this\.dataProduct/,
+  'express All filter must show every product'
+)
+assert.match(
+  menusSource,
+  /ensureActiveExpressCategory\(\)[\s\S]*?this\.activeExpressCategory &&[\s\S]*?this\.activeExpressCategory = null/,
+  'express category sync must preserve the All filter when no category is selected'
+)
+assert.match(
+  menusSource,
   /expressTableDialog/,
   'express mode must open a tablet-friendly table picker dialog'
 )
@@ -156,6 +186,26 @@ assert.match(
   expressCartSource,
   /express-table-button[\s\S]*?@click="openExpressTableDialog"[\s\S]*?express-service-button[\s\S]*?@click="openExpressServiceDialog"/,
   'express table and service buttons must open their own dialogs'
+)
+assert.doesNotMatch(
+  expressCartSource,
+  /express-checkout-heading|Finaliser|Destination, client et encaissement/,
+  'express checkout action zone must not spend tablet space on a heading'
+)
+assert.match(
+  expressCartSource,
+  /express-checkout-actions/,
+  'express checkout must group payment actions in a stronger action surface'
+)
+assert.match(
+  expressCartSource,
+  /express-cashout-button[\s\S]*?express-cashout-label[\s\S]*?Encaisser[\s\S]*?express-cashout-total[\s\S]*?formatCurrency\(total\)/,
+  'express checkout total must live inside the cash-out button'
+)
+assert.doesNotMatch(
+  expressCartSource,
+  /<div class="express-total-row">/,
+  'express checkout must not render the total as a separate row'
 )
 assert.match(
   menusSource,
@@ -239,8 +289,8 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /express-total-row/,
-  'express checkout must show the current total before payment'
+  /express-cashout-total/,
+  'express checkout must show the current total inside the payment action'
 )
 assert.match(
   menusSource,
@@ -454,13 +504,78 @@ assert.match(
 )
 assert.match(
   menusSource,
+  /express-cart-summary[\s\S]*?idxCart[\s\S]*?formatCurrency\(total\)/,
+  'express cart must give staff a compact order summary before the line items'
+)
+assert.match(
+  menusSource,
   /\.express-category-btn[\s\S]*?min-height:\s*48px/,
   'express category filters must be large enough for tablet use'
 )
 assert.match(
   menusSource,
+  /\.express-command-bar[\s\S]*?justify-content:\s*space-between/,
+  'express admin shortcuts must sit in a dedicated action row'
+)
+assert.match(
+  menusSource,
+  /\.express-filter-button--active[\s\S]*?background:\s*#1976d2/,
+  'express filters must share one clear active state'
+)
+assert.match(
+  menusSource,
+  /\.express-command-button[\s\S]*?min-height:\s*48px/,
+  'express admin shortcut buttons must remain touch-friendly'
+)
+assert.match(
+  menusSource,
+  /\.cart-action-btn[\s\S]*?height:\s*40px[\s\S]*?width:\s*40px/,
+  'express cart quantity actions must stay comfortable on tablet'
+)
+assert.match(
+  menusSource,
+  /\.cart-qty-btn[\s\S]*?height:\s*42px[\s\S]*?width:\s*42px/,
+  'express cart quantity pill must stay readable on tablet'
+)
+assert.match(
+  menusSource,
+  /\.product-grid--large[\s\S]*?--product-card-min-width:\s*150px/,
+  'express product grid must use tablet-readable product tiles'
+)
+assert.match(
+  menusSource,
+  /\.product-card--compact[\s\S]*?min-height:\s*208px/,
+  'express product tiles must keep a comfortable tablet touch height'
+)
+assert.match(
+  menusSource,
+  /\.product-card--compact:active[\s\S]*?transform:\s*scale\(0\.98\)/,
+  'express product tiles must give immediate tap feedback'
+)
+assert.match(
+  menusSource,
+  /@media \(prefers-reduced-motion: reduce\)/,
+  'express tablet motion must respect reduced motion preferences'
+)
+assert.match(
+  menusSource,
   /\.express-payment-grid ::v-deep \.v-btn[\s\S]*?min-height:\s*62px/,
   'express payment buttons must be large enough to avoid fat-finger mistakes'
+)
+assert.match(
+  menusSource,
+  /\.express-checkout[\s\S]*?background:\s*#f8fafc[\s\S]*?border:\s*1px solid #e8edf3/,
+  'express checkout action zone must read as a dedicated control panel'
+)
+assert.match(
+  menusSource,
+  /\.express-cashout-total[\s\S]*?font-size:\s*1\.35rem/,
+  'express checkout total must stay prominent inside the cash-out button'
+)
+assert.match(
+  menusSource,
+  /\.express-checkout ::v-deep \.v-input__slot[\s\S]*?min-height:\s*44px/,
+  'express checkout fields must be compact but touch-friendly'
 )
 assert.doesNotMatch(
   expressSource,

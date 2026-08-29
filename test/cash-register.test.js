@@ -73,6 +73,28 @@ assert.deepStrictEqual(buildCashRegisterCustomerRows(orders), [
   },
 ])
 
+assert.deepStrictEqual(
+  getCashRegisterPaymentSummary([
+    {
+      id: 6,
+      customer: 'Counter Bug',
+      subtotal: 4,
+      payment_status: 'paid',
+      payment: 'Paiement au comptoir',
+    },
+  ]),
+  {
+    dueAmount: 4,
+    paidAmount: 0,
+    totalAmount: 4,
+    dueOrderIds: [6],
+    paidOrderIds: [],
+    allOrderIds: [6],
+    hasAmountDue: true,
+    hasAlreadyPaidAmount: false,
+  }
+)
+
 assert.strictEqual(
   isCashRegisterOrderArchivable({
     payment_status: 'requires_payment',

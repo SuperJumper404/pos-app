@@ -31,6 +31,7 @@ assert.ok(
 )
 
 const design = read('DESIGN.md')
+const product = read('PRODUCT.md')
 assert.match(design, /## 1\. Overview/)
 assert.match(design, /## 2\. Colors/)
 assert.match(design, /## 3\. Typography/)
@@ -75,6 +76,22 @@ assert.match(statusChip, /aria-label/)
 const pageHeader = read('components/design-system/SePageHeader.vue')
 assert.match(pageHeader, /se-page-header/)
 assert.match(pageHeader, /<slot name="actions"/)
+
+assert.match(
+  product,
+  /Reorder Handle Pattern/,
+  'PRODUCT.md must document the app-wide reorder handle pattern'
+)
+assert.match(
+  design,
+  /### Reorder Handles/,
+  'DESIGN.md must document reorder handles as a reusable component'
+)
+assert.match(
+  design,
+  /mdi-arrow-up[\s\S]*mdi-arrow-down/,
+  'reorder handles must standardize up and down MDI icons'
+)
 
 const searchSurfaces = [
   'pages/clients.vue',

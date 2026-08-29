@@ -33,6 +33,22 @@ assert.ok(
   'le bouton de commande doit reprendre le libelle click and collect'
 )
 assert.ok(
+  pageSource.includes('<div class="mobile-order-bar">'),
+  'le bouton mobile click and collect doit rester affiche meme sans service point dans la reponse'
+)
+assert.ok(
+  !pageSource.includes('<div v-if="hasClickAndCollectServicePoint" class="mobile-order-bar">'),
+  'le bouton mobile ne doit pas dependre du service point'
+)
+assert.ok(
+  pageSource.includes("'users/postClickAndCollectAccess'"),
+  "le bouton doit utiliser le flux d'acces click-and-collect du shop"
+)
+assert.ok(
+  pageSource.includes("this.$router.push('/menus')"),
+  'le bouton doit ouvrir le menu apres la session click-and-collect'
+)
+assert.ok(
   pageSource.includes('hero-image-backdrop'),
   "l'image doit avoir un fond visuel pour rester lisible sans etre coupee"
 )
@@ -46,15 +62,28 @@ assert.ok(
   "le lien adresse doit avoir un style dedie pour aligner correctement l'icone"
 )
 assert.ok(
-  /--cc-sticky-z:\s*60/.test(pageSource),
+  /--cc-sticky-z:\s*90/.test(pageSource),
   'le bouton mobile doit rester au-dessus du contenu'
 )
 assert.ok(
-  /bottom:\s*max\(12px,\s*env\(safe-area-inset-bottom\)\)/.test(pageSource),
+  /bottom:\s*calc\(16px \+ env\(safe-area-inset-bottom\)\)/.test(pageSource),
   'le bouton mobile doit etre remonte au-dessus du bord bas mobile'
 )
 
 const moduleRef = { exports: {} }
+const desktopOrderActionStyle =
+  pageSource.match(/\.desktop-order-action\s*{(?<style>[\s\S]*?)\n}/)?.groups
+    ?.style || ''
+
+assert.ok(
+  /display:\s*inline-flex/.test(desktopOrderActionStyle),
+  'le bouton principal click and collect doit aussi etre affiche sur mobile'
+)
+assert.ok(
+  !/display:\s*none/.test(desktopOrderActionStyle),
+  'le bouton principal click and collect ne doit pas etre cache par defaut'
+)
+
 vm.runInNewContext(scriptMatch[1].replace('export default', 'module.exports ='), {
   module: moduleRef,
   exports: moduleRef.exports,
@@ -91,6 +120,11 @@ assert.strictEqual(
   'un point de service absent doit simplement desactiver le CTA'
 )
 assert.strictEqual(
+  computed('hasClickAndCollectServicePoint', missingShopStore),
+  false,
+  'un point de service absent doit masquer le CTA'
+)
+assert.strictEqual(
   computed('isKitchenClosed', missingShopStore),
   undefined,
   "l'etat cuisine absent doit rester neutre"
@@ -110,6 +144,7 @@ const flatShopStoreValues = {
   'shop/kitchen_closed': false,
 }
 const flatShopContext = {
+  clickAndCollectServicePoint: 7,
   $store: {
     get(pathName) {
       return flatShopStoreValues[pathName]
@@ -135,6 +170,31 @@ assert.strictEqual(
   computed('clickAndCollectServicePoint', flatShopContext),
   7,
   'le CTA doit utiliser le point de service click-and-collect du store existant'
+)
+assert.strictEqual(
+  computed('hasClickAndCollectServicePoint', flatShopContext),
+  true,
+  'un point de service renseigne doit afficher le CTA'
+)
+
+const zeroServicePointContext = {
+  clickAndCollectServicePoint: 0,
+  $store: {
+    get(pathName) {
+      return pathName === 'shop/clickAndCollectServicePoint' ? 0 : undefined
+    },
+  },
+}
+
+assert.strictEqual(
+  computed('clickAndCollectServicePoint', zeroServicePointContext),
+  0,
+  'un identifiant de point de service a 0 doit rester une valeur valide'
+)
+assert.strictEqual(
+  computed('hasClickAndCollectServicePoint', zeroServicePointContext),
+  true,
+  'le CTA mobile doit etre visible meme si le service point vaut 0'
 )
 
 const emptyShop = {
