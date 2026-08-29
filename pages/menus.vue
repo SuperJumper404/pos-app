@@ -65,22 +65,42 @@
                 </v-btn>
               </div>
               <div class="express-command-actions">
-                <v-btn
-                  outlined
-                  class="express-command-button text-none"
-                  to="/orders"
-                >
-                  <v-icon left>mdi-clipboard-list-outline</v-icon>
-                  Commandes
-                </v-btn>
-                <v-btn
-                  outlined
-                  class="express-command-button text-none"
-                  to="/cashregister"
-                >
-                  <v-icon left>mdi-cash-register</v-icon>
-                  Tiroir caisse
-                </v-btn>
+                <v-tooltip bottom>
+                  <template #activator="{ on, attrs }">
+                    <v-btn
+                      icon
+                      outlined
+                      class="express-command-button"
+                      to="/orders"
+                      aria-label="Voir les commandes"
+                      v-bind="attrs"
+                      v-on="on"
+                    >
+                      <v-icon class="express-command-icon express-command-icon--orders">
+                        mdi-clipboard-list-outline
+                      </v-icon>
+                    </v-btn>
+                  </template>
+                  <span>Commandes</span>
+                </v-tooltip>
+                <v-tooltip bottom>
+                  <template #activator="{ on, attrs }">
+                    <v-btn
+                      icon
+                      outlined
+                      class="express-command-button"
+                      to="/cashregister"
+                      aria-label="Ouvrir le tiroir caisse"
+                      v-bind="attrs"
+                      v-on="on"
+                    >
+                      <v-icon class="express-command-icon express-command-icon--cash">
+                        mdi-cash-register
+                      </v-icon>
+                    </v-btn>
+                  </template>
+                  <span>Tiroir caisse</span>
+                </v-tooltip>
               </div>
             </div>
             <div class="express-products-scroll">
@@ -412,35 +432,23 @@
               v-if="isLargeProductView && !isOrderEditActive"
               class="express-cart-summary"
             >
-              <div>
-                <div class="express-cart-summary-title">Commande</div>
-                <div class="express-cart-summary-meta">
-                  {{ idxCart }} article{{ idxCart > 1 ? 's' : '' }}
-                </div>
+              <div class="express-cart-summary-meta">
+                {{ idxCart }} article{{ idxCart > 1 ? 's' : '' }}
               </div>
               <div
                 v-if="canUseLargeProductView && !isOrderEditActive"
                 class="menu-panel-actions"
               >
-                <v-badge
-                  :content="idxCart"
-                  :value="idxCart > 0"
-                  color="success"
-                  bordered
-                  overlap
+                <v-btn
+                  icon
+                  outlined
+                  class="menu-panel-cart-button"
+                  aria-label="Ouvrir le panier"
+                  @click.stop="openCart"
                 >
-                  <v-btn
-                    icon
-                    outlined
-                    class="menu-panel-cart-button"
-                    aria-label="Ouvrir le panier"
-                    @click.stop="openCart"
-                  >
-                    <v-icon small>mdi-cart-outline</v-icon>
-                  </v-btn>
-                </v-badge>
+                  <v-icon small>mdi-cart-outline</v-icon>
+                </v-btn>
               </div>
-              <strong>{{ formatCurrency(total) }}</strong>
             </div>
             <div class="express-cart-items-scroll">
             <div
@@ -1935,7 +1943,7 @@ export default {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  margin-left: 12px;
+  margin-left: auto;
   min-width: 0;
 }
 
@@ -2017,11 +2025,16 @@ export default {
 }
 
 .express-command-actions {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
   display: flex;
   flex: 0 1 auto;
-  gap: 8px;
+  gap: 12px;
   justify-content: flex-end;
   min-width: 0;
+  padding: 4px;
 }
 
 .express-filter-row {
@@ -2070,22 +2083,30 @@ export default {
 
 .express-command-button {
   background: #ffffff !important;
-  border-color: #dfe5ee !important;
+  border-color: transparent !important;
+  border-radius: 6px !important;
   color: #121826 !important;
-  font-size: 0.92rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0 !important;
-  min-height: 48px !important;
-  min-width: 136px !important;
-  padding-left: 12px !important;
-  padding-right: 12px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  width: 48px !important;
+}
+
+.express-command-button .express-command-icon {
+  font-size: 32px;
+}
+
+.express-command-icon--orders {
+  color: #1976d2 !important;
+}
+
+.express-command-icon--cash {
+  color: #00a85a !important;
 }
 
 .express-command-button:hover,
 .express-command-button:focus-visible {
-  background: #f8fafc !important;
+  background: #e8f2ff !important;
   border-color: #1976d2 !important;
-  color: #1976d2 !important;
 }
 
 .express-products-scroll {
@@ -2367,24 +2388,11 @@ export default {
   padding: 8px 12px;
 }
 
-.express-cart-summary-title {
+.express-cart-summary-meta {
   color: #121826;
   font-size: 0.98rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
-}
-
-.express-cart-summary-meta {
-  color: rgba(18, 24, 38, 0.68);
-  font-size: 0.82rem;
-  line-height: 1.25;
-  margin-top: 2px;
-}
-
-.express-cart-summary strong {
-  color: #121826;
-  font-size: 1.12rem;
-  line-height: 1.1;
   white-space: nowrap;
 }
 
@@ -2804,12 +2812,11 @@ export default {
   }
 
   .express-command-actions {
-    flex: 1 1 260px;
+    flex: 0 0 auto;
   }
 
   .express-command-button {
-    flex: 1 1 0;
-    min-width: 0 !important;
+    flex: 0 0 48px;
   }
 }
 

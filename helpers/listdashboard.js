@@ -77,6 +77,16 @@ const listdashboard = {
           to: '/menus',
           moduleKey: 'orders',
           legacyModuleKey: 'menus',
+          hiddenFromMainNavigation: true,
+          isAdmin: false,
+        },
+        {
+          icon: 'mdi-cash-register',
+          title: 'Menu',
+          routeName: 'caisse-menu',
+          to: '/caisse/menu',
+          moduleKey: 'orders',
+          legacyModuleKey: 'menus',
           isAdmin: true,
         },
         {

@@ -254,7 +254,13 @@ export default {
         {
           key: 'service',
           title: 'Service',
-          routeNames: ['index', 'products', 'menus', 'orders', 'cashregister'],
+          routeNames: [
+            'index',
+            'products',
+            'caisse-menu',
+            'orders',
+            'cashregister',
+          ],
           names: [],
         },
         {
