@@ -183,6 +183,7 @@
               <v-text-field
                 v-model="formuser.customer"
                 type="text"
+                prepend-inner-icon="mdi-account-outline"
                 label="Nom du client"
                 :rules="[(v) => !!v || 'Veuillez saisir le nom']"
                 placeholder="Saisir le nom du client"
@@ -739,6 +740,9 @@ export default {
         }
       }
       return
+    }
+    if (this.isQrClient) {
+      this.formuser.isTakeaway = false
     }
     const restoredCheckout = await this.restoreCheckoutFromStore()
     if (!restoredCheckout) this.total = this.totalCart

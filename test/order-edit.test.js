@@ -204,6 +204,30 @@ const takeawayChipSource = fs.readFileSync(
   'utf8'
 )
 assert.ok(takeawayChipSource.includes('À emporter'))
+assert.ok(
+  takeawayChipSource.includes('class="takeaway-chip order-chip order-chip--service"'),
+  'takeaway chip must reuse the ordersStatuses service chip classes'
+)
+assert.match(
+  takeawayChipSource,
+  /<v-icon[\s\S]*?class="order-payment-chip-icon takeaway-chip__icon"/,
+  'takeaway chip must reuse the ordersStatuses chip icon spacing class'
+)
+assert.match(
+  takeawayChipSource,
+  /\.takeaway-chip[\s\S]*?height:\s*28px\s*!important/,
+  'takeaway chip must keep the same comfortable height as ordersStatuses chips'
+)
+assert.match(
+  takeawayChipSource,
+  /\.takeaway-chip[\s\S]*?padding:\s*0 12px\s*!important/,
+  'takeaway chip must keep the same horizontal padding as ordersStatuses chips'
+)
+assert.match(
+  takeawayChipSource,
+  /\.order-payment-chip-icon[\s\S]*?margin-right:\s*6px\s*!important/,
+  'takeaway chip icon must use the ordersStatuses icon spacing'
+)
 const takeawayChipOptions = loadVueComponentOptions(takeawayChipSource)
 assert.ok(
   takeawayChipOptions.props.showDineIn,
@@ -273,11 +297,15 @@ assert.ok(
   'a paid Stripe order must expose the complementary-order action'
 )
 assert.ok(
-  detailSource.includes('v-if="canOpenOrderEditModal && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canOpenOrderEditModal && !loadPage"'
+  ),
   'the edit action must keep the kitchen and helper eligibility guards'
 )
 assert.ok(
-  detailSource.includes('v-if="canStartComplementaryOrder && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canStartComplementaryOrder && !loadPage"'
+  ),
   'the complementary action must keep the Stripe paid eligibility guard'
 )
 assert.ok(
@@ -386,11 +414,15 @@ assert.ok(
   'the loading state must be cleared after successful and failed requests'
 )
 assert.ok(
-  detailSource.includes('v-if="canOpenOrderEditModal && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canOpenOrderEditModal && !loadPage"'
+  ),
   'the edit action must be hidden while another detail is loading'
 )
 assert.ok(
-  detailSource.includes('v-if="canStartComplementaryOrder && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canStartComplementaryOrder && !loadPage"'
+  ),
   'the complementary action must be hidden while another detail is loading'
 )
 
@@ -442,6 +474,16 @@ assert.ok(
 assert.ok(
   cartSource.includes('Enregistrer les modifications'),
   'the cart primary action must describe the order edit save'
+)
+assert.ok(
+  menusSource.includes('cart-order-actions') &&
+    menusSource.includes('embeddedOrderEdit && isOrderEditActive') &&
+    menusSource.includes('formatCurrency(total)'),
+  'embedded order edit menu must reuse the standard cart action button with the total'
+)
+assert.ok(
+  !menusSource.includes('order-edit-checkout'),
+  'embedded order edit menu must not use a separate checkout block'
 )
 assert.ok(
   cartSource.includes("'orderEdit/retryPayment'"),

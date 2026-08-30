@@ -94,7 +94,7 @@ assert.match(
 )
 assert.match(
   expressCommandActionsSource,
-  /to="\/orders"[\s\S]*?aria-label="Voir les commandes"[\s\S]*?mdi-clipboard-list-outline[\s\S]*?to="\/cashregister"[\s\S]*?aria-label="Ouvrir le tiroir caisse"[\s\S]*?mdi-cash-register/,
+  /to="\/orders"[\s\S]*?aria-label="Voir les commandes"[\s\S]*?mdi-order-bool-descending[\s\S]*?to="\/cashregister"[\s\S]*?aria-label="Ouvrir le tiroir caisse"[\s\S]*?mdi-cash-register/,
   'express admin shortcuts must be icon-only buttons with accessible labels'
 )
 assert.match(
@@ -114,7 +114,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /:class="\{ 'menu-page-container--express': isLargeProductView \}"/,
+  /'menu-page-container--express': isLargeProductView/,
   'express mode must remove container padding that wastes vertical space'
 )
 assert.match(
@@ -554,7 +554,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.express-filter-button--active[\s\S]*?background:\s*#1976d2/,
+  /\.express-filter-button--active[\s\S]*?background:\s*var\(--se-color-primary\)/,
   'express filters must share one clear active state'
 )
 assert.match(
@@ -574,13 +574,18 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.cart-action-btn[\s\S]*?height:\s*40px[\s\S]*?width:\s*40px/,
-  'express cart quantity actions must stay comfortable on tablet'
+  /\.express-command-icon--cash\s*\{[^}]*color:\s*var\(--se-color-success\) !important/,
+  'cash register shortcut icon must use the same success green as checkout'
 )
 assert.match(
   menusSource,
-  /\.cart-qty-btn[\s\S]*?height:\s*42px[\s\S]*?width:\s*42px/,
-  'express cart quantity pill must stay readable on tablet'
+  /\.cart-action-btn[\s\S]*?height:\s*34px[\s\S]*?width:\s*34px/,
+  'express cart quantity actions must keep the lighter compact design'
+)
+assert.match(
+  menusSource,
+  /\.cart-qty-btn[\s\S]*?height:\s*36px[\s\S]*?width:\s*36px/,
+  'express cart quantity pill must stay readable without overpowering the row'
 )
 assert.match(
   menusSource,
@@ -609,7 +614,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.express-checkout[\s\S]*?background:\s*#f8fafc[\s\S]*?border:\s*1px solid #e8edf3/,
+  /\.express-checkout[\s\S]*?background:\s*var\(--se-color-surface-muted\)[\s\S]*?border:\s*1px solid var\(--se-color-border-soft\)/,
   'express checkout action zone must read as a dedicated control panel'
 )
 assert.match(

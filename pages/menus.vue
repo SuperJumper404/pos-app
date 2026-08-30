@@ -1,5 +1,11 @@
 <template>
-  <v-container :class="{ 'menu-page-container--express': isLargeProductView }">
+  <v-container
+    class="menu-page-container"
+    :class="{
+      'menu-page-container--express': isLargeProductView,
+      'menu-page-container--client': isClientMenuView,
+    }"
+  >
     <v-alert :value="alert" :type="alertType" dismissible>{{
       alertText
     }}</v-alert>
@@ -77,7 +83,7 @@
                       v-on="on"
                     >
                       <v-icon class="express-command-icon express-command-icon--orders">
-                        mdi-clipboard-list-outline
+                        mdi-order-bool-descending
                       </v-icon>
                     </v-btn>
                   </template>
@@ -162,24 +168,67 @@
           </div>
 
           <template v-else>
-            <div class="mobile-category-view d-sm-none">
-              <div class="mobile-category-bar">
-                <v-chip
-                  v-for="category in categories"
-                  :key="category"
-                  class="mobile-category-chip"
-                  :class="{
-                    'mobile-category-chip--active':
-                      category === activeMobileCategory,
-                  }"
-                  :outlined="category === activeMobileCategory"
-                  text-color="black"
-                  label
-                  small
-                  @click="scrollToMobileCategory(category)"
+            <div
+              class="mobile-category-view"
+              :class="{
+                'd-sm-none': !isClientMenuView,
+                'client-category-view': isClientMenuView,
+              }"
+            >
+              <div
+                class="client-category-nav"
+                role="navigation"
+                aria-label="Categories du menu"
+              >
+                <v-btn
+                  icon
+                  outlined
+                  class="client-category-arrow"
+                  aria-label="Categorie precedente"
+                  @click="scrollMobileCategories(-1)"
                 >
-                  {{ category }}
-                </v-chip>
+                  <v-icon>mdi-arrow-left</v-icon>
+                </v-btn>
+                <div ref="mobileCategoryBar" class="mobile-category-bar">
+                  <v-chip
+                    v-for="category in categories"
+                    :key="category"
+                    class="mobile-category-chip"
+                    :class="{
+                      'mobile-category-chip--active':
+                        category === activeMobileCategory,
+                    }"
+                    :outlined="false"
+                    :text-color="
+                      category === activeMobileCategory ? 'white' : 'var(--se-color-text)'
+                    "
+                    label
+                    small
+                    @click="scrollToMobileCategory(category)"
+                  >
+                    <v-avatar
+                      v-if="categoryImage(category)"
+                      left
+                      size="28"
+                      class="mobile-category-image"
+                    >
+                      <v-img
+                        :src="categoryImageSrc(categoryImage(category))"
+                        :alt="category"
+                      />
+                    </v-avatar>
+                    {{ category }}
+                  </v-chip>
+                </div>
+                <v-btn
+                  icon
+                  outlined
+                  class="client-category-arrow"
+                  aria-label="Categorie suivante"
+                  @click="scrollMobileCategories(1)"
+                >
+                  <v-icon>mdi-arrow-right</v-icon>
+                </v-btn>
               </div>
 
               <div ref="mobileCategoryProducts" class="mobile-category-products">
@@ -201,6 +250,11 @@
                     <v-card
                       outlined
                       class="d-flex flex-column product-card product-clickable"
+                      :class="{
+                        'product-card--client': isClientMenuView,
+                        'product-card--in-cart':
+                          productCartQuantity(items) > 0,
+                      }"
                       @click="openProductPreview(items)"
                     >
                       <!-- Image -->
@@ -210,6 +264,12 @@
                         class="product-card-image rounded-t"
                         @click.stop="openProductPreview(items)"
                       />
+                      <div
+                        v-if="isClientMenuView && productCartQuantity(items) > 0"
+                        class="client-product-quantity"
+                      >
+                        {{ productCartQuantity(items) }}
+                      </div>
 
                       <!-- Title -->
                       <v-card-title class="product-card-title py-2 pb-0 mb-0">
@@ -273,7 +333,7 @@
               </div>
             </div>
 
-            <v-expansion-panels class="d-none d-sm-block">
+            <v-expansion-panels v-if="!isClientMenuView" class="d-none d-sm-block">
               <v-expansion-panel v-for="(category, i) in categories" :key="i">
                 <v-expansion-panel-header
                   ><h3>{{ category }}</h3></v-expansion-panel-header
@@ -414,7 +474,13 @@
           
         </v-card> -->
       </v-col>
-      <v-col sm="5" md="4" cols="12">
+      <v-col
+        sm="5"
+        md="4"
+        cols="12"
+        class="menu-cart-column"
+        :class="{ 'd-none d-sm-block': isClientMenuView }"
+      >
         <!-- <v-col md="4" class="d-none d-sm-none d-md-block"> -->
         <v-card v-if="loadPage" outlined height="425px">
           <Loading />
@@ -450,6 +516,25 @@
                 </v-btn>
               </div>
             </div>
+            <div
+              v-if="isClientMenuView && !isOrderEditActive"
+              class="client-cart-table"
+            >
+              <v-icon color="primary" size="22">mdi-table-chair</v-icon>
+              <span>{{ clientServiceSubtitle }}</span>
+            </div>
+            <div
+              v-if="isClientMenuView && !isOrderEditActive"
+              class="client-cart-summary"
+            >
+              <div>
+                <strong>Votre panier</strong>
+                <span>
+                  {{ idxCart }} article{{ idxCart > 1 ? 's' : '' }}
+                </span>
+              </div>
+              <v-icon color="primary">mdi-cart-outline</v-icon>
+            </div>
             <div class="express-cart-items-scroll">
             <div
               v-if="cartItem.length === 0"
@@ -477,6 +562,7 @@
                     mr-2
                     ml-2
                     mt-2
+                    mb-2
                   "
                   no-gutters
                 >
@@ -538,7 +624,7 @@
                     </v-btn>
 
                     <v-btn
-                      class="cart-qty-btn mx-1"
+                      class="cart-qty-btn"
                       color="success"
                       fab
                       small
@@ -562,15 +648,25 @@
                   </v-col>
                 </v-row>
 
-                <v-col>
-                  <v-chip
-                    v-for="choice in itm.selections || []"
-                    :key="choice.product_step_choice_id"
-                    class="mr-1 mt-1"
+                <div
+                  v-if="cartLineCustomizationGroups(itm).length"
+                  class="cart-item-customizations"
+                >
+                  <div
+                    v-for="group in cartLineCustomizationGroups(itm)"
+                    :key="group.stepId || group.stepName"
+                    class="cart-item-customization-row"
                   >
-                    {{ choice.choice_name || choice.name }}
-                  </v-chip>
-                </v-col>
+                    <span class="cart-item-customization-step">
+                      {{ group.stepName }}
+                    </span>
+                    <span class="cart-item-customization-choice">
+                      {{
+                        group.choices.map((choice) => choice.name).join(', ')
+                      }}
+                    </span>
+                  </div>
+                </div>
               </v-card>
             </div>
             </div>
@@ -655,7 +751,11 @@
               </div>
             </div>
             <v-card-actions
-              v-if="cartItem.length > 0 && !isLargeProductView"
+              v-if="
+                cartItem.length > 0 &&
+                (!isLargeProductView ||
+                  (embeddedOrderEdit && isOrderEditActive))
+              "
               class="cart-order-actions"
             >
               <v-btn
@@ -666,9 +766,14 @@
                   font-weight-bold
                 "
                 @click="btnOrder"
-                >Commander
-                <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
+                <span class="cart-order-btn__label">
+                  Commander
+                </span>
+                <span class="cart-order-btn__total">
+                  {{ formatCurrency(total) }}
+                </span>
+              </v-btn>
               <v-btn
                 color="red lighten-1"
                 class="cart-order-btn cart-order-btn--cancel text-none"
@@ -681,6 +786,26 @@
         </div>
       </v-col>
     </v-row>
+    <div
+      v-if="isClientMenuView && cartItem.length > 0"
+      class="client-mobile-checkout d-sm-none"
+    >
+      <v-btn
+        block
+        depressed
+        class="client-mobile-checkout-button text-none"
+        :class="{ 'client-mobile-checkout-button--pulse': clientCartPulse }"
+        :disabled="isKitchenClosed && !isOrderEditActive"
+        @click="btnOrder"
+      >
+        <span class="client-mobile-checkout-count">
+          <v-icon color="primary">mdi-shopping-outline</v-icon>
+          {{ idxCart }}
+        </span>
+        <span class="client-mobile-checkout-label">Voir ma commande</span>
+        <strong>{{ formatCurrency(total) }}</strong>
+      </v-btn>
+    </div>
 
     <v-dialog v-model="previewDialog" max-width="620">
       <v-card v-if="previewItem" class="product-preview-card">
@@ -1051,6 +1176,7 @@ import Loading from '@/components/loading'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import price from '@/helpers/price'
 import {
+  groupCustomizationSelections,
   mergeConfiguredCartLine,
   replaceConfiguredCartLine,
 } from '@/helpers/customizations'
@@ -1116,6 +1242,8 @@ export default {
     cartItem: [],
     total: 0,
     idxCart: 0,
+    clientCartPulse: false,
+    clientCartPulseTimer: null,
     allowRouteLeave: false,
     productViewMode: 'all',
     activeMobileCategory: null,
@@ -1141,8 +1269,18 @@ export default {
 
   computed: {
     categories() {
-      const items = this.dataProduct.map((x) => x.category)
+      const items = this.dataProduct
+        .map((x) => String(x.category || '').trim())
+        .filter(Boolean)
       return [...new Set(items)]
+    },
+    categoryImages() {
+      return this.dataProduct.reduce((images, product) => {
+        const category = String(product.category || '').trim()
+        if (!category || images[category]) return images
+        images[category] = product.category_image || product.categoryImage || ''
+        return images
+      }, {})
     },
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
@@ -1215,6 +1353,28 @@ export default {
       const storedAccess = process.client ? localStorage.getItem('access') : null
       const access = user.access === undefined ? storedAccess : user.access
       return Number(access) === 0
+    },
+    isClientMenuView() {
+      return !this.isAdminView && !this.isOrderEditActive
+    },
+    selectedClientTable() {
+      const storedTable = process.client
+        ? localStorage.getItem('service_point_id')
+        : null
+      const selectedId =
+        (this.$store.get('users/user') || {}).service_point_id || storedTable
+      return (
+        this.dataTables.find((table) => {
+          return String(table.id) === String(selectedId)
+        }) || null
+      )
+    },
+    clientServiceSubtitle() {
+      const tableName =
+        (this.selectedClientTable && this.selectedClientTable.name) ||
+        (process.client ? localStorage.getItem('service_point_name') : '') ||
+        ''
+      return tableName || ''
     },
     isLargeProductView() {
       return this.canUseLargeProductView && this.productViewMode === 'all'
@@ -1300,7 +1460,6 @@ export default {
   },
   async mounted() {
     this.loadPage = true
-
     if (this.isOrderEditActive) {
       this.cartItem = JSON.parse(
         JSON.stringify(this.$store.get('cart/dataCart') || [])
@@ -1369,6 +1528,11 @@ export default {
       this.loadPage = false
     })
   },
+  beforeDestroy() {
+    if (this.clientCartPulseTimer) {
+      clearTimeout(this.clientCartPulseTimer)
+    }
+  },
 
   methods: {
     ensureActiveMobileCategory() {
@@ -1383,13 +1547,38 @@ export default {
     setActiveMobileCategory(category) {
       this.activeMobileCategory = category
     },
+    scrollMobileCategories(direction) {
+      const scroller = this.$refs.mobileCategoryBar
+      if (!scroller) return
+      const distance = Math.max(160, scroller.clientWidth * 0.7)
+      if (typeof scroller.scrollBy === 'function') {
+        scroller.scrollBy({
+          left: direction * distance,
+          behavior: 'smooth',
+        })
+        return
+      }
+      scroller.scrollLeft += direction * distance
+    },
     scrollToMobileCategory(category) {
       this.setActiveMobileCategory(category)
       this.$nextTick(() => {
         const target = this.$refs[`mobileCategory-${category}`]
         const element = Array.isArray(target) ? target[0] : target
         const scroller = this.$refs.mobileCategoryProducts
-        if (!element || !scroller) {
+        if (!element) {
+          return
+        }
+        if (this.isClientMenuView) {
+          const stickyOffset = this.$vuetify.breakpoint.xsOnly ? 74 : 92
+          const top =
+            element.getBoundingClientRect().top +
+            window.pageYOffset -
+            stickyOffset
+          window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+          return
+        }
+        if (!scroller) {
           return
         }
         const top =
@@ -1402,6 +1591,19 @@ export default {
         }
         scroller.scrollTop = top
       })
+    },
+    cartLineCustomizationGroups(item) {
+      return groupCustomizationSelections(
+        item && (item.selections || item.customizationList)
+      )
+    },
+    productCartQuantity(product) {
+      const productId = product && product.id
+      return this.cartItem.reduce((sum, line) => {
+        return String(line.id) === String(productId)
+          ? sum + Number(line.qty || 0)
+          : sum
+      }, 0)
     },
     restorePersistedCheckoutCart() {
       const payload = this.$store.get('cart/clientOrderPayload') || {}
@@ -1434,6 +1636,12 @@ export default {
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
+    },
+    categoryImage(category) {
+      return this.categoryImages[String(category || '').trim()] || ''
+    },
+    categoryImageSrc(image) {
+      return `${this.staticURL}/api/v1/imgcategories/${image}`
     },
     addPreviewItemToCart() {
       if (!this.previewItem) return
@@ -1616,6 +1824,16 @@ export default {
     showCartAddFeedback() {
       this.cartAddSnackbarText = 'Produit ajouté au panier'
       this.cartAddSnackbar = true
+      if (this.isClientMenuView) {
+        this.clientCartPulse = false
+        if (this.clientCartPulseTimer) clearTimeout(this.clientCartPulseTimer)
+        this.$nextTick(() => {
+          this.clientCartPulse = true
+          this.clientCartPulseTimer = setTimeout(() => {
+            this.clientCartPulse = false
+          }, 420)
+        })
+      }
     },
     addToCart(params) {
       if (this.isKitchenClosed && !this.isOrderEditActive) {
@@ -1924,6 +2142,10 @@ export default {
   border: 1px solid #eeeeee;
 }
 
+.menu-page-container {
+  background: var(--se-color-bg);
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   height: 2.7em;
@@ -1948,9 +2170,9 @@ export default {
 }
 
 .menu-panel-cart-button {
-  background: #ffffff !important;
-  border-color: #dfe5ee !important;
-  color: #121826 !important;
+  background: var(--se-color-surface) !important;
+  border-color: var(--se-color-border) !important;
+  color: var(--se-color-text) !important;
   height: 40px !important;
   min-width: 40px !important;
   width: 40px !important;
@@ -1958,9 +2180,9 @@ export default {
 
 .menu-panel-cart-button:hover,
 .menu-panel-cart-button:focus-visible {
-  background: #f8fafc !important;
-  border-color: #1976d2 !important;
-  color: #1976d2 !important;
+  background: var(--se-color-surface-muted) !important;
+  border-color: var(--se-color-primary) !important;
+  color: var(--se-color-primary) !important;
 }
 
 .product-grid {
@@ -1976,6 +2198,262 @@ export default {
 .product-grid--large {
   --product-card-min-width: 150px;
   gap: 12px;
+}
+
+.menu-page-container--client {
+  background: transparent;
+  max-width: none;
+  padding-top: 0 !important;
+}
+
+.menu-page-container--client .menu-panel-card {
+  overflow: visible;
+}
+
+.client-cart-summary {
+  align-items: center;
+  background: var(--se-color-surface);
+  border-bottom: 1px solid var(--se-color-border-soft);
+  color: var(--se-color-text);
+  display: flex;
+  justify-content: space-between;
+  margin: -8px -8px 12px;
+  min-height: 58px;
+  padding: 12px 16px;
+}
+
+.client-cart-table {
+  align-items: center;
+  background: var(--se-color-primary-soft);
+  border: 1px solid #d7e8fb;
+  border-radius: 8px;
+  color: #123a63;
+  display: flex;
+  gap: 8px;
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1.2;
+  margin: -2px 0 10px;
+  min-height: 46px;
+  padding: 10px 12px;
+}
+
+.client-cart-table span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-cart-summary div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.client-cart-summary strong {
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+
+.client-cart-summary span {
+  color: rgba(18, 24, 38, 0.62);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.client-category-nav {
+  align-items: center;
+  background: var(--se-color-surface);
+  border-bottom: 0;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 12px 6vw;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  width: 100%;
+}
+
+.client-category-arrow {
+  background: var(--se-color-surface-muted) !important;
+  border-color: var(--se-color-border) !important;
+  border-radius: 999px !important;
+  color: var(--se-color-primary) !important;
+  flex: 0 0 44px;
+  height: 44px !important;
+  width: 44px !important;
+}
+
+.client-category-arrow:hover,
+.client-category-arrow:focus-visible {
+  background: var(--se-color-primary-soft) !important;
+  border-color: #b7d7fb !important;
+}
+
+.client-category-view {
+  height: auto;
+  min-height: 0;
+}
+
+.client-category-view .mobile-category-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.client-category-view .mobile-category-products {
+  overflow-y: visible;
+  padding: 28px 0;
+}
+
+.client-category-view .mobile-category-title {
+  color: #123a63;
+  font-size: 1.55rem;
+  font-weight: 900;
+  margin-bottom: 18px;
+}
+
+.client-category-view .mobile-category-section {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 980px;
+  padding: 0 8px;
+}
+
+@media (min-width: 600px) {
+  .menu-page-container--client .menu-cart-column {
+    align-self: flex-start;
+  }
+
+  .menu-page-container--client .menu-cart-column .menu-panel-card {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 108px);
+    position: fixed;
+    right: 24px;
+    top: 92px;
+    width: min(calc(33.333vw - 32px), 420px);
+    z-index: 4;
+  }
+
+  .menu-page-container--client .menu-cart-column .express-cart-items-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+.client-product-quantity {
+  align-items: center;
+  background: var(--se-color-primary);
+  border: 2px solid var(--se-color-surface);
+  border-radius: 999px;
+  color: var(--se-color-surface);
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 900;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 9px;
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 2;
+}
+
+.client-mobile-checkout {
+  bottom: 16px;
+  left: 0;
+  padding: 0 14px;
+  position: fixed;
+  right: 0;
+  z-index: 8;
+}
+
+.client-mobile-checkout-button {
+  background: var(--se-color-primary) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 14px rgba(18, 24, 38, 0.18) !important;
+  color: var(--se-color-surface) !important;
+  min-height: 64px !important;
+  padding: 0 16px !important;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.client-mobile-checkout-button--pulse {
+  animation: client-cart-pop 420ms ease-out;
+}
+
+.client-mobile-checkout-button ::v-deep .v-btn__content {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+}
+
+.client-mobile-checkout-count {
+  align-items: center;
+  background: var(--se-color-surface);
+  border-radius: 8px;
+  color: var(--se-color-primary);
+  display: inline-flex;
+  font-size: 1.15rem;
+  font-weight: 900;
+  gap: 6px;
+  justify-content: center;
+  min-height: 42px;
+  min-width: 58px;
+  padding: 0 10px;
+}
+
+.client-mobile-checkout-label {
+  font-size: 1.02rem;
+  font-weight: 900;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.client-mobile-checkout-button strong {
+  font-size: 1rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+@keyframes client-cart-pop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-4px) scale(1.025);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-mobile-checkout-button--pulse {
+    animation: none;
+  }
+
+  .product-card--client,
+  .product-card--client .product-card-image,
+  .client-mobile-checkout-button {
+    transition: none !important;
+  }
+
+  .product-card--client.product-clickable:hover,
+  .product-card--client.product-clickable:focus-visible,
+  .product-card--client.product-clickable:hover .product-card-image {
+    transform: none;
+  }
 }
 
 .menu-page-container--express {
@@ -2013,8 +2491,8 @@ export default {
 
 .express-command-bar {
   align-items: stretch;
-  background: #f8fafc;
-  border: 1px solid #e8edf3;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
   border-radius: 8px;
   display: flex;
   flex: 0 0 auto;
@@ -2026,8 +2504,8 @@ export default {
 
 .express-command-actions {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #dfe5ee;
+  background: var(--se-color-surface);
+  border: 1px solid var(--se-color-border);
   border-radius: 8px;
   display: flex;
   flex: 0 1 auto;
@@ -2044,10 +2522,10 @@ export default {
 }
 
 .express-filter-button {
-  background: #ffffff !important;
-  border: 1px solid #dfe5ee !important;
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border) !important;
   border-radius: 8px !important;
-  color: #121826 !important;
+  color: var(--se-color-text) !important;
   cursor: pointer;
   flex: 0 0 auto;
   font-size: 0.98rem !important;
@@ -2066,7 +2544,7 @@ export default {
 
 .express-filter-button:hover,
 .express-filter-button:focus-visible {
-  background: #f8fafc !important;
+  background: var(--se-color-surface-muted) !important;
   border-color: #b9c8dc !important;
 }
 
@@ -2076,16 +2554,16 @@ export default {
 
 .express-filter-button--active,
 .express-all-chip--active {
-  background: #1976d2 !important;
-  border-color: #1976d2 !important;
-  color: #ffffff !important;
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
+  color: var(--se-color-surface) !important;
 }
 
 .express-command-button {
-  background: #ffffff !important;
+  background: var(--se-color-surface) !important;
   border-color: transparent !important;
   border-radius: 6px !important;
-  color: #121826 !important;
+  color: var(--se-color-text) !important;
   height: 48px !important;
   min-width: 48px !important;
   width: 48px !important;
@@ -2096,17 +2574,17 @@ export default {
 }
 
 .express-command-icon--orders {
-  color: #1976d2 !important;
+  color: var(--se-color-primary) !important;
 }
 
 .express-command-icon--cash {
-  color: #00a85a !important;
+  color: var(--se-color-success) !important;
 }
 
 .express-command-button:hover,
 .express-command-button:focus-visible {
-  background: #e8f2ff !important;
-  border-color: #1976d2 !important;
+  background: var(--se-color-primary-soft) !important;
+  border-color: var(--se-color-primary) !important;
 }
 
 .express-products-scroll {
@@ -2123,7 +2601,7 @@ export default {
 
 .express-category-btn:hover,
 .express-category-btn:focus-visible {
-  background: #f8fafc !important;
+  background: var(--se-color-surface-muted) !important;
   border-color: #b9c8dc !important;
 }
 
@@ -2132,16 +2610,16 @@ export default {
 }
 
 .express-category-btn.primary {
-  background: #1976d2 !important;
-  border-color: #1976d2 !important;
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
   box-shadow: 0 2px 6px rgba(25, 118, 210, 0.18) !important;
-  color: #ffffff !important;
+  color: var(--se-color-surface) !important;
 }
 
 .express-category-btn.primary:hover,
 .express-category-btn.primary:focus-visible {
-  background: #1769bd !important;
-  border-color: #1769bd !important;
+  background: var(--se-color-primary-hover) !important;
+  border-color: var(--se-color-primary-hover) !important;
 }
 
 .express-filter-button ::v-deep .v-btn__content,
@@ -2157,7 +2635,7 @@ export default {
 }
 
 .product-card {
-  background: #ffffff !important;
+  background: var(--se-color-surface) !important;
   border-color: #e1e7ef !important;
   border-radius: 8px !important;
   box-shadow: none !important;
@@ -2169,6 +2647,31 @@ export default {
   width: 100%;
 }
 
+.product-card--client {
+  position: relative;
+  transform: translateZ(0);
+}
+
+.product-card--client.product-clickable:hover,
+.product-card--client.product-clickable:focus-visible {
+  background: var(--se-color-surface) !important;
+  box-shadow: 0 6px 8px rgba(18, 24, 38, 0.08) !important;
+  transform: translateY(-2px);
+}
+
+.product-card--client.product-card--in-cart {
+  border-color: var(--se-color-primary) !important;
+}
+
+.product-card--client .product-card-image {
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.product-card--client.product-clickable:hover .product-card-image {
+  filter: saturate(1.04) contrast(1.02);
+  transform: scale(1.015);
+}
+
 .menu-panel-card,
 .cart-item-card,
 .product-clickable:hover,
@@ -2178,8 +2681,8 @@ export default {
 
 .product-clickable:hover,
 .product-clickable:focus-visible {
-  border-color: #1976d2 !important;
-  background: #ffffff !important;
+  border-color: var(--se-color-primary) !important;
+  background: var(--se-color-surface) !important;
 }
 
 .product-clickable:active {
@@ -2231,7 +2734,7 @@ export default {
 }
 
 .product-card-image {
-  background: #f8fafc;
+  background: var(--se-color-surface-muted);
   border-radius: 6px !important;
   flex: 0 0 auto;
   margin: 6px 6px 0;
@@ -2253,7 +2756,7 @@ export default {
 }
 
 .product-card-title-text {
-  color: #121826;
+  color: var(--se-color-text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -2280,8 +2783,8 @@ export default {
 
 .product-card-price {
   align-items: center;
-  border-top: 1px solid #e8edf3;
-  color: #121826;
+  border-top: 1px solid var(--se-color-border-soft);
+  color: var(--se-color-text);
   display: inline-flex;
   font-size: 1.12rem;
   font-weight: 800;
@@ -2328,7 +2831,7 @@ export default {
 }
 
 .cart-item-name {
-  color: #121826;
+  color: var(--se-color-text);
   font-size: 1rem !important;
   line-height: 1.2;
   max-width: 100%;
@@ -2341,22 +2844,59 @@ export default {
   margin-top: 2px;
 }
 
+.cart-item-customizations {
+  background: var(--se-color-surface-muted);
+  border-top: 1px solid var(--se-color-border-soft);
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px 12px;
+}
+
+.cart-item-customization-row {
+  align-items: baseline;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(88px, 0.42fr) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.cart-item-customization-step {
+  color: rgba(18, 24, 38, 0.58);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart-item-customization-choice {
+  color: var(--se-color-text);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .cart-item-actions {
   flex: 0 0 auto;
+  gap: 4px;
   white-space: nowrap;
 }
 
 .cart-action-btn {
-  height: 40px !important;
-  width: 40px !important;
+  height: 34px !important;
+  width: 34px !important;
 }
 
 .cart-qty-btn {
   box-shadow: none !important;
-  font-size: 1.08rem !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  width: 42px !important;
+  font-size: 1.12rem !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  width: 36px !important;
 }
 
 .express-empty-cart {
@@ -2377,8 +2917,8 @@ export default {
 
 .express-cart-summary {
   align-items: center;
-  background: #f8fafc;
-  border: 1px solid #e8edf3;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
   border-radius: 8px;
   display: flex;
   flex: 0 0 auto;
@@ -2389,7 +2929,7 @@ export default {
 }
 
 .express-cart-summary-meta {
-  color: #121826;
+  color: var(--se-color-text);
   font-size: 0.98rem;
   font-weight: 700;
   line-height: 1.2;
@@ -2400,6 +2940,7 @@ export default {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  padding-bottom: 14px;
   padding-right: 2px;
 }
 
@@ -2422,13 +2963,30 @@ export default {
 }
 
 .cart-order-btn ::v-deep .v-btn__content {
+  align-items: center;
+  display: flex;
+  gap: 8px;
   min-width: 0;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.cart-order-btn__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-order-btn__total {
+  font-size: 1.02rem;
+  font-weight: 900;
+  margin-left: auto;
   white-space: nowrap;
 }
 
 .express-checkout {
-  background: #f8fafc;
-  border: 1px solid #e8edf3;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
   border-radius: 8px;
   display: grid;
   flex: 0 0 auto;
@@ -2439,16 +2997,16 @@ export default {
 
 .express-table-button {
   flex: 1 1 0;
-  background: #ffffff !important;
-  border: 1px solid #dfe5ee !important;
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border) !important;
   min-height: 64px !important;
   min-width: 0 !important;
 }
 
 .express-service-button {
   flex: 1 1 0;
-  background: #ffffff !important;
-  border: 1px solid #dfe5ee !important;
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border) !important;
   min-height: 64px !important;
   min-width: 0 !important;
 }
@@ -2465,7 +3023,7 @@ export default {
 }
 
 .express-checkout ::v-deep .v-input__slot {
-  background: #ffffff !important;
+  background: var(--se-color-surface) !important;
   min-height: 44px !important;
 }
 
@@ -2652,10 +3210,10 @@ export default {
   background: transparent;
   display: flex;
   flex: 0 0 auto;
-  gap: 18px;
+  gap: 10px;
   justify-content: flex-start;
   overflow-x: auto;
-  padding: 14px 16px;
+  padding: 4px 2px;
   white-space: nowrap;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -2666,16 +3224,52 @@ export default {
 }
 
 .mobile-category-chip {
-  border-radius: 12px !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e1e7ef !important;
+  border-radius: 999px !important;
+  color: var(--se-color-text) !important;
   flex: 0 0 auto;
-  font-size: 1rem !important;
-  font-weight: 600;
-  min-height: 32px !important;
-  padding: 0 12px !important;
+  font-size: 0.96rem !important;
+  font-weight: 800;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  transition: background-color 160ms ease, border-color 160ms ease,
+    color 160ms ease, transform 160ms ease;
 }
 
-.mobile-category-chip--active ::v-deep .v-chip {
-  border-color: #000 !important;
+.mobile-category-chip--active {
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
+  color: var(--se-color-surface) !important;
+  transform: translateY(-2px);
+}
+
+.mobile-category-chip--active ::v-deep .v-chip__content {
+  color: var(--se-color-surface) !important;
+}
+
+.mobile-category-image {
+  background: var(--se-color-surface);
+  border: 2px solid var(--se-color-surface);
+  margin-left: -8px !important;
+  margin-right: 9px !important;
+}
+
+.mobile-category-image ::v-deep .v-image {
+  height: 100%;
+  width: 100%;
+}
+
+.mobile-category-chip:hover,
+.mobile-category-chip:focus-visible {
+  background: var(--se-color-primary-soft) !important;
+  border-color: #b7d7fb !important;
+}
+
+.mobile-category-chip--active:hover,
+.mobile-category-chip--active:focus-visible {
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
 }
 
 .mobile-category-products {
@@ -2780,19 +3374,20 @@ export default {
   }
 
   .cart-item-actions {
+    gap: 4px;
     margin-left: 8px;
   }
 
   .cart-action-btn {
-    height: 40px !important;
-    width: 40px !important;
+    height: 34px !important;
+    width: 34px !important;
   }
 
   .cart-qty-btn {
-    font-size: 1.08rem !important;
-    height: 42px !important;
-    min-width: 42px !important;
-    width: 42px !important;
+    font-size: 1.12rem !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    width: 36px !important;
   }
 
   .cart-order-actions {
@@ -2821,13 +3416,70 @@ export default {
 }
 
 @media (max-width: 599px) {
+  .menu-page-container--client {
+    padding-bottom: 92px !important;
+  }
+
+  .menu-page-container--client .menu-content-row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .menu-page-container--client .menu-content-row > .col {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .menu-page-container--client .menu-panel-card {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .client-category-nav {
+    margin: 0;
+    padding: 10px 14px;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    z-index: 8;
+  }
+
+  .client-category-view .mobile-category-bar {
+    gap: 10px;
+    padding: 4px 1px;
+  }
+
+  .client-category-view .mobile-category-chip {
+    font-size: 0.9rem !important;
+    min-height: 38px !important;
+    padding: 0 14px !important;
+  }
+
+  .client-category-view .mobile-category-products {
+    flex: 0 0 auto;
+    min-height: unset;
+    overflow-y: visible;
+    padding: 148px 22px 12px;
+  }
+
+  .client-category-view .mobile-category-title {
+    font-size: 1.75rem;
+    margin-bottom: 22px;
+  }
+
+  .client-category-view .mobile-category-section {
+    padding: 0;
+  }
+
   .menu-content-row {
     margin-top: 0 !important;
   }
 
   .product-grid {
-    --product-card-min-width: 145px;
-    gap: 8px;
+    --product-card-min-width: 0;
+    gap: 28px 22px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .product-card {
@@ -2861,6 +3513,15 @@ export default {
 }
 
 @media (max-width: 420px) {
+  .client-mobile-checkout-button {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .client-mobile-checkout-label {
+    font-size: 0.92rem;
+  }
+
   .cart-order-actions {
     flex-direction: column;
   }

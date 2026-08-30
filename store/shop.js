@@ -3,6 +3,7 @@ import {
   DEFAULT_DISCOUNT_PERCENTAGES,
   normalizeDiscountPercentages,
 } from '../helpers/discount'
+import { normalizeShopTheme } from '../helpers/shopThemes'
 const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 
 export const state = () => ({
@@ -20,6 +21,7 @@ export const state = () => ({
   shop_description: '',
   shop_hours: '',
   shop_social_media: '',
+  shop_theme: normalizeShopTheme(),
   shop_payment_methods: '',
   shop_discount_percentages: DEFAULT_DISCOUNT_PERCENTAGES,
   shop_profile_image: '',
@@ -95,6 +97,10 @@ export const actions = {
         dispatch(
           'set/shop_social_media',
           JSON.parse(response.data.data[0].shop_social_media)
+        )
+        dispatch(
+          'set/shop_theme',
+          normalizeShopTheme(response.data.data[0].shop_theme)
         )
         dispatch('set/shop_printer_ip', response.data.data[0].shop_printer_ip)
         dispatch('set/smart_print_app', response.data.data[0].smart_print_app)
@@ -213,6 +219,10 @@ export const actions = {
         dispatch(
           'set/shop_social_media',
           JSON.parse(response.data.data.shop_social_media)
+        )
+        dispatch(
+          'set/shop_theme',
+          normalizeShopTheme(response.data.data.shop_theme)
         )
         dispatch(
           'set/stripe_charges_enabled',
