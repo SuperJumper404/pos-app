@@ -16,25 +16,6 @@
     >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
-    <button
-      v-if="isClientMenuView"
-      class="client-service-banner"
-      type="button"
-      @click="openClientServiceDialog"
-    >
-      <span class="client-service-icon">
-        <v-icon color="primary" size="32">
-          {{ clientIsTakeaway ? 'mdi-shopping-outline' : 'mdi-table-chair' }}
-        </v-icon>
-      </span>
-      <span class="client-service-copy">
-        <strong>{{ clientServiceTitle }}</strong>
-        <span v-if="clientServiceSubtitle">{{ clientServiceSubtitle }}</span>
-      </span>
-      <v-icon color="primary" class="client-service-chevron">
-        mdi-chevron-down
-      </v-icon>
-    </button>
     <v-row
       class="menu-content-row mt-5"
       :class="{ 'menu-content-row--express': isLargeProductView }"
@@ -496,6 +477,7 @@
         sm="5"
         md="4"
         cols="12"
+        class="menu-cart-column"
         :class="{ 'd-none d-sm-block': isClientMenuView }"
       >
         <!-- <v-col md="4" class="d-none d-sm-none d-md-block"> -->
@@ -532,6 +514,13 @@
                   <v-icon small>mdi-cart-outline</v-icon>
                 </v-btn>
               </div>
+            </div>
+            <div
+              v-if="isClientMenuView && !isOrderEditActive"
+              class="client-cart-table"
+            >
+              <v-icon color="primary" size="22">mdi-table-chair</v-icon>
+              <span>{{ clientServiceSubtitle }}</span>
             </div>
             <div
               v-if="isClientMenuView && !isOrderEditActive"
@@ -572,6 +561,7 @@
                     mr-2
                     ml-2
                     mt-2
+                    mb-2
                   "
                   no-gutters
                 >
@@ -633,7 +623,7 @@
                     </v-btn>
 
                     <v-btn
-                      class="cart-qty-btn mx-1"
+                      class="cart-qty-btn"
                       color="success"
                       fab
                       small
@@ -777,15 +767,11 @@
                 @click="btnOrder"
               >
                 <span class="cart-order-btn__label">
-                  {{ isClientMenuView ? 'Voir ma commande' : 'Commander' }}
+                  Commander
                 </span>
-                <span
-                  v-if="embeddedOrderEdit && isOrderEditActive"
-                  class="cart-order-btn__total"
-                >
+                <span class="cart-order-btn__total">
                   {{ formatCurrency(total) }}
                 </span>
-                <v-icon small right>mdi-silverware-fork-knife</v-icon>
               </v-btn>
               <v-btn
                 color="red lighten-1"
@@ -812,7 +798,7 @@
         @click="btnOrder"
       >
         <span class="client-mobile-checkout-count">
-          <v-icon color="white">mdi-shopping-outline</v-icon>
+          <v-icon color="primary">mdi-shopping-outline</v-icon>
           {{ idxCart }}
         </span>
         <span class="client-mobile-checkout-label">Voir ma commande</span>
@@ -1070,43 +1056,6 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog
-      v-if="isClientMenuView"
-      v-model="clientServiceDialog"
-      max-width="520"
-      persistent
-    >
-      <v-card class="client-service-dialog">
-        <v-card-title>Sur place ou a emporter</v-card-title>
-        <v-card-text>
-          <div class="client-service-grid">
-            <v-btn
-              class="client-service-tile text-none"
-              :class="{ 'client-service-tile--active': !clientIsTakeaway }"
-              :color="!clientIsTakeaway ? 'primary' : 'grey lighten-3'"
-              :dark="!clientIsTakeaway"
-              depressed
-              @click="selectClientService('dine_in')"
-            >
-              <v-icon class="mb-2" size="34">mdi-table-chair</v-icon>
-              <span>Sur place</span>
-            </v-btn>
-            <v-btn
-              class="client-service-tile text-none"
-              :class="{ 'client-service-tile--active': clientIsTakeaway }"
-              :color="clientIsTakeaway ? 'primary' : 'grey lighten-3'"
-              :dark="clientIsTakeaway"
-              depressed
-              @click="selectClientService('takeaway')"
-            >
-              <v-icon class="mb-2" size="34">mdi-shopping-outline</v-icon>
-              <span>A emporter</span>
-            </v-btn>
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-
     <v-dialog v-model="expressTableDialog" max-width="720">
       <v-card>
         <v-card-title>Choisir la table</v-card-title>
@@ -1297,8 +1246,6 @@ export default {
     allowRouteLeave: false,
     productViewMode: 'all',
     activeMobileCategory: null,
-    clientServiceDialog: false,
-    clientServiceMode: 'dine_in',
     activeExpressCategory: null,
     expressSelectedTable: parseInt(localStorage.getItem('service_point_id')) || null,
     expressCustomer: '',
@@ -1409,9 +1356,6 @@ export default {
     isClientMenuView() {
       return !this.isAdminView && !this.isOrderEditActive
     },
-    clientIsTakeaway() {
-      return this.clientServiceMode === 'takeaway'
-    },
     selectedClientTable() {
       const storedTable = process.client
         ? localStorage.getItem('service_point_id')
@@ -1424,16 +1368,12 @@ export default {
         }) || null
       )
     },
-    clientServiceTitle() {
-      return this.clientIsTakeaway ? 'A emporter' : 'Sur place'
-    },
     clientServiceSubtitle() {
-      if (this.clientIsTakeaway) return ''
       const tableName =
         (this.selectedClientTable && this.selectedClientTable.name) ||
         (process.client ? localStorage.getItem('service_point_name') : '') ||
         ''
-      return tableName ? `Table ${tableName}` : 'Table'
+      return tableName || ''
     },
     isLargeProductView() {
       return this.canUseLargeProductView && this.productViewMode === 'all'
@@ -1519,12 +1459,6 @@ export default {
   },
   async mounted() {
     this.loadPage = true
-    if (this.isClientMenuView) {
-      if (!this.loadClientServiceChoice()) {
-        this.resetClientServiceChoice()
-      }
-    }
-
     if (this.isOrderEditActive) {
       this.cartItem = JSON.parse(
         JSON.stringify(this.$store.get('cart/dataCart') || [])
@@ -1611,35 +1545,6 @@ export default {
     },
     setActiveMobileCategory(category) {
       this.activeMobileCategory = category
-    },
-    resetClientServiceChoice() {
-      this.clientServiceMode = 'dine_in'
-      this.persistClientServiceChoice()
-      this.clientServiceDialog = true
-    },
-    loadClientServiceChoice() {
-      if (!process.client) return false
-      const storedMode = localStorage.getItem('client_service_mode')
-      if (!['dine_in', 'takeaway'].includes(storedMode)) return false
-
-      this.clientServiceMode = storedMode
-      this.clientServiceDialog = false
-      return true
-    },
-    openClientServiceDialog() {
-      this.clientServiceDialog = true
-    },
-    selectClientService(mode) {
-      this.clientServiceMode = mode === 'takeaway' ? 'takeaway' : 'dine_in'
-      this.persistClientServiceChoice()
-      this.clientServiceDialog = false
-    },
-    persistClientServiceChoice() {
-      if (!process.client) return
-      localStorage.setItem(
-        'client_service_mode',
-        this.clientIsTakeaway ? 'takeaway' : 'dine_in'
-      )
     },
     scrollMobileCategories(direction) {
       const scroller = this.$refs.mobileCategoryBar
@@ -2291,68 +2196,13 @@ export default {
 }
 
 .menu-page-container--client {
-  background: #f6f8fb;
+  background: transparent;
   max-width: none;
   padding-top: 0 !important;
 }
 
-.client-service-banner {
-  align-items: center;
-  background: #ffffff;
-  border: 1px solid #e1e7ef;
-  border-radius: 8px;
-  color: #121826;
-  cursor: pointer;
-  display: flex;
-  gap: 14px;
-  margin: 10px auto 0;
-  max-width: 1180px;
-  min-height: 72px;
-  padding: 12px 18px;
-  text-align: left;
-  width: 100%;
-}
-
-.client-service-banner:focus-visible {
-  outline: 3px solid rgba(25, 118, 210, 0.28);
-  outline-offset: 2px;
-}
-
-.client-service-icon {
-  align-items: center;
-  background: #e8f2ff;
-  border-radius: 8px;
-  display: inline-flex;
-  flex: 0 0 auto;
-  height: 48px;
-  justify-content: center;
-  width: 48px;
-}
-
-.client-service-copy {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.client-service-copy strong {
-  font-size: 1.25rem;
-  font-weight: 900;
-  line-height: 1.15;
-  text-transform: uppercase;
-}
-
-.client-service-copy span {
-  color: rgba(18, 24, 38, 0.68);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.25;
-  margin-top: 4px;
-}
-
-.client-service-chevron {
-  flex: 0 0 auto;
+.menu-page-container--client .menu-panel-card {
+  overflow: visible;
 }
 
 .client-cart-summary {
@@ -2365,6 +2215,29 @@ export default {
   margin: -8px -8px 12px;
   min-height: 58px;
   padding: 12px 16px;
+}
+
+.client-cart-table {
+  align-items: center;
+  background: #e8f2ff;
+  border: 1px solid #d7e8fb;
+  border-radius: 8px;
+  color: #123a63;
+  display: flex;
+  gap: 8px;
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1.2;
+  margin: -2px 0 10px;
+  min-height: 46px;
+  padding: 10px 12px;
+}
+
+.client-cart-table span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .client-cart-summary div {
@@ -2387,31 +2260,18 @@ export default {
 
 .client-category-nav {
   align-items: center;
-  background: rgba(255, 255, 255, 0.96);
-  border-bottom: 1px solid #e8edf3;
+  background: #ffffff;
+  border-bottom: 0;
   display: flex;
   flex: 0 0 auto;
   gap: 12px;
-  margin: 0 -12px;
+  margin: 0 auto;
+  max-width: 1180px;
   padding: 12px 6vw;
   position: sticky;
   top: 0;
   z-index: 3;
-}
-
-.client-category-nav::after {
-  background: linear-gradient(
-    to bottom,
-    rgba(18, 24, 38, 0.08),
-    rgba(18, 24, 38, 0)
-  );
-  bottom: -10px;
-  content: '';
-  height: 10px;
-  left: 0;
-  pointer-events: none;
-  position: absolute;
-  right: 0;
+  width: 100%;
 }
 
 .client-category-arrow {
@@ -2435,6 +2295,11 @@ export default {
   min-height: 0;
 }
 
+.client-category-view .mobile-category-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .client-category-view .mobile-category-products {
   overflow-y: visible;
   padding: 28px 0;
@@ -2452,6 +2317,29 @@ export default {
   margin-right: auto;
   max-width: 980px;
   padding: 0 8px;
+}
+
+@media (min-width: 600px) {
+  .menu-page-container--client .menu-cart-column {
+    align-self: flex-start;
+  }
+
+  .menu-page-container--client .menu-cart-column .menu-panel-card {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 108px);
+    position: fixed;
+    right: 24px;
+    top: 92px;
+    width: min(calc(33.333vw - 32px), 420px);
+    z-index: 4;
+  }
+
+  .menu-page-container--client .menu-cart-column .express-cart-items-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 .client-product-quantity {
@@ -2483,10 +2371,10 @@ export default {
 }
 
 .client-mobile-checkout-button {
-  background: #ffe9b5 !important;
+  background: #1976d2 !important;
   border-radius: 8px !important;
   box-shadow: 0 8px 14px rgba(18, 24, 38, 0.18) !important;
-  color: #123a63 !important;
+  color: #ffffff !important;
   min-height: 64px !important;
   padding: 0 16px !important;
   transition: transform 180ms ease, box-shadow 180ms ease;
@@ -2506,9 +2394,9 @@ export default {
 
 .client-mobile-checkout-count {
   align-items: center;
-  background: #1976d2;
+  background: #ffffff;
   border-radius: 8px;
-  color: #ffffff;
+  color: #1976d2;
   display: inline-flex;
   font-size: 1.15rem;
   font-weight: 900;
@@ -2531,32 +2419,6 @@ export default {
   font-size: 1rem;
   font-weight: 900;
   white-space: nowrap;
-}
-
-.client-service-grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.client-service-tile {
-  border-radius: 8px !important;
-  flex-direction: column;
-  font-size: 1.05rem !important;
-  font-weight: 800 !important;
-  height: 118px !important;
-  min-width: 0 !important;
-}
-
-.client-service-tile--active {
-  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.42) !important;
-}
-
-.client-service-tile ::v-deep .v-btn__content {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  white-space: normal;
 }
 
 @keyframes client-cart-pop {
@@ -3015,20 +2877,21 @@ export default {
 
 .cart-item-actions {
   flex: 0 0 auto;
+  gap: 4px;
   white-space: nowrap;
 }
 
 .cart-action-btn {
-  height: 40px !important;
-  width: 40px !important;
+  height: 34px !important;
+  width: 34px !important;
 }
 
 .cart-qty-btn {
   box-shadow: none !important;
-  font-size: 1.08rem !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  width: 42px !important;
+  font-size: 1.12rem !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  width: 36px !important;
 }
 
 .express-empty-cart {
@@ -3072,6 +2935,7 @@ export default {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  padding-bottom: 14px;
   padding-right: 2px;
 }
 
@@ -3505,19 +3369,20 @@ export default {
   }
 
   .cart-item-actions {
+    gap: 4px;
     margin-left: 8px;
   }
 
   .cart-action-btn {
-    height: 40px !important;
-    width: 40px !important;
+    height: 34px !important;
+    width: 34px !important;
   }
 
   .cart-qty-btn {
-    font-size: 1.08rem !important;
-    height: 42px !important;
-    min-width: 42px !important;
-    width: 42px !important;
+    font-size: 1.12rem !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    width: 36px !important;
   }
 
   .cart-order-actions {
@@ -3560,24 +3425,19 @@ export default {
     padding-right: 0 !important;
   }
 
-  .client-service-banner {
-    margin: 10px 12px 0;
-    min-height: 72px;
-    padding: 12px 14px;
-    width: auto;
-  }
-
-  .client-service-copy strong {
-    font-size: 1.06rem;
-  }
-
-  .client-service-copy span {
-    font-size: 0.92rem;
+  .menu-page-container--client .menu-panel-card {
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .client-category-nav {
     margin: 0;
     padding: 10px 14px;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    z-index: 8;
   }
 
   .client-category-view .mobile-category-bar {
@@ -3592,7 +3452,10 @@ export default {
   }
 
   .client-category-view .mobile-category-products {
-    padding: 42px 22px 12px;
+    flex: 0 0 auto;
+    min-height: unset;
+    overflow-y: visible;
+    padding: 148px 22px 12px;
   }
 
   .client-category-view .mobile-category-title {
@@ -3645,10 +3508,6 @@ export default {
 }
 
 @media (max-width: 420px) {
-  .client-service-grid {
-    grid-template-columns: 1fr;
-  }
-
   .client-mobile-checkout-button {
     padding-left: 10px !important;
     padding-right: 10px !important;

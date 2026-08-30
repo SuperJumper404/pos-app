@@ -72,9 +72,39 @@ assert.match(detailSource, /orders\/refundStripeOrder/)
 assert.match(detailSource, /<span class="order-detail-header__label">Table<\/span>/)
 assert.match(detailSource, /{{ orderTableLabel }}/)
 assert.match(detailSource, /<span class="order-detail-header__label">Statut<\/span>/)
-assert.match(detailSource, /{{ orderStatusText }}/)
-assert.match(detailSource, /:color="orderStatusColor"/)
+assert.match(detailSource, /{{ detailStatusMeta\.label }}/)
+assert.match(detailSource, /:color="detailStatusMeta\.color"/)
+assert.match(
+  detailSource,
+  /class="order-payment-chip-icon"[\s\S]*?{{ detailStatusMeta\.icon }}/,
+  'order detail status chip must use the same dedicated icon spacing as ordersStatuses'
+)
+assert.match(
+  detailSource,
+  /detailStatusMeta\(\)[\s\S]*?icon:\s*'mdi-silverware-fork-knife'[\s\S]*?icon:\s*'mdi-check-decagram-outline'[\s\S]*?icon:\s*'mdi-close-octagon-outline'[\s\S]*?icon:\s*'mdi-timer-sand'/,
+  'order detail status chip must reuse the ordersStatuses status icons'
+)
 assert.match(detailSource, /service_point_name/)
+assert.match(
+  detailSource,
+  /paymentMeta\(item\)[\s\S]*?'mdi-check-circle-outline'[\s\S]*?'mdi-cash-register'[\s\S]*?'mdi-cash-clock'[\s\S]*?'mdi-timer-sand'[\s\S]*?'mdi-cash-refund'[\s\S]*?'mdi-alert-circle-outline'/,
+  'order detail payment chip must reuse the ordersStatuses payment icons'
+)
+assert.match(
+  detailSource,
+  /{{ detailPaymentMeta\.label }}/,
+  'order detail payment chip must render the mapped payment label'
+)
+assert.match(
+  detailSource,
+  /{{ detailPaymentMeta\.icon }}/,
+  'order detail payment chip must render the mapped payment icon'
+)
+assert.match(
+  detailSource,
+  /\.order-chip--payment[\s\S]*?height:\s*28px\s*!important/,
+  'order detail chips must use the same comfortable height as ordersStatuses chips'
+)
 assert.match(detailSource, /v-if="discountAmount > 0"/)
 assert.match(detailSource, /subtotalBeforeDiscount/)
 assert.match(detailSource, /discountLabel/)
@@ -82,9 +112,63 @@ assert.match(detailSource, /formatCurrency\(discountAmount\)/)
 assert.match(detailSource, /order-detail-discount/)
 assert.match(detailSource, /class="order-detail-action-bar"/)
 assert.match(detailSource, /class="order-detail-action order-detail-action--primary/)
-assert.match(detailSource, /\.order-detail-action-bar[\s\S]*grid-template-columns/)
-assert.match(detailSource, /\.order-detail-action[\s\S]*min-height:\s*72px/)
+assert.match(
+  detailSource,
+  /class="mt-5 order-detail-actions-card"/,
+  'order detail actions must keep their dedicated grey action rail'
+)
+assert.match(
+  detailSource,
+  /\.order-detail-actions-card[\s\S]*background:\s*#eef1f5\s*!important/,
+  'order detail actions must keep a visible grey background behind the buttons'
+)
+assert.doesNotMatch(
+  detailSource,
+  /class="order-detail-action[^"]*"[\s\S]{0,220}?outlined/,
+  'order detail action buttons must use filled colors instead of outlined buttons'
+)
+assert.doesNotMatch(
+  detailSource,
+  /color="error"[\s\S]{0,80}?outlined[\s\S]{0,120}?class="order-detail-action/,
+  'cancel order detail action must be a filled danger button'
+)
+assert.doesNotMatch(
+  detailSource,
+  /color="primaryPurple"[\s\S]{0,80}?outlined[\s\S]{0,120}?class="order-detail-action/,
+  'print order detail action must be a filled secondary button'
+)
+assert.match(
+  detailSource,
+  /\.order-detail-action-bar[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(150px,\s*220px\)\)/,
+  'desktop order detail actions must stay proportional instead of stretching across the whole row'
+)
+assert.match(
+  detailSource,
+  /\.order-detail-action-bar[\s\S]*justify-content:\s*end/,
+  'desktop order detail actions must align as compact controls'
+)
+assert.match(detailSource, /\.order-detail-action[\s\S]*min-height:\s*60px/)
+assert.match(
+  detailSource,
+  /\.order-detail-action[\s\S]*width:\s*100%/,
+  'order detail actions must fill their bounded grid cell'
+)
 assert.match(detailSource, /\.order-detail-action-bar[\s\S]*@media[\s\S]*grid-template-columns:\s*repeat\(2/)
+assert.match(
+  detailSource,
+  /@media \(max-width:\s*600px\)[\s\S]*\.order-detail-action-bar[\s\S]*justify-content:\s*stretch/,
+  'mobile order detail actions must keep comfortable full-width tap targets'
+)
+assert.match(
+  detailSource,
+  /\.order-detail-action__icon[\s\S]*font-size:\s*22px/,
+  'order detail action icons must stay proportional to compact buttons'
+)
+assert.doesNotMatch(
+  detailSource,
+  /\.order-detail-action--back\s*\{[\s\S]*?grid-column:\s*1 \/ -1/,
+  'mobile order detail back action must not span the whole row'
+)
 assert.match(orderTicketSource, /buildOrderTicketPayload/)
 assert.match(orderTicketSource, /sendOrderTicket/)
 assert.match(orderTicketSource, /ticketType: 'commande'/)

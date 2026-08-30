@@ -31,8 +31,17 @@
             </div>
             <div class="order-detail-header__field">
               <span class="order-detail-header__label">Statut</span>
-              <v-chip small dark :color="orderStatusColor">
-                {{ orderStatusText }}
+              <v-chip
+                small
+                label
+                dark
+                :color="detailStatusMeta.color"
+                :class="['order-chip', `order-chip--${detailStatusMeta.key}`]"
+              >
+                <v-icon left size="16" class="order-payment-chip-icon">
+                  {{ detailStatusMeta.icon }}
+                </v-icon>
+                {{ detailStatusMeta.label }}
               </v-chip>
             </div>
             <div
@@ -42,10 +51,15 @@
               <span class="order-detail-header__label">Paiement</span>
               <v-chip
                 small
+                label
                 dark
-                :color="paymentStatusColor(orderPaymentStatus)"
+                :color="detailPaymentMeta.color"
+                class="order-chip order-chip--payment"
               >
-                {{ paymentStatusText(orderPaymentStatus) }}
+                <v-icon left size="16" class="order-payment-chip-icon">
+                  {{ detailPaymentMeta.icon }}
+                </v-icon>
+                {{ detailPaymentMeta.label }}
               </v-chip>
             </div>
             <div class="order-detail-header__field">
@@ -207,7 +221,7 @@
         <v-btn
           v-if="canCancelOrder && !loadPage"
           color="error"
-          outlined
+          depressed
           class="order-detail-action order-detail-action--danger text-none"
           :disabled="statusActionLoading"
           @click="openCancelDialog"
@@ -230,7 +244,7 @@
         <v-btn
           v-if="canUseStaffOrderActions && orderSummary && !loadPage"
           color="primaryPurple"
-          outlined
+          depressed
           class="order-detail-action order-detail-action--secondary text-none"
           :loading="orderPrintLoading"
           :disabled="orderPrintLoading"
@@ -242,6 +256,7 @@
         <v-btn
           v-if="canUseStaffOrderActions && canOpenOrderEditModal && !loadPage"
           color="success"
+          depressed
           class="order-detail-action order-detail-action--secondary text-none"
           :loading="startLoading"
           :disabled="startLoading"
@@ -253,6 +268,7 @@
         <v-btn
           v-if="canUseStaffOrderActions && canStartComplementaryOrder && !loadPage"
           color="success"
+          depressed
           class="order-detail-action order-detail-action--secondary text-none"
           :loading="startLoading"
           :disabled="startLoading"
@@ -263,6 +279,7 @@
         </v-btn>
         <v-btn
           color="primary"
+          depressed
           class="order-detail-action order-detail-action--back text-none"
           @click="$router.go(-1)"
         >
@@ -663,6 +680,41 @@ export default {
         colors[Number(this.orderSummary && this.orderSummary.status)] ||
         'grey'
       )
+    },
+    detailStatusMeta() {
+      switch (Number(this.orderSummary && this.orderSummary.status)) {
+        case 2:
+          return {
+            key: 'preparing',
+            label: 'En préparation',
+            color: 'success',
+            icon: 'mdi-silverware-fork-knife',
+          }
+        case 3:
+          return {
+            key: 'done',
+            label: 'Terminée',
+            color: 'primary',
+            icon: 'mdi-check-decagram-outline',
+          }
+        case 4:
+          return {
+            key: 'canceled',
+            label: 'Annulée',
+            color: 'warning',
+            icon: 'mdi-close-octagon-outline',
+          }
+        default:
+          return {
+            key: 'received',
+            label: 'En attente',
+            color: 'grey',
+            icon: 'mdi-timer-sand',
+          }
+      }
+    },
+    detailPaymentMeta() {
+      return this.paymentMeta(this.orderPaymentStatus || {})
     },
     currentUser() {
       return this.$store.get('users/user') || {}
@@ -1218,6 +1270,48 @@ export default {
     paymentStatusColor(item) {
       return getPaymentStatusColor(item)
     },
+    paymentMeta(item) {
+      switch (item.payment_status) {
+        case 'paid':
+          return {
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
+            icon: 'mdi-check-circle-outline',
+          }
+        case 'unpaid':
+          return {
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
+            icon: /comptoir/i.test(item.payment || '')
+              ? 'mdi-cash-register'
+              : 'mdi-cash-clock',
+          }
+        case 'requires_payment':
+          return {
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
+            icon: 'mdi-timer-sand',
+          }
+        case 'refunded':
+          return {
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
+            icon: 'mdi-cash-refund',
+          }
+        case 'failed':
+          return {
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
+            icon: 'mdi-alert-circle-outline',
+          }
+        default:
+          return {
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
+            icon: 'mdi-credit-card-outline',
+          }
+      }
+    },
   },
 }
 </script>
@@ -1317,10 +1411,63 @@ export default {
 
 .order-detail-header__field .v-chip {
   align-self: center;
-  font-size: 11px;
-  height: 24px;
   max-width: 100%;
-  padding: 0 8px;
+}
+
+.order-chip {
+  border-radius: 999px !important;
+  font-size: 0.74rem !important;
+  font-weight: 900 !important;
+  height: 28px !important;
+  letter-spacing: 0;
+  padding: 0 12px !important;
+}
+
+.order-chip ::v-deep .v-chip__content,
+.order-chip .v-icon {
+  color: inherit !important;
+}
+
+.order-chip--received,
+.order-chip--waiting {
+  background: #8a94a6 !important;
+  color: #ffffff !important;
+}
+
+.order-chip--preparing,
+.order-chip--paid {
+  background: #00d97e !important;
+  color: #ffffff !important;
+}
+
+.order-chip--done {
+  background: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+.order-chip--canceled,
+.order-chip--counter,
+.order-chip--refunded {
+  background: #ff9f0a !important;
+  color: #ffffff !important;
+}
+
+.order-chip--failed {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.order-chip--payment {
+  height: 28px !important;
+  max-width: 100%;
+  padding: 0 12px !important;
+}
+
+.order-payment-chip-icon {
+  flex: 0 0 auto;
+  margin-left: -1px !important;
+  margin-right: 6px !important;
+  overflow: visible;
 }
 
 .order-detail-header__label {
@@ -1520,13 +1667,15 @@ export default {
 }
 
 .order-detail-actions-card {
+  background: #eef1f5 !important;
   border-radius: 12px !important;
 }
 
 .order-detail-action-bar {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 220px));
+  justify-content: end;
   padding: 12px !important;
 }
 
@@ -1535,28 +1684,29 @@ export default {
   border-radius: 10px !important;
   display: flex !important;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   height: auto !important;
   justify-content: center;
   margin: 0 !important;
-  min-height: 72px !important;
-  padding: 12px 10px !important;
+  min-height: 60px !important;
+  padding: 8px 10px !important;
   text-align: center;
   white-space: normal !important;
+  width: 100%;
 }
 
 .order-detail-action ::v-deep .v-btn__content {
   align-items: center;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   white-space: normal;
 }
 
 .order-detail-action__icon {
-  font-size: 28px !important;
-  height: 28px;
+  font-size: 22px !important;
+  height: 22px;
   margin: 0 !important;
-  width: 28px;
+  width: 22px;
 }
 
 .order-detail-action__label {
@@ -1568,7 +1718,7 @@ export default {
 .order-detail-action--primary {
   font-size: 16px !important;
   font-weight: 700;
-  min-height: 84px !important;
+  min-height: 64px !important;
 }
 
 .order-payment-total {
@@ -1657,20 +1807,17 @@ export default {
   .order-detail-action-bar {
     gap: 10px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
     padding: 10px !important;
   }
 
   .order-detail-action {
     font-size: 13px;
-    min-height: 78px !important;
+    min-height: 60px !important;
   }
 
   .order-detail-action--primary {
-    min-height: 84px !important;
-  }
-
-  .order-detail-action--back {
-    grid-column: 1 / -1;
+    min-height: 64px !important;
   }
 
   .order-detail-item {

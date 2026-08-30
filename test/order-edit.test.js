@@ -204,6 +204,30 @@ const takeawayChipSource = fs.readFileSync(
   'utf8'
 )
 assert.ok(takeawayChipSource.includes('À emporter'))
+assert.ok(
+  takeawayChipSource.includes('class="takeaway-chip order-chip order-chip--service"'),
+  'takeaway chip must reuse the ordersStatuses service chip classes'
+)
+assert.match(
+  takeawayChipSource,
+  /<v-icon[\s\S]*?class="order-payment-chip-icon takeaway-chip__icon"/,
+  'takeaway chip must reuse the ordersStatuses chip icon spacing class'
+)
+assert.match(
+  takeawayChipSource,
+  /\.takeaway-chip[\s\S]*?height:\s*28px\s*!important/,
+  'takeaway chip must keep the same comfortable height as ordersStatuses chips'
+)
+assert.match(
+  takeawayChipSource,
+  /\.takeaway-chip[\s\S]*?padding:\s*0 12px\s*!important/,
+  'takeaway chip must keep the same horizontal padding as ordersStatuses chips'
+)
+assert.match(
+  takeawayChipSource,
+  /\.order-payment-chip-icon[\s\S]*?margin-right:\s*6px\s*!important/,
+  'takeaway chip icon must use the ordersStatuses icon spacing'
+)
 const takeawayChipOptions = loadVueComponentOptions(takeawayChipSource)
 assert.ok(
   takeawayChipOptions.props.showDineIn,

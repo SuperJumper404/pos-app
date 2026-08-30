@@ -742,8 +742,7 @@ export default {
       return
     }
     if (this.isQrClient) {
-      this.formuser.isTakeaway =
-        localStorage.getItem('client_service_mode') === 'takeaway'
+      this.formuser.isTakeaway = false
     }
     const restoredCheckout = await this.restoreCheckoutFromStore()
     if (!restoredCheckout) this.total = this.totalCart

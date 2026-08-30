@@ -579,13 +579,13 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.cart-action-btn[\s\S]*?height:\s*40px[\s\S]*?width:\s*40px/,
-  'express cart quantity actions must stay comfortable on tablet'
+  /\.cart-action-btn[\s\S]*?height:\s*34px[\s\S]*?width:\s*34px/,
+  'express cart quantity actions must keep the lighter compact design'
 )
 assert.match(
   menusSource,
-  /\.cart-qty-btn[\s\S]*?height:\s*42px[\s\S]*?width:\s*42px/,
-  'express cart quantity pill must stay readable on tablet'
+  /\.cart-qty-btn[\s\S]*?height:\s*36px[\s\S]*?width:\s*36px/,
+  'express cart quantity pill must stay readable without overpowering the row'
 )
 assert.match(
   menusSource,
