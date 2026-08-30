@@ -59,8 +59,9 @@
             <v-chip
               small
               label
+              dark
+              :color="paymentMeta(item).color"
               class="order-chip order-chip--payment"
-              :class="paymentMeta(item).className"
             >
               <v-icon left size="16" class="order-payment-chip-icon">
                 {{ paymentMeta(item).icon }}
@@ -161,6 +162,7 @@ import price from '@/helpers/price'
 import moment from 'moment'
 const {
   getPaymentStatusText,
+  getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
 
 export default {
@@ -253,11 +255,13 @@ export default {
       return this.$store.get('orders/dataOrdersByUserId') || []
     },
     dataOrdersFilteredByOrdersSent() {
+      const sentOrders = this.dataOrders.filter(this.orderIsSent)
+
       if (localStorage.getItem('access') !== '3') {
-        return this.dataOrders
+        return sentOrders
       }
       const ids = (this.allOrdersSent || []).map((x) => String(x))
-      return this.dataOrders.filter((order) => ids.includes(String(order.id)))
+      return sentOrders.filter((order) => ids.includes(String(order.id)))
     },
     currentOrdersCount() {
       const orders = this.dataOrdersFilteredByOrdersSent
@@ -330,6 +334,9 @@ export default {
     canCancelOrder(item) {
       return ![0, 2, 3, 4].includes(Number(item.status))
     },
+    orderIsSent(order) {
+      return Number(order.status) !== 0
+    },
     paymentStatusText(item) {
       return getPaymentStatusText(item)
     },
@@ -372,45 +379,44 @@ export default {
       return [true, 1, '1'].includes(item.is_takeaway)
     },
     paymentMeta(item) {
-      const label = this.paymentSummary(item)
       switch (item.payment_status) {
         case 'paid':
           return {
-            label,
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
             icon: 'mdi-check-circle-outline',
-            className: 'order-chip--paid',
           }
         case 'unpaid':
           return {
-            label,
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
             icon: /comptoir/i.test(item.payment || '')
               ? 'mdi-cash-register'
               : 'mdi-cash-clock',
-            className: 'order-chip--counter',
           }
         case 'requires_payment':
           return {
-            label,
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
             icon: 'mdi-timer-sand',
-            className: 'order-chip--waiting',
           }
         case 'refunded':
           return {
-            label,
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
             icon: 'mdi-cash-refund',
-            className: 'order-chip--refunded',
           }
         case 'failed':
           return {
-            label,
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
             icon: 'mdi-alert-circle-outline',
-            className: 'order-chip--failed',
           }
         default:
           return {
-            label,
+            label: getPaymentStatusText(item),
+            color: getPaymentStatusColor(item),
             icon: 'mdi-credit-card-outline',
-            className: 'order-chip--waiting',
           }
       }
     },

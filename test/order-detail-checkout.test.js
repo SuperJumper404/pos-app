@@ -25,7 +25,7 @@ const {
   sendOrderTicket,
 } = require('../helpers/orderTicket')
 
-assert.match(detailSource, /v-if="canCollectOrder[^"]*"/)
+assert.match(detailSource, /v-if="canUseStaffOrderActions && canCollectOrder[^"]*"/)
 assert.match(detailSource, /@click="openPaymentDialog"/)
 assert.match(detailSource, /v-model="paymentDialog"/)
 assert.match(detailSource, /v-for="method in paymentMethods"/)
@@ -42,12 +42,29 @@ assert.doesNotMatch(detailSource, /orders\/archiveOrder/)
 assert.match(detailSource, /discountType: this\.archiveDiscountType/)
 assert.match(detailSource, /discountValue: this\.archiveDiscountValue/)
 assert.match(detailSource, /@click="printOrderTicket"/)
-assert.match(detailSource, /v-if="canApproveOrder[^"]*"/)
+assert.match(detailSource, /canUseStaffOrderActions/)
+assert.match(detailSource, /v-if="canUseStaffOrderActions && canApproveOrder[^"]*"/)
 assert.match(detailSource, /@click="approveOrder"/)
-assert.match(detailSource, /v-if="canFinishOrder[^"]*"/)
+assert.match(detailSource, /v-if="canUseStaffOrderActions && canFinishOrder[^"]*"/)
 assert.match(detailSource, /@click="finishOrder"/)
+assert.match(
+  detailSource,
+  /async updateOrderStatus\(status\)[\s\S]*?!this\.canUseStaffOrderActions/,
+  'client order detail must not be able to call staff status updates'
+)
 assert.match(detailSource, /v-if="canCancelOrder[^"]*"/)
 assert.match(detailSource, /@click="openCancelDialog"/)
+assert.doesNotMatch(
+  detailSource,
+  /v-if="canUseStaffOrderActions && canCancelOrder[^"]*"/,
+  'client order detail must keep cancellation available outside staff-only actions'
+)
+assert.match(detailSource, /isQrClientAccess\(this\.userAccess\)/)
+assert.match(
+  detailSource,
+  /printOrderTicket\(\)[\s\S]*?!this\.canUseStaffOrderActions/,
+  'client order detail must not be able to print staff order tickets'
+)
 assert.match(detailSource, /v-model="cancelOrderDialog"/)
 assert.match(detailSource, /confirmCancelOrder/)
 assert.match(detailSource, /orders\/updateOrder/)

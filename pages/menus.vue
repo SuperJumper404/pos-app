@@ -760,7 +760,11 @@
               </div>
             </div>
             <v-card-actions
-              v-if="cartItem.length > 0 && !isLargeProductView"
+              v-if="
+                cartItem.length > 0 &&
+                (!isLargeProductView ||
+                  (embeddedOrderEdit && isOrderEditActive))
+              "
               class="cart-order-actions"
             >
               <v-btn
@@ -771,9 +775,18 @@
                   font-weight-bold
                 "
                 @click="btnOrder"
-                >{{ isClientMenuView ? 'Voir ma commande' : 'Commander' }}
-                <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
+                <span class="cart-order-btn__label">
+                  {{ isClientMenuView ? 'Voir ma commande' : 'Commander' }}
+                </span>
+                <span
+                  v-if="embeddedOrderEdit && isOrderEditActive"
+                  class="cart-order-btn__total"
+                >
+                  {{ formatCurrency(total) }}
+                </span>
+                <v-icon small right>mdi-silverware-fork-knife</v-icon>
+              </v-btn>
               <v-btn
                 color="red lighten-1"
                 class="cart-order-btn cart-order-btn--cancel text-none"
@@ -3081,7 +3094,24 @@ export default {
 }
 
 .cart-order-btn ::v-deep .v-btn__content {
+  align-items: center;
+  display: flex;
+  gap: 8px;
   min-width: 0;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.cart-order-btn__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-order-btn__total {
+  font-size: 1.02rem;
+  font-weight: 900;
+  margin-left: auto;
   white-space: nowrap;
 }
 

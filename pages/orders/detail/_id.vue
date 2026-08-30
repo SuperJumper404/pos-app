@@ -181,7 +181,7 @@
     <v-card color="grey lighten-3" class="mt-5 order-detail-actions-card">
       <v-card-actions class="order-detail-action-bar">
         <v-btn
-          v-if="canApproveOrder && !loadPage"
+          v-if="canUseStaffOrderActions && canApproveOrder && !loadPage"
           color="primary"
           depressed
           class="order-detail-action order-detail-action--success text-none"
@@ -193,7 +193,7 @@
           <span class="order-detail-action__label">Valider</span>
         </v-btn>
         <v-btn
-          v-if="canFinishOrder && !loadPage"
+          v-if="canUseStaffOrderActions && canFinishOrder && !loadPage"
           color="success"
           depressed
           class="order-detail-action order-detail-action--success text-none"
@@ -216,7 +216,7 @@
           <span class="order-detail-action__label">{{ cancelActionLabel }}</span>
         </v-btn>
         <v-btn
-          v-if="canCollectOrder && !loadPage"
+          v-if="canUseStaffOrderActions && canCollectOrder && !loadPage"
           color="success"
           depressed
           class="order-detail-action order-detail-action--primary text-none"
@@ -228,7 +228,7 @@
           <span class="order-detail-action__label">Encaisser</span>
         </v-btn>
         <v-btn
-          v-if="orderSummary && !loadPage"
+          v-if="canUseStaffOrderActions && orderSummary && !loadPage"
           color="primaryPurple"
           outlined
           class="order-detail-action order-detail-action--secondary text-none"
@@ -240,7 +240,7 @@
           <span class="order-detail-action__label">Imprimer ticket de commande</span>
         </v-btn>
         <v-btn
-          v-if="canOpenOrderEditModal && !loadPage"
+          v-if="canUseStaffOrderActions && canOpenOrderEditModal && !loadPage"
           color="success"
           class="order-detail-action order-detail-action--secondary text-none"
           :loading="startLoading"
@@ -251,7 +251,7 @@
           <span class="order-detail-action__label">Modifier</span>
         </v-btn>
         <v-btn
-          v-if="canStartComplementaryOrder && !loadPage"
+          v-if="canUseStaffOrderActions && canStartComplementaryOrder && !loadPage"
           color="success"
           class="order-detail-action order-detail-action--secondary text-none"
           :loading="startLoading"
@@ -520,6 +520,7 @@ import {
   buildOrderTicketPayload,
   sendOrderTicket,
 } from '@/helpers/orderTicket'
+import { isQrClientAccess } from '@/helpers/checkoutAccess'
 const {
   canEditOrder: isOrderEditable,
   canStartComplementaryOrder: canCreateComplementaryOrder,
@@ -595,11 +596,20 @@ export default {
           : user.access
       return Number(access)
     },
+    isQrClientOrderDetail() {
+      return isQrClientAccess(this.userAccess)
+    },
+    canUseStaffOrderActions() {
+      return !this.isQrClientOrderDetail
+    },
     canOpenOrderEditModal() {
       return canUseOrderEditModal(this.userAccess, this.orderSummary || {})
     },
     canStartComplementaryOrder() {
-      return canCreateComplementaryOrder(this.orderSummary || {})
+      return (
+        this.canUseStaffOrderActions &&
+        canCreateComplementaryOrder(this.orderSummary || {})
+      )
     },
     hasLocalCart() {
       const cart = this.$store.get('cart/dataCart')
@@ -677,10 +687,12 @@ export default {
       )
     },
     cancelActionLabel() {
-      return this.isStripeRefund ? 'Rembourser' : 'Annuler'
+      return this.isQrClientOrderDetail || !this.isStripeRefund
+        ? 'Annuler'
+        : 'Rembourser'
     },
     cancelActionMessage() {
-      return this.isStripeRefund
+      return !this.isQrClientOrderDetail && this.isStripeRefund
         ? 'Êtes-vous sûr de vouloir rembourser cette commande ?'
         : 'Êtes-vous sûr de vouloir annuler cette commande ?'
     },
@@ -721,7 +733,8 @@ export default {
     },
     canCollectOrder() {
       return Boolean(
-        this.orderSummary &&
+        this.canUseStaffOrderActions &&
+          this.orderSummary &&
           ['unpaid', 'requires_payment'].includes(
             this.orderSummary.payment_status
           )
@@ -966,7 +979,11 @@ export default {
       this.loadOrderDetail(this.id)
     },
     async updateOrderStatus(status) {
-      if (this.statusActionLoading || !this.orderSummary) return false
+      if (
+        !this.canUseStaffOrderActions ||
+        this.statusActionLoading ||
+        !this.orderSummary
+      ) return false
       this.statusActionLoading = true
       try {
         const result = await this.$store.dispatch('orders/updateOrder', {
@@ -1019,7 +1036,7 @@ export default {
       this.statusActionLoading = true
       try {
         let result
-        if (this.isStripeRefund) {
+        if (!this.isQrClientOrderDetail && this.isStripeRefund) {
           result = await this.$store.dispatch('orders/refundStripeOrder', {
             id: this.orderSummary.id,
           })
@@ -1148,7 +1165,11 @@ export default {
       }
     },
     printOrderTicket() {
-      if (this.orderPrintLoading || !this.orderSummary) return
+      if (
+        !this.canUseStaffOrderActions ||
+        this.orderPrintLoading ||
+        !this.orderSummary
+      ) return
       this.orderPrintLoading = true
       try {
         sendOrderTicket({

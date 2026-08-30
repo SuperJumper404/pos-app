@@ -273,11 +273,15 @@ assert.ok(
   'a paid Stripe order must expose the complementary-order action'
 )
 assert.ok(
-  detailSource.includes('v-if="canOpenOrderEditModal && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canOpenOrderEditModal && !loadPage"'
+  ),
   'the edit action must keep the kitchen and helper eligibility guards'
 )
 assert.ok(
-  detailSource.includes('v-if="canStartComplementaryOrder && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canStartComplementaryOrder && !loadPage"'
+  ),
   'the complementary action must keep the Stripe paid eligibility guard'
 )
 assert.ok(
@@ -386,11 +390,15 @@ assert.ok(
   'the loading state must be cleared after successful and failed requests'
 )
 assert.ok(
-  detailSource.includes('v-if="canOpenOrderEditModal && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canOpenOrderEditModal && !loadPage"'
+  ),
   'the edit action must be hidden while another detail is loading'
 )
 assert.ok(
-  detailSource.includes('v-if="canStartComplementaryOrder && !loadPage"'),
+  detailSource.includes(
+    'v-if="canUseStaffOrderActions && canStartComplementaryOrder && !loadPage"'
+  ),
   'the complementary action must be hidden while another detail is loading'
 )
 
@@ -442,6 +450,16 @@ assert.ok(
 assert.ok(
   cartSource.includes('Enregistrer les modifications'),
   'the cart primary action must describe the order edit save'
+)
+assert.ok(
+  menusSource.includes('cart-order-actions') &&
+    menusSource.includes('embeddedOrderEdit && isOrderEditActive') &&
+    menusSource.includes('formatCurrency(total)'),
+  'embedded order edit menu must reuse the standard cart action button with the total'
+)
+assert.ok(
+  !menusSource.includes('order-edit-checkout'),
+  'embedded order edit menu must not use a separate checkout block'
 )
 assert.ok(
   cartSource.includes("'orderEdit/retryPayment'"),

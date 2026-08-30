@@ -82,14 +82,20 @@ assert.match(
 
 assert.match(
   source,
-  /payment_status\) \{[\s\S]*?case 'refunded':[\s\S]*?icon: 'mdi-cash-refund'[\s\S]*?className: 'order-chip--refunded'/,
-  'refunded payment chip must keep the previous refund icon'
+  /getPaymentStatusText,\s*[\s\S]*?getPaymentStatusColor,/,
+  'orders status payment chips must reuse the same payment display helpers as the orders page'
 )
 
 assert.match(
   source,
-  /\.order-chip--canceled,\s*[\s\S]*?\.order-chip--counter,\s*[\s\S]*?\.order-chip--refunded\s*\{[\s\S]*?background:\s*#ff9f0a/,
-  'refunded payment chip must keep the previous orange color'
+  /:color="paymentMeta\(item\)\.color"/,
+  'payment chips must use the official payment status color'
+)
+
+assert.match(
+  source,
+  /label:\s*getPaymentStatusText\(item\)/,
+  'payment chips must use the official payment status label'
 )
 
 assert.match(
@@ -126,6 +132,24 @@ assert.match(
   source,
   /currentOrdersCount\(\)/,
   'orders status page must expose the number of active orders'
+)
+
+assert.match(
+  source,
+  /orderIsSent\(order\)/,
+  'orders status page must centralize the sent-order filter'
+)
+
+assert.match(
+  source,
+  /Number\(order\.status\)\s*!==\s*0/,
+  'orders status page must hide draft status 0 orders'
+)
+
+assert.match(
+  source,
+  /this\.dataOrders\.filter\(this\.orderIsSent\)/,
+  'staff orders status view must not display status 0 ghost orders'
 )
 
 assert.match(
