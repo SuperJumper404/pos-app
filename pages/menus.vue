@@ -1,5 +1,10 @@
 <template>
-  <v-container :class="{ 'menu-page-container--express': isLargeProductView }">
+  <v-container
+    :class="{
+      'menu-page-container--express': isLargeProductView,
+      'menu-page-container--client': isClientMenuView,
+    }"
+  >
     <v-alert :value="alert" :type="alertType" dismissible>{{
       alertText
     }}</v-alert>
@@ -11,6 +16,25 @@
     >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
+    <button
+      v-if="isClientMenuView"
+      class="client-service-banner"
+      type="button"
+      @click="openClientServiceDialog"
+    >
+      <span class="client-service-icon">
+        <v-icon color="primary" size="32">
+          {{ clientIsTakeaway ? 'mdi-shopping-outline' : 'mdi-table-chair' }}
+        </v-icon>
+      </span>
+      <span class="client-service-copy">
+        <strong>{{ clientServiceTitle }}</strong>
+        <span v-if="clientServiceSubtitle">{{ clientServiceSubtitle }}</span>
+      </span>
+      <v-icon color="primary" class="client-service-chevron">
+        mdi-chevron-down
+      </v-icon>
+    </button>
     <v-row
       class="menu-content-row mt-5"
       :class="{ 'menu-content-row--express': isLargeProductView }"
@@ -77,7 +101,7 @@
                       v-on="on"
                     >
                       <v-icon class="express-command-icon express-command-icon--orders">
-                        mdi-clipboard-list-outline
+                        mdi-order-bool-descending
                       </v-icon>
                     </v-btn>
                   </template>
@@ -162,24 +186,67 @@
           </div>
 
           <template v-else>
-            <div class="mobile-category-view d-sm-none">
-              <div class="mobile-category-bar">
-                <v-chip
-                  v-for="category in categories"
-                  :key="category"
-                  class="mobile-category-chip"
-                  :class="{
-                    'mobile-category-chip--active':
-                      category === activeMobileCategory,
-                  }"
-                  :outlined="category === activeMobileCategory"
-                  text-color="black"
-                  label
-                  small
-                  @click="scrollToMobileCategory(category)"
+            <div
+              class="mobile-category-view"
+              :class="{
+                'd-sm-none': !isClientMenuView,
+                'client-category-view': isClientMenuView,
+              }"
+            >
+              <div
+                class="client-category-nav"
+                role="navigation"
+                aria-label="Categories du menu"
+              >
+                <v-btn
+                  icon
+                  outlined
+                  class="client-category-arrow"
+                  aria-label="Categorie precedente"
+                  @click="scrollMobileCategories(-1)"
                 >
-                  {{ category }}
-                </v-chip>
+                  <v-icon>mdi-arrow-left</v-icon>
+                </v-btn>
+                <div ref="mobileCategoryBar" class="mobile-category-bar">
+                  <v-chip
+                    v-for="category in categories"
+                    :key="category"
+                    class="mobile-category-chip"
+                    :class="{
+                      'mobile-category-chip--active':
+                        category === activeMobileCategory,
+                    }"
+                    :outlined="false"
+                    :text-color="
+                      category === activeMobileCategory ? 'white' : '#121826'
+                    "
+                    label
+                    small
+                    @click="scrollToMobileCategory(category)"
+                  >
+                    <v-avatar
+                      v-if="categoryImage(category)"
+                      left
+                      size="28"
+                      class="mobile-category-image"
+                    >
+                      <v-img
+                        :src="categoryImageSrc(categoryImage(category))"
+                        :alt="category"
+                      />
+                    </v-avatar>
+                    {{ category }}
+                  </v-chip>
+                </div>
+                <v-btn
+                  icon
+                  outlined
+                  class="client-category-arrow"
+                  aria-label="Categorie suivante"
+                  @click="scrollMobileCategories(1)"
+                >
+                  <v-icon>mdi-arrow-right</v-icon>
+                </v-btn>
               </div>
 
               <div ref="mobileCategoryProducts" class="mobile-category-products">
@@ -201,6 +268,11 @@
                     <v-card
                       outlined
                       class="d-flex flex-column product-card product-clickable"
+                      :class="{
+                        'product-card--client': isClientMenuView,
+                        'product-card--in-cart':
+                          productCartQuantity(items) > 0,
+                      }"
                       @click="openProductPreview(items)"
                     >
                       <!-- Image -->
@@ -210,6 +282,12 @@
                         class="product-card-image rounded-t"
                         @click.stop="openProductPreview(items)"
                       />
+                      <div
+                        v-if="isClientMenuView && productCartQuantity(items) > 0"
+                        class="client-product-quantity"
+                      >
+                        {{ productCartQuantity(items) }}
+                      </div>
 
                       <!-- Title -->
                       <v-card-title class="product-card-title py-2 pb-0 mb-0">
@@ -273,7 +351,7 @@
               </div>
             </div>
 
-            <v-expansion-panels class="d-none d-sm-block">
+            <v-expansion-panels v-if="!isClientMenuView" class="d-none d-sm-block">
               <v-expansion-panel v-for="(category, i) in categories" :key="i">
                 <v-expansion-panel-header
                   ><h3>{{ category }}</h3></v-expansion-panel-header
@@ -414,7 +492,12 @@
           
         </v-card> -->
       </v-col>
-      <v-col sm="5" md="4" cols="12">
+      <v-col
+        sm="5"
+        md="4"
+        cols="12"
+        :class="{ 'd-none d-sm-block': isClientMenuView }"
+      >
         <!-- <v-col md="4" class="d-none d-sm-none d-md-block"> -->
         <v-card v-if="loadPage" outlined height="425px">
           <Loading />
@@ -449,6 +532,18 @@
                   <v-icon small>mdi-cart-outline</v-icon>
                 </v-btn>
               </div>
+            </div>
+            <div
+              v-if="isClientMenuView && !isOrderEditActive"
+              class="client-cart-summary"
+            >
+              <div>
+                <strong>Votre panier</strong>
+                <span>
+                  {{ idxCart }} article{{ idxCart > 1 ? 's' : '' }}
+                </span>
+              </div>
+              <v-icon color="primary">mdi-cart-outline</v-icon>
             </div>
             <div class="express-cart-items-scroll">
             <div
@@ -562,15 +657,25 @@
                   </v-col>
                 </v-row>
 
-                <v-col>
-                  <v-chip
-                    v-for="choice in itm.selections || []"
-                    :key="choice.product_step_choice_id"
-                    class="mr-1 mt-1"
+                <div
+                  v-if="cartLineCustomizationGroups(itm).length"
+                  class="cart-item-customizations"
+                >
+                  <div
+                    v-for="group in cartLineCustomizationGroups(itm)"
+                    :key="group.stepId || group.stepName"
+                    class="cart-item-customization-row"
                   >
-                    {{ choice.choice_name || choice.name }}
-                  </v-chip>
-                </v-col>
+                    <span class="cart-item-customization-step">
+                      {{ group.stepName }}
+                    </span>
+                    <span class="cart-item-customization-choice">
+                      {{
+                        group.choices.map((choice) => choice.name).join(', ')
+                      }}
+                    </span>
+                  </div>
+                </div>
               </v-card>
             </div>
             </div>
@@ -666,7 +771,7 @@
                   font-weight-bold
                 "
                 @click="btnOrder"
-                >Commander
+                >{{ isClientMenuView ? 'Voir ma commande' : 'Commander' }}
                 <v-icon small right>mdi-silverware-fork-knife</v-icon></v-btn
               >
               <v-btn
@@ -681,6 +786,26 @@
         </div>
       </v-col>
     </v-row>
+    <div
+      v-if="isClientMenuView && cartItem.length > 0"
+      class="client-mobile-checkout d-sm-none"
+    >
+      <v-btn
+        block
+        depressed
+        class="client-mobile-checkout-button text-none"
+        :class="{ 'client-mobile-checkout-button--pulse': clientCartPulse }"
+        :disabled="isKitchenClosed && !isOrderEditActive"
+        @click="btnOrder"
+      >
+        <span class="client-mobile-checkout-count">
+          <v-icon color="white">mdi-shopping-outline</v-icon>
+          {{ idxCart }}
+        </span>
+        <span class="client-mobile-checkout-label">Voir ma commande</span>
+        <strong>{{ formatCurrency(total) }}</strong>
+      </v-btn>
+    </div>
 
     <v-dialog v-model="previewDialog" max-width="620">
       <v-card v-if="previewItem" class="product-preview-card">
@@ -932,6 +1057,43 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog
+      v-if="isClientMenuView"
+      v-model="clientServiceDialog"
+      max-width="520"
+      persistent
+    >
+      <v-card class="client-service-dialog">
+        <v-card-title>Sur place ou a emporter</v-card-title>
+        <v-card-text>
+          <div class="client-service-grid">
+            <v-btn
+              class="client-service-tile text-none"
+              :class="{ 'client-service-tile--active': !clientIsTakeaway }"
+              :color="!clientIsTakeaway ? 'primary' : 'grey lighten-3'"
+              :dark="!clientIsTakeaway"
+              depressed
+              @click="selectClientService('dine_in')"
+            >
+              <v-icon class="mb-2" size="34">mdi-table-chair</v-icon>
+              <span>Sur place</span>
+            </v-btn>
+            <v-btn
+              class="client-service-tile text-none"
+              :class="{ 'client-service-tile--active': clientIsTakeaway }"
+              :color="clientIsTakeaway ? 'primary' : 'grey lighten-3'"
+              :dark="clientIsTakeaway"
+              depressed
+              @click="selectClientService('takeaway')"
+            >
+              <v-icon class="mb-2" size="34">mdi-shopping-outline</v-icon>
+              <span>A emporter</span>
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="expressTableDialog" max-width="720">
       <v-card>
         <v-card-title>Choisir la table</v-card-title>
@@ -1051,6 +1213,7 @@ import Loading from '@/components/loading'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import price from '@/helpers/price'
 import {
+  groupCustomizationSelections,
   mergeConfiguredCartLine,
   replaceConfiguredCartLine,
 } from '@/helpers/customizations'
@@ -1116,9 +1279,13 @@ export default {
     cartItem: [],
     total: 0,
     idxCart: 0,
+    clientCartPulse: false,
+    clientCartPulseTimer: null,
     allowRouteLeave: false,
     productViewMode: 'all',
     activeMobileCategory: null,
+    clientServiceDialog: false,
+    clientServiceMode: 'dine_in',
     activeExpressCategory: null,
     expressSelectedTable: parseInt(localStorage.getItem('service_point_id')) || null,
     expressCustomer: '',
@@ -1141,8 +1308,18 @@ export default {
 
   computed: {
     categories() {
-      const items = this.dataProduct.map((x) => x.category)
+      const items = this.dataProduct
+        .map((x) => String(x.category || '').trim())
+        .filter(Boolean)
       return [...new Set(items)]
+    },
+    categoryImages() {
+      return this.dataProduct.reduce((images, product) => {
+        const category = String(product.category || '').trim()
+        if (!category || images[category]) return images
+        images[category] = product.category_image || product.categoryImage || ''
+        return images
+      }, {})
     },
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
@@ -1215,6 +1392,35 @@ export default {
       const storedAccess = process.client ? localStorage.getItem('access') : null
       const access = user.access === undefined ? storedAccess : user.access
       return Number(access) === 0
+    },
+    isClientMenuView() {
+      return !this.isAdminView && !this.isOrderEditActive
+    },
+    clientIsTakeaway() {
+      return this.clientServiceMode === 'takeaway'
+    },
+    selectedClientTable() {
+      const storedTable = process.client
+        ? localStorage.getItem('service_point_id')
+        : null
+      const selectedId =
+        (this.$store.get('users/user') || {}).service_point_id || storedTable
+      return (
+        this.dataTables.find((table) => {
+          return String(table.id) === String(selectedId)
+        }) || null
+      )
+    },
+    clientServiceTitle() {
+      return this.clientIsTakeaway ? 'A emporter' : 'Sur place'
+    },
+    clientServiceSubtitle() {
+      if (this.clientIsTakeaway) return ''
+      const tableName =
+        (this.selectedClientTable && this.selectedClientTable.name) ||
+        (process.client ? localStorage.getItem('service_point_name') : '') ||
+        ''
+      return tableName ? `Table ${tableName}` : 'Table'
     },
     isLargeProductView() {
       return this.canUseLargeProductView && this.productViewMode === 'all'
@@ -1300,6 +1506,11 @@ export default {
   },
   async mounted() {
     this.loadPage = true
+    if (this.isClientMenuView) {
+      if (!this.loadClientServiceChoice()) {
+        this.resetClientServiceChoice()
+      }
+    }
 
     if (this.isOrderEditActive) {
       this.cartItem = JSON.parse(
@@ -1369,6 +1580,11 @@ export default {
       this.loadPage = false
     })
   },
+  beforeDestroy() {
+    if (this.clientCartPulseTimer) {
+      clearTimeout(this.clientCartPulseTimer)
+    }
+  },
 
   methods: {
     ensureActiveMobileCategory() {
@@ -1383,13 +1599,67 @@ export default {
     setActiveMobileCategory(category) {
       this.activeMobileCategory = category
     },
+    resetClientServiceChoice() {
+      this.clientServiceMode = 'dine_in'
+      this.persistClientServiceChoice()
+      this.clientServiceDialog = true
+    },
+    loadClientServiceChoice() {
+      if (!process.client) return false
+      const storedMode = localStorage.getItem('client_service_mode')
+      if (!['dine_in', 'takeaway'].includes(storedMode)) return false
+
+      this.clientServiceMode = storedMode
+      this.clientServiceDialog = false
+      return true
+    },
+    openClientServiceDialog() {
+      this.clientServiceDialog = true
+    },
+    selectClientService(mode) {
+      this.clientServiceMode = mode === 'takeaway' ? 'takeaway' : 'dine_in'
+      this.persistClientServiceChoice()
+      this.clientServiceDialog = false
+    },
+    persistClientServiceChoice() {
+      if (!process.client) return
+      localStorage.setItem(
+        'client_service_mode',
+        this.clientIsTakeaway ? 'takeaway' : 'dine_in'
+      )
+    },
+    scrollMobileCategories(direction) {
+      const scroller = this.$refs.mobileCategoryBar
+      if (!scroller) return
+      const distance = Math.max(160, scroller.clientWidth * 0.7)
+      if (typeof scroller.scrollBy === 'function') {
+        scroller.scrollBy({
+          left: direction * distance,
+          behavior: 'smooth',
+        })
+        return
+      }
+      scroller.scrollLeft += direction * distance
+    },
     scrollToMobileCategory(category) {
       this.setActiveMobileCategory(category)
       this.$nextTick(() => {
         const target = this.$refs[`mobileCategory-${category}`]
         const element = Array.isArray(target) ? target[0] : target
         const scroller = this.$refs.mobileCategoryProducts
-        if (!element || !scroller) {
+        if (!element) {
+          return
+        }
+        if (this.isClientMenuView) {
+          const stickyOffset = this.$vuetify.breakpoint.xsOnly ? 74 : 92
+          const top =
+            element.getBoundingClientRect().top +
+            window.pageYOffset -
+            stickyOffset
+          window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+          return
+        }
+        if (!scroller) {
           return
         }
         const top =
@@ -1402,6 +1672,19 @@ export default {
         }
         scroller.scrollTop = top
       })
+    },
+    cartLineCustomizationGroups(item) {
+      return groupCustomizationSelections(
+        item && (item.selections || item.customizationList)
+      )
+    },
+    productCartQuantity(product) {
+      const productId = product && product.id
+      return this.cartItem.reduce((sum, line) => {
+        return String(line.id) === String(productId)
+          ? sum + Number(line.qty || 0)
+          : sum
+      }, 0)
     },
     restorePersistedCheckoutCart() {
       const payload = this.$store.get('cart/clientOrderPayload') || {}
@@ -1434,6 +1717,12 @@ export default {
     productImageSrc(image) {
       const fileName = image || 'default.png'
       return `${this.staticURL}/api/v1/imgproducts/${fileName}`
+    },
+    categoryImage(category) {
+      return this.categoryImages[String(category || '').trim()] || ''
+    },
+    categoryImageSrc(image) {
+      return `${this.staticURL}/api/v1/imgcategories/${image}`
     },
     addPreviewItemToCart() {
       if (!this.previewItem) return
@@ -1616,6 +1905,16 @@ export default {
     showCartAddFeedback() {
       this.cartAddSnackbarText = 'Produit ajouté au panier'
       this.cartAddSnackbar = true
+      if (this.isClientMenuView) {
+        this.clientCartPulse = false
+        if (this.clientCartPulseTimer) clearTimeout(this.clientCartPulseTimer)
+        this.$nextTick(() => {
+          this.clientCartPulse = true
+          this.clientCartPulseTimer = setTimeout(() => {
+            this.clientCartPulse = false
+          }, 420)
+        })
+      }
     },
     addToCart(params) {
       if (this.isKitchenClosed && !this.isOrderEditActive) {
@@ -1978,6 +2277,305 @@ export default {
   gap: 12px;
 }
 
+.menu-page-container--client {
+  background: #f6f8fb;
+  max-width: none;
+  padding-top: 0 !important;
+}
+
+.client-service-banner {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e1e7ef;
+  border-radius: 8px;
+  color: #121826;
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  margin: 10px auto 0;
+  max-width: 1180px;
+  min-height: 72px;
+  padding: 12px 18px;
+  text-align: left;
+  width: 100%;
+}
+
+.client-service-banner:focus-visible {
+  outline: 3px solid rgba(25, 118, 210, 0.28);
+  outline-offset: 2px;
+}
+
+.client-service-icon {
+  align-items: center;
+  background: #e8f2ff;
+  border-radius: 8px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.client-service-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.client-service-copy strong {
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.client-service-copy span {
+  color: rgba(18, 24, 38, 0.68);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 4px;
+}
+
+.client-service-chevron {
+  flex: 0 0 auto;
+}
+
+.client-cart-summary {
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #e8edf3;
+  color: #121826;
+  display: flex;
+  justify-content: space-between;
+  margin: -8px -8px 12px;
+  min-height: 58px;
+  padding: 12px 16px;
+}
+
+.client-cart-summary div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.client-cart-summary strong {
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+
+.client-cart-summary span {
+  color: rgba(18, 24, 38, 0.62);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.client-category-nav {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #e8edf3;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  margin: 0 -12px;
+  padding: 12px 6vw;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.client-category-nav::after {
+  background: linear-gradient(
+    to bottom,
+    rgba(18, 24, 38, 0.08),
+    rgba(18, 24, 38, 0)
+  );
+  bottom: -10px;
+  content: '';
+  height: 10px;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+.client-category-arrow {
+  background: #f8fafc !important;
+  border-color: #dfe5ee !important;
+  border-radius: 999px !important;
+  color: #1976d2 !important;
+  flex: 0 0 44px;
+  height: 44px !important;
+  width: 44px !important;
+}
+
+.client-category-arrow:hover,
+.client-category-arrow:focus-visible {
+  background: #e8f2ff !important;
+  border-color: #b7d7fb !important;
+}
+
+.client-category-view {
+  height: auto;
+  min-height: 0;
+}
+
+.client-category-view .mobile-category-products {
+  overflow-y: visible;
+  padding: 28px 0;
+}
+
+.client-category-view .mobile-category-title {
+  color: #123a63;
+  font-size: 1.55rem;
+  font-weight: 900;
+  margin-bottom: 18px;
+}
+
+.client-category-view .mobile-category-section {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 980px;
+  padding: 0 8px;
+}
+
+.client-product-quantity {
+  align-items: center;
+  background: #1976d2;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 900;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 9px;
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 2;
+}
+
+.client-mobile-checkout {
+  bottom: 16px;
+  left: 0;
+  padding: 0 14px;
+  position: fixed;
+  right: 0;
+  z-index: 8;
+}
+
+.client-mobile-checkout-button {
+  background: #ffe9b5 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 14px rgba(18, 24, 38, 0.18) !important;
+  color: #123a63 !important;
+  min-height: 64px !important;
+  padding: 0 16px !important;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.client-mobile-checkout-button--pulse {
+  animation: client-cart-pop 420ms ease-out;
+}
+
+.client-mobile-checkout-button ::v-deep .v-btn__content {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+}
+
+.client-mobile-checkout-count {
+  align-items: center;
+  background: #1976d2;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 1.15rem;
+  font-weight: 900;
+  gap: 6px;
+  justify-content: center;
+  min-height: 42px;
+  min-width: 58px;
+  padding: 0 10px;
+}
+
+.client-mobile-checkout-label {
+  font-size: 1.02rem;
+  font-weight: 900;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.client-mobile-checkout-button strong {
+  font-size: 1rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.client-service-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.client-service-tile {
+  border-radius: 8px !important;
+  flex-direction: column;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  height: 118px !important;
+  min-width: 0 !important;
+}
+
+.client-service-tile--active {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.42) !important;
+}
+
+.client-service-tile ::v-deep .v-btn__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  white-space: normal;
+}
+
+@keyframes client-cart-pop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-4px) scale(1.025);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-mobile-checkout-button--pulse {
+    animation: none;
+  }
+
+  .product-card--client,
+  .product-card--client .product-card-image,
+  .client-mobile-checkout-button {
+    transition: none !important;
+  }
+
+  .product-card--client.product-clickable:hover,
+  .product-card--client.product-clickable:focus-visible,
+  .product-card--client.product-clickable:hover .product-card-image {
+    transform: none;
+  }
+}
+
 .menu-page-container--express {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
@@ -2100,7 +2698,7 @@ export default {
 }
 
 .express-command-icon--cash {
-  color: #00a85a !important;
+  color: #00e676 !important;
 }
 
 .express-command-button:hover,
@@ -2167,6 +2765,31 @@ export default {
   transition: border-color 140ms ease, background-color 140ms ease,
     transform 120ms ease;
   width: 100%;
+}
+
+.product-card--client {
+  position: relative;
+  transform: translateZ(0);
+}
+
+.product-card--client.product-clickable:hover,
+.product-card--client.product-clickable:focus-visible {
+  background: #ffffff !important;
+  box-shadow: 0 6px 8px rgba(18, 24, 38, 0.08) !important;
+  transform: translateY(-2px);
+}
+
+.product-card--client.product-card--in-cart {
+  border-color: #1976d2 !important;
+}
+
+.product-card--client .product-card-image {
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.product-card--client.product-clickable:hover .product-card-image {
+  filter: saturate(1.04) contrast(1.02);
+  transform: scale(1.015);
 }
 
 .menu-panel-card,
@@ -2339,6 +2962,42 @@ export default {
   font-size: 0.92rem;
   line-height: 1.2;
   margin-top: 2px;
+}
+
+.cart-item-customizations {
+  background: #f8fafc;
+  border-top: 1px solid #e8edf3;
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px 12px;
+}
+
+.cart-item-customization-row {
+  align-items: baseline;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(88px, 0.42fr) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.cart-item-customization-step {
+  color: rgba(18, 24, 38, 0.58);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart-item-customization-choice {
+  color: #121826;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .cart-item-actions {
@@ -2652,10 +3311,10 @@ export default {
   background: transparent;
   display: flex;
   flex: 0 0 auto;
-  gap: 18px;
+  gap: 10px;
   justify-content: flex-start;
   overflow-x: auto;
-  padding: 14px 16px;
+  padding: 4px 2px;
   white-space: nowrap;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -2666,16 +3325,52 @@ export default {
 }
 
 .mobile-category-chip {
-  border-radius: 12px !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e1e7ef !important;
+  border-radius: 999px !important;
+  color: #121826 !important;
   flex: 0 0 auto;
-  font-size: 1rem !important;
-  font-weight: 600;
-  min-height: 32px !important;
-  padding: 0 12px !important;
+  font-size: 0.96rem !important;
+  font-weight: 800;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  transition: background-color 160ms ease, border-color 160ms ease,
+    color 160ms ease, transform 160ms ease;
 }
 
-.mobile-category-chip--active ::v-deep .v-chip {
-  border-color: #000 !important;
+.mobile-category-chip--active {
+  background: #1976d2 !important;
+  border-color: #1976d2 !important;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+}
+
+.mobile-category-chip--active ::v-deep .v-chip__content {
+  color: #ffffff !important;
+}
+
+.mobile-category-image {
+  background: #ffffff;
+  border: 2px solid #ffffff;
+  margin-left: -8px !important;
+  margin-right: 9px !important;
+}
+
+.mobile-category-image ::v-deep .v-image {
+  height: 100%;
+  width: 100%;
+}
+
+.mobile-category-chip:hover,
+.mobile-category-chip:focus-visible {
+  background: #e8f2ff !important;
+  border-color: #b7d7fb !important;
+}
+
+.mobile-category-chip--active:hover,
+.mobile-category-chip--active:focus-visible {
+  background: #1976d2 !important;
+  border-color: #1976d2 !important;
 }
 
 .mobile-category-products {
@@ -2821,13 +3516,72 @@ export default {
 }
 
 @media (max-width: 599px) {
+  .menu-page-container--client {
+    padding-bottom: 92px !important;
+  }
+
+  .menu-page-container--client .menu-content-row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .menu-page-container--client .menu-content-row > .col {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .client-service-banner {
+    margin: 10px 12px 0;
+    min-height: 72px;
+    padding: 12px 14px;
+    width: auto;
+  }
+
+  .client-service-copy strong {
+    font-size: 1.06rem;
+  }
+
+  .client-service-copy span {
+    font-size: 0.92rem;
+  }
+
+  .client-category-nav {
+    margin: 0;
+    padding: 10px 14px;
+  }
+
+  .client-category-view .mobile-category-bar {
+    gap: 10px;
+    padding: 4px 1px;
+  }
+
+  .client-category-view .mobile-category-chip {
+    font-size: 0.9rem !important;
+    min-height: 38px !important;
+    padding: 0 14px !important;
+  }
+
+  .client-category-view .mobile-category-products {
+    padding: 42px 22px 12px;
+  }
+
+  .client-category-view .mobile-category-title {
+    font-size: 1.75rem;
+    margin-bottom: 22px;
+  }
+
+  .client-category-view .mobile-category-section {
+    padding: 0;
+  }
+
   .menu-content-row {
     margin-top: 0 !important;
   }
 
   .product-grid {
-    --product-card-min-width: 145px;
-    gap: 8px;
+    --product-card-min-width: 0;
+    gap: 28px 22px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .product-card {
@@ -2861,6 +3615,19 @@ export default {
 }
 
 @media (max-width: 420px) {
+  .client-service-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-mobile-checkout-button {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .client-mobile-checkout-label {
+    font-size: 0.92rem;
+  }
+
   .cart-order-actions {
     flex-direction: column;
   }

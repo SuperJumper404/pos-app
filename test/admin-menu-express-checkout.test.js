@@ -94,7 +94,7 @@ assert.match(
 )
 assert.match(
   expressCommandActionsSource,
-  /to="\/orders"[\s\S]*?aria-label="Voir les commandes"[\s\S]*?mdi-clipboard-list-outline[\s\S]*?to="\/cashregister"[\s\S]*?aria-label="Ouvrir le tiroir caisse"[\s\S]*?mdi-cash-register/,
+  /to="\/orders"[\s\S]*?aria-label="Voir les commandes"[\s\S]*?mdi-order-bool-descending[\s\S]*?to="\/cashregister"[\s\S]*?aria-label="Ouvrir le tiroir caisse"[\s\S]*?mdi-cash-register/,
   'express admin shortcuts must be icon-only buttons with accessible labels'
 )
 assert.match(
@@ -114,7 +114,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /:class="\{ 'menu-page-container--express': isLargeProductView \}"/,
+  /'menu-page-container--express': isLargeProductView/,
   'express mode must remove container padding that wastes vertical space'
 )
 assert.match(
@@ -571,6 +571,11 @@ assert.match(
   menusSource,
   /\.express-command-button \.express-command-icon\s*\{[^}]*font-size:\s*32px/,
   'express admin shortcut icons must be large enough for quick recognition'
+)
+assert.match(
+  menusSource,
+  /\.express-command-icon--cash\s*\{[^}]*color:\s*#00e676 !important/,
+  'cash register shortcut icon must use the same success green as checkout'
 )
 assert.match(
   menusSource,

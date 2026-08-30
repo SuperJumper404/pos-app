@@ -20,6 +20,21 @@ assert.match(
 )
 assert.match(
   menusSource,
+  /loadClientServiceChoice\(\)/,
+  'client menu must load a previously selected service choice'
+)
+assert.match(
+  menusSource,
+  /localStorage\.getItem\('client_service_mode'\)/,
+  'client service choice must be restored from localStorage'
+)
+assert.match(
+  menusSource,
+  /if\s*\(!this\.loadClientServiceChoice\(\)\)\s*\{[\s\S]*?this\.resetClientServiceChoice\(\)/,
+  'client service modal must open only when no choice was already stored'
+)
+assert.match(
+  menusSource,
   /ensureActiveMobileCategory\(\)[\s\S]*?this\.activeMobileCategory\s*=\s*this\.categories\[0\]/,
   'mobile menus must select the first category by default'
 )
@@ -58,27 +73,27 @@ const mobileCategoryChip = menusSource.match(
 )[0]
 assert.match(
   menusSource,
-  /:outlined="category === activeMobileCategory"/,
-  'only the active category chip must be outlined'
+  /:outlined="false"/,
+  'category chips must use the filled active-state design'
 )
 assert.doesNotMatch(
   mobileCategoryChip,
   /(^|\s):?color=/,
-  'category chips must not use filled colors'
+  'category chips must keep their colors in CSS classes'
 )
 assert.match(
   menusSource,
-  /text-color="black"/,
-  'category chips must use black text'
+  /category === activeMobileCategory \? 'white' : '#121826'/,
+  'category chips must switch text contrast for the active state'
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip\s*\{[\s\S]*?border-radius:\s*12px\s*!important/,
-  'category chips must use a 12px radius'
+  /\.mobile-category-chip\s*\{[\s\S]*?border-radius:\s*999px\s*!important/,
+  'category chips must use a pill radius'
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip\s*\{[\s\S]*?font-size:\s*1rem\s*!important/,
+  /\.mobile-category-chip\s*\{[\s\S]*?font-size:\s*0\.96rem\s*!important/,
   'category chip text must be larger'
 )
 assert.match(
@@ -88,28 +103,28 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.mobile-category-bar\s*\{[\s\S]*?padding:\s*14px 16px/,
+  /\.mobile-category-bar\s*\{[\s\S]*?padding:\s*4px 2px/,
   'mobile category bar must keep spacious padding'
 )
 assert.match(
   menusSource,
-  /\.mobile-category-bar\s*\{[\s\S]*?gap:\s*18px/,
+  /\.mobile-category-bar\s*\{[\s\S]*?gap:\s*10px/,
   'mobile category bar must keep spacious chip gaps'
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip\s*\{[\s\S]*?min-height:\s*32px\s*!important/,
-  'category chips must be at least 32px high'
+  /\.mobile-category-chip\s*\{[\s\S]*?min-height:\s*40px\s*!important/,
+  'category chips must be touch-friendly'
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip\s*\{[\s\S]*?padding:\s*0 12px\s*!important/,
-  'category chips must use 12px horizontal padding'
+  /\.mobile-category-chip\s*\{[\s\S]*?padding:\s*0 16px\s*!important/,
+  'category chips must use generous horizontal padding'
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip--active\s*::v-deep\s*\.v-chip\s*\{[\s\S]*?border-color:\s*#000\s*!important/,
-  'only the selected category chip must use a black outline'
+  /\.mobile-category-chip--active\s*\{[\s\S]*?background:\s*#1976d2\s*!important/,
+  'only the selected category chip must use the primary filled state'
 )
 assert.doesNotMatch(
   menusSource,
