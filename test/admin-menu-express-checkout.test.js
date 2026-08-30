@@ -554,7 +554,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.express-filter-button--active[\s\S]*?background:\s*#1976d2/,
+  /\.express-filter-button--active[\s\S]*?background:\s*var\(--se-color-primary\)/,
   'express filters must share one clear active state'
 )
 assert.match(
@@ -574,7 +574,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.express-command-icon--cash\s*\{[^}]*color:\s*#00e676 !important/,
+  /\.express-command-icon--cash\s*\{[^}]*color:\s*var\(--se-color-success\) !important/,
   'cash register shortcut icon must use the same success green as checkout'
 )
 assert.match(
@@ -614,7 +614,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.express-checkout[\s\S]*?background:\s*#f8fafc[\s\S]*?border:\s*1px solid #e8edf3/,
+  /\.express-checkout[\s\S]*?background:\s*var\(--se-color-surface-muted\)[\s\S]*?border:\s*1px solid var\(--se-color-border-soft\)/,
   'express checkout action zone must read as a dedicated control panel'
 )
 assert.match(

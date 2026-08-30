@@ -237,6 +237,7 @@ export default {
         shop_social_media: this.$store.get('shop/shop_social_media'),
         shop_profile_image: this.$store.get('shop/shop_profile_image'),
         shop_status: this.$store.get('shop/shop_status'),
+        shop_theme: this.$store.get('shop/shop_theme'),
       }
 
       return Object.values(shopInfo).some((value) => Boolean(value)) ? shopInfo : {}
@@ -641,7 +642,7 @@ export default {
   border-radius: 999px;
   padding: 3px 8px;
   background: var(--se-color-primary);
-  color: #ffffff;
+  color: var(--se-color-surface);
   font-size: var(--se-font-caption);
   font-weight: 800;
 }

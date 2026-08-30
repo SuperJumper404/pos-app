@@ -73,8 +73,8 @@ export default {
 </script>
 <style scoped>
 .client-top-bar {
-  background: #ffffff !important;
-  border-bottom: 1px solid #e8edf3;
+  background: var(--se-color-surface) !important;
+  border-bottom: 1px solid var(--se-color-border-soft);
   box-shadow: none !important;
 }
 
@@ -85,8 +85,8 @@ export default {
 }
 
 .client-nav-shell {
-  background: #f8fafc;
-  border: 1px solid #dfe5ee;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border);
   border-radius: 999px;
   margin-bottom: 8px;
   margin-top: 8px;
@@ -107,7 +107,7 @@ export default {
 .client-nav-tab {
   align-items: center;
   border-radius: 999px;
-  color: #1f2933 !important;
+  color: var(--se-color-text-body) !important;
   display: inline-flex;
   font-weight: 900;
   gap: 8px;
@@ -120,15 +120,15 @@ export default {
 }
 
 .client-nav-tab.v-tab--active {
-  background: #1976d2 !important;
-  color: #ffffff !important;
+  background: var(--se-color-primary) !important;
+  color: var(--se-color-surface) !important;
 }
 
 .client-nav-tab__icon {
   align-items: center;
-  background: #e8f2ff;
+  background: var(--se-color-primary-soft);
   border-radius: 999px;
-  color: #1976d2;
+  color: var(--se-color-primary);
   display: inline-flex;
   flex: 0 0 30px;
   height: 30px;
@@ -138,7 +138,7 @@ export default {
 
 .client-nav-tab.v-tab--active .client-nav-tab__icon {
   background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  color: var(--se-color-surface);
 }
 
 .client-nav-tab__label {

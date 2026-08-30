@@ -107,6 +107,7 @@ export default {
   plugins: [
     { src: '~/plugins/consoleLogs.client.js', ssr: false },
     { src: '~/plugins/persistedState.client.js', srr: false },
+    { src: '~/plugins/shopTheme.client.js', ssr: false },
     { src: '~/plugins/axios.js' },
   ],
   components: true,

@@ -88,8 +88,10 @@
               :key="category.name"
               depressed
               class="kiosk-category-button text-none"
-              :color="category.name === activeCategory ? 'primary' : 'grey lighten-3'"
-              :dark="category.name === activeCategory"
+              :class="{
+                'kiosk-category-button--active':
+                  category.name === activeCategory,
+              }"
               :disabled="checkoutInteractionLocked"
               @click="activeCategory = category.name"
             >
@@ -1255,7 +1257,7 @@ export default {
 <style scoped>
 .kiosk-page {
   min-height: 100vh;
-  background: #f4f6f8;
+  background: var(--se-color-bg);
 }
 
 .kiosk-shell {
@@ -1275,7 +1277,7 @@ export default {
   justify-content: center;
   gap: 24px;
   padding: 24px;
-  background: #ffffff;
+  background: var(--se-color-surface);
 }
 
 .kiosk-welcome-mosaic {
@@ -1352,7 +1354,7 @@ export default {
   overflow: visible;
   aspect-ratio: 1;
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--se-color-surface);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
   padding: 10px;
 }
@@ -1418,21 +1420,22 @@ export default {
 .kiosk-header {
   min-height: 84px;
   padding: 18px 28px;
-  background: #ffffff;
-  border-bottom: 1px solid #dfe5ee;
+  background: var(--se-color-surface);
+  border-bottom: 1px solid var(--se-color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
 .kiosk-header h1 {
+  color: var(--se-color-text);
   margin: 0;
   font-size: 2rem;
   letter-spacing: 0;
 }
 
 .kiosk-eyebrow {
-  color: #1976d2;
+  color: var(--se-color-primary);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -1458,8 +1461,8 @@ export default {
 
 .kiosk-side-categories {
   grid-row: 1 / 3;
-  background: #ffffff;
-  border-right: 1px solid #dfe5ee;
+  background: var(--se-color-surface);
+  border-right: 1px solid var(--se-color-border);
   padding: 14px;
 }
 
@@ -1470,11 +1473,18 @@ export default {
 }
 
 .kiosk-category-button {
+  background: var(--se-color-surface-muted) !important;
   min-height: 132px !important;
   border-radius: 8px !important;
+  color: var(--se-color-text-body) !important;
   font-size: 1.05rem !important;
   font-weight: 800 !important;
   padding: 8px !important;
+}
+
+.kiosk-category-button--active {
+  background: var(--se-color-primary) !important;
+  color: var(--se-color-surface) !important;
 }
 
 .kiosk-category-button ::v-deep .v-btn__content {
@@ -1518,8 +1528,8 @@ export default {
 .kiosk-bottom-cart {
   grid-column: 2;
   padding: 18px;
-  background: #ffffff;
-  border-top: 1px solid #dfe5ee;
+  background: var(--se-color-surface);
+  border-top: 1px solid var(--se-color-border);
 }
 
 .kiosk-bottom-cart h2 {
@@ -1543,7 +1553,7 @@ export default {
 .kiosk-cart-count {
   display: block;
   margin-top: 2px;
-  color: #64748b;
+  color: var(--se-color-text-muted);
   font-size: 0.95rem;
   font-weight: 700;
 }
@@ -1595,7 +1605,7 @@ export default {
 }
 
 .kiosk-cart-item-choices {
-  color: #1976d2;
+  color: var(--se-color-primary);
   font-size: 0.86rem;
 }
 
@@ -1703,7 +1713,7 @@ export default {
 .kiosk-stripe-panel {
   margin-top: 16px;
   padding: 12px;
-  border: 1px solid #dfe5ee;
+  border: 1px solid var(--se-color-border);
   border-radius: 8px;
 }
 
@@ -1734,7 +1744,7 @@ export default {
   .kiosk-side-categories {
     grid-row: auto;
     border-right: 0;
-    border-top: 1px solid #dfe5ee;
+    border-top: 1px solid var(--se-color-border);
   }
 
   .kiosk-category-stack {

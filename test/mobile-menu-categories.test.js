@@ -109,7 +109,7 @@ assert.doesNotMatch(
 )
 assert.match(
   menusSource,
-  /category === activeMobileCategory \? 'white' : '#121826'/,
+  /category === activeMobileCategory \? 'white' : 'var\(--se-color-text\)'/,
   'category chips must switch text contrast for the active state'
 )
 assert.match(
@@ -174,7 +174,7 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.mobile-category-chip--active\s*\{[\s\S]*?background:\s*#1976d2\s*!important/,
+  /\.mobile-category-chip--active\s*\{[\s\S]*?background:\s*var\(--se-color-primary\)\s*!important/,
   'only the selected category chip must use the primary filled state'
 )
 assert.doesNotMatch(
@@ -224,7 +224,7 @@ assert.doesNotMatch(
 )
 assert.match(
   menusSource,
-  /\.client-mobile-checkout-button\s*\{[\s\S]*?background:\s*#1976d2\s*!important[\s\S]*?color:\s*#ffffff\s*!important/,
+  /\.client-mobile-checkout-button\s*\{[\s\S]*?background:\s*var\(--se-color-primary\)\s*!important[\s\S]*?color:\s*var\(--se-color-surface\)\s*!important/,
   'client checkout button must use the primary action color'
 )
 assert.match(

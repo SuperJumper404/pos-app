@@ -35,7 +35,7 @@ assert.match(
 )
 assert.match(
   source,
-  /\.client-top-bar\s*\{[\s\S]*?background:\s*#ffffff\s*!important[\s\S]*?border-bottom:\s*1px solid #e8edf3/,
+  /\.client-top-bar\s*\{[\s\S]*?background:\s*var\(--se-color-surface\)\s*!important[\s\S]*?border-bottom:\s*1px solid var\(--se-color-border-soft\)/,
   'client top bar must use a flat white surface with a soft divider'
 )
 assert.match(
@@ -45,7 +45,7 @@ assert.match(
 )
 assert.match(
   source,
-  /\.client-nav-shell\s*\{[\s\S]*?background:\s*#f8fafc[\s\S]*?border:\s*1px solid #dfe5ee[\s\S]*?border-radius:\s*999px/,
+  /\.client-nav-shell\s*\{[\s\S]*?background:\s*var\(--se-color-surface-muted\)[\s\S]*?border:\s*1px solid var\(--se-color-border\)[\s\S]*?border-radius:\s*999px/,
   'client nav shell must look like a restrained segmented control'
 )
 assert.match(
@@ -65,7 +65,7 @@ assert.match(
 )
 assert.match(
   source,
-  /\.client-nav-tab\.v-tab--active\s*\{[\s\S]*?background:\s*#1976d2\s*!important[\s\S]*?color:\s*#ffffff\s*!important/,
+  /\.client-nav-tab\.v-tab--active\s*\{[\s\S]*?background:\s*var\(--se-color-primary\)\s*!important[\s\S]*?color:\s*var\(--se-color-surface\)\s*!important/,
   'active client nav tab must use the primary action color'
 )
 assert.match(

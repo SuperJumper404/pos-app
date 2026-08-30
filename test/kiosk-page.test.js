@@ -98,7 +98,10 @@ assert.match(pageSource, /border-radius: 12px/)
 assert.match(pageSource, /\.kiosk-welcome-mosaic-tile ::v-deep \.v-image[\s\S]*overflow: hidden/)
 assert.match(pageSource, /\.kiosk-welcome-mosaic-tile ::v-deep \.v-image__image[\s\S]*border-radius: 12px/)
 assert.doesNotMatch(pageSource, /background:\s*#111827/)
-assert.match(pageSource, /\.kiosk-welcome[\s\S]*background:\s*#ffffff/)
+assert.match(
+  pageSource,
+  /\.kiosk-welcome[\s\S]*background:\s*var\(--se-color-surface\)/
+)
 assert.doesNotMatch(pageSource, /kiosk-welcome-overlay/)
 assert.doesNotMatch(pageSource, /radial-gradient\(circle at center/)
 assert.doesNotMatch(pageSource, /filter:\s*blur/)

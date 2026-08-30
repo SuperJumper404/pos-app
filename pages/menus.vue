@@ -1,5 +1,6 @@
 <template>
   <v-container
+    class="menu-page-container"
     :class="{
       'menu-page-container--express': isLargeProductView,
       'menu-page-container--client': isClientMenuView,
@@ -199,7 +200,7 @@
                     }"
                     :outlined="false"
                     :text-color="
-                      category === activeMobileCategory ? 'white' : '#121826'
+                      category === activeMobileCategory ? 'white' : 'var(--se-color-text)'
                     "
                     label
                     small
@@ -2141,6 +2142,10 @@ export default {
   border: 1px solid #eeeeee;
 }
 
+.menu-page-container {
+  background: var(--se-color-bg);
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   height: 2.7em;
@@ -2165,9 +2170,9 @@ export default {
 }
 
 .menu-panel-cart-button {
-  background: #ffffff !important;
-  border-color: #dfe5ee !important;
-  color: #121826 !important;
+  background: var(--se-color-surface) !important;
+  border-color: var(--se-color-border) !important;
+  color: var(--se-color-text) !important;
   height: 40px !important;
   min-width: 40px !important;
   width: 40px !important;
@@ -2175,9 +2180,9 @@ export default {
 
 .menu-panel-cart-button:hover,
 .menu-panel-cart-button:focus-visible {
-  background: #f8fafc !important;
-  border-color: #1976d2 !important;
-  color: #1976d2 !important;
+  background: var(--se-color-surface-muted) !important;
+  border-color: var(--se-color-primary) !important;
+  color: var(--se-color-primary) !important;
 }
 
 .product-grid {
@@ -2207,9 +2212,9 @@ export default {
 
 .client-cart-summary {
   align-items: center;
-  background: #ffffff;
-  border-bottom: 1px solid #e8edf3;
-  color: #121826;
+  background: var(--se-color-surface);
+  border-bottom: 1px solid var(--se-color-border-soft);
+  color: var(--se-color-text);
   display: flex;
   justify-content: space-between;
   margin: -8px -8px 12px;
@@ -2219,7 +2224,7 @@ export default {
 
 .client-cart-table {
   align-items: center;
-  background: #e8f2ff;
+  background: var(--se-color-primary-soft);
   border: 1px solid #d7e8fb;
   border-radius: 8px;
   color: #123a63;
@@ -2260,7 +2265,7 @@ export default {
 
 .client-category-nav {
   align-items: center;
-  background: #ffffff;
+  background: var(--se-color-surface);
   border-bottom: 0;
   display: flex;
   flex: 0 0 auto;
@@ -2275,10 +2280,10 @@ export default {
 }
 
 .client-category-arrow {
-  background: #f8fafc !important;
-  border-color: #dfe5ee !important;
+  background: var(--se-color-surface-muted) !important;
+  border-color: var(--se-color-border) !important;
   border-radius: 999px !important;
-  color: #1976d2 !important;
+  color: var(--se-color-primary) !important;
   flex: 0 0 44px;
   height: 44px !important;
   width: 44px !important;
@@ -2286,7 +2291,7 @@ export default {
 
 .client-category-arrow:hover,
 .client-category-arrow:focus-visible {
-  background: #e8f2ff !important;
+  background: var(--se-color-primary-soft) !important;
   border-color: #b7d7fb !important;
 }
 
@@ -2344,10 +2349,10 @@ export default {
 
 .client-product-quantity {
   align-items: center;
-  background: #1976d2;
-  border: 2px solid #ffffff;
+  background: var(--se-color-primary);
+  border: 2px solid var(--se-color-surface);
   border-radius: 999px;
-  color: #ffffff;
+  color: var(--se-color-surface);
   display: inline-flex;
   font-size: 0.86rem;
   font-weight: 900;
@@ -2371,10 +2376,10 @@ export default {
 }
 
 .client-mobile-checkout-button {
-  background: #1976d2 !important;
+  background: var(--se-color-primary) !important;
   border-radius: 8px !important;
   box-shadow: 0 8px 14px rgba(18, 24, 38, 0.18) !important;
-  color: #ffffff !important;
+  color: var(--se-color-surface) !important;
   min-height: 64px !important;
   padding: 0 16px !important;
   transition: transform 180ms ease, box-shadow 180ms ease;
@@ -2394,9 +2399,9 @@ export default {
 
 .client-mobile-checkout-count {
   align-items: center;
-  background: #ffffff;
+  background: var(--se-color-surface);
   border-radius: 8px;
-  color: #1976d2;
+  color: var(--se-color-primary);
   display: inline-flex;
   font-size: 1.15rem;
   font-weight: 900;
@@ -2486,8 +2491,8 @@ export default {
 
 .express-command-bar {
   align-items: stretch;
-  background: #f8fafc;
-  border: 1px solid #e8edf3;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
   border-radius: 8px;
   display: flex;
   flex: 0 0 auto;
@@ -2499,8 +2504,8 @@ export default {
 
 .express-command-actions {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #dfe5ee;
+  background: var(--se-color-surface);
+  border: 1px solid var(--se-color-border);
   border-radius: 8px;
   display: flex;
   flex: 0 1 auto;
@@ -2517,10 +2522,10 @@ export default {
 }
 
 .express-filter-button {
-  background: #ffffff !important;
-  border: 1px solid #dfe5ee !important;
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border) !important;
   border-radius: 8px !important;
-  color: #121826 !important;
+  color: var(--se-color-text) !important;
   cursor: pointer;
   flex: 0 0 auto;
   font-size: 0.98rem !important;
@@ -2539,7 +2544,7 @@ export default {
 
 .express-filter-button:hover,
 .express-filter-button:focus-visible {
-  background: #f8fafc !important;
+  background: var(--se-color-surface-muted) !important;
   border-color: #b9c8dc !important;
 }
 
@@ -2549,16 +2554,16 @@ export default {
 
 .express-filter-button--active,
 .express-all-chip--active {
-  background: #1976d2 !important;
-  border-color: #1976d2 !important;
-  color: #ffffff !important;
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
+  color: var(--se-color-surface) !important;
 }
 
 .express-command-button {
-  background: #ffffff !important;
+  background: var(--se-color-surface) !important;
   border-color: transparent !important;
   border-radius: 6px !important;
-  color: #121826 !important;
+  color: var(--se-color-text) !important;
   height: 48px !important;
   min-width: 48px !important;
   width: 48px !important;
@@ -2569,17 +2574,17 @@ export default {
 }
 
 .express-command-icon--orders {
-  color: #1976d2 !important;
+  color: var(--se-color-primary) !important;
 }
 
 .express-command-icon--cash {
-  color: #00e676 !important;
+  color: var(--se-color-success) !important;
 }
 
 .express-command-button:hover,
 .express-command-button:focus-visible {
-  background: #e8f2ff !important;
-  border-color: #1976d2 !important;
+  background: var(--se-color-primary-soft) !important;
+  border-color: var(--se-color-primary) !important;
 }
 
 .express-products-scroll {
@@ -2596,7 +2601,7 @@ export default {
 
 .express-category-btn:hover,
 .express-category-btn:focus-visible {
-  background: #f8fafc !important;
+  background: var(--se-color-surface-muted) !important;
   border-color: #b9c8dc !important;
 }
 
@@ -2605,16 +2610,16 @@ export default {
 }
 
 .express-category-btn.primary {
-  background: #1976d2 !important;
-  border-color: #1976d2 !important;
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
   box-shadow: 0 2px 6px rgba(25, 118, 210, 0.18) !important;
-  color: #ffffff !important;
+  color: var(--se-color-surface) !important;
 }
 
 .express-category-btn.primary:hover,
 .express-category-btn.primary:focus-visible {
-  background: #1769bd !important;
-  border-color: #1769bd !important;
+  background: var(--se-color-primary-hover) !important;
+  border-color: var(--se-color-primary-hover) !important;
 }
 
 .express-filter-button ::v-deep .v-btn__content,
@@ -2630,7 +2635,7 @@ export default {
 }
 
 .product-card {
-  background: #ffffff !important;
+  background: var(--se-color-surface) !important;
   border-color: #e1e7ef !important;
   border-radius: 8px !important;
   box-shadow: none !important;
@@ -2649,13 +2654,13 @@ export default {
 
 .product-card--client.product-clickable:hover,
 .product-card--client.product-clickable:focus-visible {
-  background: #ffffff !important;
+  background: var(--se-color-surface) !important;
   box-shadow: 0 6px 8px rgba(18, 24, 38, 0.08) !important;
   transform: translateY(-2px);
 }
 
 .product-card--client.product-card--in-cart {
-  border-color: #1976d2 !important;
+  border-color: var(--se-color-primary) !important;
 }
 
 .product-card--client .product-card-image {
@@ -2676,8 +2681,8 @@ export default {
 
 .product-clickable:hover,
 .product-clickable:focus-visible {
-  border-color: #1976d2 !important;
-  background: #ffffff !important;
+  border-color: var(--se-color-primary) !important;
+  background: var(--se-color-surface) !important;
 }
 
 .product-clickable:active {
@@ -2729,7 +2734,7 @@ export default {
 }
 
 .product-card-image {
-  background: #f8fafc;
+  background: var(--se-color-surface-muted);
   border-radius: 6px !important;
   flex: 0 0 auto;
   margin: 6px 6px 0;
@@ -2751,7 +2756,7 @@ export default {
 }
 
 .product-card-title-text {
-  color: #121826;
+  color: var(--se-color-text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -2778,8 +2783,8 @@ export default {
 
 .product-card-price {
   align-items: center;
-  border-top: 1px solid #e8edf3;
-  color: #121826;
+  border-top: 1px solid var(--se-color-border-soft);
+  color: var(--se-color-text);
   display: inline-flex;
   font-size: 1.12rem;
   font-weight: 800;
@@ -2826,7 +2831,7 @@ export default {
 }
 
 .cart-item-name {
-  color: #121826;
+  color: var(--se-color-text);
   font-size: 1rem !important;
   line-height: 1.2;
   max-width: 100%;
@@ -2840,8 +2845,8 @@ export default {
 }
 
 .cart-item-customizations {
-  background: #f8fafc;
-  border-top: 1px solid #e8edf3;
+  background: var(--se-color-surface-muted);
+  border-top: 1px solid var(--se-color-border-soft);
   display: grid;
   gap: 6px;
   margin-top: 10px;
@@ -2867,7 +2872,7 @@ export default {
 }
 
 .cart-item-customization-choice {
-  color: #121826;
+  color: var(--se-color-text);
   font-size: 0.86rem;
   font-weight: 700;
   line-height: 1.25;
@@ -2912,8 +2917,8 @@ export default {
 
 .express-cart-summary {
   align-items: center;
-  background: #f8fafc;
-  border: 1px solid #e8edf3;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
   border-radius: 8px;
   display: flex;
   flex: 0 0 auto;
@@ -2924,7 +2929,7 @@ export default {
 }
 
 .express-cart-summary-meta {
-  color: #121826;
+  color: var(--se-color-text);
   font-size: 0.98rem;
   font-weight: 700;
   line-height: 1.2;
@@ -2980,8 +2985,8 @@ export default {
 }
 
 .express-checkout {
-  background: #f8fafc;
-  border: 1px solid #e8edf3;
+  background: var(--se-color-surface-muted);
+  border: 1px solid var(--se-color-border-soft);
   border-radius: 8px;
   display: grid;
   flex: 0 0 auto;
@@ -2992,16 +2997,16 @@ export default {
 
 .express-table-button {
   flex: 1 1 0;
-  background: #ffffff !important;
-  border: 1px solid #dfe5ee !important;
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border) !important;
   min-height: 64px !important;
   min-width: 0 !important;
 }
 
 .express-service-button {
   flex: 1 1 0;
-  background: #ffffff !important;
-  border: 1px solid #dfe5ee !important;
+  background: var(--se-color-surface) !important;
+  border: 1px solid var(--se-color-border) !important;
   min-height: 64px !important;
   min-width: 0 !important;
 }
@@ -3018,7 +3023,7 @@ export default {
 }
 
 .express-checkout ::v-deep .v-input__slot {
-  background: #ffffff !important;
+  background: var(--se-color-surface) !important;
   min-height: 44px !important;
 }
 
@@ -3222,7 +3227,7 @@ export default {
   background: #f1f5f9 !important;
   border: 1px solid #e1e7ef !important;
   border-radius: 999px !important;
-  color: #121826 !important;
+  color: var(--se-color-text) !important;
   flex: 0 0 auto;
   font-size: 0.96rem !important;
   font-weight: 800;
@@ -3233,19 +3238,19 @@ export default {
 }
 
 .mobile-category-chip--active {
-  background: #1976d2 !important;
-  border-color: #1976d2 !important;
-  color: #ffffff !important;
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
+  color: var(--se-color-surface) !important;
   transform: translateY(-2px);
 }
 
 .mobile-category-chip--active ::v-deep .v-chip__content {
-  color: #ffffff !important;
+  color: var(--se-color-surface) !important;
 }
 
 .mobile-category-image {
-  background: #ffffff;
-  border: 2px solid #ffffff;
+  background: var(--se-color-surface);
+  border: 2px solid var(--se-color-surface);
   margin-left: -8px !important;
   margin-right: 9px !important;
 }
@@ -3257,14 +3262,14 @@ export default {
 
 .mobile-category-chip:hover,
 .mobile-category-chip:focus-visible {
-  background: #e8f2ff !important;
+  background: var(--se-color-primary-soft) !important;
   border-color: #b7d7fb !important;
 }
 
 .mobile-category-chip--active:hover,
 .mobile-category-chip--active:focus-visible {
-  background: #1976d2 !important;
-  border-color: #1976d2 !important;
+  background: var(--se-color-primary) !important;
+  border-color: var(--se-color-primary) !important;
 }
 
 .mobile-category-products {

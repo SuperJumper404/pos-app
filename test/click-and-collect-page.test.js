@@ -140,6 +140,7 @@ const flatShopStoreValues = {
   'shop/shop_social_media': { instagram: 'https://instagram.com/demo' },
   'shop/shop_profile_image': 'demo.jpg',
   'shop/shop_status': 'Ouverture prochaine',
+  'shop/shop_theme': { preset: 'default', colors: { primary: '#1976d2' } },
   'shop/clickAndCollectServicePoint': 7,
   'shop/kitchen_closed': false,
 }
@@ -163,6 +164,7 @@ assert.deepStrictEqual(
     shop_social_media: { instagram: 'https://instagram.com/demo' },
     shop_profile_image: 'demo.jpg',
     shop_status: 'Ouverture prochaine',
+    shop_theme: { preset: 'default', colors: { primary: '#1976d2' } },
   },
   'la page doit pouvoir lire le module shop plat existant'
 )

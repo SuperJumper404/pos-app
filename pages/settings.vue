@@ -516,6 +516,80 @@
             ></v-text-field>
           </v-card>
         </v-col>
+        <v-col cols="12">
+          <v-card
+            id="theme"
+            outlined
+            class="pa-4 settings-card settings-theme-card"
+          >
+            <h3 class="mb-3 settings-section-title">
+              <v-icon small color="primary">mdi-palette-outline</v-icon>
+              Theme du restaurant
+            </h3>
+            <v-row class="settings-theme-controls" no-gutters>
+              <v-col cols="12" sm="auto" class="settings-theme-select-col">
+                <v-select
+                  v-model="selectedThemePreset"
+                  class="settings-field settings-theme-select"
+                  prepend-inner-icon="mdi-format-color-fill"
+                  :items="themePresetOptions"
+                  item-text="text"
+                  item-value="value"
+                  label="Theme"
+                  hide-details
+                  dense
+                  outlined
+                ></v-select>
+              </v-col>
+              <v-col cols="12" sm="auto">
+                <div class="settings-theme-json-actions">
+                  <v-btn
+                    height="40"
+                    outlined
+                    color="primary"
+                    class="settings-theme-edit-button text-none"
+                    @click="openThemeJsonDialog"
+                  >
+                    Edit
+                    <v-icon small right>mdi-pencil-outline</v-icon>
+                  </v-btn>
+                </div>
+              </v-col>
+            </v-row>
+            <v-dialog v-model="themeJsonDialog" max-width="860">
+              <v-card class="pa-5 settings-theme-dialog">
+                <v-card-title class="settings-theme-dialog-title px-0 pt-0">
+                  Modifier le JSON du theme
+                </v-card-title>
+                <v-textarea
+                  v-model="themeJsonDraft"
+                  class="settings-field settings-theme-json"
+                  prepend-inner-icon="mdi-code-json"
+                  label="JSON du theme"
+                  :error-messages="themeJsonError ? [themeJsonError] : []"
+                  rows="18"
+                  spellcheck="false"
+                  no-resize
+                  outlined
+                ></v-textarea>
+                <v-card-actions class="px-0 pb-0">
+                  <v-spacer></v-spacer>
+                  <v-btn text class="text-none" @click="closeThemeJsonDialog">
+                    Annuler
+                  </v-btn>
+                  <v-btn
+                    color="primary"
+                    depressed
+                    class="text-none"
+                    @click="applyThemeJsonDraft"
+                  >
+                    Appliquer
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+          </v-card>
+        </v-col>
       </v-row>
 
       <div class="settings-actionbar">
@@ -562,6 +636,7 @@ import {
   DISCOUNT_PERCENTAGE_OPTIONS,
   normalizeDiscountPercentages,
 } from '@/helpers/discount'
+import { SHOP_THEME_PRESETS, normalizeShopTheme } from '@/helpers/shopThemes'
 export default {
   components: {
     Loading,
@@ -591,6 +666,11 @@ export default {
     PAYMENT_METHOD_OPTIONS,
     DISCOUNT_PERCENTAGE_OPTIONS,
     DEFAULT_DISCOUNT_PERCENTAGES,
+    SHOP_THEME_PRESETS,
+    themeJson: JSON.stringify(normalizeShopTheme(), null, 2),
+    themeJsonDialog: false,
+    themeJsonDraft: '',
+    themeJsonError: '',
     AllPaymentsMethods: ['Chèque', 'Espèces ', 'Tickets Restaurants'],
     shopImg: null,
     imageUrl: null,
@@ -620,6 +700,7 @@ export default {
       auto_print_order_tickets: false,
       activate_tva: false,
       qr_payment_mode: 'stripe_before_order',
+      shop_theme: normalizeShopTheme(),
     },
     valid: true,
     nameRules: [
@@ -704,6 +785,26 @@ export default {
     qr_payment_mode() {
       return this.$store.get('shop/qr_payment_mode') || 'stripe_before_order'
     },
+    shop_theme() {
+      return this.$store.get('shop/shop_theme')
+    },
+    themePresetOptions() {
+      return Object.keys(SHOP_THEME_PRESETS).map((value) => ({
+        value,
+        text: SHOP_THEME_PRESETS[value].label,
+      }))
+    },
+    selectedThemePreset: {
+      get() {
+        return this.formShop.shop_theme.preset
+      },
+      set(value) {
+        const preset = SHOP_THEME_PRESETS[value] || SHOP_THEME_PRESETS.default
+        this.formShop.shop_theme = normalizeShopTheme(preset.theme)
+        this.themeJson = this.formatShopThemeJson(this.formShop.shop_theme)
+        this.themeJsonError = ''
+      },
+    },
     stripeReady() {
       return [true, 1, '1', 'true'].includes(
         this.$store.get('shop/stripe_charges_enabled')
@@ -762,6 +863,9 @@ export default {
         // Ignore les mutations du pré-remplissage initial (mounted)
         if (this.formReady) this.isDirty = true
       },
+    },
+    themeJson() {
+      if (this.formReady) this.isDirty = true
     },
     shopImg: {
       immediate: false,
@@ -843,6 +947,11 @@ export default {
           this.auto_print_order_tickets
         this.formShop.activate_tva = this.activate_tva
         this.formShop.qr_payment_mode = this.qr_payment_mode
+        this.formShop.shop_theme = normalizeShopTheme(this.shop_theme)
+        this.themeJson = this.formatShopThemeJson(this.formShop.shop_theme)
+        this.themeJsonDialog = false
+        this.themeJsonDraft = ''
+        this.themeJsonError = ''
 
         this.imageUrl = `${this.staticURL}/api/v1/imgprofile/${this.formShop.shop_profile_image}`
 
@@ -920,6 +1029,7 @@ export default {
         this.formShop.discount_percentages = normalizeDiscountPercentages(
           this.formShop.discount_percentages
         )
+        this.formShop.shop_theme = normalizeShopTheme(this.formShop.shop_theme)
         const res = await this.$store.dispatch('shop/updateShopInfo', {
           id: this.id,
           data: this.formShop,
@@ -949,6 +1059,35 @@ export default {
     },
     reset() {
       this.$refs.form.reset()
+    },
+    openThemeJsonDialog() {
+      this.themeJsonDraft = this.themeJson
+      this.themeJsonError = ''
+      this.themeJsonDialog = true
+    },
+    closeThemeJsonDialog() {
+      this.themeJsonDialog = false
+      this.themeJsonDraft = ''
+      this.themeJsonError = ''
+    },
+    formatShopThemeJson(theme) {
+      return JSON.stringify(normalizeShopTheme(theme), null, 2)
+    },
+    applyThemeJsonDraft() {
+      try {
+        const parsed = JSON.parse(this.themeJsonDraft)
+        const normalized = normalizeShopTheme(parsed)
+        this.formShop.shop_theme = normalized
+        this.themeJson = this.formatShopThemeJson(normalized)
+        this.themeJsonError = ''
+        this.themeJsonDialog = false
+        this.themeJsonDraft = ''
+      } catch (error) {
+        this.themeJsonError = 'JSON du theme invalide.'
+        this.$store.dispatch('notifications/error', {
+          message: 'JSON du theme invalide.',
+        })
+      }
     },
     validateInput(event) {
       const charCode = event.which ? event.which : event.keyCode
@@ -1095,6 +1234,47 @@ export default {
   margin-top: 8px !important;
 }
 
+.settings-theme-card {
+  min-height: auto;
+}
+
+.settings-theme-controls {
+  align-items: flex-end;
+  display: flex;
+  gap: 12px;
+}
+
+.settings-theme-select-col {
+  flex: 0 1 320px;
+  max-width: 320px;
+}
+
+.settings-theme-select {
+  width: 100%;
+}
+
+.settings-theme-json-actions {
+  align-items: center;
+  display: flex;
+  height: 40px;
+}
+
+.settings-theme-edit-button {
+  min-width: 92px !important;
+}
+
+.settings-theme-dialog-title {
+  color: var(--se-color-text, #121826);
+  font-size: var(--se-font-title, 1.25rem);
+  font-weight: var(--se-weight-semibold, 600);
+}
+
+.settings-theme-json ::v-deep textarea {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
 .settings-site-link {
   min-height: 40px;
   padding: 0 16px !important;
@@ -1220,10 +1400,26 @@ export default {
 }
 
 @media (max-width: 720px) {
+  .settings-theme-controls,
   .settings-hero,
   .settings-hero__title {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .settings-theme-json-actions {
+    align-items: stretch;
+    height: auto;
+  }
+
+  .settings-theme-edit-button {
+    width: 100%;
+  }
+
+  .settings-theme-select-col {
+    flex-basis: auto;
+    max-width: none;
+    width: 100%;
   }
 
   .settings-hours-list {
