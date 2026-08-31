@@ -789,14 +789,22 @@ export default {
       return this.$store.get('shop/shop_theme')
     },
     themePresetOptions() {
-      return Object.keys(SHOP_THEME_PRESETS).map((value) => ({
+      const currentPreset =
+        this.formShop.shop_theme && this.formShop.shop_theme.preset
+          ? this.formShop.shop_theme.preset
+          : SHOP_THEME_PRESETS.default.theme.preset
+      const options = Object.keys(SHOP_THEME_PRESETS).map((value) => ({
         value,
         text: SHOP_THEME_PRESETS[value].label,
       }))
+      return [{ value: currentPreset, text: 'Current theme' }, ...options]
     },
     selectedThemePreset: {
       get() {
-        return this.formShop.shop_theme.preset
+        const preset = this.formShop.shop_theme && this.formShop.shop_theme.preset
+        return SHOP_THEME_PRESETS[preset]
+          ? preset
+          : SHOP_THEME_PRESETS.default.theme.preset
       },
       set(value) {
         const preset = SHOP_THEME_PRESETS[value] || SHOP_THEME_PRESETS.default
