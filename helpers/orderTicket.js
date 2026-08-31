@@ -199,9 +199,7 @@ const buildOrderTicketEscPos = (payload = {}) => {
     push(
       alignCenter(),
       boldOn(),
-      doubleOn(),
       esc(`Paiement : ${payload.paymentMethod}\n`),
-      doubleOff(),
       boldOff(),
       esc('\n')
     )
@@ -221,7 +219,7 @@ const buildOrderTicketEscPos = (payload = {}) => {
 const buildOrderTicketCloudXml = (payload = {}) => {
   const shop = payload.shopInfo || {}
   const paymentXml = payload.paymentMethod
-    ? `<text em="true" align="center" width="2" height="2">Paiement : ${xmlEscape(payload.paymentMethod)}</text><feed line="2"/>`
+    ? `<text em="true" align="center" width="1" height="1">Paiement : ${xmlEscape(payload.paymentMethod)}</text><feed line="2"/>`
     : ''
   const lines = payload.details
     .map((item) => {
