@@ -81,7 +81,7 @@ const listdashboard = {
           isAdmin: false,
         },
         {
-          icon: 'mdi-cash-register',
+          icon: 'mdi-silverware-fork-knife',
           title: 'Menu',
           routeName: 'caisse-menu',
           to: '/caisse/menu',
