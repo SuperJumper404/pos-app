@@ -179,18 +179,8 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.express-filter-row[\s\S]*?flex-wrap:\s*wrap/,
-  'express category filters must wrap when there are too many categories'
-)
-assert.match(
-  menusSource,
   /expressProducts\(\)[\s\S]*?if \(!this\.activeExpressCategory\) return this\.dataProduct/,
   'express All filter must show every product'
-)
-assert.match(
-  menusSource,
-  /expressProducts\(\)[\s\S]*?String\(product\.category \|\| ''\)\.trim\(\) === this\.activeExpressCategory/,
-  'express category filter must use normalized category names'
 )
 assert.match(
   menusSource,
@@ -559,8 +549,8 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /\.express-command-bar[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\) auto/,
-  'express admin shortcuts must sit in a dedicated action column beside filters'
+  /\.express-command-bar[\s\S]*?justify-content:\s*space-between/,
+  'express admin shortcuts must sit in a dedicated action row'
 )
 assert.match(
   menusSource,

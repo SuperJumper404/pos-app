@@ -48,14 +48,13 @@
                 <v-btn
                   depressed
                   class="express-filter-button express-all-chip text-none"
-                  aria-label="Toutes les catégories"
                   :class="{
                     'express-filter-button--active': !activeExpressCategory,
                     'express-all-chip--active': !activeExpressCategory,
                   }"
                   @click="setExpressCategory(null)"
                 >
-                  <v-icon class="express-all-icon">mdi-view-grid-outline</v-icon>
+                  All
                 </v-btn>
                 <v-btn
                   v-for="category in categories"
@@ -913,7 +912,7 @@
               depressed
               @click="openExpressDiscountDialog"
             >
-              <v-icon class="mb-2">mdi-percent</v-icon>
+              <v-icon class="mb-2">mdi-tag-percent-outline</v-icon>
               <span>{{ expressDiscountLabel }}</span>
             </v-btn>
           </div>
@@ -1296,8 +1295,7 @@ export default {
     },
     productsByCategory() {
       return this.dataProduct.reduce((groups, product) => {
-        const category = String(product.category || '').trim()
-        if (!category) return groups
+        const category = product.category
         if (!groups[category]) groups[category] = []
         groups[category].push(product)
         return groups
@@ -1387,8 +1385,7 @@ export default {
     expressProducts() {
       if (!this.activeExpressCategory) return this.dataProduct
       return this.dataProduct.filter(
-        (product) =>
-          String(product.category || '').trim() === this.activeExpressCategory
+        (product) => product.category === this.activeExpressCategory
       )
     },
     selectedExpressTable() {
@@ -2481,10 +2478,9 @@ export default {
   align-items: center;
   display: flex;
   flex: 0 0 auto;
-  flex-wrap: wrap;
   gap: 8px;
-  overflow: visible;
-  white-space: normal;
+  overflow-x: auto;
+  white-space: nowrap;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -2494,25 +2490,29 @@ export default {
 }
 
 .express-command-bar {
-  align-items: flex-start;
+  align-items: stretch;
   background: var(--se-color-surface-muted);
   border: 1px solid var(--se-color-border-soft);
   border-radius: 8px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   flex: 0 0 auto;
   gap: 12px;
+  justify-content: space-between;
   margin-bottom: 12px;
   padding: 8px;
 }
 
 .express-command-actions {
   align-items: center;
+  background: var(--se-color-surface);
+  border: 1px solid var(--se-color-border);
+  border-radius: 8px;
   display: flex;
+  flex: 0 1 auto;
   gap: 12px;
   justify-content: flex-end;
   min-width: 0;
-  padding-top: 2px;
+  padding: 4px;
 }
 
 .express-filter-row {
@@ -2542,10 +2542,6 @@ export default {
   min-width: 76px !important;
 }
 
-.express-all-icon {
-  font-size: 26px !important;
-}
-
 .express-filter-button:hover,
 .express-filter-button:focus-visible {
   background: var(--se-color-surface-muted) !important;
@@ -2565,7 +2561,7 @@ export default {
 
 .express-command-button {
   background: var(--se-color-surface) !important;
-  border-color: var(--se-color-border) !important;
+  border-color: transparent !important;
   border-radius: 6px !important;
   color: var(--se-color-text) !important;
   height: 48px !important;
@@ -2607,13 +2603,6 @@ export default {
 .express-category-btn:focus-visible {
   background: var(--se-color-surface-muted) !important;
   border-color: #b9c8dc !important;
-}
-
-.express-category-btn.express-filter-button--active:hover,
-.express-category-btn.express-filter-button--active:focus-visible {
-  background: var(--se-color-primary) !important;
-  border-color: var(--se-color-primary) !important;
-  color: var(--se-color-surface) !important;
 }
 
 .express-category-btn:active {

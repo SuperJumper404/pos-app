@@ -245,13 +245,13 @@
           v-if="canUseStaffOrderActions && orderSummary && !loadPage"
           color="primaryPurple"
           depressed
-          class="order-detail-action order-detail-action--secondary white--text text-none"
+          class="order-detail-action order-detail-action--secondary text-none"
           :loading="orderPrintLoading"
           :disabled="orderPrintLoading"
           @click="printOrderTicket"
         >
-          <v-icon class="order-detail-action__icon" color="white">mdi-printer-outline</v-icon>
-          <span class="order-detail-action__label">Imprimer commande</span>
+          <v-icon class="order-detail-action__icon">mdi-printer-outline</v-icon>
+          <span class="order-detail-action__label">Imprimer ticket de commande</span>
         </v-btn>
         <v-btn
           v-if="canUseStaffOrderActions && canOpenOrderEditModal && !loadPage"
@@ -371,7 +371,7 @@
               depressed
               @click="openOrderDiscountDialog"
             >
-              <v-icon class="mb-2">mdi-percent</v-icon>
+              <v-icon class="mb-2">mdi-tag-percent-outline</v-icon>
               <span>{{ effectiveDiscountLabel }}</span>
             </v-btn>
           </div>

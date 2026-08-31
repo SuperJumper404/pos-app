@@ -273,7 +273,7 @@ assert.match(
 )
 assert.match(
   cloudXml,
-  /<text em="true" align="center" width="1" height="1">Paiement : Carte<\/text>/
+  /<text em="true" align="center" width="2" height="2">Paiement : Carte<\/text>/
 )
 
 console.log('order detail checkout tests passed')
