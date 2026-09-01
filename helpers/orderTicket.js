@@ -60,6 +60,12 @@ const customizationLines = (item = {}) =>
 const getItemPrice = (item = {}) =>
   item.total === undefined || item.total === null ? item.price : item.total
 
+const ORDER_TICKET_PRODUCT_NAME_WIDTH = 24
+const ORDER_TICKET_SEPARATOR = '------------------------------------'
+const ORDER_TICKET_PRODUCT_HEADER = `QTE   ${'PRODUIT'.padEnd(
+  ORDER_TICKET_PRODUCT_NAME_WIDTH
+)}PRIX`
+
 const sumDetails = (details) =>
   (Array.isArray(details) ? details : []).reduce(
     (sum, item) => sum + (Number(getItemPrice(item)) || 0),
@@ -104,11 +110,10 @@ const buildOrderTicketEscPos = (payload = {}) => {
   const boldOn = () => Buffer.from([0x1b, 0x45, 1])
   const boldOff = () => Buffer.from([0x1b, 0x45, 0])
   const doubleOn = () => Buffer.from([0x1d, 0x21, 0x11])
-  const doubleOff = () => Buffer.from([0x1d, 0x21, 0x00])
   const doubleHeightOn = () => Buffer.from([0x1d, 0x21, 0x01])
-  const doubleHeightOff = () => Buffer.from([0x1d, 0x21, 0x00])
+  const doubleOff = () => Buffer.from([0x1d, 0x21, 0x00])
   const tripleOn = () => Buffer.from([0x1d, 0x21, 0x22])
-  const line = () => esc('--------------------------------\n')
+  const line = () => esc(`${ORDER_TICKET_SEPARATOR}\n`)
   const cut = () => Buffer.from([0x1d, 0x56, 0x00])
   const euroSymbol = Buffer.from([0x80])
   const output = []
@@ -149,17 +154,17 @@ const buildOrderTicketEscPos = (payload = {}) => {
 
   push(
     boldOn(),
-    doubleHeightOn(),
     alignLeft(),
-    esc('QTE   PRODUIT                PRIX\n'),
-    doubleHeightOff(),
+    esc(`${ORDER_TICKET_PRODUCT_HEADER}\n`),
     boldOff(),
     line()
   )
 
   payload.details.forEach((item) => {
     const qty = `${item.qty || 0}x`.padEnd(5)
-    const name = String(item.name || '').padEnd(20).slice(0, 20)
+    const name = String(item.name || '')
+      .padEnd(ORDER_TICKET_PRODUCT_NAME_WIDTH)
+      .slice(0, ORDER_TICKET_PRODUCT_NAME_WIDTH)
     const price = formatAmount(getItemPrice(item)).padStart(7)
     push(
       alignLeft(),
@@ -168,7 +173,7 @@ const buildOrderTicketEscPos = (payload = {}) => {
       esc(`${qty}${name}${price} `),
       euroSymbol,
       esc('\n'),
-      doubleHeightOff(),
+      doubleOff(),
       boldOff()
     )
     customizationLines(item).forEach((customization) => {
@@ -224,7 +229,9 @@ const buildOrderTicketCloudXml = (payload = {}) => {
   const lines = payload.details
     .map((item) => {
       const qty = `${item.qty || 0}x`.padEnd(5)
-      const name = String(item.name || '').padEnd(20).slice(0, 20)
+      const name = String(item.name || '')
+        .padEnd(ORDER_TICKET_PRODUCT_NAME_WIDTH)
+        .slice(0, ORDER_TICKET_PRODUCT_NAME_WIDTH)
       const price = formatAmount(getItemPrice(item)).padStart(7)
       const customizations = customizationLines(item)
         .map(
@@ -250,14 +257,14 @@ const buildOrderTicketCloudXml = (payload = {}) => {
     `<text em="true" align="center" width="2" height="2">${xmlEscape(payload.table)}</text><feed line="1"/>` +
     `<text em="true" align="center" width="2" height="2">Client:${xmlEscape(payload.customer)}</text><feed line="1"/>` +
     `<text em="true" align="center" width="1" height="1">${xmlEscape(formatDate(payload.created))}</text><feed line="2"/>` +
-    '<text align="left"> QTE   PRODUIT                PRIX</text><feed line="1"/>' +
-    '<text align="left">--------------------------------</text><feed line="2"/>' +
+    `<text align="left"> ${xmlEscape(ORDER_TICKET_PRODUCT_HEADER)}</text><feed line="1"/>` +
+    `<text align="left">${ORDER_TICKET_SEPARATOR}</text><feed line="2"/>` +
     lines +
-    '<text align="left">--------------------------------</text><feed line="1"/>' +
+    `<text align="left">${ORDER_TICKET_SEPARATOR}</text><feed line="1"/>` +
     `<text em="true" align="center" width="2" height="2">TOTAL : ${xmlEscape(formatAmount(payload.total))} €</text><feed line="1"/>` +
     `<text em="true" align="center" width="2" height="2">${xmlEscape(payload.saleMode)}</text><feed line="2"/>` +
     paymentXml +
-    '<text align="left">--------------------------------</text><feed line="2"/>' +
+    `<text align="left">${ORDER_TICKET_SEPARATOR}</text><feed line="2"/>` +
     (payload.remark
       ? `<text em="true" align="left">NOTE: ${xmlEscape(payload.remark)}</text><feed line="1"/>`
       : '') +

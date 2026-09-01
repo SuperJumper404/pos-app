@@ -315,10 +315,35 @@ const runAsyncAssertions = async () => {
   assert.ok(payoutSource.includes('confirmReceiptChoice(false)'))
   assert.ok(payoutSource.includes('buildCashierReceiptPayload'))
   assert.ok(payoutSource.includes('sendCashierReceipt'))
+  assert.ok(
+    payoutSource.includes("'orders/getDetailOrder'"),
+    'la cloture caisse doit charger les lignes produits de la commande active avant archive'
+  )
+  assert.ok(
+    !payoutSource.includes("'history/getAllArchivedOrders'"),
+    'la cloture caisse ne doit pas attendre les donnees archivees pour imprimer'
+  )
+  assert.ok(
+    !payoutSource.includes("'history/getDetailArchivedOrder'"),
+    'la cloture caisse doit eviter le detail history encore vide juste apres archive'
+  )
+  assert.ok(
+    payoutSource.includes('details: order.receiptDetails || []'),
+    'le ticket de caisse de cloture doit recevoir les lignes produits chargees'
+  )
+  assert.ok(
+    payoutSource.includes("receipt_review_qr_url: this.$store.get('shop/receipt_review_qr_url')"),
+    'le ticket de cloture doit reprendre les informations shop du ticket history'
+  )
   assert.ok(payoutSource.includes('pendingPaymentMethod'))
   const btnYesSource = payoutSource.slice(payoutSource.indexOf('async btnYes'))
   assert.ok(btnYesSource.includes('? this.pendingPaymentMethod'))
   assert.ok(btnYesSource.includes('wantsReceipt'))
+  assert.ok(
+    btnYesSource.indexOf('buildReceiptOrdersWithDetails') <
+      btnYesSource.indexOf('archiveOrdersSafely'),
+    'les details produits doivent etre charges avant archiveOrdersSafely'
+  )
   assert.ok(
     btnYesSource.indexOf('this.ordersToArchive = archiveSummary.failedOrderIds') <
       btnYesSource.indexOf("dispatch('orders/getAllOrder'")

@@ -310,6 +310,12 @@ export default {
       return {
         shop_name: this.$store.get('shop/shop_name'),
         shop_adress: this.$store.get('shop/shop_adress'),
+        shop_siret: this.$store.get('shop/shop_siret'),
+        shop_naf: this.$store.get('shop/shop_naf'),
+        shop_vat_number: this.$store.get('shop/shop_vat_number'),
+        receipt_review_qr_url: this.$store.get('shop/receipt_review_qr_url'),
+        receipt_review_qr_label: this.$store.get('shop/receipt_review_qr_label'),
+        cash_register_number: this.$store.get('shop/cash_register_number'),
         shop_phone: this.$store.get('shop/shop_phone'),
         shop_mail: this.$store.get('shop/shop_mail'),
         shop_description: this.$store.get('shop/shop_description'),
@@ -319,6 +325,7 @@ export default {
         shop_status: this.$store.get('shop/shop_status'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
+        activate_tva: this.$store.get('shop/activate_tva'),
       }
     },
     discountPercentages() {
@@ -468,6 +475,26 @@ export default {
       this.receiptDialog = false
       return this.btnYes(wantsReceipt)
     },
+    async buildReceiptOrdersWithDetails(orders) {
+      const printableOrders = Array.isArray(orders) ? orders : []
+      const ordersWithDetails = []
+
+      for (const order of printableOrders) {
+        let details = []
+        try {
+          const loaded = await this.$store.dispatch(
+            'orders/getDetailOrder',
+            order.id
+          )
+          details = loaded ? this.$store.get('orders/detailOrder') || [] : []
+        } catch (error) {
+          details = []
+        }
+        ordersWithDetails.push({ ...order, receiptDetails: details.slice() })
+      }
+
+      return ordersWithDetails
+    },
     printReceiptsForOrders(orders, paymentMethod) {
       const printableOrders = Array.isArray(orders) ? orders : []
       if (!printableOrders.length) return
@@ -477,7 +504,7 @@ export default {
           sendCashierReceipt({
             payload: buildCashierReceiptPayload({
               order,
-              details: [],
+              details: order.receiptDetails || [],
               shopInfo: this.shopInfo,
               fallbackPaymentMethod: paymentMethod || order.payment,
               fallbackTable: this.id,
@@ -520,6 +547,9 @@ export default {
       const paymentMethod = requiresPaymentMethod
         ? this.pendingPaymentMethod
         : null
+      const receiptOrdersWithDetails = wantsReceipt
+        ? await this.buildReceiptOrdersWithDetails(receiptOrders)
+        : []
 
       try {
         if (!orderIds.length) {
@@ -604,7 +634,9 @@ export default {
         if (wantsReceipt) {
           const successfulIds = new Set(archiveSummary.successfulOrderIds)
           this.printReceiptsForOrders(
-            receiptOrders.filter((order) => successfulIds.has(order.id)),
+            receiptOrdersWithDetails.filter((order) =>
+              successfulIds.has(order.id)
+            ),
             paymentMethod
           )
         }

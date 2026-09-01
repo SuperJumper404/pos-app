@@ -54,6 +54,35 @@ assert.strictEqual(
   '1x  Boisson          20%   6,00'
 )
 
+const customizedPayload = buildCashierReceiptPayload({
+  order: {
+    id: 77,
+    ordernumber: '1077',
+    payment: 'Carte',
+    subtotal: 12,
+  },
+  details: [
+    {
+      name: 'Burger',
+      qty: 1,
+      total: 12,
+      customizationList: [
+        { step_name: 'Sauces', name: 'Ketchup' },
+        { step_name: 'Cuisson', name: 'Bien cuit' },
+      ],
+    },
+  ],
+  shopInfo: { shop_name: 'Le Comptoir' },
+})
+
+const customizedEscPos = buildCashierEscPos(customizedPayload).toString('latin1')
+const customizedCloudXml = buildCashierCloudXml(customizedPayload)
+for (const output of [customizedEscPos, customizedCloudXml]) {
+  assert.ok(output.includes('Burger'))
+  assert.ok(output.includes('- Sauces : Ketchup'))
+  assert.ok(output.includes('- Cuisson : Bien cuit'))
+}
+
 const escPos = buildCashierEscPos(payload).toString('latin1')
 const cloudXml = buildCashierCloudXml(payload)
 for (const value of ['NAF', '5610A', 'FR123', 'Alice', 'Caisse 2', 'emporter']) {
