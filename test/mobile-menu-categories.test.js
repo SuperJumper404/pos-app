@@ -114,6 +114,21 @@ assert.match(
 )
 assert.match(
   menusSource,
+  /<v-snackbar[\s\S]*?v-if="showMenuSnackbars"[\s\S]*?v-model="kitchenClosedSnackbar"/,
+  'mobile menus must not mount the kitchen closed snackbar'
+)
+assert.match(
+  menusSource,
+  /<v-snackbar[\s\S]*?v-if="showMenuSnackbars"[\s\S]*?v-model="cartAddSnackbar"/,
+  'mobile menus must not mount the cart notification snackbar'
+)
+assert.match(
+  menusSource,
+  /showMenuSnackbars\(\)\s*\{[\s\S]*?return this\.\$vuetify\.breakpoint\.smAndUp/,
+  'menu snackbars must only display from tablet size upward'
+)
+assert.match(
+  menusSource,
   /\.mobile-category-chip\s*\{[\s\S]*?border-radius:\s*999px\s*!important/,
   'category chips must use a pill radius'
 )
