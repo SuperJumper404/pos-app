@@ -1366,7 +1366,7 @@ export default {
   background: var(--se-color-warning-soft);
 }
 
-.orders-lane-card--warning .v-icon {
+.orders-lane-card--warning .orders-lane-card__icon .v-icon {
   color: var(--se-color-warning);
 }
 
@@ -1374,7 +1374,7 @@ export default {
   background: var(--se-color-success-soft);
 }
 
-.orders-lane-card--success .v-icon {
+.orders-lane-card--success .orders-lane-card__icon .v-icon {
   color: var(--se-color-success);
 }
 
@@ -1382,7 +1382,7 @@ export default {
   background: var(--se-color-primary-soft);
 }
 
-.orders-lane-card--primary .v-icon {
+.orders-lane-card--primary .orders-lane-card__icon .v-icon {
   color: var(--se-color-primary);
 }
 
