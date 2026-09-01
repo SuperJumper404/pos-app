@@ -28,6 +28,16 @@ assert.match(
 )
 assert.match(
   indexSource,
+  /mainModuleCards\(\)[\s\S]*?'caisse-menu'[\s\S]*?'orders'[\s\S]*?'cashregister'[\s\S]*?'history'[\s\S]*?'statistics'[\s\S]*?'reports'/,
+  "l'accueil doit mettre Menu, Commandes, Tiroir-caisse, Historique, Statistiques et Rapports en avant"
+)
+assert.match(
+  indexSource,
+  /secondaryModuleCards\(\)[\s\S]*?mainRouteNames[\s\S]*?this\.moduleCards\.filter/,
+  "les autres modules doivent rester en acces secondaires"
+)
+assert.match(
+  indexSource,
   /connectedUserLabel/,
   "le bandeau doit afficher l'utilisateur connecte"
 )
@@ -70,6 +80,51 @@ assert.match(
   indexSource,
   /module-card__arrow/,
   'les tuiles doivent indiquer visuellement le clic'
+)
+assert.match(
+  indexSource,
+  /\.home-dashboard__content\s*\{[\s\S]*?width:\s*100%/,
+  "l'accueil doit prendre toute la largeur disponible"
+)
+assert.doesNotMatch(
+  indexSource,
+  /\.home-dashboard__content\s*\{[\s\S]*?max-width:\s*1160px/,
+  "l'accueil ne doit plus etre limite a une colonne centree"
+)
+assert.match(
+  indexSource,
+  /module-card--main[\s\S]*?align-items:\s*center;[\s\S]*?min-height:\s*246px/,
+  'les modules principaux doivent etre beaucoup plus grands'
+)
+assert.match(
+  indexSource,
+  /module-card--main\s*\{[\s\S]*?text-align:\s*center/,
+  'les modules principaux doivent centrer leur contenu'
+)
+assert.match(
+  indexSource,
+  /module-card--main \.module-card__icon[\s\S]*?font-size:\s*48px/,
+  'les icones des modules principaux doivent etre tres visibles'
+)
+assert.match(
+  indexSource,
+  /main-modules-grid[\s\S]*?margin:\s*-10px/,
+  'les cartes principales doivent etre plus espacees'
+)
+assert.match(
+  indexSource,
+  /module-card--secondary[\s\S]*?align-items:\s*center;[\s\S]*?min-height:\s*86px/,
+  'les modules secondaires doivent rester petits en bas'
+)
+assert.match(
+  indexSource,
+  /secondary-modules-grid[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*center;[\s\S]*?overflow-x:\s*auto;[\s\S]*?white-space:\s*nowrap/,
+  'les modules secondaires doivent rester sur une seule ligne centree'
+)
+assert.match(
+  indexSource,
+  /secondary-module-col[\s\S]*?flex:\s*0 0 132px/,
+  'les modules secondaires doivent garder une largeur compacte fixe'
 )
 assert.match(packageJson.scripts.test, /test\/home-dashboard\.test\.js/)
 

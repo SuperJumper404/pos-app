@@ -50,20 +50,24 @@
       </section>
 
       <div class="home-dashboard__section-title">
-        <span>Modules</span>
-        <small>{{ moduleCards.length }} acces disponible(s)</small>
+        <span>Acces principaux</span>
+        <small>{{ mainModuleCards.length }} module(s) prioritaire(s)</small>
       </div>
 
-      <v-row dense>
+      <v-row dense class="main-modules-grid">
         <v-col
-          v-for="module in moduleCards"
+          v-for="module in mainModuleCards"
           :key="module.to"
-          cols="6"
-          sm="4"
-          md="3"
-          lg="2"
+          cols="12"
+          sm="6"
+          lg="4"
+          class="main-module-col"
         >
-          <button class="module-card" type="button" @click="goToModule(module)">
+          <button
+            class="module-card module-card--main"
+            type="button"
+            @click="goToModule(module)"
+          >
             <span class="module-card__icon-wrap">
               <v-icon class="module-card__icon">{{ module.icon }}</v-icon>
             </span>
@@ -75,6 +79,35 @@
           </button>
         </v-col>
       </v-row>
+
+      <div
+        v-if="secondaryModuleCards.length"
+        class="home-dashboard__section-title home-dashboard__section-title--secondary"
+      >
+        <span>Autres modules</span>
+        <small>{{ secondaryModuleCards.length }} acces secondaire(s)</small>
+      </div>
+
+      <div v-if="secondaryModuleCards.length" class="secondary-modules-grid">
+        <div
+          v-for="module in secondaryModuleCards"
+          :key="module.to"
+          class="secondary-module-col"
+        >
+          <button
+            class="module-card module-card--secondary"
+            type="button"
+            @click="goToModule(module)"
+          >
+            <span class="module-card__icon-wrap">
+              <v-icon class="module-card__icon">{{ module.icon }}</v-icon>
+            </span>
+            <span class="module-card__body">
+              <strong>{{ module.title }}</strong>
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   </v-container>
 </template>
@@ -153,6 +186,29 @@ export default {
         this.modulePermissions,
         this.isPrimaryAdmin
       ).filter((item) => item.to && item.routeName !== 'index')
+    },
+    mainModuleCards() {
+      const mainRoutes = [
+        'caisse-menu',
+        'orders',
+        'cashregister',
+        'history',
+        'statistics',
+        'reports',
+      ]
+      return mainRoutes
+        .map((routeName) =>
+          this.moduleCards.find((module) => module.routeName === routeName)
+        )
+        .filter(Boolean)
+    },
+    secondaryModuleCards() {
+      const mainRouteNames = new Set(
+        this.mainModuleCards.map((module) => module.routeName)
+      )
+      return this.moduleCards.filter(
+        (module) => !mainRouteNames.has(module.routeName)
+      )
     },
     shopName() {
       return this.$store.get('shop/shop_name')
@@ -256,8 +312,7 @@ export default {
 }
 
 .home-dashboard__content {
-  max-width: 1160px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .home-dashboard__hero {
@@ -309,6 +364,10 @@ export default {
 .home-dashboard__section-title small {
   color: var(--se-color-text-muted);
   font-weight: 600;
+}
+
+.home-dashboard__section-title--secondary {
+  margin-top: 26px;
 }
 
 .info-grid {
@@ -393,6 +452,11 @@ export default {
     box-shadow 0.15s ease, transform 0.15s ease;
 }
 
+.main-module-col,
+.secondary-module-col {
+  padding: 10px !important;
+}
+
 .module-card:focus {
   outline: 3px solid rgba(25, 118, 210, 0.24);
   outline-offset: 2px;
@@ -448,6 +512,87 @@ export default {
   font-size: 20px;
 }
 
+.main-modules-grid {
+  align-items: stretch;
+  margin: -10px;
+}
+
+.module-card--main {
+  align-items: center;
+  gap: 18px;
+  justify-content: center;
+  min-height: 246px;
+  padding: 28px;
+  text-align: center;
+}
+
+.module-card--main .module-card__icon-wrap {
+  height: 82px;
+  width: 82px;
+}
+
+.module-card--main .module-card__icon {
+  font-size: 48px;
+}
+
+.module-card--main .module-card__body {
+  align-items: center;
+  gap: 8px;
+}
+
+.module-card--main .module-card__body strong {
+  font-size: 1.42rem;
+}
+
+.module-card--main .module-card__body small {
+  font-size: var(--se-font-small);
+}
+
+.module-card--main .module-card__arrow {
+  align-self: center;
+  font-size: 28px;
+}
+
+.secondary-modules-grid {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  overflow-x: auto;
+  padding-bottom: 18px;
+  white-space: nowrap;
+}
+
+.secondary-module-col {
+  flex: 0 0 132px;
+}
+
+.module-card--secondary {
+  align-items: center;
+  height: 100%;
+  min-height: 86px;
+  padding: 12px;
+  gap: 9px;
+  text-align: center;
+}
+
+.module-card--secondary .module-card__icon-wrap {
+  height: 40px;
+  width: 40px;
+}
+
+.module-card--secondary .module-card__icon {
+  font-size: 24px;
+}
+
+.module-card--secondary .module-card__body strong {
+  font-size: 0.82rem;
+}
+
+.module-card--secondary .module-card__arrow,
+.module-card--secondary .module-card__body small {
+  display: none;
+}
+
 @media (max-width: 960px) {
   .home-dashboard__hero {
     grid-template-columns: 1fr;
@@ -476,8 +621,35 @@ export default {
     padding: 14px;
   }
 
+  .module-card--main {
+    min-height: 206px;
+    padding: 18px;
+  }
+
+  .module-card--main .module-card__icon-wrap {
+    height: 68px;
+    width: 68px;
+  }
+
+  .module-card--main .module-card__icon {
+    font-size: 40px;
+  }
+
+  .module-card--secondary {
+    min-height: 78px;
+    padding: 11px;
+  }
+
+  .secondary-module-col {
+    flex-basis: 118px;
+  }
+
   .module-card__body strong {
     font-size: 0.92rem;
+  }
+
+  .module-card--main .module-card__body strong {
+    font-size: 1.16rem;
   }
 }
 </style>
