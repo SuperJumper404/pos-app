@@ -1,6 +1,7 @@
 const moment = require('moment')
 const { normalizeVatBreakdown } = require('./vat')
 const { formatPrice, parsePrice, roundPrice } = require('./price-functions')
+const { groupCustomizationSelections } = require('./customizations')
 
 const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 
@@ -52,6 +53,30 @@ const formatReceiptProductLine = (item = {}, isTvaActive = false) => {
 
   return `${qty}${name}${formatCompactVatRate(item).padStart(5)}${price}`
 }
+
+const getCustomizationSelections = (item = {}) =>
+  [
+    item.customization_selections,
+    item.customizationSelections,
+    item.customization_snapshots,
+    item.customizationSnapshots,
+    item.historical_customizations,
+    item.historicalCustomizations,
+  ].find((selections) => Array.isArray(selections) && selections.length) ||
+  item.customizationList
+
+const receiptCustomizationLines = (item = {}) =>
+  groupCustomizationSelections(getCustomizationSelections(item))
+    .flatMap((group) =>
+      (group.choices || []).map((choice) => {
+        const choiceName = String(choice.name || '').trim()
+        if (!choiceName) return ''
+        return group.stepName
+          ? `  - ${group.stepName} : ${choiceName}`
+          : `  - ${choiceName}`
+      })
+    )
+    .filter(Boolean)
 
 const optionalText = (value) => String(value == null ? '' : value).trim()
 
@@ -272,6 +297,9 @@ const buildCashierEscPos = (payload) => {
       euroSymbol,
       esc('\n')
     )
+    receiptCustomizationLines(item).forEach((lineText) => {
+      push(alignLeft(), esc(`${lineText}\n`))
+    })
   })
   push(line())
 
@@ -364,9 +392,16 @@ const buildCashierCloudXml = (payload) => {
     .join('')
   const productXml = payload.details
     .map((item) => {
+      const customizationXml = receiptCustomizationLines(item)
+        .map(
+          (line) =>
+            `<text align="left">${xmlEscape(line)}</text><feed line="1"/>`
+        )
+        .join('')
       return (
         `<text em="true" align="left">${xmlEscape(formatReceiptProductLine(item, payload.isTvaActive))} \u20AC</text>` +
-        '<feed line="1"/>'
+        '<feed line="1"/>' +
+        customizationXml
       )
     })
     .join('')

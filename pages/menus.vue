@@ -1146,6 +1146,7 @@
     <!-- <pre>acces :{{ access }}</pre>
     <pre>ici {{ itemDialog }}</pre> -->
     <v-snackbar
+      v-if="showMenuSnackbars"
       v-model="kitchenClosedSnackbar"
       color="warning"
       timeout="4500"
@@ -1159,6 +1160,7 @@
       </template>
     </v-snackbar>
     <v-snackbar
+      v-if="showMenuSnackbars"
       v-model="cartAddSnackbar"
       color="success"
       timeout="2200"
@@ -1383,6 +1385,9 @@ export default {
     },
     canUseLargeProductView() {
       return this.isAdminView && this.$vuetify.breakpoint.smAndUp
+    },
+    showMenuSnackbars() {
+      return this.$vuetify.breakpoint.smAndUp
     },
     expressProducts() {
       if (!this.activeExpressCategory) return this.dataProduct

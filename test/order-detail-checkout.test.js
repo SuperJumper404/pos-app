@@ -238,6 +238,8 @@ const cloudXml = buildOrderTicketCloudXml(enrichedPayload)
 assert.match(cloudXml, /À emporter/)
 assert.match(cloudXml, /Sauces : Ketchup/)
 assert.match(cloudXml, /Sauces : Barbecue/)
+assert.match(cloudXml, /QTE\s+PRODUIT\s{17}PRIX/)
+assert.match(cloudXml, /------------------------------------/)
 assert.match(
   cloudXml,
   /<text em="true" align="left" width="1" height="2">1x\s{3}Burger/
