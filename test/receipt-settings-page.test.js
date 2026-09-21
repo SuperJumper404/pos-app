@@ -83,6 +83,12 @@ assert.ok(
   'La section horaires doit utiliser une grille compacte dediee'
 )
 assert.ok(
+  settingsSource.includes('addHourPeriod') &&
+    settingsSource.includes('removeHourPeriod') &&
+    settingsSource.includes('normalizeShopHours'),
+  'les horaires doivent permettre deux plages par jour et normaliser les anciens horaires'
+)
+assert.ok(
   /<v-row class="settings-main-grid">[\s\S]*<v-col cols="12" md="6" lg="6">[\s\S]*<v-card id="media"[\s\S]*<v-col cols="12" md="6" lg="6">[\s\S]*<v-card[\s\S]*id="horaires"/.test(
     settingsSource
   ),

@@ -107,9 +107,23 @@
                   dense
                   hide-details
                 ></v-switch>
+                <div v-if="day.isOpen" class="settings-hours-periods">
+                  <div
+                    v-for="(period, periodIndex) in day.periods"
+                    :key="periodIndex"
+                    class="settings-hours-period"
+                  >
+                    <v-btn
+                      v-if="day.periods.length > 1"
+                      icon
+                      small
+                      aria-label="Supprimer la plage horaire"
+                      @click="removeHourPeriod(day, periodIndex)"
+                    >
+                      <v-icon small>mdi-close</v-icon>
+                    </v-btn>
                 <v-text-field
-                  v-if="day.isOpen"
-                  v-model="day.from"
+                  v-model="period.from"
                   class="settings-hours-time"
                   hide-details
                   single-line
@@ -117,13 +131,12 @@
                   dense
                   outlined
                   suffix="H"
-                  :disabled="!day.isOpen"
                   label="De"
                   @keypress="validateInput"
                 ></v-text-field>
                 <v-text-field
                   v-if="day.isOpen"
-                  v-model="day.to"
+                  v-model="period.to"
                   class="settings-hours-time"
                   hide-details
                   single-line
@@ -131,10 +144,22 @@
                   type="text"
                   suffix="H"
                   dense
-                  :disabled="!day.isOpen"
                   label="À"
                 ></v-text-field>
-                <div v-else class="settings-hours-closed"></div>
+                  </div>
+                  <v-btn
+                    v-if="day.periods.length < 2"
+                    text
+                    small
+                    color="primary"
+                    class="settings-hours-add text-none"
+                    @click="addHourPeriod(day)"
+                  >
+                    <v-icon left small>mdi-plus</v-icon>
+                    Ajouter une plage
+                  </v-btn>
+                </div>
+                <div v-else class="settings-hours-closed">Ferm&eacute;</div>
               </div>
             </div>
           </div>
@@ -637,6 +662,7 @@ import {
   normalizeDiscountPercentages,
 } from '@/helpers/discount'
 import { SHOP_THEME_PRESETS, normalizeShopTheme } from '@/helpers/shopThemes'
+const { normalizeShopHours } = require('@/helpers/shopHours')
 export default {
   components: {
     Loading,
@@ -933,7 +959,9 @@ export default {
         this.formShop.discount_percentages = normalizeDiscountPercentages(
           this.shop_discount_percentages
         )
-        this.formShop.shop_hours = JSON.parse(JSON.stringify(this.shop_hours))
+        this.formShop.shop_hours = normalizeShopHours(
+          JSON.parse(JSON.stringify(this.shop_hours))
+        )
         this.formShop.shop_social_media = JSON.parse(
           JSON.stringify(this.shop_social_media)
         )
@@ -1026,6 +1054,7 @@ export default {
     async submitShopEdit() {
       if (this.isValue) {
         this.loadingBtn = true
+        this.formShop.shop_hours = normalizeShopHours(this.formShop.shop_hours)
         this.formShop.shop_payment_methods = normalizePaymentMethods(
           this.formShop.shop_payment_methods
         )
@@ -1098,6 +1127,14 @@ export default {
       if (charCode < 48 || charCode > 57 || event.target.value.length >= 2) {
         event.preventDefault()
       }
+    },
+    addHourPeriod(day) {
+      if (!day || !Array.isArray(day.periods) || day.periods.length >= 2) return
+      day.periods.push({ from: '', to: '' })
+    },
+    removeHourPeriod(day, periodIndex) {
+      if (!day || !Array.isArray(day.periods) || day.periods.length <= 1) return
+      day.periods.splice(periodIndex, 1)
     },
   },
 }
@@ -1307,7 +1344,7 @@ export default {
   align-items: center;
   column-gap: 18px;
   display: grid;
-  grid-template-columns: 112px 104px 72px 72px;
+  grid-template-columns: 112px 104px minmax(0, 1fr);
   min-height: 52px;
 }
 
@@ -1327,6 +1364,23 @@ export default {
 .settings-hours-time {
   margin-top: 0 !important;
   max-width: 72px;
+}
+
+.settings-hours-periods {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.settings-hours-period {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.settings-hours-add {
+  margin-left: 2px;
 }
 
 .settings-hours-closed {
@@ -1431,7 +1485,7 @@ export default {
 
   .settings-hours-row {
     column-gap: 6px;
-    grid-template-columns: minmax(74px, 1fr) 86px 58px 58px;
+    grid-template-columns: minmax(74px, 1fr) 86px minmax(0, 1fr);
   }
 
   .settings-hours-day {

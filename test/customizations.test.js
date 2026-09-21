@@ -2422,6 +2422,7 @@ const runReviewRegressionTests = async () => {
     ['set/user.is_primary_admin', false],
     ['set/user.session_subject', null],
     ['set/user.service_point_id', null],
+    ['set/user.service_point_name', null],
     ['set/user.order_source', null],
   ])
 
@@ -2582,6 +2583,7 @@ const runReviewRegressionTests = async () => {
     is_primary_admin: false,
     session_subject: null,
     service_point_id: null,
+    service_point_name: null,
     order_source: null,
   })
   assert.strictEqual(persistedAuthState.authenticated, false)
@@ -2595,6 +2597,7 @@ const runReviewRegressionTests = async () => {
     'is_primary_admin',
     'session_subject',
     'service_point_id',
+    'service_point_name',
     'order_source',
   ]) {
     assert.strictEqual(authStorage.getItem(key), null)
@@ -2636,6 +2639,7 @@ const runReviewRegressionTests = async () => {
     is_primary_admin: false,
     session_subject: null,
     service_point_id: null,
+    service_point_name: null,
     order_source: null,
   })
   assert.strictEqual(failedAuthState.cart.clientOrderAuthRedirect, true)

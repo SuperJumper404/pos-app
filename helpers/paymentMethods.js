@@ -12,10 +12,10 @@ const PAYMENT_METHOD_OPTIONS = [
     aliases: ['Espèce', 'Espèces '],
   },
   {
-    text: 'Ticket resto',
-    value: 'Ticket resto',
+    text: 'Ticket restaurant',
+    value: 'Ticket restaurant',
     icon: 'mdi-ticket-confirmation-outline',
-    aliases: ['Ticket Restaurant', 'Tickets Restaurants'],
+    aliases: ['Ticket resto', 'Ticket Restaurant', 'Tickets Restaurants'],
   },
   {
     text: 'Chèque',
@@ -40,12 +40,15 @@ const findPaymentMethodOption = (method) => {
   })
 }
 
-const normalizePaymentMethod = (method) => {
+const normalizePaymentMethod = (method, provider) => {
   const candidate = method && typeof method === 'object'
     ? method.value || method.text || method.name
     : method
+  if (normalizeText(provider).includes('stripe')) return 'Stripe'
+  if (normalizeText(candidate).includes('stripe')) return 'Stripe'
+  if (normalizeText(candidate) === 'autre') return 'Carte bancaire'
   const option = findPaymentMethodOption(candidate)
-  return option ? option.value : String(candidate || '').trim()
+  return option ? option.value : (String(candidate || '').trim() ? 'Carte bancaire' : '')
 }
 
 const normalizePaymentMethods = (methods) => {
@@ -59,7 +62,10 @@ const normalizePaymentSummary = (rows) => {
   const grouped = new Map()
 
   source.forEach((row) => {
-    const payment = normalizePaymentMethod(row && row.payment)
+    const payment = normalizePaymentMethod(
+      row && row.payment,
+      row && row.payment_provider
+    )
     if (!payment) return
 
     const key = normalizeText(payment)

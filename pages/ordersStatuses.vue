@@ -1,5 +1,10 @@
 <template>
   <v-container fluid class="orders-status-page">
+    <div v-if="clientServicePointName" class="orders-service-point">
+      <v-icon color="primary" size="22">mdi-table-chair</v-icon>
+      <span>{{ clientServicePointName }}</span>
+    </div>
+
     <v-card v-if="loadPage" outlined class="orders-loading-card">
       <Loading />
     </v-card>
@@ -246,6 +251,14 @@ export default {
         user.service_point_id ||
         localStorage.getItem('service_point_id') ||
         user.id
+      )
+    },
+    clientServicePointName() {
+      const user = this.user || {}
+      return (
+        user.service_point_name ||
+        localStorage.getItem('service_point_name') ||
+        ''
       )
     },
     allOrdersSent() {
@@ -513,6 +526,20 @@ export default {
   height: 350px;
   margin-top: 20px;
   overflow-y: auto;
+}
+
+.orders-service-point {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #121826;
+  display: flex;
+  font-weight: 900;
+  gap: 8px;
+  margin: 0 auto 12px;
+  max-width: 1180px;
+  padding: 12px 16px;
 }
 
 .orders-current-count {

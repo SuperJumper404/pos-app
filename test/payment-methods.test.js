@@ -2,8 +2,13 @@ const assert = require('assert')
 const {
   getPaymentMethodOptions,
   normalizePaymentMethods,
+  normalizePaymentMethod,
   normalizePaymentSummary,
 } = require('../helpers/paymentMethods')
+
+if (normalizePaymentMethod('carte bancaire', 'stripe') !== 'Stripe') {
+  throw new Error('Stripe must stay distinct from card payments')
+}
 
 assert.deepStrictEqual(
   normalizePaymentMethods([
@@ -15,9 +20,9 @@ assert.deepStrictEqual(
 
 assert.deepStrictEqual(
   getPaymentMethodOptions([
-    { text: 'Ticket resto', value: 'Ticket resto', icon: 'mdi-ticket-confirmation-outline' },
+    { text: 'Ticket restaurant', value: 'Ticket restaurant', icon: 'mdi-ticket-confirmation-outline' },
   ]).map((method) => method.text),
-  ['Ticket resto']
+  ['Ticket restaurant']
 )
 
 assert.deepStrictEqual(
@@ -26,13 +31,15 @@ assert.deepStrictEqual(
     { payment: 'Carte bancaire', total: 47.6 },
     { payment: 'espèces', total: 34.7 },
     { payment: 'Espèces', total: 20 },
-    { payment: 'Ticket resto', total: 22.5 },
+    { payment: 'Ticket restaurant', total: 22.5 },
     { payment: 'ticket resto', total: 26 },
+    { payment: 'carte bancaire', payment_provider: 'stripe', total: 12 },
   ]),
   [
     { payment: 'Carte bancaire', total: 87 },
     { payment: 'Espèces', total: 54.7 },
-    { payment: 'Ticket resto', total: 48.5 },
+    { payment: 'Ticket restaurant', total: 48.5 },
+    { payment: 'Stripe', payment_provider: 'stripe', total: 12 },
   ]
 )
 

@@ -1190,6 +1190,8 @@ import {
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import { calculateDiscount } from '@/helpers/discount'
 // import * as config from '@/nuxt.config'
+const productTracksStock = (product = {}) =>
+  [true, 1, '1'].includes(product.track_stock)
 export default {
   components: {
     Loading,
@@ -1376,6 +1378,7 @@ export default {
     clientServiceSubtitle() {
       const tableName =
         (this.selectedClientTable && this.selectedClientTable.name) ||
+        (this.$store.get('users/user') || {}).service_point_name ||
         (process.client ? localStorage.getItem('service_point_name') : '') ||
         ''
       return tableName || ''
@@ -1854,7 +1857,7 @@ export default {
         return
       }
 
-      if (Number(params.stock) < 1) {
+      if (productTracksStock(params) && Number(params.stock) < 1) {
         this.showAlert('Produit non disponible', 'error')
         return
       }

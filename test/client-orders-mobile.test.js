@@ -12,6 +12,16 @@ assert.match(
   /clientServicePointId\(\)\s*\{/,
   'client orders must resolve the active service point'
 )
+assert.match(
+  source,
+  /clientServicePointName\(\)\s*\{/,
+  'client orders must resolve the scanned table name'
+)
+assert.match(
+  source,
+  /class="orders-service-point"[\s\S]*?clientServicePointName/,
+  'client orders must display the scanned table name'
+)
 assert.ok(
   (source.match(/servicePointId:\s*this\.clientServicePointId/g) || []).length >= 2,
   'initial loading and polling must request orders by service point'

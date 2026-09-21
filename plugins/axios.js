@@ -2,6 +2,7 @@ const {
   parsePersistedState,
   serializePersistedState,
 } = require('../helpers/persistedState')
+const { clearStoredAuth, isQrSession } = require('../helpers/sessionAuth')
 
 const clearAuthState = (state) => {
   if (!state || typeof state !== 'object') return
@@ -16,6 +17,10 @@ const clearAuthState = (state) => {
   user.shopid = null
   user.module_permissions = null
   user.is_primary_admin = false
+  user.session_subject = null
+  user.service_point_id = null
+  user.service_point_name = null
+  user.order_source = null
 }
 
 const isAuthStateCleared = (state) => {
@@ -53,6 +58,10 @@ const sanitizedAuthSnapshot = (state) => {
             shopid: null,
             module_permissions: null,
             is_primary_admin: false,
+            session_subject: null,
+            service_point_id: null,
+            service_point_name: null,
+            order_source: null,
           },
         }),
       },
@@ -61,13 +70,10 @@ const sanitizedAuthSnapshot = (state) => {
 }
 
 export default function ({ $axios, redirect, store }) {
+  let authRedirectInProgress = false
+
   const clearAuth = () => {
-    localStorage.removeItem('idUser')
-    localStorage.removeItem('access')
-    localStorage.removeItem('token')
-    localStorage.removeItem('shopid')
-    localStorage.removeItem('module_permissions')
-    localStorage.removeItem('is_primary_admin')
+    clearStoredAuth(localStorage)
   }
 
   const markAuthRedirect = async () => {
@@ -161,11 +167,16 @@ export default function ({ $axios, redirect, store }) {
     }
 
     if (status === 401) {
+      if (authRedirectInProgress) return
+      authRedirectInProgress = true
+      const qrSession =
+        isQrSession(store.state.users && store.state.users.user) ||
+        Boolean(localStorage.getItem('table_access_token'))
       await markAuthRedirect()
       await clearStoreAuth()
       persistClearedAuth()
       clearAuth()
-      redirect('/login')
+      redirect(qrSession ? '/session-expired' : '/login')
     }
   })
 }

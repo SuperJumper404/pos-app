@@ -88,7 +88,7 @@ assert.deepStrictEqual(
   getPaymentMethodOptions([
     { text: 'Ticket resto', value: 'Ticket resto', icon: 'mdi-ticket-confirmation-outline' },
   ]).map((method) => method.text),
-  ['Ticket resto']
+  ['Ticket restaurant']
 )
 
 console.log('vat breakdown tests passed')

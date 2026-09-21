@@ -45,6 +45,7 @@ const responseUser = {
   shopid: 8,
   session_subject: 'service_point',
   service_point_id: 31,
+  username: 'Table 31',
   source: 'table_qr',
 }
 
@@ -71,6 +72,8 @@ actions.postTableAccess
     assert.strictEqual(storage.shopid, '8')
     assert.strictEqual(storage.session_subject, 'service_point')
     assert.strictEqual(storage.service_point_id, '31')
+    assert.strictEqual(storage.service_point_name, 'Table 31')
+    assert.strictEqual(storage.table_access_token, 'stable-qr-token')
     assert.deepStrictEqual(dispatches.slice(0, 5), [
       { type: 'set/user.id', payload: null, options: undefined },
       { type: 'set/user.access', payload: 2, options: undefined },
