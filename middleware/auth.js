@@ -27,7 +27,12 @@ export default async function ({ store, redirect, route, router }) {
 
   if (!store.state.authenticated) {
     if (typeof store.dispatch === 'function') {
-      store.dispatch('users/restoreAuthenticatedUser')
+      const restoredFromState = await store.dispatch(
+        'users/ensureAuthenticatedStorage'
+      )
+      if (!restoredFromState) {
+        store.dispatch('users/restoreAuthenticatedUser')
+      }
     }
     const canRestoreQrSession =
       !store.state.authenticated &&
@@ -44,6 +49,10 @@ export default async function ({ store, redirect, route, router }) {
     if (!store.state.authenticated) {
       return redirect(storedQrToken ? '/session-expired' : '/login')
     }
+  }
+
+  if (typeof store.dispatch === 'function' && store.state.authenticated) {
+    await store.dispatch('users/ensureAuthenticatedStorage')
   }
 
   const currentUser = store.state.users.user || {}

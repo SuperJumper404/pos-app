@@ -12,6 +12,7 @@ const authMiddleware = new Function(executable)()
 
 assert.ok(source.includes("postTableAccess"))
 assert.ok(source.includes("await store.dispatch('users/postTableAccess', storedQrToken)"))
+assert.ok(source.includes("users/ensureAuthenticatedStorage"))
 
 const run = async ({ authenticated, access, path, name }) => {
   const redirects = []
