@@ -1351,6 +1351,13 @@ export default {
     isOrderEditActive() {
       return this.$store.get('orderEdit/active') === true
     },
+    isQrBootstrapReady() {
+      const user = this.$store.get('users/user') || {}
+      return (
+        user.qrSessionReady === true &&
+        user.qrSessionToken === localStorage.getItem('table_access_token')
+      )
+    },
     orderEditDirty() {
       return this.$store.get('orderEdit/dirty') === true
     },
@@ -1515,6 +1522,17 @@ export default {
       this.restorePersistedCheckoutCart()
     } else {
       this.cartItem = []
+    }
+
+    if (this.isQrBootstrapReady) {
+      if (typeof this.ensureActiveMobileCategory === 'function') {
+        this.ensureActiveMobileCategory()
+      }
+      if (typeof this.ensureActiveExpressCategory === 'function') {
+        this.ensureActiveExpressCategory()
+      }
+      this.loadPage = false
+      return
     }
 
     const calls = [

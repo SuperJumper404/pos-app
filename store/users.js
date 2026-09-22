@@ -1,9 +1,16 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
+const qrBootstrapFactory =
+  typeof require === 'function'
+    ? require('../helpers/qrSessionBootstrap')
+    : { createQrSessionBootstrap: null }
 const sessionAuth =
   typeof require === 'function'
     ? require('../helpers/sessionAuth')
     : { isTokenExpired: () => false }
 const { isTokenExpired } = sessionAuth
+let tableAccessRequest = null
+let tableAccessRequestToken = null
+let qrSessionBootstrap = null
 export const state = () => ({
   message: '',
   alertSuccess: false,
@@ -19,6 +26,8 @@ export const state = () => ({
     service_point_id: null,
     service_point_name: null,
     order_source: null,
+    qrSessionReady: false,
+    qrSessionToken: null,
   },
   userDetail: [],
 })
@@ -35,6 +44,8 @@ export const mutations = {
     currentState.user.service_point_id = null
     currentState.user.service_point_name = null
     currentState.user.order_source = null
+    currentState.user.qrSessionReady = false
+    currentState.user.qrSessionToken = null
   },
 }
 export const plugins = [EasyAccess()]
@@ -130,7 +141,10 @@ export const actions = {
       .then((response) => {
         console.log('REspondse DAta', response.data.data)
         localStorage.removeItem('table_access_token')
+        qrSessionBootstrap = null
         persistAuthenticatedUser(dispatch, response)
+        dispatch('set/user.qrSessionReady', false)
+        dispatch('set/user.qrSessionToken', null)
         dispatch('set/message', response.data.message)
         dispatch('notifications/success', response.data.message, { root: true })
         return true
@@ -143,11 +157,20 @@ export const actions = {
       })
   },
   postTableAccess({ dispatch }, token) {
-    return this.$axios
-      .post('/baseurl/api/v1/table-access', { token })
+    const normalizedToken = String(token || '').trim()
+    if (!normalizedToken) return Promise.resolve(false)
+    if (tableAccessRequest && tableAccessRequestToken === normalizedToken) {
+      return tableAccessRequest
+    }
+
+    tableAccessRequestToken = normalizedToken
+    tableAccessRequest = this.$axios
+      .post('/baseurl/api/v1/table-access', { token: normalizedToken })
       .then((response) => {
-        localStorage.setItem('table_access_token', token)
+        localStorage.setItem('table_access_token', normalizedToken)
         persistAuthenticatedUser(dispatch, response)
+        dispatch('set/user.qrSessionReady', false)
+        dispatch('set/user.qrSessionToken', normalizedToken)
         dispatch('set/message', response.data.message)
         dispatch('notifications/success', response.data.message, {
           root: true,
@@ -162,6 +185,35 @@ export const actions = {
         dispatch('set/message', message)
         dispatch('set/alertError', true)
         return false
+      })
+      .finally(() => {
+        tableAccessRequest = null
+        tableAccessRequestToken = null
+      })
+    return tableAccessRequest
+  },
+  bootstrapTableAccess({ dispatch }, token) {
+    if (!qrSessionBootstrap) {
+      qrSessionBootstrap = qrBootstrapFactory.createQrSessionBootstrap({
+        authenticate: (qrToken) => dispatch('postTableAccess', qrToken),
+        loadInitialData: () =>
+          Promise.all([
+            dispatch('shop/getCurrentShopInfo', null, { root: true }),
+            dispatch('products/getProducts', null, { root: true }),
+            dispatch('servicePoints/getAll', null, { root: true }),
+          ]),
+      })
+    }
+
+    return qrSessionBootstrap(token)
+      .then((result) => {
+        dispatch('set/user.qrSessionReady', true)
+        dispatch('set/user.qrSessionToken', String(token || '').trim())
+        return result
+      })
+      .catch((error) => {
+        dispatch('set/user.qrSessionReady', false)
+        throw error
       })
   },
   postClickAndCollectAccess({ dispatch }, shopId) {
@@ -182,6 +234,9 @@ export const actions = {
       })
   },
   clearAuthenticatedUser({ dispatch }) {
+    qrSessionBootstrap = null
+    tableAccessRequest = null
+    tableAccessRequestToken = null
     dispatch('set/user.id', null)
     dispatch('set/user.access', null)
     dispatch('set/user.token', null)
@@ -192,6 +247,8 @@ export const actions = {
     dispatch('set/user.service_point_id', null)
     dispatch('set/user.service_point_name', null)
     dispatch('set/user.order_source', null)
+    dispatch('set/user.qrSessionReady', false)
+    dispatch('set/user.qrSessionToken', null)
     return true
   },
   postLogout({ dispatch }) {

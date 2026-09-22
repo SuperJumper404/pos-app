@@ -2424,6 +2424,8 @@ const runReviewRegressionTests = async () => {
     ['set/user.service_point_id', null],
     ['set/user.service_point_name', null],
     ['set/user.order_source', null],
+    ['set/user.qrSessionReady', false],
+    ['set/user.qrSessionToken', null],
   ])
 
   const originalRecovery = {
@@ -2585,6 +2587,8 @@ const runReviewRegressionTests = async () => {
     service_point_id: null,
     service_point_name: null,
     order_source: null,
+    qrSessionReady: false,
+    qrSessionToken: null,
   })
   assert.strictEqual(persistedAuthState.authenticated, false)
   assert.deepStrictEqual(persistedAuthState.users.user, authState.users.user)
@@ -2641,6 +2645,8 @@ const runReviewRegressionTests = async () => {
     service_point_id: null,
     service_point_name: null,
     order_source: null,
+    qrSessionReady: false,
+    qrSessionToken: null,
   })
   assert.strictEqual(failedAuthState.cart.clientOrderAuthRedirect, true)
   assert.deepStrictEqual(

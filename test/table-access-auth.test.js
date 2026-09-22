@@ -16,7 +16,11 @@ const executable = source
   .replace(/export const actions =/, 'const actions =')
   .concat('\nreturn { state, mutations, actions }\n')
 
-const moduleFactory = new Function('defaultMutations', executable)
+const moduleFactory = new Function(
+  'defaultMutations',
+  'createQrSessionBootstrap',
+  executable
+)
 
 const storage = {}
 global.localStorage = {
@@ -31,7 +35,10 @@ global.localStorage = {
   },
 }
 
-const { actions } = moduleFactory(() => ({}))
+const { actions } = moduleFactory(
+  () => ({}),
+  require('../helpers/qrSessionBootstrap').createQrSessionBootstrap
+)
 const dispatches = []
 const context = {
   dispatch(type, payload, options) {
