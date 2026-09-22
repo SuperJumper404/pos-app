@@ -45,12 +45,13 @@ export const actions = {
   getCurrentShopInfo({ dispatch }) {
     const access = parseInt(localStorage.getItem('access'))
     const shopId = localStorage.getItem('shopid')
+    const sessionSubject = localStorage.getItem('session_subject')
 
     if (access === 0) {
       return dispatch('getShopInfo')
     }
 
-    if (shopId) {
+    if (sessionSubject === 'service_point' && shopId) {
       return dispatch('getShopInfoClickAndCollect', shopId)
     }
 

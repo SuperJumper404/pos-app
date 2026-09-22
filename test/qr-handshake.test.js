@@ -3,18 +3,18 @@ const { runQrHandshake } = require('../helpers/qrHandshake')
 
 const events = []
 runQrHandshake({
-  authenticate: async () => events.push('authenticate') || true,
-  loadShop: async () => events.push('shop') || true,
-  loadProducts: async () => events.push('products') || true,
+  authenticate: () => events.push('authenticate') || true,
+  loadShop: () => events.push('shop') || true,
+  loadProducts: () => events.push('products') || true,
   timeoutMs: 100,
 }).then((result) => {
   assert.deepStrictEqual(events, ['authenticate', 'shop', 'products'])
   assert.strictEqual(result.ready, true)
 
   return runQrHandshake({
-    authenticate: async () => false,
-    loadShop: async () => true,
-    loadProducts: async () => true,
+    authenticate: () => false,
+    loadShop: () => true,
+    loadProducts: () => true,
     timeoutMs: 100,
   })
 }).then(() => {

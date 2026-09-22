@@ -16,7 +16,6 @@
 
 <script>
 import Loading from '@/components/loading'
-import { runQrHandshake } from '@/helpers/qrHandshake'
 
 export default {
   components: { Loading },
@@ -49,14 +48,10 @@ export default {
       this.errorMessage = ''
 
       try {
-        await runQrHandshake({
-          authenticate: () => this.$store.dispatch(
-            'users/postTableAccess',
-            this.$route.params.token
-          ),
-          loadShop: () => this.$store.dispatch('shop/getCurrentShopInfo'),
-          loadProducts: () => this.$store.dispatch('products/getProducts'),
-        })
+        await this.$store.dispatch(
+          'users/bootstrapTableAccess',
+          this.$route.params.token
+        )
 
         if (attempt !== this.handshakeAttempt) return
         this.loading = false

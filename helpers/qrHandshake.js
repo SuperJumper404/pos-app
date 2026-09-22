@@ -11,7 +11,7 @@ const withTimeout = (promise, timeoutMs) => {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
 
-const runQrHandshake = async ({
+const runQrHandshake = ({
   authenticate,
   loadShop,
   loadProducts,
@@ -27,7 +27,7 @@ const runQrHandshake = async ({
     (loader) => typeof loader === 'function'
   )
   const results = await Promise.all(loaders.map((loader) => loader()))
-  if (results.some((result) => result === false)) {
+  if (results.includes(false)) {
     throw new Error('Impossible de charger les données du restaurant.')
   }
 
