@@ -5,14 +5,17 @@ const path = require('path')
 
 const source = fs.readFileSync(path.join(__dirname, '../middleware/auth.js'), 'utf8')
 const executable = source
-  .replace(/export default function/, 'function authMiddleware')
+  .replace(/export default (?:async )?function/, 'async function authMiddleware')
   .concat('\nreturn authMiddleware\n')
 
 const authMiddleware = new Function(executable)()
 
-const run = ({ authenticated, access, path, name }) => {
+assert.ok(source.includes("postTableAccess"))
+assert.ok(source.includes("await store.dispatch('users/postTableAccess', storedQrToken)"))
+
+const run = async ({ authenticated, access, path, name }) => {
   const redirects = []
-  authMiddleware({
+  await authMiddleware({
     store: {
       state: {
         authenticated,
@@ -30,23 +33,24 @@ const run = ({ authenticated, access, path, name }) => {
   return redirects
 }
 
+;(async () => {
 assert.deepStrictEqual(
-  run({ authenticated: false, access: null, path: '/', name: 'index' }),
+  await run({ authenticated: false, access: null, path: '/', name: 'index' }),
   ['/login']
 )
 
 assert.deepStrictEqual(
-  run({ authenticated: true, access: 2, path: '/settings', name: 'settings' }),
+  await run({ authenticated: true, access: 2, path: '/settings', name: 'settings' }),
   ['/menus']
 )
 
 assert.deepStrictEqual(
-  run({ authenticated: true, access: 2, path: '/menus', name: 'menus' }),
+  await run({ authenticated: true, access: 2, path: '/menus', name: 'menus' }),
   []
 )
 
 assert.deepStrictEqual(
-  run({
+  await run({
     authenticated: true,
     access: 2,
     path: '/caisse/menu',
@@ -56,18 +60,22 @@ assert.deepStrictEqual(
 )
 
 assert.deepStrictEqual(
-  run({ authenticated: true, access: 2, path: '/menus/', name: 'menus' }),
+  await run({ authenticated: true, access: 2, path: '/menus/', name: 'menus' }),
   []
 )
 
 assert.deepStrictEqual(
-  run({ authenticated: true, access: 3, path: '/tables', name: 'tables' }),
+  await run({ authenticated: true, access: 3, path: '/tables', name: 'tables' }),
   ['/menus']
 )
 
 assert.deepStrictEqual(
-  run({ authenticated: true, access: 0, path: '/settings', name: 'settings' }),
+  await run({ authenticated: true, access: 0, path: '/settings', name: 'settings' }),
   []
 )
 
 console.log('auth middleware tests passed')
+})().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

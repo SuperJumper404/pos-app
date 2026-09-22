@@ -17,7 +17,7 @@ const sessionAuth =
     : { isQrSession: () => false, isTokenExpired: () => false }
 const { isQrSession, isTokenExpired } = sessionAuth
 
-export default function ({ store, redirect, route, router }) {
+export default async function ({ store, redirect, route, router }) {
   const storedToken =
     typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
   const storedQrToken =
@@ -28,6 +28,18 @@ export default function ({ store, redirect, route, router }) {
   if (!store.state.authenticated) {
     if (typeof store.dispatch === 'function') {
       store.dispatch('users/restoreAuthenticatedUser')
+    }
+    const canRestoreQrSession =
+      !store.state.authenticated &&
+      storedQrToken &&
+      typeof window !== 'undefined' &&
+      typeof store.dispatch === 'function'
+    if (canRestoreQrSession) {
+      try {
+        await store.dispatch('users/postTableAccess', storedQrToken)
+      } catch (error) {
+        // The normal redirect below handles invalid or expired QR tokens.
+      }
     }
     if (!store.state.authenticated) {
       return redirect(storedQrToken ? '/session-expired' : '/login')

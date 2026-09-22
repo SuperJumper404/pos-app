@@ -6,8 +6,8 @@
         <v-alert v-else-if="error" outlined text type="error">
           {{ message }}
         </v-alert>
-        <v-btn v-if="error" color="primary" class="text-none" to="/login">
-          Retour a la connexion
+        <v-btn v-if="error" color="primary" class="text-none" to="/qr-scan-failed">
+          Scanner a nouveau le QR code
         </v-btn>
       </v-col>
     </v-row>
@@ -16,6 +16,7 @@
 
 <script>
 import Loading from '@/components/loading'
+import { runQrHandshake } from '@/helpers/qrHandshake'
 
 export default {
   components: { Loading },
@@ -24,24 +25,49 @@ export default {
     return {
       loading: true,
       error: false,
+      errorMessage: '',
+      handshakeAttempt: 0,
     }
   },
   computed: {
     message() {
-      return this.$store.get('users/message') || 'Token QR invalide.'
+      return (
+        this.errorMessage ||
+        this.$store.get('users/message') ||
+        'Token QR invalide.'
+      )
     },
   },
-  async mounted() {
-    const ok = await this.$store.dispatch(
-      'users/postTableAccess',
-      this.$route.params.token
-    )
-    this.loading = false
-    if (ok) {
-      this.$router.replace('/menus')
-      return
-    }
-    this.error = true
+  mounted() {
+    this.startHandshake()
+  },
+  methods: {
+    async startHandshake() {
+      const attempt = ++this.handshakeAttempt
+      this.loading = true
+      this.error = false
+      this.errorMessage = ''
+
+      try {
+        await runQrHandshake({
+          authenticate: () => this.$store.dispatch(
+            'users/postTableAccess',
+            this.$route.params.token
+          ),
+          loadShop: () => this.$store.dispatch('shop/getCurrentShopInfo'),
+          loadProducts: () => this.$store.dispatch('products/getProducts'),
+        })
+
+        if (attempt !== this.handshakeAttempt) return
+        this.loading = false
+        this.$router.replace('/menus')
+      } catch (error) {
+        if (attempt !== this.handshakeAttempt) return
+        this.loading = false
+        this.error = true
+        this.errorMessage = error.message || 'Connexion QR impossible.'
+      }
+    },
   },
 }
 </script>
