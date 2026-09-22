@@ -190,6 +190,12 @@
 </template>
 
 <script>
+const {
+  getDayPeriods,
+  isHourInPeriods,
+  validPeriods,
+} = require('@/helpers/shopHours')
+
 export default {
   layout: 'empty',
   data() {
@@ -313,23 +319,8 @@ export default {
         return false
       }
 
-      const openingHour = Number(today.from)
-      const closingHour = Number(today.to)
-
-      if (
-        !Number.isFinite(openingHour) ||
-        !Number.isFinite(closingHour) ||
-        today.from == null ||
-        today.to == null ||
-        openingHour < 0 ||
-        closingHour > 24 ||
-        openingHour === closingHour
-      ) {
-        return false
-      }
-
       const currentHour = new Date().getHours()
-      return currentHour >= openingHour && currentHour < closingHour
+      return isHourInPeriods(today, currentHour)
     },
   },
   watch: {
@@ -353,25 +344,32 @@ export default {
         return 'Fermé'
       }
 
-      const openingHour = Number(day.from)
-      const closingHour = Number(day.to)
+      const periods = validPeriods(day)
+      const hasClosedPeriod = getDayPeriods(day).some(
+        (period) => Number(period.from) === 0 && Number(period.to) === 0
+      )
 
       if (
-        day.from == null ||
-        day.to == null ||
-        !Number.isFinite(openingHour) ||
-        !Number.isFinite(closingHour)
+        !periods.length && !hasClosedPeriod
       ) {
         return 'Horaires non renseign\u00E9s'
       }
 
-      if (openingHour === closingHour) {
+      if (getDayPeriods(day).some(
+        (period) => Number(period.from) === 0 && Number(period.to) === 0
+      )) {
         return 'Fermé'
       }
 
-      return `${String(openingHour).padStart(2, '0')}:00 - ${String(
-        closingHour
-      ).padStart(2, '0')}:00`
+      return periods
+        .map((period) => {
+          const openingHour = Number(period.from)
+          const closingHour = Number(period.to)
+          return `${String(openingHour).padStart(2, '0')}:00 - ${String(
+            closingHour
+          ).padStart(2, '0')}:00`
+        })
+        .join(` ${String.fromCharCode(183)} `)
     },
     getDayName(day, index) {
       const weekDays = [

@@ -11,13 +11,39 @@ const {
   isKioskOnlyUser,
   isKioskRoute,
 } = kioskAccess
+const sessionAuth =
+  typeof require === 'function'
+    ? require('../helpers/sessionAuth')
+    : { isQrSession: () => false, isTokenExpired: () => false }
+const { isQrSession, isTokenExpired } = sessionAuth
 
 export default function ({ store, redirect, route, router }) {
+  const storedToken =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+  const storedQrToken =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('table_access_token')
+      : null
+
   if (!store.state.authenticated) {
-    return redirect('/login')
+    if (typeof store.dispatch === 'function') {
+      store.dispatch('users/restoreAuthenticatedUser')
+    }
+    if (!store.state.authenticated) {
+      return redirect(storedQrToken ? '/session-expired' : '/login')
+    }
   }
 
   const currentUser = store.state.users.user || {}
+  const currentToken = currentUser.token || storedToken
+  if (currentToken && isTokenExpired(currentToken)) {
+    return redirect(
+      isQrSession(currentUser) || storedQrToken
+        ? '/session-expired'
+        : '/login'
+    )
+  }
+
   if (isKioskRoute(route) && !canAccessKiosk(currentUser)) {
     return redirect([2, 3].includes(Number(currentUser.access)) ? '/menus' : '/')
   }

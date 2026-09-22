@@ -1,4 +1,9 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
+const sessionAuth =
+  typeof require === 'function'
+    ? require('../helpers/sessionAuth')
+    : { isTokenExpired: () => false }
+const { isTokenExpired } = sessionAuth
 export const state = () => ({
   message: '',
   alertSuccess: false,
@@ -12,6 +17,7 @@ export const state = () => ({
     is_primary_admin: false,
     session_subject: null,
     service_point_id: null,
+    service_point_name: null,
     order_source: null,
   },
   userDetail: [],
@@ -27,6 +33,7 @@ export const mutations = {
     currentState.user.is_primary_admin = false
     currentState.user.session_subject = null
     currentState.user.service_point_id = null
+    currentState.user.service_point_name = null
     currentState.user.order_source = null
   },
 }
@@ -50,6 +57,10 @@ const persistAuthenticatedUser = (dispatch, response) => {
   localStorage.setItem('is_primary_admin', user.is_primary_admin ? '1' : '0')
   localStorage.setItem('session_subject', user.session_subject || 'staff')
   localStorage.setItem('service_point_id', user.service_point_id || '')
+  localStorage.setItem(
+    'service_point_name',
+    servicePointSession ? user.username || user.service_point_name || '' : ''
+  )
   localStorage.setItem('order_source', user.source || '')
   dispatch('set/user.id', servicePointSession ? null : user.id)
   dispatch('set/user.access', user.access)
@@ -63,10 +74,42 @@ const persistAuthenticatedUser = (dispatch, response) => {
   dispatch('set/user.is_primary_admin', Boolean(user.is_primary_admin))
   dispatch('set/user.session_subject', user.session_subject || 'staff')
   dispatch('set/user.service_point_id', user.service_point_id || null)
+  dispatch(
+    'set/user.service_point_name',
+    servicePointSession ? user.username || user.service_point_name || null : null
+  )
   dispatch('set/user.order_source', user.source || null)
   return user
 }
+const restoreAuthenticatedUser = (dispatch) => {
+  const token = localStorage.getItem('token')
+  const access = localStorage.getItem('access')
+  const shopid = localStorage.getItem('shopid')
+  const sessionSubject = localStorage.getItem('session_subject') || 'staff'
+
+  if (!token || !access || !shopid || isTokenExpired(token)) return false
+
+  dispatch('set/user.id', localStorage.getItem('idUser'))
+  dispatch('set/user.access', Number(access))
+  dispatch('set/user.token', token)
+  dispatch('set/user.shopid', Number(shopid))
+  dispatch('set/user.module_permissions', JSON.parse(localStorage.getItem('module_permissions') || 'null'))
+  dispatch('set/user.is_primary_admin', localStorage.getItem('is_primary_admin') === '1')
+  dispatch('set/user.session_subject', sessionSubject)
+  dispatch('set/user.service_point_id', localStorage.getItem('service_point_id') || null)
+  dispatch('set/user.service_point_name', localStorage.getItem('service_point_name') || null)
+  dispatch('set/user.order_source', localStorage.getItem('order_source') || null)
+  dispatch('setAuthentication', true, { root: true })
+  return true
+}
 export const actions = {
+  restoreAuthenticatedUser({ dispatch }) {
+    try {
+      return restoreAuthenticatedUser(dispatch)
+    } catch (error) {
+      return false
+    }
+  },
   postRegister({ dispatch }, params) {
     params.shopid = localStorage.getItem('shopid')
     return this.$axios
@@ -86,6 +129,7 @@ export const actions = {
       .post('/baseurl/api/v1/login', params)
       .then((response) => {
         console.log('REspondse DAta', response.data.data)
+        localStorage.removeItem('table_access_token')
         persistAuthenticatedUser(dispatch, response)
         dispatch('set/message', response.data.message)
         dispatch('notifications/success', response.data.message, { root: true })
@@ -102,6 +146,7 @@ export const actions = {
     return this.$axios
       .post('/baseurl/api/v1/table-access', { token })
       .then((response) => {
+        localStorage.setItem('table_access_token', token)
         persistAuthenticatedUser(dispatch, response)
         dispatch('set/message', response.data.message)
         dispatch('notifications/success', response.data.message, {
@@ -123,6 +168,7 @@ export const actions = {
     return this.$axios
       .post(`/baseurl/api/v1/shopInfo/click-and-collect/${shopId}/session`)
       .then((response) => {
+        localStorage.removeItem('table_access_token')
         const user = persistAuthenticatedUser(dispatch, response)
         dispatch('set/message', response.data.message)
         return user || true
@@ -144,6 +190,7 @@ export const actions = {
     dispatch('set/user.is_primary_admin', false)
     dispatch('set/user.session_subject', null)
     dispatch('set/user.service_point_id', null)
+    dispatch('set/user.service_point_name', null)
     dispatch('set/user.order_source', null)
     return true
   },
@@ -169,7 +216,9 @@ export const actions = {
         localStorage.removeItem('is_primary_admin')
         localStorage.removeItem('session_subject')
         localStorage.removeItem('service_point_id')
+        localStorage.removeItem('service_point_name')
         localStorage.removeItem('order_source')
+        localStorage.removeItem('table_access_token')
         dispatch('clearAuthenticatedUser')
         dispatch('clearAuthentication', null, { root: true })
         dispatch('set/message', response.data.message)

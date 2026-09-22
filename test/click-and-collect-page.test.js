@@ -2,6 +2,7 @@ const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
+const shopHours = require('../helpers/shopHours')
 
 const pagePath = path.join(
   __dirname,
@@ -87,6 +88,7 @@ assert.ok(
 vm.runInNewContext(scriptMatch[1].replace('export default', 'module.exports ='), {
   module: moduleRef,
   exports: moduleRef.exports,
+  require: (request) => request === '@/helpers/shopHours' ? shopHours : require(request),
   console: { log() {} },
 })
 
@@ -284,6 +286,13 @@ assert.strictEqual(page.methods.formatOpeningHours({ isOpen: false }), 'Ferm\u00
 assert.strictEqual(
   page.methods.formatOpeningHours({ isOpen: true, from: 9, to: 18 }),
   '09:00 - 18:00'
+)
+assert.strictEqual(
+  page.methods.formatOpeningHours({
+    isOpen: true,
+    periods: [{ from: 8, to: 12 }, { from: 14, to: 17 }],
+  }),
+  '08:00 - 12:00 · 14:00 - 17:00'
 )
 assert.strictEqual(
   page.methods.formatOpeningHours({ isOpen: true, from: 0, to: 0 }),
