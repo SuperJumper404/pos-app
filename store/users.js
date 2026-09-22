@@ -49,11 +49,11 @@ export const mutations = {
   },
 }
 export const plugins = [EasyAccess()]
-const persistAuthenticatedUser = (dispatch, response) => {
-  const payload = response.data.data
-  const user = Array.isArray(payload) ? payload[0] : payload
+const persistAuthStorage = (user) => {
+  if (typeof localStorage === 'undefined' || !user) return false
+
   const servicePointSession = user.session_subject === 'service_point'
-  if (servicePointSession) {
+  if (servicePointSession || user.id == null) {
     localStorage.removeItem('idUser')
   } else {
     localStorage.setItem('idUser', user.id)
@@ -70,9 +70,21 @@ const persistAuthenticatedUser = (dispatch, response) => {
   localStorage.setItem('service_point_id', user.service_point_id || '')
   localStorage.setItem(
     'service_point_name',
-    servicePointSession ? user.username || user.service_point_name || '' : ''
+    servicePointSession
+      ? user.username || user.service_point_name || ''
+      : ''
   )
-  localStorage.setItem('order_source', user.source || '')
+  localStorage.setItem('order_source', user.source || user.order_source || '')
+  if (servicePointSession && user.qrSessionToken) {
+    localStorage.setItem('table_access_token', user.qrSessionToken)
+  }
+  return true
+}
+const persistAuthenticatedUser = (dispatch, response) => {
+  const payload = response.data.data
+  const user = Array.isArray(payload) ? payload[0] : payload
+  const servicePointSession = user.session_subject === 'service_point'
+  persistAuthStorage(user)
   dispatch('set/user.id', servicePointSession ? null : user.id)
   dispatch('set/user.access', user.access)
   dispatch('set/user.token', user.token)
@@ -114,6 +126,22 @@ const restoreAuthenticatedUser = (dispatch) => {
   return true
 }
 export const actions = {
+  ensureAuthenticatedStorage({ dispatch, state, rootState }) {
+    const user = state.user || {}
+    if (
+      !user.token ||
+      user.access === null ||
+      user.shopid === null ||
+      isTokenExpired(user.token)
+    ) {
+      return false
+    }
+
+    if (!rootState || !rootState.authenticated) {
+      dispatch('setAuthentication', true, { root: true })
+    }
+    return persistAuthStorage(user)
+  },
   restoreAuthenticatedUser({ dispatch }) {
     try {
       return restoreAuthenticatedUser(dispatch)
