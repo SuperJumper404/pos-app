@@ -167,6 +167,13 @@ export default function ({ $axios, redirect, store }) {
     }
 
     if (status === 401) {
+      const isTableAccessAttempt = /\/table-access(?:\/|$)/.test(
+        String(error.config && error.config.url ? error.config.url : '')
+      )
+      if (isTableAccessAttempt) {
+        redirect('/qr-scan-failed')
+        return
+      }
       if (authRedirectInProgress) return
       authRedirectInProgress = true
       const qrSession =

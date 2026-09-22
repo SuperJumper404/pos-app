@@ -77,12 +77,12 @@ assert.match(middlewareSource, /canAccessKiosk/)
 assert.match(middlewareSource, /redirect\('\/borne'\)/)
 
 const executableMiddleware = middlewareSource
-  .replace(/export default function/, 'function authMiddleware')
+  .replace(/export default (?:async )?function/, 'async function authMiddleware')
   .concat('\nreturn authMiddleware\n')
 const authMiddleware = new Function('require', executableMiddleware)(require)
-const runMiddleware = (user, route) => {
+const runMiddleware = async (user, route) => {
   const redirects = []
-  authMiddleware({
+  await authMiddleware({
     store: {
       state: {
         authenticated: true,
@@ -98,36 +98,37 @@ const runMiddleware = (user, route) => {
   return redirects
 }
 
+;(async () => {
 assert.deepStrictEqual(
-  runMiddleware(
+  await runMiddleware(
     { access: 1, module_permissions: ['orders'], is_primary_admin: false },
     { path: '/borne', name: 'borne' }
   ),
   ['/']
 )
 assert.deepStrictEqual(
-  runMiddleware(
+  await runMiddleware(
     { access: 1, module_permissions: ['borne'], is_primary_admin: false },
     { path: '/borne', name: 'borne' }
   ),
   ['/']
 )
 assert.deepStrictEqual(
-  runMiddleware(
+  await runMiddleware(
     { access: 2, session_subject: 'service_point', source: 'borne' },
     { path: '/borne', name: 'borne' }
   ),
   []
 )
 assert.deepStrictEqual(
-  runMiddleware(
+  await runMiddleware(
     { access: 0, module_permissions: [], is_primary_admin: true },
     { path: '/borne', name: 'borne' }
   ),
   []
 )
 assert.deepStrictEqual(
-  runMiddleware(
+  await runMiddleware(
     { access: 2, module_permissions: ['borne'], is_primary_admin: false },
     { path: '/borne', name: 'borne' }
   ),
@@ -139,3 +140,7 @@ assert.match(homeSource, /isKioskOnlyUser/)
 assert.match(homeSource, /this\.\$router\.replace\('\/borne'\)/)
 
 console.log('kiosk auth middleware tests passed')
+})().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})
