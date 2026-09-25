@@ -54,8 +54,8 @@
         color="primaryPurple"
         class="mb-5 d-flex"
       >
-        <v-btn value="staff" class="flex-grow-1 text-none">Connexion caisse</v-btn>
         <v-btn value="admin" class="flex-grow-1 text-none">Connexion admin</v-btn>
+        <v-btn value="staff" class="flex-grow-1 text-none">Connexion caisse</v-btn>
       </v-btn-toggle>
       <v-text-field
         v-if="formprops.access !== 1"
@@ -172,7 +172,7 @@ export default {
   data() {
     return {
       isValue: false,
-      loginMode: 'staff',
+      loginMode: 'admin',
       statePass: false,
       stsMsg: false,
       loadingBtn: false,

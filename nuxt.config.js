@@ -96,7 +96,11 @@ export default {
         content: 'https://smarteat.fr/logo.png',
       },
     ],
-    link: [{ rel: 'icon', type: 'image/x-icon', href: '/logo.png' }],
+    link: [
+      { rel: 'icon', type: 'image/png', href: '/logo.png' },
+      { rel: 'apple-touch-icon', href: '/icon-192.png' },
+      { rel: 'manifest', href: '/manifest.webmanifest' },
+    ],
   },
   css: [
     '~/assets/css/styles',

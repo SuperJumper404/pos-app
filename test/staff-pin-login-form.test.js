@@ -9,6 +9,11 @@ const source = fs.readFileSync(
 
 assert.match(source, /Connexion caisse/)
 assert.match(source, /Connexion admin/)
+assert.match(
+  source,
+  /value="admin"[\s\S]*Connexion admin[\s\S]*value="staff"[\s\S]*Connexion caisse/
+)
+assert.match(source, /loginMode:\s*'admin'/)
 assert.match(source, /staff_login_id/)
 assert.match(source, /PIN a 4 chiffres/)
 assert.match(source, /postLogin[\s\S]*staff_login_id/)
