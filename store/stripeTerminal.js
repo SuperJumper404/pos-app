@@ -208,10 +208,11 @@ const reconcileCurrentReader = (context, reader, request) => {
 const reconcileReaderList = (context, readers, request) => {
   const { dispatch, state } = context
   const current = state.currentReader
-  if (!current) return
-  const listed = readers.find((reader) => reader.id === current.id)
-  if (!listed || !listed.isActive || listed.assignedUserId !== current.assignedUserId) {
-    dispatch('set/currentReader', null)
+  if (current) {
+    const listed = readers.find((reader) => reader.id === current.id)
+    if (!listed || !listed.isActive || listed.assignedUserId !== current.assignedUserId) {
+      dispatch('set/currentReader', null)
+    }
   }
   return refreshCurrentReader(context, request)
 }

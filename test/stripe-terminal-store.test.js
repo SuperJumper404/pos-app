@@ -128,9 +128,9 @@ const run = async () => {
   ]
 
   for (const [name, input, method, url, body, dto, field] of routes) {
-    const refetchesCurrent = ['assignReader', 'setReaderActive'].includes(name)
+    const refetchesCurrent = ['getReaders', 'refreshReaders', 'assignReader', 'setReaderActive'].includes(name)
     const h = refetchesCurrent
-      ? harness(null, null, (requestMethod) => Promise.resolve(ok(requestMethod === 'get' ? null : dto)))
+      ? harness(null, null, (requestMethod, args) => Promise.resolve(ok(args[0] === `${base}/current-reader` ? null : dto)))
       : harness({ data: dto })
     const returned = await h.call(name, input)
     assert.deepStrictEqual(returned, dto, `${name} must return backend DTO`)
@@ -223,7 +223,8 @@ const run = async () => {
   const oldList = deferred()
   const newList = deferred()
   let listCalls = 0
-  const listRace = harness(null, null, () => ++listCalls === 1 ? oldList.promise : newList.promise)
+  const listRace = harness(null, null, (method, args) => args[0] === `${base}/current-reader`
+    ? Promise.resolve(ok(null)) : ++listCalls === 1 ? oldList.promise : newList.promise)
   const firstList = listRace.call('getReaders')
   const secondList = listRace.call('getReaders')
   assert.strictEqual(listRace.current.loading, true)
@@ -239,7 +240,8 @@ const run = async () => {
   const staleFailure = deferred()
   const freshSuccess = deferred()
   let errorCalls = 0
-  const errorRace = harness(null, null, () => ++errorCalls === 1 ? staleFailure.promise : freshSuccess.promise)
+  const errorRace = harness(null, null, (method, args) => args[0] === `${base}/current-reader`
+    ? Promise.resolve(ok(null)) : ++errorCalls === 1 ? staleFailure.promise : freshSuccess.promise)
   const previous = errorRace.call('getReaders')
   const latest = errorRace.call('getReaders')
   freshSuccess.resolve(ok([reader]))
@@ -252,7 +254,8 @@ const run = async () => {
   const pendingPaymentFailure = deferred()
   const unrelatedList = deferred()
   const crossDomain = harness(null, null, (method, args) =>
-    args[0].includes('/payments') ? pendingPaymentFailure.promise : unrelatedList.promise)
+    args[0] === `${base}/current-reader` ? Promise.resolve(ok(null))
+      : args[0].includes('/payments') ? pendingPaymentFailure.promise : unrelatedList.promise)
   const paymentRequest = crossDomain.call('startPayment', { orderIds: [3] })
   const readerRequest = crossDomain.call('getReaders')
   pendingPaymentFailure.reject({ response: { data: { error: 'TERMINAL_PAYMENT_FAILED' } } })
@@ -529,6 +532,50 @@ const run = async () => {
   obsoleteCurrent.resolve(ok(reader))
   assert.strictEqual(await oldCurrentFetch, false)
   assert.strictEqual(listCurrentRace.current.currentReader, null)
+
+  for (const [action, oldFinishesLast] of [
+    ['getReaders', true], ['getReaders', false],
+    ['refreshReaders', true], ['refreshReaders', false],
+  ]) {
+    const olderCurrent = deferred()
+    const freshEmptyList = deferred()
+    const authoritativeCurrent = deferred()
+    let currentRequests = 0
+    const emptyCurrentRace = harness(null, null, (method, args) => args[0] === `${base}/current-reader`
+      ? ++currentRequests === 1 ? olderCurrent.promise : authoritativeCurrent.promise
+      : freshEmptyList.promise)
+    assert.strictEqual(emptyCurrentRace.current.currentReader, null)
+    const olderFetch = emptyCurrentRace.call('getCurrentReader')
+    let listSettled = false
+    const newerList = emptyCurrentRace.call(action).then((value) => {
+      listSettled = true
+      return value
+    })
+    freshEmptyList.resolve(ok([]))
+    await Promise.resolve()
+    assert.deepStrictEqual(emptyCurrentRace.current.readers, [])
+    if (oldFinishesLast) {
+      authoritativeCurrent.resolve(ok(null))
+      assert.deepStrictEqual(await newerList, [])
+    }
+    olderCurrent.resolve(ok(reader))
+    const olderResult = await olderFetch
+    assert.strictEqual(emptyCurrentRace.current.currentReader, null,
+      `${action} must not let an older GET repopulate an initially empty current reader`)
+    assert.strictEqual(olderResult, false)
+    if (!oldFinishesLast) {
+      assert.strictEqual(listSettled, false, `${action} must await authoritative reconciliation`)
+      assert.strictEqual(emptyCurrentRace.current.loading, true)
+      authoritativeCurrent.resolve(ok(null))
+      assert.deepStrictEqual(await newerList, [])
+    }
+    assert.strictEqual(currentRequests, 2)
+    assertRequest(emptyCurrentRace.calls[2], 'get', `${base}/current-reader`)
+    assert.deepStrictEqual(emptyCurrentRace.current.readers, [])
+    assert.strictEqual(emptyCurrentRace.current.currentReader, null)
+    assert.strictEqual(emptyCurrentRace.current.loading, false)
+    assert.strictEqual(emptyCurrentRace.current.error, null)
+  }
 
   const unrelated = harness({ data: { ...reader, id: 8 } })
   unrelated.current.currentReader = reader
