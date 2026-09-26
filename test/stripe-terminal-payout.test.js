@@ -45,6 +45,7 @@ const make = (options = {}) => {
   const sessionStorage = options.storage || storage()
   const state = {
     orders: options.orders || [order()], reader: { ...reader }, activePayment: null,
+    details: options.details || [],
     error: null, authenticated: true, user: { id: 4, shopid: 2 },
   }
   const responses = {}
@@ -92,7 +93,7 @@ const make = (options = {}) => {
         authenticated: state.authenticated,
         'users/user': state.user,
         'orders/dataOrders': state.orders,
-        'orders/detailOrder': [],
+        'orders/detailOrder': state.details,
         'stripeTerminal/currentReader': state.reader,
         'stripeTerminal/activePayment': state.activePayment,
         'stripeTerminal/error': state.error,
@@ -827,6 +828,178 @@ test('successive paid sessions each use their own authoritative receipt without 
   assert.deepStrictEqual(printed.map(o => [o.id, o.subtotal]), [[1, 10.75], [2, 10.75]])
   assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
   assert.strictEqual(count(h, 'stripeTerminal/refreshPayment'), 2)
+})
+
+test('another cashier closes authoritative paid A and leaves unpaid B available without payment-status authorization', async () => {
+  const h = make({ orders: [order(1, { payment_status: 'paid', payment: 'Carte bancaire - TPE Stripe',
+    payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91, stripe_terminal_amount_cents: 1075 }), order(2)] })
+  h.state.user = { id: 99, shopid: 2 }
+  h.state.reader = null
+  h.responses['stripeTerminal/refreshPayment'] = false
+  await h.initialize()
+  assert.strictEqual(h.instance.receiptDialog, true)
+  assert.strictEqual(count(h, 'stripeTerminal/refreshPayment'), 0)
+  const printed = []
+  h.instance.printReceiptsForOrders = orders => printed.push(...orders)
+  await h.instance.confirmReceiptChoice(true)
+  assert.deepStrictEqual(printed.map(o => [o.id, o.subtotal]), [[1, 10.75]])
+  assert.deepStrictEqual(h.calls.filter(x => x.name === 'orders/archiveOrder').map(x => x.payload.id), [1])
+  assert.deepStrictEqual(Array.from(h.instance.ordersToArchive), [2])
+  assert.strictEqual(h.instance.requiresPaymentMethod, true)
+  assert.strictEqual(h.instance.paymentControlsLocked, false)
+  h.instance.selectPaymentMethod('Espèces')
+  await h.instance.requestReceiptChoice()
+  assert.strictEqual(h.instance.receiptDialog, true)
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+  assert.strictEqual(count(h, 'stripeTerminal/cancelPayment'), 0)
+})
+
+test('unpaid, unlinked or malformed allocation data cannot bypass Terminal confirmation', async () => {
+  for (const patch of [{ payment_status: 'unpaid' }, { stripe_terminal_amount_cents: null },
+    { stripe_terminal_amount_cents: -1 }, { stripe_terminal_amount_cents: 10.5 },
+    { payment_provider: 'stripe' }]) {
+    const h = make({ orders: [order(1, { payment_status: 'paid', payment: 'Carte bancaire',
+      payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91, stripe_terminal_amount_cents: 1075, ...patch })] })
+    h.responses['stripeTerminal/refreshPayment'] = false
+    await h.initialize()
+    noSettlement(h)
+  }
+})
+
+test('Terminal paid receipts scale order and line VAT while the manual snapshot stays unchanged', async () => {
+  const details = [{ id: 10, name: 'Menu', qty: 1, price: 12, total: 12, vat_rate: 20,
+    total_ht: 10, total_vat: 2, unit_price_ht: 10, unit_vat: 2 }]
+  for (const terminal of [true, false]) {
+    const h = make({ orders: [order(1, { total_ht: 10, total_vat: 2 })], details })
+    await h.initialize()
+    h.instance.selectPaymentMethod(terminal ? terminalMethod : 'Espèces')
+    await h.instance.requestReceiptChoice()
+    if (terminal) {
+      h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', { amountCents: 1075 })
+      await h.tick()
+    }
+    const printed = []
+    h.instance.printReceiptsForOrders = orders => printed.push(...orders)
+    await h.instance.confirmReceiptChoice(true)
+    const receiptOrder = printed[0]
+    assert.strictEqual(receiptOrder.total_ht, terminal ? 8.96 : 10)
+    assert.strictEqual(receiptOrder.total_vat, terminal ? 1.79 : 2)
+    const { buildCashierReceiptPayload } = require('../helpers/cashierReceipt')
+    const receipt = buildCashierReceiptPayload({ order: receiptOrder, details: receiptOrder.receiptDetails, shopInfo: { activate_tva: true } })
+    assert.strictEqual(receipt.totalAmount, terminal ? 10.75 : 12)
+    assert.strictEqual(receipt.discountAmount, terminal ? 1.25 : 0)
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(receipt.vatBreakdown)), [{ vatRate: 20,
+      totalHt: terminal ? 8.96 : 10, totalVat: terminal ? 1.79 : 2, totalTtc: terminal ? 10.75 : 12 }])
+    assert.strictEqual(receipt.details[0].total, receipt.totalAmount)
+    assert.strictEqual(Math.round((receiptOrder.total_ht + receiptOrder.total_vat) * 100), Math.round(receipt.totalAmount * 100))
+    assert.strictEqual(details[0].total_ht, 10, 'The source line must not be mutated')
+  }
+})
+
+test('legacy invalid exact recovery is discarded so current discount edits can start a valid payment', async () => {
+  for (const [discountType, discountValue] of [['percent', 100], ['amount', 1151], ['amount', 'invalid']]) {
+    const h = make()
+    h.storage.setItem('cashregister-terminal:2:4', JSON.stringify({ orderIds: [1], discountType, discountValue }))
+    h.instance.discountType = 'amount'
+    h.instance.discountValue = 1.25
+    await h.initialize()
+    assert.strictEqual(h.storage.getItem('cashregister-terminal:2:4'), null)
+    assert.strictEqual(h.instance.terminalAttempt, null)
+    assert.strictEqual(h.instance.discountValue, 1.25, 'Recovery cannot overwrite current form edits')
+    assert.strictEqual(h.instance.paymentControlsLocked, false)
+    assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+    h.instance.selectPaymentMethod('Espèces')
+    assert.strictEqual(h.instance.selectedPaymentMethod, 'Espèces')
+    h.instance.clearDiscount()
+    h.instance.discountType = 'amount'
+    h.instance.discountValue = 1.25
+    h.instance.selectPaymentMethod(terminalMethod)
+    h.responses['stripeTerminal/startPayment'] = payment('processing', { amountCents: 1075 })
+    await h.instance.requestReceiptChoice()
+    assert.strictEqual(h.instance.terminalState, 'processing')
+    assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 1)
+    assert.strictEqual(h.calls.find(x => x.name === 'stripeTerminal/startPayment').payload.discountValue, 125)
+  }
+})
+
+test('discarding invalid pending A preserves unrelated recovery records', async () => {
+  const h = make()
+  h.storage.setItem('cashregister-terminal:2:4', JSON.stringify({ version: 2, records: {
+    'pending:1': { orderIds: [1], discountType: 'percent', discountValue: 100 },
+    '92:2': { orderIds: [2], paymentId: 92, status: 'succeeded' },
+  } }))
+  await h.initialize()
+  const records = Object.values(JSON.parse(h.storage.getItem('cashregister-terminal:2:4')).records)
+  assert.deepStrictEqual(records, [{ orderIds: [2], paymentId: 92, status: 'succeeded' }])
+})
+
+test('recovery never discards real session or PI identities even with an invalid saved discount', async () => {
+  for (const identity of [{ paymentId: 91 }, { stripePaymentIntentId: 'pi_saved' },
+    { stripe_payment_intent_id: 'pi_saved' }, { paymentIntentId: 'pi_saved' }]) {
+    const h = make()
+    h.storage.setItem('cashregister-terminal:2:4', JSON.stringify({ orderIds: [1], discountType: 'percent', discountValue: 100, ...identity }))
+    await h.initialize()
+    assert.ok(h.storage.getItem('cashregister-terminal:2:4'))
+    assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+    if (!identity.paymentId) assert.strictEqual(h.instance.terminalState, 'recovery')
+    noSettlement(h)
+  }
+})
+
+test('an ambiguous valid start keeps its original recovery even if refreshed prices later make its discount invalid', async () => {
+  const h = make()
+  await h.initialize()
+  h.instance.discountType = 'amount'
+  h.instance.discountValue = 10
+  h.responses['stripeTerminal/startPayment'] = false
+  h.instance.selectPaymentMethod(terminalMethod)
+  await h.instance.requestReceiptChoice()
+  h.state.orders = [order(1, { subtotal: 5 })]
+  await h.instance.retryTerminalPayment()
+  assert.ok(h.storage.getItem('cashregister-terminal:2:4'))
+  assert.strictEqual(h.instance.terminalState, 'recovery')
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 1)
+})
+
+test('authoritative paid recovery clears a stale real-store A context before B starts', async () => {
+  const h = make({ orders: [order(1, { payment_status: 'paid', payment: 'Carte bancaire',
+    payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91, stripe_terminal_amount_cents: 1075 }), order(2)] })
+  const real = h.load(path.join(root, 'store/stripeTerminal.js'))
+  const terminal = real.state()
+  terminal.activePayment = payment()
+  const previousGet = h.instance.$store.get
+  h.instance.$store.get = key => key === 'stripeTerminal/activePayment' ? terminal.activePayment : previousGet(key)
+  const previousDispatch = h.instance.$store.dispatch
+  h.instance.$store.dispatch = (name, payload) => {
+    if (!['stripeTerminal/resetPayment', 'stripeTerminal/refreshPayment', 'stripeTerminal/startPayment'].includes(name)) return previousDispatch(name, payload)
+    h.calls.push({ name, payload })
+    return real.actions[name.split('/')[1]].call({ $axios: {
+      get: () => Promise.resolve({ data: { code: 403, success: false } }),
+      post: () => Promise.resolve({ data: { code: 200, success: true, data: payment('processing', { id: 92, orderIds: [2] }) } }),
+    } }, { state: terminal, dispatch: (name, value) => { terminal[name.slice(4)] = value } }, payload)
+  }
+  await h.initialize()
+  await h.instance.confirmReceiptChoice(false)
+  h.instance.selectPaymentMethod(terminalMethod)
+  await h.instance.requestReceiptChoice()
+  assert.strictEqual(h.instance.terminalState, 'processing')
+  assert.strictEqual(terminal.activePayment.id, 92)
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 1)
+  assert.strictEqual(count(h, 'stripeTerminal/refreshPayment'), 0)
+})
+
+test('destroy during paid-order context reset cannot open a receipt afterward', async () => {
+  const h = make({ orders: [order(1, { payment_status: 'paid', payment: 'Carte bancaire',
+    payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91, stripe_terminal_amount_cents: 1075 })] })
+  const pending = deferred()
+  h.responses['stripeTerminal/resetPayment'] = pending.promise
+  const loading = h.initialize()
+  for (let i = 0; i < 10; i++) await Promise.resolve()
+  h.page.beforeDestroy.call(h.instance)
+  pending.resolve(true)
+  await loading
+  noSettlement(h)
+  assert.strictEqual(h.timers.size, 0)
 })
 
 const run = async () => {

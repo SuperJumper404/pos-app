@@ -1,4 +1,5 @@
 const PAID_STATUS = 'paid'
+const { calculateDiscount } = require('./discount')
 const CASH_REGISTER_PAYMENT_STATUSES = new Set([
   PAID_STATUS,
   'unpaid',
@@ -43,6 +44,58 @@ const terminalRecoveryCollection = (stored) => {
   return { version: 2, records }
 }
 
+const receiptCents = (value) => value == null ? NaN : Math.round(Number(value) * 100)
+const nonnegativeCents = (value) => Number.isSafeInteger(value) && value >= 0
+
+const terminalTaxFields = (source, amountCents) => {
+  const ht = receiptCents(source.total_ht ?? source.totalHt)
+  const vat = receiptCents(source.total_vat ?? source.totalVat)
+  const rate = source.vat_rate ?? source.vatRate
+  let numerator
+  let denominator
+  if (nonnegativeCents(ht) && nonnegativeCents(vat) && Number.isSafeInteger(ht + vat)) {
+    numerator = ht
+    denominator = ht + vat
+  } else if (rate != null && Number.isFinite(Number(rate)) && Number(rate) >= 0) {
+    numerator = 10000
+    denominator = 10000 + Math.round(Number(rate) * 100)
+  } else return {}
+  const totalHt = denominator > 0
+    ? Number((BigInt(amountCents) * BigInt(numerator) + BigInt(denominator) / 2n) / BigInt(denominator)) : 0
+  return { total_ht: totalHt / 100, total_vat: (amountCents - totalHt) / 100 }
+}
+
+const terminalReceiptWithDetails = (order, details) => {
+  const source = Array.isArray(details) ? details : []
+  const amountCents = receiptCents(order.subtotal)
+  const weights = source.map((line) => receiptCents(line.total))
+  const gross = weights.reduce((sum, value) => sum + value, 0)
+  if (!source.length || !nonnegativeCents(amountCents) || !weights.every(nonnegativeCents) ||
+    !Number.isSafeInteger(gross) || gross <= 0) return { ...order, receiptDetails: source.slice() }
+
+  // Largest remainders preserve the paid total; line IDs break equal-cent ties.
+  const shares = weights.map((weight, index) => {
+    const product = BigInt(amountCents) * BigInt(weight)
+    return { index, cents: Number(product / BigInt(gross)), remainder: product % BigInt(gross),
+      id: Number(source[index].orderDetailsId ?? source[index].id) || index }
+  })
+  const ranked = shares.slice().sort((a, b) => a.remainder === b.remainder
+    ? a.id - b.id || a.index - b.index : a.remainder > b.remainder ? -1 : 1)
+  const remaining = amountCents - shares.reduce((sum, share) => sum + share.cents, 0)
+  for (let i = 0; i < remaining; i++) ranked[i].cents += 1
+  const receiptDetails = source.map((line, index) => {
+    const tax = terminalTaxFields(line, shares[index].cents)
+    const qty = Number(line.qty) > 0 ? Number(line.qty) : 1
+    return { ...line, total: shares[index].cents / 100, ...tax,
+      ...(tax.total_ht != null && { unit_price_ht: Math.round(tax.total_ht * 100 / qty) / 100,
+        unit_vat: Math.round(tax.total_vat * 100 / qty) / 100 }) }
+  })
+  const totals = receiptDetails.every((line) => nonnegativeCents(receiptCents(line.total_ht)) && nonnegativeCents(receiptCents(line.total_vat)))
+    ? { total_ht: receiptDetails.reduce((sum, line) => sum + receiptCents(line.total_ht), 0) / 100,
+        total_vat: receiptDetails.reduce((sum, line) => sum + receiptCents(line.total_vat), 0) / 100 } : {}
+  return { ...order, ...totals, receiptDetails }
+}
+
 const terminalReceiptSnapshot = (orders, payment) => {
   const { hasSettledTerminalAllocations } = require('./stripeTerminal')
   if (!hasSettledTerminalAllocations(payment)) return []
@@ -50,7 +103,7 @@ const terminalReceiptSnapshot = (orders, payment) => {
     const allocation = payment.allocations.find((a) => a.orderId === Number(order.id))
     const baseCents = Math.round(Number(order.subtotal) * 100)
     const discount = Math.max(0, baseCents - allocation.amountCents) / 100
-    return { ...order, subtotal: allocation.amountCents / 100,
+    return { ...order, ...terminalTaxFields(order, allocation.amountCents), subtotal: allocation.amountCents / 100,
       subtotal_before_discount: baseCents / 100, discount_type: discount ? 'amount' : 'none',
       discount_value: discount, discount_amount: discount, payment_status: 'paid',
       payment_provider: 'stripe_terminal', payment: 'Carte bancaire - TPE Stripe',
@@ -67,6 +120,23 @@ const cashRegisterTerminalPayload = ({ orderIds, discountType, discountValue }) 
       : Number(discountValue) || 0,
   }),
 })
+
+const terminalAttemptTotalCents = (attempt, subtotal) => {
+  const type = attempt.discountType ?? 'none'
+  const value = Number(attempt.discountValue ?? 0)
+  if (!['none', 'percent', 'amount'].includes(type) || !Number.isFinite(value) || value < 0 ||
+    (type === 'percent' && value > 100) || (type === 'amount' && !Number.isSafeInteger(value)) ||
+    !Number.isFinite(Number(subtotal))) return null
+  const discount = calculateDiscount({ subtotal, type, value: type === 'amount' ? value / 100 : value })
+  const total = receiptCents(discount.total)
+  return nonnegativeCents(total) ? total : null
+}
+
+const hasTerminalAttemptIdentity = (attempt) =>
+  [attempt.paymentId, attempt.sessionId].some((id) => Number.isSafeInteger(id) && id > 0) ||
+  [attempt.paymentIntentId, attempt.stripePaymentIntentId, attempt.stripe_payment_intent_id]
+    .some((id) => typeof id === 'string' && /^pi_[a-zA-Z0-9_]+$/.test(id)) ||
+  (Number.isSafeInteger(attempt.validatedAmountCents) && attempt.validatedAmountCents >= 50)
 
 const summarizeArchiveResults = (orderIds, results = []) => {
   const normalizedOrderIds = normalizeOrderIds(orderIds)
@@ -245,6 +315,9 @@ module.exports = {
   terminalAttemptKey,
   terminalRecoveryCollection,
   terminalReceiptSnapshot,
+  terminalReceiptWithDetails,
+  terminalAttemptTotalCents,
+  hasTerminalAttemptIdentity,
   resolveRetryDueOrderIds,
   summarizeArchiveResults,
 }

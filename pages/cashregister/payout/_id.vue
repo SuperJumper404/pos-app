@@ -279,6 +279,9 @@ const {
   terminalAttemptKey,
   terminalRecoveryCollection,
   terminalReceiptSnapshot,
+  terminalReceiptWithDetails,
+  terminalAttemptTotalCents,
+  hasTerminalAttemptIdentity,
 } = require('@/helpers/cashRegister')
 const {
   isTerminalMethod,
@@ -603,12 +606,14 @@ export default {
       return this.terminalDispatch('stripeTerminal/refreshPayment', paymentId)
     },
     terminalAmountAllowed(attempt) {
-      const discount = calculateDiscount({
-        subtotal: this.paymentSummary.dueAmount,
-        type: attempt.discountType,
-        value: attempt.discountType === 'amount' ? attempt.discountValue / 100 : attempt.discountValue,
-      })
-      if (Math.round(discount.total * 100) >= 50) return true
+      const total = terminalAttemptTotalCents(attempt, this.paymentSummary.dueAmount)
+      if (total !== null && total >= 50) return true
+      if (hasTerminalAttemptIdentity(attempt)) { this.terminalRecovery(); return false }
+      if (matchesCashRegisterTerminalAttempt(attempt, this.paymentSummary.dueOrderIds) &&
+        this.readTerminalCollection().records[terminalAttemptKey(attempt)]) {
+        this.terminalAttempt = attempt
+        this.rememberTerminalAttempt(null)
+      }
       this.terminalState = 'idle'
       this.terminalNotice = 'Le montant à encaisser par TPE doit être au moins de 0,50 €. Modifiez la remise ou choisissez un autre moyen.'
       return false
@@ -634,6 +639,9 @@ export default {
       this.terminalReaderReady = reader !== false
       this.terminalChecking = false
       if (!this.ordersLoaded) { this.terminalRecovery(); return }
+      const recovered = await this.recoverPaidTerminalOrders()
+      if (!this.terminalRequestIsCurrent(generation)) return
+      if (recovered) { this.offerTerminalReceipt(); return }
       this.terminalAttempt = this.readTerminalAttempt()
       if (this.terminalAttempt) return this.retryTerminalPayment()
     },
@@ -646,6 +654,7 @@ export default {
       const generation = this.terminalGeneration
       try {
         if (!await this.refreshTerminalOrders(generation)) return
+        if (await this.recoverPaidTerminalOrders() || !this.terminalRequestIsCurrent(generation)) return
         // A fresh order snapshot and saved attempt are checked before any POST.
         const saved = this.readTerminalAttempt(true)
         const attempt = saved || cashRegisterTerminalPayload({
@@ -659,7 +668,8 @@ export default {
           return
         }
         if (!attempt.paymentId && !this.terminalAmountAllowed(attempt)) return
-        this.rememberTerminalAttempt(attempt)
+        this.rememberTerminalAttempt(attempt.paymentId ? attempt : { ...attempt,
+          validatedAmountCents: attempt.validatedAmountCents ?? terminalAttemptTotalCents(attempt, this.paymentSummary.dueAmount) })
         const result = attempt.paymentId
           ? await this.refreshRememberedTerminalPayment(attempt.paymentId, generation)
           : await this.terminalDispatch('stripeTerminal/startPayment', attempt)
@@ -701,6 +711,7 @@ export default {
       const generation = this.terminalGeneration
       try {
         if (!await this.refreshTerminalOrders(generation)) return
+        if (await this.recoverPaidTerminalOrders() || !this.terminalRequestIsCurrent(generation)) return
         const discovered = this.readTerminalAttempt()
         const attempt = discovered && discovered.paymentId ? discovered : this.terminalAttempt || discovered
         if (!attempt) {
@@ -717,6 +728,8 @@ export default {
         if (!attempt.paymentId && !this.terminalAmountAllowed(attempt)) return
         this.selectedPaymentMethod = 'stripe_terminal'
         this.terminalAttempt = attempt
+        if (!attempt.paymentId) this.rememberTerminalAttempt({ ...attempt,
+          validatedAmountCents: attempt.validatedAmountCents ?? terminalAttemptTotalCents(attempt, this.paymentSummary.dueAmount) })
         const result = attempt.paymentId
           ? await this.refreshRememberedTerminalPayment(attempt.paymentId, generation)
           : await this.terminalDispatch('stripeTerminal/startPayment', attempt)
@@ -728,6 +741,41 @@ export default {
           this.offerTerminalReceipt()
         }
       }
+    },
+    async recoverPaidTerminalOrders() {
+      const paid = this.dataOrders.filter((order) => this.ordersToArchive.includes(Number(order.id)) &&
+        !this.terminalSettlements[order.id] && order.payment_status === 'paid' &&
+        order.payment_provider === 'stripe_terminal' &&
+        Number.isSafeInteger(Number(order.stripe_terminal_payment_id)) && Number(order.stripe_terminal_payment_id) > 0 &&
+        Number.isSafeInteger(order.stripe_terminal_amount_cents) && order.stripe_terminal_amount_cents >= 0)
+      if (!paid.length) return false
+      const paymentId = Number(paid[0].stripe_terminal_payment_id)
+      const orders = paid.filter((order) => Number(order.stripe_terminal_payment_id) === paymentId)
+      const allocations = orders.map((order) => ({ orderId: Number(order.id), amountCents: order.stripe_terminal_amount_cents }))
+      const payment = { id: paymentId, status: 'succeeded', currency: 'eur', allocations,
+        orderIds: allocations.map((a) => a.orderId), amountCents: allocations.reduce((sum, a) => sum + a.amountCents, 0) }
+      if (!hasSettledTerminalAllocations(payment)) return false
+      this.stopTerminalPolling()
+      this.terminalState = 'recovery'
+      const generation = this.terminalGeneration
+      const cached = this.$store.get('stripeTerminal/activePayment')
+      if (!cached || cached.id === paymentId) await this.terminalDispatch('stripeTerminal/resetPayment')
+      if (!this.terminalRequestIsCurrent(generation)) return true
+      this.selectedPaymentMethod = 'stripe_terminal'
+      this.terminalPayment = payment
+      this.terminalNotice = terminalPaymentMessage(payment)
+      this.terminalAttempt = Object.values(this.readTerminalCollection().records).find((a) => a.paymentId === paymentId) ||
+        { paymentId, orderIds: payment.orderIds }
+      this.setTerminalReceiptOrders(orders, payment)
+      return true
+    },
+    setTerminalReceiptOrders(orders, payment) {
+      this.terminalReceiptOrders = terminalReceiptSnapshot(orders, payment)
+      this.terminalSettlements = { ...this.terminalSettlements,
+        ...Object.fromEntries(this.terminalReceiptOrders.map((order) => [order.id, order])) }
+      if (this.retryActive) this.retryDueOrderIds = this.retryDueOrderIds.filter((id) => !payment.orderIds.includes(id))
+      this.terminalState = this.terminalReceiptOrders.length ? 'succeeded' : 'idle'
+      this.rememberTerminalAttempt({ ...this.terminalAttempt, status: 'succeeded' })
     },
     async acceptTerminalPayment(payment, generation) {
       this.stopTerminalPolling()
@@ -750,14 +798,9 @@ export default {
       } else if (payment.status === 'succeeded') {
         if (!hasSettledTerminalAllocations(payment)) { this.terminalRecovery(); return }
         if (!await this.refreshTerminalOrders(generation)) return
-        this.terminalReceiptOrders = terminalReceiptSnapshot(
+        this.setTerminalReceiptOrders(
           this.dataOrders.filter((order) => this.ordersToArchive.includes(Number(order.id))), payment
         )
-        this.terminalSettlements = { ...this.terminalSettlements,
-          ...Object.fromEntries(this.terminalReceiptOrders.map((order) => [order.id, order])) }
-        if (this.retryActive) this.retryDueOrderIds = this.retryDueOrderIds.filter((id) => !payment.orderIds.includes(id))
-        this.terminalState = this.terminalReceiptOrders.length ? 'succeeded' : 'idle'
-        this.rememberTerminalAttempt({ ...this.terminalAttempt, status: 'succeeded' })
       } else if (['failed', 'canceled'].includes(payment.status)) {
         this.terminalState = payment.status
         this.rememberTerminalAttempt(null)
@@ -901,7 +944,9 @@ export default {
         } catch (error) {
           details = []
         }
-        ordersWithDetails.push({ ...order, receiptDetails: details.slice() })
+        ordersWithDetails.push(this.terminalSettlements[order.id]
+          ? terminalReceiptWithDetails(order, details)
+          : { ...order, receiptDetails: details.slice() })
       }
 
       return ordersWithDetails
