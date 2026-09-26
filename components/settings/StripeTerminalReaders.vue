@@ -71,7 +71,7 @@
                   <v-btn
                     icon
                     color="primary"
-                    :disabled="busy"
+                    :disabled="busy || !reader.isActive"
                     :aria-label="`Réaffecter ${reader.label}`"
                     v-bind="attrs"
                     v-on="on"
@@ -110,14 +110,14 @@
               dense
               outlined
               hide-details
-              :disabled="busy"
+              :disabled="busy || !reader.isActive"
             />
             <v-tooltip bottom>
               <template #activator="{ on, attrs }">
                 <v-btn
                   icon
                   color="primary"
-                  :disabled="busy || !assignmentUserId"
+                  :disabled="busy || !reader.isActive || !assignmentUserId"
                   :aria-label="`Enregistrer l'affectation de ${reader.label}`"
                   v-bind="attrs"
                   v-on="on"
@@ -148,9 +148,9 @@
       </div>
     </template>
 
-    <v-dialog v-model="dialogOpen" max-width="520" :persistent="busy">
+    <v-dialog v-model="dialogOpen" max-width="520" :persistent="busy" aria-labelledby="terminal-register-title">
       <v-card class="terminal-readers__dialog">
-        <v-card-title>Connecter TPE</v-card-title>
+        <v-card-title id="terminal-register-title">Connecter TPE</v-card-title>
         <v-card-text>
           <v-form ref="registrationForm" @submit.prevent="registerReader">
             <v-text-field
@@ -158,7 +158,7 @@
               label="Code d’enregistrement"
               autocomplete="off"
               :rules="[required]"
-              :disabled="busy"
+              :disabled="!stripeReady || busy"
               outlined
               dense
               autofocus
@@ -167,7 +167,7 @@
               v-model="readerLabel"
               label="Nom du terminal"
               :rules="[required]"
-              :disabled="busy"
+              :disabled="!stripeReady || busy"
               outlined
               dense
             />
@@ -178,7 +178,7 @@
               item-value="id"
               label="Caissier"
               :rules="[required]"
-              :disabled="busy"
+              :disabled="!stripeReady || busy"
               outlined
               dense
             />
@@ -188,7 +188,7 @@
                 v-model="address.line1"
                 label="Adresse"
                 :rules="[required]"
-                :disabled="busy"
+                :disabled="!stripeReady || busy"
                 outlined
                 dense
               />
@@ -196,8 +196,11 @@
                 <v-text-field
                   v-model="address.postalCode"
                   label="Code postal"
-                  :rules="[required]"
-                  :disabled="busy"
+                  :rules="[postalCodeRule]"
+                  :disabled="!stripeReady || busy"
+                  maxlength="5"
+                  inputmode="numeric"
+                  autocomplete="postal-code"
                   outlined
                   dense
                 />
@@ -205,12 +208,12 @@
                   v-model="address.city"
                   label="Ville"
                   :rules="[required]"
-                  :disabled="busy"
+                  :disabled="!stripeReady || busy"
                   outlined
                   dense
                 />
               </div>
-              <v-text-field label="Pays" :value="address.country" readonly outlined dense />
+              <v-text-field label="Pays" :value="address.country" :disabled="!stripeReady || busy" readonly outlined dense />
             </template>
             <v-alert v-if="actionError" type="error" text dense role="alert">
               {{ actionError }}
@@ -218,8 +221,8 @@
           </v-form>
         </v-card-text>
         <v-card-actions class="justify-end">
-          <v-btn text class="text-none" :disabled="busy" @click="closeRegistration">Annuler</v-btn>
-          <v-btn color="primary" class="text-none" :loading="busy" @click="registerReader">
+          <v-btn text class="text-none" :disabled="!stripeReady || busy" @click="closeRegistration">Annuler</v-btn>
+          <v-btn color="primary" class="text-none" :loading="busy" :disabled="!stripeReady || busy" @click="registerReader">
             Connecter TPE
           </v-btn>
         </v-card-actions>
@@ -236,6 +239,8 @@ export default {
   },
   data: () => ({
     busy: false,
+    busyOwner: 0,
+    connectionVersion: 0,
     listLoaded: false,
     staffLoaded: false,
     loadAttempted: false,
@@ -255,7 +260,7 @@ export default {
     },
     cashiers() {
       return (this.$store.get('staff/data') || []).filter(
-        (user) => [0, 1].includes(Number(user.access))
+        (user) => [0, 1].includes(Number(user.access)) && Number(user.status) === 1
       )
     },
     firstLocation() {
@@ -265,59 +270,98 @@ export default {
   watch: {
     stripeReady: {
       immediate: true,
-      handler() { this.loadData() },
+      handler(ready) {
+        if (ready) this.loadData()
+        else this.resetConnection()
+      },
     },
     dialogOpen(value) {
       if (!value) this.registrationCode = ''
     },
   },
   methods: {
+    acquireBusy() {
+      if (this.busy) return null
+      this.busy = true
+      return ++this.busyOwner
+    },
+    releaseBusy(owner) {
+      if (this.busyOwner === owner) this.busy = false
+    },
+    resetConnection() {
+      this.connectionVersion += 1
+      this.busyOwner += 1
+      this.busy = false
+      this.closeRegistration()
+      this.readerLabel = ''
+      this.assignedUserId = null
+      this.address = { line1: '', postalCode: '', city: '', country: 'FR' }
+      this.editingReaderId = null
+      this.assignmentUserId = null
+      this.listLoaded = false
+      this.staffLoaded = false
+      this.loadAttempted = false
+      this.listError = ''
+    },
     required(value) {
       return Boolean(value && String(value).trim()) || 'Champ requis'
     },
+    postalCodeRule(value) {
+      return /^\d{5}$/.test(String(value || '')) || 'Code postal : 5 chiffres requis.'
+    },
     async loadData() {
-      if (!this.isAdmin || !this.stripeReady || this.loadAttempted) return
+      if (!this.isAdmin || !this.stripeReady || this.loadAttempted || this.busy) return
+      const owner = this.acquireBusy()
+      const version = this.connectionVersion
       this.loadAttempted = true
-      this.busy = true
       this.listError = ''
       try {
         const [readers, staff] = await Promise.all([
           this.$store.dispatch('stripeTerminal/getReaders'),
-          this.$store.dispatch('staff/getAll'),
+          this.$store.dispatch('staff/getAll', { silent: true }),
         ])
+        if (version !== this.connectionVersion || !this.stripeReady) return
         this.listLoaded = readers !== false
         this.staffLoaded = staff !== false
         if (readers === false || staff === false) {
           this.listError = 'Impossible de charger les TPE ou les caissiers. Actualisez pour réessayer.'
         }
       } catch (error) {
-        this.listError = 'Impossible de charger les TPE ou les caissiers. Actualisez pour réessayer.'
+        if (version === this.connectionVersion && this.stripeReady) {
+          this.listError = 'Impossible de charger les TPE ou les caissiers. Actualisez pour réessayer.'
+        }
       } finally {
-        this.busy = false
+        this.releaseBusy(owner)
       }
     },
     async refreshReaders() {
       if (!this.isAdmin || !this.stripeReady || this.busy) return
-      this.busy = true
+      const owner = this.acquireBusy()
+      const version = this.connectionVersion
       this.listError = ''
       try {
         const [readers, staff] = await Promise.all([
           this.$store.dispatch('stripeTerminal/refreshReaders'),
-          this.staffLoaded ? Promise.resolve(true) : this.$store.dispatch('staff/getAll'),
+          this.staffLoaded ? Promise.resolve(true) : this.$store.dispatch('staff/getAll', { silent: true }),
         ])
+        if (version !== this.connectionVersion || !this.stripeReady) return
         this.listLoaded = readers !== false
         this.staffLoaded = staff !== false
         if (readers === false || staff === false) {
           this.listError = 'Actualisation impossible. Réessayez.'
         }
       } catch (error) {
-        this.listError = 'Actualisation impossible. Réessayez.'
+        if (version === this.connectionVersion && this.stripeReady) {
+          this.listError = 'Actualisation impossible. Réessayez.'
+        }
       } finally {
-        this.busy = false
+        this.releaseBusy(owner)
       }
     },
     cashierName(id) {
-      const cashier = this.cashiers.find((item) => Number(item.id) === Number(id))
+      const cashier = (this.$store.get('staff/data') || []).find(
+        (item) => Number(item.id) === Number(id)
+      )
       return cashier ? cashier.username : 'Non attribué'
     },
     openRegistration() {
@@ -332,10 +376,14 @@ export default {
       if (this.$refs.registrationForm) this.$refs.registrationForm.resetValidation()
     },
     async registerReader() {
+      if (!this.isAdmin || !this.stripeReady || this.busy) {
+        this.registrationCode = ''
+        return
+      }
+      const owner = this.acquireBusy()
+      const version = this.connectionVersion
       try {
-        if (!this.isAdmin || !this.stripeReady || this.busy) return
         if (!this.$refs.registrationForm.validate()) return
-        this.busy = true
         this.actionError = ''
         const payload = {
           registrationCode: this.registrationCode.trim(),
@@ -351,6 +399,7 @@ export default {
           }
         }
         const result = await this.$store.dispatch('stripeTerminal/registerReader', payload)
+        if (version !== this.connectionVersion || !this.stripeReady) return
         if (result === false) {
           this.actionError = 'Connexion du TPE impossible. Vérifiez le code et réessayez.'
         } else {
@@ -359,46 +408,58 @@ export default {
           this.assignedUserId = null
         }
       } catch (error) {
-        this.actionError = 'Connexion du TPE impossible. Vérifiez le code et réessayez.'
+        if (version === this.connectionVersion && this.stripeReady) {
+          this.actionError = 'Connexion du TPE impossible. Vérifiez le code et réessayez.'
+        }
       } finally {
-        this.registrationCode = ''
-        this.busy = false
+        if (version === this.connectionVersion) this.registrationCode = ''
+        this.releaseBusy(owner)
       }
     },
     startAssignment(reader) {
+      if (!this.isAdmin || !this.stripeReady || this.busy || !reader.isActive) return
       this.editingReaderId = reader.id
       this.assignmentUserId = reader.assignedUserId
       this.listError = ''
     },
     async assignReader(reader, assignedUserId) {
-      if (!this.isAdmin || !this.stripeReady || this.busy || !assignedUserId) return
-      this.busy = true
+      if (!this.isAdmin || !this.stripeReady || this.busy || !reader.isActive || !assignedUserId) return
+      const owner = this.acquireBusy()
+      const version = this.connectionVersion
       this.listError = ''
       try {
         const result = await this.$store.dispatch('stripeTerminal/assignReader', {
           id: reader.id, assignedUserId,
         })
+        if (version !== this.connectionVersion || !this.stripeReady) return
         if (result === false) this.listError = 'Affectation impossible. Réessayez.'
         else this.editingReaderId = null
       } catch (error) {
-        this.listError = 'Affectation impossible. Réessayez.'
+        if (version === this.connectionVersion && this.stripeReady) {
+          this.listError = 'Affectation impossible. Réessayez.'
+        }
       } finally {
-        this.busy = false
+        this.releaseBusy(owner)
       }
     },
     async setReaderActive(reader) {
       if (!this.isAdmin || !this.stripeReady || this.busy) return
-      this.busy = true
+      const owner = this.acquireBusy()
+      const version = this.connectionVersion
       this.listError = ''
       try {
         const result = await this.$store.dispatch('stripeTerminal/setReaderActive', {
           id: reader.id, isActive: !reader.isActive,
         })
+        if (version !== this.connectionVersion || !this.stripeReady) return
         if (result === false) this.listError = 'Modification du TPE impossible. Réessayez.'
+        else if (reader.isActive) this.editingReaderId = null
       } catch (error) {
-        this.listError = 'Modification du TPE impossible. Réessayez.'
+        if (version === this.connectionVersion && this.stripeReady) {
+          this.listError = 'Modification du TPE impossible. Réessayez.'
+        }
       } finally {
-        this.busy = false
+        this.releaseBusy(owner)
       }
     },
   },

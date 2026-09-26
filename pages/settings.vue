@@ -432,7 +432,7 @@
               Connecter Stripe
               <v-icon small right>mdi-credit-card-check</v-icon>
             </v-btn>
-            <StripeTerminalReaders v-if="isAdmin" :stripe-ready="stripeReady" />
+            <StripeTerminalReaders v-if="isAdmin" :stripe-ready="stripeReady" :is-admin="isAdmin" />
           </v-card>
         </v-col>
         <v-col cols="12" md="6">

@@ -25,10 +25,12 @@ export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 
 export const actions = {
-  async getAll({ dispatch }) {
+  async getAll({ dispatch }, options = {}) {
+    const silent = options && options.silent === true
     try {
       const response = await this.$axios.get('/baseurl/api/v1/users', {
         headers: authHeaders(),
+        ...(silent && { skipGlobalErrorNotification: true }),
       })
       const users = Array.isArray(response.data.data) ? response.data.data : []
       const staff = users
@@ -40,10 +42,10 @@ export const actions = {
       )
       return true
     } catch (error) {
-      const message = errorMessage(error)
+      const message = silent ? 'Impossible de charger les caissiers.' : errorMessage(error)
       dispatch('set/message', message)
       dispatch('set/data', [])
-      dispatch('notifications/error', message, { root: true })
+      if (!silent) dispatch('notifications/error', message, { root: true })
       return false
     }
   },
