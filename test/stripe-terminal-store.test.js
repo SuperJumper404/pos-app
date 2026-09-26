@@ -379,6 +379,34 @@ const run = async () => {
   assert.strictEqual(await listing, false)
   assert.strictEqual(staleList.current.readers[0].isActive, false)
 
+  const firstMutation = deferred()
+  const secondMutation = deferred()
+  let sameReaderPatches = 0
+  const sameReaderRace = harness(null, null, (method) => method === 'patch'
+    ? ++sameReaderPatches === 1 ? firstMutation.promise : secondMutation.promise
+    : Promise.resolve(ok(null)))
+  const olderChange = sameReaderRace.call('assignReader', { id: 7, assignedUserId: 5 })
+  const newerChange = sameReaderRace.call('assignReader', { id: 7, assignedUserId: 6 })
+  secondMutation.resolve(ok({ ...reader, assignedUserId: 6 }))
+  assert.strictEqual((await newerChange).assignedUserId, 6)
+  firstMutation.resolve(ok({ ...reader, assignedUserId: 5 }))
+  assert.strictEqual(await olderChange, false)
+  assert.strictEqual(sameReaderRace.current.readers[0].assignedUserId, 6)
+
+  const independentFirst = deferred()
+  const independentSecond = deferred()
+  let independentPatches = 0
+  const independentReaders = harness(null, null, (method) => method === 'patch'
+    ? ++independentPatches === 1 ? independentFirst.promise : independentSecond.promise
+    : Promise.resolve(ok(null)))
+  const firstReaderChange = independentReaders.call('assignReader', { id: 7, assignedUserId: 5 })
+  const secondReaderChange = independentReaders.call('assignReader', { id: 8, assignedUserId: 6 })
+  independentSecond.resolve(ok({ ...reader, id: 8, assignedUserId: 6 }))
+  await secondReaderChange
+  independentFirst.resolve(ok({ ...reader, assignedUserId: 5 }))
+  await firstReaderChange
+  assert.deepStrictEqual(independentReaders.current.readers.map((item) => item.id).sort(), [7, 8])
+
   const unrelatedCurrent = deferred()
   const unrelatedRegistration = deferred()
   const registrationRace = harness(null, null, (method) =>
@@ -452,6 +480,55 @@ const run = async () => {
   pendingCurrent.resolve(ok(reader))
   await loadingCurrent
   assert.strictEqual(adminRace.current.currentReader, null)
+
+  for (const [label, list] of [
+    ['absent', []],
+    ['inactive', [{ ...reader, isActive: false }]],
+  ]) {
+    const currentRefresh = deferred()
+    const listed = harness(null, null, (method, args) => args[0].includes('current-reader')
+      ? currentRefresh.promise : Promise.resolve(ok(list)))
+    listed.current.currentReader = reader
+    const fetching = listed.call('getReaders')
+    await Promise.resolve()
+    assert.strictEqual(listed.current.currentReader, null, `${label} clears before GET settles`)
+    assert.strictEqual(listed.calls.length, 2, `${label} triggers current-reader GET`)
+    currentRefresh.resolve(ok(null))
+    assert.deepStrictEqual(await fetching, list)
+    assert.strictEqual(listed.current.currentReader, null)
+  }
+
+  const reassignedList = { ...reader, assignedUserId: 5 }
+  const reassignedCurrent = harness(null, null, (method, args) => args[0].includes('current-reader')
+    ? Promise.resolve(ok(null)) : Promise.resolve(ok([reassignedList])))
+  reassignedCurrent.current.currentReader = reader
+  await reassignedCurrent.call('getReaders')
+  assert.strictEqual(reassignedCurrent.current.currentReader, null)
+  assert.strictEqual(reassignedCurrent.calls.length, 2)
+
+  const unchangedCurrent = harness(null, null, (method, args) => args[0].includes('current-reader')
+    ? Promise.resolve(ok(reader)) : Promise.resolve(ok([reader])))
+  unchangedCurrent.current.currentReader = reader
+  await unchangedCurrent.call('refreshReaders')
+  assert.deepStrictEqual(unchangedCurrent.current.currentReader, reader)
+  assert.strictEqual(unchangedCurrent.calls.length, 2)
+
+  const obsoleteCurrent = deferred()
+  const listCurrent = deferred()
+  let overlapGets = 0
+  const listCurrentRace = harness(null, null, (method, args) => args[0].includes('current-reader')
+    ? ++overlapGets === 1 ? obsoleteCurrent.promise : listCurrent.promise
+    : Promise.resolve(ok([])))
+  listCurrentRace.current.currentReader = reader
+  const oldCurrentFetch = listCurrentRace.call('getCurrentReader')
+  const freshListFetch = listCurrentRace.call('getReaders')
+  await Promise.resolve()
+  assert.strictEqual(listCurrentRace.current.currentReader, null)
+  listCurrent.resolve(ok(null))
+  await freshListFetch
+  obsoleteCurrent.resolve(ok(reader))
+  assert.strictEqual(await oldCurrentFetch, false)
+  assert.strictEqual(listCurrentRace.current.currentReader, null)
 
   const unrelated = harness({ data: { ...reader, id: 8 } })
   unrelated.current.currentReader = reader

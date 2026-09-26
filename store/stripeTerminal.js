@@ -10,7 +10,8 @@ const requestState = (state) => {
     requestsByState.set(state, {
       active: 0, list: 0, admin: 0, currentReader: 0, payment: 0,
       errors: { list: 0, admin: 0, currentReader: 0, payment: 0 },
-      errorOwner: null, mutation: 0, session: 0, currentRefresh: null,
+      errorOwner: null, mutation: 0, readerMutations: new Map(),
+      session: 0, currentRefresh: null,
     })
   }
   return requestsByState.get(state)
@@ -138,7 +139,8 @@ const runRequest = async ({ dispatch, state }, scope, send, validDto, onSuccess,
     const fresh = request[scope] === generation && samePayment &&
       (!options.isFresh || options.isFresh(request))
     if (!fresh && !options.applyEverySuccess) return false
-    if (fresh || options.applyEverySuccess) onSuccess(dto, request)
+    const applied = (fresh || options.applyEverySuccess) && onSuccess(dto, request)
+    if (applied === false) return false
     if (options.afterSuccess) await options.afterSuccess(dto, request)
     if (request.session !== session) return false
     return dto
@@ -164,14 +166,19 @@ const updateReader = (dispatch, state, reader) => {
   dispatch('set/readers', found ? readers : [...readers, reader])
 }
 
-const runReaderMutation = (context, send, afterSuccess = () => {}) => {
+const runReaderMutation = (context, send, afterSuccess = () => {}, readerId = () => null) => {
   const { dispatch, state } = context
   const request = requestState(state)
+  let mutation
+  let id
   return runRequest(context, 'admin', () => {
     const result = send()
-    request.mutation += 1
+    mutation = ++request.mutation
+    id = readerId()
+    if (id !== null) request.readerMutations.set(id, mutation)
     return result
   }, validReader, (reader) => {
+    if (id !== null && request.readerMutations.get(id) !== mutation) return false
     request.mutation += 1
     updateReader(dispatch, state, reader)
   }, {
@@ -180,11 +187,7 @@ const runReaderMutation = (context, send, afterSuccess = () => {}) => {
   })
 }
 
-const reconcileCurrentReader = async (context, reader, request) => {
-  const { dispatch, state } = context
-  if (state.currentReader && state.currentReader.id === reader.id) {
-    dispatch('set/currentReader', null)
-  }
+const refreshCurrentReader = async ({ dispatch }, request) => {
   let refresh = dispatch('getCurrentReader')
   request.currentRefresh = refresh
   while (refresh) {
@@ -192,6 +195,25 @@ const reconcileCurrentReader = async (context, reader, request) => {
     if (request.currentRefresh === refresh) break
     refresh = request.currentRefresh
   }
+}
+
+const reconcileCurrentReader = (context, reader, request) => {
+  const { dispatch, state } = context
+  if (state.currentReader && state.currentReader.id === reader.id) {
+    dispatch('set/currentReader', null)
+  }
+  return refreshCurrentReader(context, request)
+}
+
+const reconcileReaderList = (context, readers, request) => {
+  const { dispatch, state } = context
+  const current = state.currentReader
+  if (!current) return
+  const listed = readers.find((reader) => reader.id === current.id)
+  if (!listed || !listed.isActive || listed.assignedUserId !== current.assignedUserId) {
+    dispatch('set/currentReader', null)
+  }
+  return refreshCurrentReader(context, request)
 }
 
 export const state = () => ({
@@ -212,7 +234,10 @@ export const actions = {
     return runRequest(context, 'list',
       () => this.$axios.get(`${baseUrl}/readers`, requestConfig()),
       validReaders, (readers) => dispatch('set/readers', readers),
-      { isFresh: (request) => request.mutation === mutation })
+      {
+        isFresh: (request) => request.mutation === mutation,
+        afterSuccess: (readers, request) => reconcileReaderList(context, readers, request),
+      })
   },
   registerReader(context, input) {
     return runReaderMutation(context,
@@ -231,7 +256,8 @@ export const actions = {
         const id = requiredId(input.id)
         const assignedUserId = requiredId(input.assignedUserId)
         return this.$axios.patch(`${baseUrl}/readers/${id}/assignment`, { assignedUserId }, requestConfig())
-      }, (reader, request) => reconcileCurrentReader(context, reader, request))
+      }, (reader, request) => reconcileCurrentReader(context, reader, request),
+      () => Number(input.id))
   },
   setReaderActive(context, input) {
     return runReaderMutation(context,
@@ -241,7 +267,8 @@ export const actions = {
         }
         const id = requiredId(input.id)
         return this.$axios.patch(`${baseUrl}/readers/${id}/status`, { isActive: input.isActive }, requestConfig())
-      }, (reader, request) => reconcileCurrentReader(context, reader, request))
+      }, (reader, request) => reconcileCurrentReader(context, reader, request),
+      () => Number(input.id))
   },
   refreshReaders(context) {
     const { dispatch } = context
@@ -249,14 +276,19 @@ export const actions = {
     return runRequest(context, 'list',
       () => this.$axios.post(`${baseUrl}/readers/refresh`, {}, requestConfig()),
       validReaders, (readers) => dispatch('set/readers', readers),
-      { isFresh: (request) => request.mutation === mutation })
+      {
+        isFresh: (request) => request.mutation === mutation,
+        afterSuccess: (readers, request) => reconcileReaderList(context, readers, request),
+      })
   },
   getCurrentReader(context) {
     const { dispatch } = context
-    return runRequest(context, 'currentReader',
+    const refresh = runRequest(context, 'currentReader',
       () => this.$axios.get(`${baseUrl}/current-reader`, requestConfig()),
       (reader) => reader === null || validReader(reader),
       (reader) => dispatch('set/currentReader', reader))
+    requestState(context.state).currentRefresh = refresh
+    return refresh
   },
   startPayment(context, input) {
     const { dispatch } = context
@@ -302,6 +334,7 @@ export const actions = {
     request.active = 0
     request.currentRefresh = null
     request.errorOwner = null
+    request.readerMutations.clear()
     for (const scope of ['list', 'admin', 'currentReader', 'payment']) {
       request[scope] += 1
       request.errors[scope] += 1
