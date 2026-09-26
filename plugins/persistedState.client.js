@@ -1,6 +1,7 @@
 import createPersistedState from 'vuex-persistedstate'
 const {
   parsePersistedState,
+  sanitizePersistedState,
   serializePersistedState,
 } = require('../helpers/persistedState')
 
@@ -14,10 +15,10 @@ export default ({ store }) => {
         storage.removeItem(key)
       }
 
-      return state
+      return sanitizePersistedState(state)
     },
     setState(key, state, storage) {
-      storage.setItem(key, serializePersistedState(state))
+      storage.setItem(key, serializePersistedState(sanitizePersistedState(state)))
     },
   })(store)
 }

@@ -1,5 +1,6 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 const { isStaffAccess } = require('../helpers/staffRoles')
+const latestRequests = new WeakMap()
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -25,25 +26,31 @@ export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 
 export const actions = {
-  async getAll({ dispatch }) {
+  async getAll({ dispatch, state }, options = {}) {
+    const silent = options && options.silent === true
+    const request = {}
+    latestRequests.set(state, request)
     try {
       const response = await this.$axios.get('/baseurl/api/v1/users', {
         headers: authHeaders(),
+        ...(silent && { skipGlobalErrorNotification: true }),
       })
       const users = Array.isArray(response.data.data) ? response.data.data : []
       const staff = users
         .filter((user) => isStaffAccess(user.access))
         .sort((first, second) => Number(second.is_primary_admin) - Number(first.is_primary_admin))
+      if (latestRequests.get(state) !== request) return false
       dispatch(
         'set/data',
         staff
       )
       return true
     } catch (error) {
-      const message = errorMessage(error)
+      if (latestRequests.get(state) !== request) return false
+      const message = silent ? 'Impossible de charger les caissiers.' : errorMessage(error)
       dispatch('set/message', message)
       dispatch('set/data', [])
-      dispatch('notifications/error', message, { root: true })
+      if (!silent) dispatch('notifications/error', message, { root: true })
       return false
     }
   },
