@@ -104,6 +104,16 @@ const run = async () => {
 
   global.localStorage = { getItem: (key) => key === 'token' ? 'test-token' : null }
 
+  for (const allocations of [undefined, [], [{ orderId: 3, amountCents: 1249 }],
+    [{ orderId: 4, amountCents: 1250 }], [{ orderId: 3, amountCents: -1 }],
+    [{ orderId: 3, amountCents: 625 }, { orderId: 3, amountCents: 625 }]]) {
+    const invalid = harness({ data: { ...payment, status: 'succeeded', allocations } })
+    assert.strictEqual(await invalid.call('refreshPayment', 13), false,
+      'Successful payments require exact allocations that sum to the settled total')
+  }
+  const settled = { ...payment, status: 'succeeded', allocations: [{ orderId: 3, amountCents: 1250 }] }
+  assert.deepStrictEqual(await harness({ data: settled }).call('refreshPayment', 13), settled)
+
   const routes = [
     ['getReaders', undefined, 'get', `${base}/readers`, undefined, [reader], 'readers'],
     ['registerReader', {

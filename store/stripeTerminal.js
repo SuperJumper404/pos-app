@@ -1,6 +1,6 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 
-const { terminalErrorMessage } = require('../helpers/stripeTerminal')
+const { terminalErrorMessage, hasSettledTerminalAllocations } = require('../helpers/stripeTerminal')
 const baseUrl = '/baseurl/api/v1/stripe/terminal'
 const requestsByState = new WeakMap()
 const paymentStatuses = ['creating', 'processing', 'succeeded', 'failed', 'canceled']
@@ -57,6 +57,7 @@ const validPayment = (payment) => validObject(payment) && validId(payment.id) &&
   payment.currency === 'eur' && Array.isArray(payment.orderIds) &&
   payment.orderIds.length > 0 && payment.orderIds.every(validId) &&
   new Set(payment.orderIds).size === payment.orderIds.length &&
+  (payment.status !== 'succeeded' || hasSettledTerminalAllocations(payment)) &&
   (payment.failureCode === null || typeof payment.failureCode === 'string') &&
   (payment.failureMessage === null || typeof payment.failureMessage === 'string')
 const validEnvelope = (response) => {

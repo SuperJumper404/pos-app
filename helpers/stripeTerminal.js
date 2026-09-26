@@ -9,6 +9,16 @@ const isTerminalMethod = (method) => {
 const isTerminalPaymentPending = (payment) =>
   Boolean(payment && ['creating', 'processing'].includes(payment.status))
 
+const hasSettledTerminalAllocations = (payment) => Boolean(payment &&
+  payment.status === 'succeeded' && Array.isArray(payment.orderIds) &&
+  Array.isArray(payment.allocations) && payment.allocations.length > 0 &&
+  payment.allocations.length === payment.orderIds.length &&
+  new Set(payment.allocations.map((a) => a && a.orderId)).size === payment.orderIds.length &&
+  payment.allocations.every((a) => a && Number.isSafeInteger(a.orderId) && a.orderId > 0 &&
+    payment.orderIds.includes(a.orderId) && Number.isSafeInteger(a.amountCents) && a.amountCents >= 0) &&
+  Number.isSafeInteger(payment.amountCents) &&
+  payment.allocations.reduce((sum, a) => sum + a.amountCents, 0) === payment.amountCents)
+
 const terminalPaymentMessage = (payment) => {
   const status = payment && payment.status
   if (status === 'failed') {
@@ -57,5 +67,6 @@ module.exports = {
   terminalErrorMessage,
   isTerminalMethod,
   isTerminalPaymentPending,
+  hasSettledTerminalAllocations,
   terminalPaymentMessage,
 }

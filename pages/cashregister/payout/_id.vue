@@ -11,7 +11,7 @@
           </div>
           <v-btn
             icon
-            :disabled="loadingBtn"
+            :disabled="loadingBtn || terminalBusy"
             width="44"
             height="44"
             aria-label="Fermer la modal d'encaissement"
@@ -155,7 +155,7 @@
           <p class="cashregister-receipt-modal__copy">
             Voulez-vous imprimer un ticket pour
             <span class="cashregister-payout-order__numbers">
-              {{ displayOrderNumbers }}
+              {{ receiptOrderNumbers }}
             </span>
             ?
           </p>
@@ -276,12 +276,16 @@ const {
   resolveRetryDueOrderIds,
   matchesCashRegisterTerminalAttempt,
   cashRegisterTerminalPayload,
+  terminalAttemptKey,
+  terminalRecoveryCollection,
+  terminalReceiptSnapshot,
 } = require('@/helpers/cashRegister')
 const {
   isTerminalMethod,
   isTerminalPaymentPending,
   terminalErrorMessage,
   terminalPaymentMessage,
+  hasSettledTerminalAllocations,
 } = require('@/helpers/stripeTerminal')
 
 export default {
@@ -323,6 +327,8 @@ export default {
       terminalState: 'idle',
       terminalPayment: null,
       terminalAttempt: null,
+      terminalReceiptOrders: [],
+      terminalSettlements: {},
       terminalNotice: '',
       terminalBusy: false,
       terminalCanceling: false,
@@ -376,7 +382,7 @@ export default {
       const selectedIds = new Set(this.ordersToArchive)
       return this.dataOrders.filter((order) =>
         selectedIds.has(Number(order.id))
-      )
+      ).map((order) => this.terminalSettlements[order.id] || order)
     },
     displayOrderNumbers() {
       if (!this.selectedOrders.length) {
@@ -388,6 +394,15 @@ export default {
     },
     paymentSummary() {
       return getCashRegisterPaymentSummary(this.selectedOrders)
+    },
+    receiptOrderNumbers() {
+      if (!this.terminalReceiptOrders.length) return this.displayOrderNumbers
+      return this.terminalReceiptOrders
+        .map((order) => `#${order.ordernumber || order.orderNumber || 'numero indisponible'}`)
+        .join(', ')
+    },
+    needsTerminalReceipt() {
+      return this.selectedOrders.some((order) => order.stripe_terminal_payment_id && !this.terminalSettlements[order.id])
     },
     shopInfo() {
       return {
@@ -468,7 +483,7 @@ export default {
         this.terminalChecking ||
         this.terminalBusy ||
         ['starting', 'processing', 'recovery'].includes(this.terminalState) ||
-        (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod && !this.terminalAvailable) ||
+        (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod && !this.terminalReceiptOrders.length && !this.terminalAvailable) ||
         !this.ordersToArchive.length ||
         (this.requiresPaymentMethod && this.selectedPaymentMethod === null)
       )
@@ -479,6 +494,7 @@ export default {
         : 'Clôturer la table'
     },
     actionButtonLabel() {
+      if (this.terminalReceiptOrders.length) return 'Clôturer le paiement'
       return this.requiresPaymentMethod ? 'Encaisser' : 'Clôturer'
     },
   },
@@ -527,20 +543,75 @@ export default {
     terminalRequestIsCurrent(generation) {
       return !this.terminalDisposed && generation === this.terminalGeneration && Boolean(this.cashierIdentity)
     },
+    readTerminalCollection() {
+      try {
+        return terminalRecoveryCollection(JSON.parse(sessionStorage.getItem(this.terminalStorageKey)))
+      } catch (error) { return terminalRecoveryCollection(null) }
+    },
     rememberTerminalAttempt(attempt) {
+      const saved = this.readTerminalCollection()
+      const previousKey = terminalAttemptKey(this.terminalAttempt)
+      if (!attempt) {
+        if (previousKey) delete saved.records[previousKey]
+      } else {
+        const key = terminalAttemptKey(attempt)
+        if (!key) return
+        if (previousKey && this.terminalAttempt.paymentId === attempt.paymentId && attempt.paymentId) {
+          delete saved.records[previousKey]
+        }
+        if (attempt.paymentId) delete saved.records[terminalAttemptKey({ orderIds: attempt.orderIds })]
+        saved.records[key] = attempt
+      }
       this.terminalAttempt = attempt
       try {
-        if (attempt) sessionStorage.setItem(this.terminalStorageKey, JSON.stringify(attempt))
+        if (Object.keys(saved.records).length) sessionStorage.setItem(this.terminalStorageKey, JSON.stringify(saved))
         else sessionStorage.removeItem(this.terminalStorageKey)
       } catch (error) {
-        // Server idempotency still protects a retry when tab storage is unavailable.
+        // Backend idempotency still protects starts when tab storage is unavailable.
       }
     },
-    readTerminalAttempt() {
-      try {
-        const attempt = JSON.parse(sessionStorage.getItem(this.terminalStorageKey))
-        return matchesCashRegisterTerminalAttempt(attempt, this.ordersToArchive) ? attempt : null
-      } catch (error) { return null }
+    resolveTerminalArchives(orderIds) {
+      const attempt = this.terminalAttempt
+      if (!attempt || attempt.status !== 'succeeded') return
+      const archivedOrderIds = [...new Set([...(attempt.archivedOrderIds || []), ...orderIds])]
+        .filter((id) => attempt.orderIds.includes(id))
+      this.rememberTerminalAttempt(attempt.orderIds.every((id) => archivedOrderIds.includes(id))
+        ? null : { ...attempt, archivedOrderIds })
+    },
+    readTerminalAttempt(includeUnrelated = false) {
+      const records = Object.values(this.readTerminalCollection().records)
+      const cached = this.$store.get('stripeTerminal/activePayment')
+      if (cached && isTerminalPaymentPending(cached)) {
+        records.push({ orderIds: cached.orderIds, paymentId: cached.id })
+      }
+      const selected = this.dataOrders.filter((order) => this.ordersToArchive.includes(Number(order.id)))
+      const linked = selected.find((order) => order.stripe_terminal_payment_id &&
+        !this.terminalSettlements[order.id])
+      if (linked) return records.find((a) => a.paymentId === Number(linked.stripe_terminal_payment_id)) || {
+        paymentId: Number(linked.stripe_terminal_payment_id),
+        orderIds: selected.filter((o) => o.stripe_terminal_payment_id === linked.stripe_terminal_payment_id).map((o) => Number(o.id)),
+      }
+      const due = this.paymentSummary.dueOrderIds
+      return records.find((a) => a.paymentId && matchesCashRegisterTerminalAttempt(a, due)) ||
+        records.find((a) => matchesCashRegisterTerminalAttempt(a, due)) ||
+        records.find((a) => a.paymentId && a.orderIds.some((id) => this.ordersToArchive.includes(id))) ||
+        (includeUnrelated ? records.find((a) => a.paymentId && a.status !== 'succeeded') : null) || null
+    },
+    async refreshRememberedTerminalPayment(paymentId, generation) {
+      await this.terminalDispatch('stripeTerminal/resetPayment')
+      if (!this.terminalRequestIsCurrent(generation)) return false
+      return this.terminalDispatch('stripeTerminal/refreshPayment', paymentId)
+    },
+    terminalAmountAllowed(attempt) {
+      const discount = calculateDiscount({
+        subtotal: this.paymentSummary.dueAmount,
+        type: attempt.discountType,
+        value: attempt.discountType === 'amount' ? attempt.discountValue / 100 : attempt.discountValue,
+      })
+      if (Math.round(discount.total * 100) >= 50) return true
+      this.terminalState = 'idle'
+      this.terminalNotice = 'Le montant à encaisser par TPE doit être au moins de 0,50 €. Modifiez la remise ou choisissez un autre moyen.'
+      return false
     },
     terminalRecovery() {
       this.stopTerminalPolling()
@@ -564,10 +635,6 @@ export default {
       this.terminalChecking = false
       if (!this.ordersLoaded) { this.terminalRecovery(); return }
       this.terminalAttempt = this.readTerminalAttempt()
-      const cached = this.$store.get('stripeTerminal/activePayment')
-      if (!this.terminalAttempt && matchesCashRegisterTerminalAttempt(cached, this.ordersToArchive)) {
-        this.terminalAttempt = { orderIds: cached.orderIds, paymentId: cached.id }
-      }
       if (this.terminalAttempt) return this.retryTerminalPayment()
     },
     async startTerminalPayment() {
@@ -579,24 +646,22 @@ export default {
       const generation = this.terminalGeneration
       try {
         if (!await this.refreshTerminalOrders(generation)) return
-        if (!this.requiresPaymentMethod) {
-          this.terminalState = 'succeeded'
-          return
-        }
         // A fresh order snapshot and saved attempt are checked before any POST.
-        this.terminalAttempt = this.terminalAttempt || this.readTerminalAttempt()
-        const cached = this.$store.get('stripeTerminal/activePayment')
-        if (!this.terminalAttempt && matchesCashRegisterTerminalAttempt(cached, this.ordersToArchive) && isTerminalPaymentPending(cached)) {
-          this.terminalAttempt = { orderIds: cached.orderIds, paymentId: cached.id }
-        }
-        const attempt = this.terminalAttempt || cashRegisterTerminalPayload({
+        const saved = this.readTerminalAttempt(true)
+        const attempt = saved || cashRegisterTerminalPayload({
           orderIds: this.retryActive ? this.retryDueOrderIds : this.paymentSummary.dueOrderIds,
           discountType: this.discountType === null ? null : this.effectiveDiscountType,
           discountValue: this.effectiveDiscountValue,
         })
+        if (!attempt.paymentId && !matchesCashRegisterTerminalAttempt(attempt, this.paymentSummary.dueOrderIds)) {
+          this.terminalState = 'idle'
+          this.terminalNotice = 'La sélection a changé. Vérifiez les commandes avant de poursuivre.'
+          return
+        }
+        if (!attempt.paymentId && !this.terminalAmountAllowed(attempt)) return
         this.rememberTerminalAttempt(attempt)
         const result = attempt.paymentId
-          ? await this.terminalDispatch('stripeTerminal/refreshPayment', attempt.paymentId)
+          ? await this.refreshRememberedTerminalPayment(attempt.paymentId, generation)
           : await this.terminalDispatch('stripeTerminal/startPayment', attempt)
         if (!this.terminalRequestIsCurrent(generation)) return
         await this.acceptTerminalPayment(result, generation)
@@ -636,22 +701,24 @@ export default {
       const generation = this.terminalGeneration
       try {
         if (!await this.refreshTerminalOrders(generation)) return
-        if (!this.requiresPaymentMethod) {
-          this.terminalState = 'succeeded'
-          this.terminalNotice = 'Paiement accepté. Commandes à clôturer.'
-          this.rememberTerminalAttempt(null)
-          return
-        }
-        const attempt = this.terminalAttempt || this.readTerminalAttempt()
+        const discovered = this.readTerminalAttempt()
+        const attempt = discovered && discovered.paymentId ? discovered : this.terminalAttempt || discovered
         if (!attempt) {
           this.terminalState = 'idle'
           this.terminalNotice = ''
           return
         }
+        if (!attempt.paymentId && !matchesCashRegisterTerminalAttempt(attempt, this.paymentSummary.dueOrderIds)) {
+          this.terminalState = 'idle'
+          this.terminalNotice = 'La sélection a changé. Le paiement précédent reste à vérifier séparément.'
+          this.terminalAttempt = null
+          return
+        }
+        if (!attempt.paymentId && !this.terminalAmountAllowed(attempt)) return
         this.selectedPaymentMethod = 'stripe_terminal'
         this.terminalAttempt = attempt
         const result = attempt.paymentId
-          ? await this.terminalDispatch('stripeTerminal/refreshPayment', attempt.paymentId)
+          ? await this.refreshRememberedTerminalPayment(attempt.paymentId, generation)
           : await this.terminalDispatch('stripeTerminal/startPayment', attempt)
         if (!this.terminalRequestIsCurrent(generation)) return
         await this.acceptTerminalPayment(result, generation)
@@ -666,23 +733,31 @@ export default {
       this.stopTerminalPolling()
       const attempt = this.terminalAttempt
       if (!payment || !attempt || !Array.isArray(payment.orderIds) ||
-        payment.orderIds.length !== attempt.orderIds.length ||
-        !attempt.orderIds.every((id) => payment.orderIds.includes(id)) ||
         (attempt.paymentId && payment.id !== attempt.paymentId)) {
         this.terminalRecovery()
         return
       }
+      const matching = matchesCashRegisterTerminalAttempt(attempt, payment.orderIds)
+      if (!matching && !attempt.paymentId) this.rememberTerminalAttempt(null)
       this.terminalPayment = payment
-      this.rememberTerminalAttempt({ ...attempt, paymentId: payment.id })
+      this.rememberTerminalAttempt({ ...(matching ? attempt : {}), orderIds: payment.orderIds, paymentId: payment.id })
       this.terminalNotice = terminalPaymentMessage(payment)
+      const unrelated = !payment.orderIds.some((id) => this.ordersToArchive.includes(id))
+      if (unrelated) this.terminalNotice = `Paiement des autres commandes (${payment.orderIds.join(', ')}). ${this.terminalNotice}`
       if (isTerminalPaymentPending(payment)) {
         this.terminalState = payment.status === 'creating' ? 'starting' : 'processing'
         this.scheduleTerminalPoll()
       } else if (payment.status === 'succeeded') {
+        if (!hasSettledTerminalAllocations(payment)) { this.terminalRecovery(); return }
         if (!await this.refreshTerminalOrders(generation)) return
-        if (this.requiresPaymentMethod) { this.terminalRecovery(); return }
-        this.terminalState = 'succeeded'
-        this.rememberTerminalAttempt(null)
+        this.terminalReceiptOrders = terminalReceiptSnapshot(
+          this.dataOrders.filter((order) => this.ordersToArchive.includes(Number(order.id))), payment
+        )
+        this.terminalSettlements = { ...this.terminalSettlements,
+          ...Object.fromEntries(this.terminalReceiptOrders.map((order) => [order.id, order])) }
+        if (this.retryActive) this.retryDueOrderIds = this.retryDueOrderIds.filter((id) => !payment.orderIds.includes(id))
+        this.terminalState = this.terminalReceiptOrders.length ? 'succeeded' : 'idle'
+        this.rememberTerminalAttempt({ ...this.terminalAttempt, status: 'succeeded' })
       } else if (['failed', 'canceled'].includes(payment.status)) {
         this.terminalState = payment.status
         this.rememberTerminalAttempt(null)
@@ -691,7 +766,7 @@ export default {
       }
     },
     offerTerminalReceipt() {
-      if (this.terminalState === 'succeeded' && !this.requiresPaymentMethod && !this.receiptDialog) {
+      if (this.terminalState === 'succeeded' && this.terminalReceiptOrders.length && !this.receiptDialog) {
         this.requestReceiptChoice()
       }
     },
@@ -771,7 +846,7 @@ export default {
       this.discountDialog = false
     },
     orderDiscountPayload(orderId) {
-      if (this.terminalState === 'succeeded') return {}
+      if (this.terminalSettlements[orderId]) return {}
       if (this.discountType === null) return {}
       if (this.effectiveDiscountType === 'none') {
         return {
@@ -797,10 +872,11 @@ export default {
     },
     requestReceiptChoice() {
       if (this.confirmDisabled) return
-      if (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod) {
+      if (!this.terminalReceiptOrders.length && this.needsTerminalReceipt) return this.retryTerminalPayment()
+      if (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod && !this.terminalReceiptOrders.length) {
         return this.startTerminalPayment()
       }
-      this.pendingPaymentMethod = this.requiresPaymentMethod
+      this.pendingPaymentMethod = this.requiresPaymentMethod && !this.terminalReceiptOrders.length
         ? this.selectedPaymentMethod
         : null
       this.receiptDialog = true
@@ -872,18 +948,21 @@ export default {
     },
     async btnYes(wantsReceipt = false) {
       if (this.loadingBtn) return
+      const terminalArchive = this.terminalReceiptOrders.length > 0
       if (this.terminalBusy || this.terminalChecking ||
         ['starting', 'processing', 'recovery'].includes(this.terminalState) ||
-        (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod)) return
+        (!terminalArchive && this.needsTerminalReceipt) ||
+        (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod && !terminalArchive)) return
 
       this.loadingBtn = true
-      const orderIds = this.ordersToArchive.slice()
-      const receiptOrders = this.selectedOrders.slice()
+      const receiptOrders = (terminalArchive ? this.terminalReceiptOrders : this.selectedOrders).slice()
+      const orderIds = terminalArchive ? receiptOrders.map((order) => Number(order.id)) : this.ordersToArchive.slice()
+      const untouchedOrderIds = this.ordersToArchive.filter((id) => !orderIds.includes(id))
       const paymentSummary = this.paymentSummary
       const initialDueOrderIds = this.retryActive
         ? this.retryDueOrderIds.slice()
         : paymentSummary.dueOrderIds.slice()
-      const requiresPaymentMethod = this.requiresPaymentMethod
+      const requiresPaymentMethod = !terminalArchive && this.requiresPaymentMethod
       const paymentMethod = requiresPaymentMethod
         ? this.pendingPaymentMethod
         : null
@@ -912,10 +991,13 @@ export default {
             })
         )
 
+        if (terminalArchive) this.resolveTerminalArchives(archiveSummary.successfulOrderIds)
+
         if (!archiveSummary.allSucceeded) {
           this.ordersToArchive = archiveSummary.failedOrderIds
+          if (terminalArchive) this.ordersToArchive = [...this.ordersToArchive, ...untouchedOrderIds]
           this.retryDueOrderIds = initialDueOrderIds.filter((orderId) =>
-            archiveSummary.failedOrderIds.includes(orderId)
+            this.ordersToArchive.includes(orderId)
           )
           this.retryActive = true
 
@@ -928,7 +1010,7 @@ export default {
           } catch (error) {}
 
           const retryDueResolution = resolveRetryDueOrderIds({
-            failedOrderIds: archiveSummary.failedOrderIds,
+            failedOrderIds: this.ordersToArchive,
             fallbackDueOrderIds: this.retryDueOrderIds,
             refreshedOrders: this.dataOrders,
             refreshSucceeded,
@@ -936,6 +1018,17 @@ export default {
           this.ordersToArchive = retryDueResolution.orderIds
           this.retryDueOrderIds = retryDueResolution.dueOrderIds
           this.retryActive = this.ordersToArchive.length > 0
+          if (terminalArchive) {
+            this.retryDueOrderIds = this.retryDueOrderIds.filter((id) => !this.terminalSettlements[id])
+            if (retryDueResolution.reliable) this.resolveTerminalArchives(
+              archiveSummary.failedOrderIds.filter((id) => !this.ordersToArchive.includes(id))
+            )
+            this.terminalReceiptOrders = receiptOrders.filter((order) => this.ordersToArchive.includes(Number(order.id)))
+            if (!this.terminalReceiptOrders.length) {
+              this.terminalState = 'idle'
+              this.selectedPaymentMethod = null
+            }
+          }
 
           if (!this.ordersToArchive.length) {
             this.$store.dispatch(
@@ -981,10 +1074,11 @@ export default {
           )
         }
 
+        let refreshSucceeded = false
         try {
-          await this.$store.dispatch('orders/getAllOrder', {
+          refreshSucceeded = (await this.$store.dispatch('orders/getAllOrder', {
             refresh: Date.now(),
-          })
+          })) === true
         } catch (error) {}
 
         this.retryActive = false
@@ -995,6 +1089,21 @@ export default {
           `${archiveSummary.successfulOrderIds.length} commande(s) archivee(s) avec succes.`,
           { root: true }
         )
+        if (terminalArchive) {
+          this.terminalReceiptOrders = []
+          this.terminalState = 'idle'
+          this.selectedPaymentMethod = null
+          this.clearDiscount()
+          if (untouchedOrderIds.length) {
+            this.ordersToArchive = untouchedOrderIds
+            this.retryActive = !refreshSucceeded
+            this.retryDueOrderIds = initialDueOrderIds.filter((id) => untouchedOrderIds.includes(id))
+            await Promise.resolve().then(() => this.$router.replace({
+              query: { ...this.$route.query, orders: untouchedOrderIds },
+            })).catch(() => {})
+            return
+          }
+        }
         this.dialog = false
       } finally {
         this.loadingBtn = false

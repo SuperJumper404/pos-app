@@ -295,7 +295,7 @@ const runAsyncAssertions = async () => {
   assert.ok(payoutSource.includes('applyDiscount'))
   assert.ok(payoutSource.includes('discountType: this.effectiveDiscountType'))
   assert.ok(payoutSource.includes('discountValue: this.effectiveDiscountValue'))
-  assert.ok(payoutSource.includes(':disabled="loadingBtn"'))
+  assert.ok(payoutSource.includes(':disabled="loadingBtn || terminalBusy"'))
   assert.ok(payoutSource.includes('if (this.loadingBtn) return'))
   assert.ok(payoutSource.includes("this.$route.path !== '/cashregister'"))
   assert.ok(payoutSource.includes('displayOrderNumbers'))

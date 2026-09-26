@@ -16,10 +16,14 @@ const order = (id = 1, extra = {}) => ({
   id, ordernumber: `A${id}`, subtotal: 12, payment_status: 'unpaid',
   payment: 'Paiement au comptoir', ...extra,
 })
-const payment = (status = 'processing', extra = {}) => ({
-  id: 91, readerId: 7, status, amountCents: 1200, currency: 'eur',
-  orderIds: [1], failureCode: null, failureMessage: null, ...extra,
-})
+const payment = (status = 'processing', extra = {}) => {
+  const dto = { id: 91, readerId: 7, status, amountCents: 1200, currency: 'eur',
+    orderIds: [1], failureCode: null, failureMessage: null, ...extra }
+  if (status === 'succeeded' && !dto.allocations) dto.allocations = dto.orderIds.map(orderId => ({
+    orderId, amountCents: dto.amountCents / dto.orderIds.length,
+  }))
+  return dto
+}
 const deferred = () => {
   let settle
   const promise = new Promise((resolve) => { settle = resolve })
@@ -126,7 +130,7 @@ const make = (options = {}) => {
     timers.delete(next[0])
     await next[1]()
   }
-  return { instance, state, calls, responses, timers, initialize, tick, page, storage: sessionStorage }
+  return { instance, state, calls, responses, timers, initialize, tick, page, storage: sessionStorage, load }
 }
 
 const tests = []
@@ -268,6 +272,7 @@ test('in-memory session discovery refreshes a matching active session', async ()
 
 test('paid-but-unarchived reload closes through receipt/archive without startPayment', async () => {
   const h = make({ orders: [order(1, { payment_status: 'paid', payment: 'Carte bancaire', payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91 })] })
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded')
   await h.initialize()
   await h.instance.requestReceiptChoice()
   assert.strictEqual(h.instance.receiptDialog, true)
@@ -349,6 +354,7 @@ test('uncertain start recovery first refreshes paid orders and never starts agai
   h.responses['stripeTerminal/startPayment'] = false
   await start(h)
   assert.strictEqual(h.instance.terminalState, 'recovery')
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded')
   h.responses['orders/getAllOrder'] = () => {
     h.state.orders = [order(1, { payment_status: 'paid', payment: 'Carte bancaire', payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91 })]
     return true
@@ -362,7 +368,8 @@ test('unrelated returned payment cannot settle the selection', async () => {
   const h = make()
   h.responses['stripeTerminal/startPayment'] = payment('succeeded', { orderIds: [99] })
   await start(h)
-  assert.strictEqual(h.instance.terminalState, 'recovery')
+  assert.strictEqual(h.instance.terminalState, 'idle')
+  assert.ok(h.instance.terminalNotice.includes('autres commandes'))
   noSettlement(h)
 })
 
@@ -569,6 +576,257 @@ test('raw service messages never enter the payment status copy', async () => {
   await h.tick()
   assert.ok(!h.instance.terminalNotice.includes('secret-stripe-message'))
   assert.ok(!h.instance.terminalNotice.includes('raw-unknown'))
+})
+
+test('recovery matching requires exact, order-insensitive due IDs', () => {
+  const { matchesCashRegisterTerminalAttempt: matches } = require('../helpers/cashRegister')
+  assert.strictEqual(matches({ orderIds: [1, 2] }, [2, 1]), true)
+  for (const ids of [[1], [1, 2, 3], [2, 3], [], [1, 1]]) {
+    assert.strictEqual(matches({ orderIds: [1, 2] }, ids), false)
+  }
+})
+
+test('unmatched unknown recovery is never replayed on subset or superset reload', async () => {
+  for (const ids of [[1], [1, 2, 3]]) {
+    const saved = storage()
+    saved.setItem('cashregister-terminal:2:4', JSON.stringify({ orderIds: [1, 2], discountType: 'none', discountValue: 0 }))
+    const h = make({ storage: saved, orders: ids.map(id => order(id)) })
+    await h.initialize()
+    assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+    noSettlement(h)
+  }
+})
+
+test('recovery records preserve unresolved A when B is recorded and resolved', async () => {
+  const h = make()
+  await h.initialize()
+  h.instance.rememberTerminalAttempt({ orderIds: [1], paymentId: 91 })
+  h.instance.rememberTerminalAttempt({ orderIds: [2], paymentId: 92 })
+  let saved = JSON.parse(h.storage.getItem('cashregister-terminal:2:4'))
+  assert.strictEqual(saved.version, 2)
+  assert.strictEqual(Object.keys(saved.records).length, 2)
+  h.instance.rememberTerminalAttempt(null)
+  saved = JSON.parse(h.storage.getItem('cashregister-terminal:2:4'))
+  assert.deepStrictEqual(Object.values(saved.records).map(x => x.paymentId), [91])
+  const reloaded = make({ storage: h.storage })
+  await reloaded.initialize()
+  assert.strictEqual(count(reloaded, 'stripeTerminal/startPayment'), 0)
+  assert.strictEqual(reloaded.instance.terminalPayment.id, 91)
+})
+
+test('A processing then B attempted then reload A never loses or repays A', async () => {
+  const a = make()
+  await start(a)
+  a.page.beforeDestroy.call(a.instance)
+  const b = make({ storage: a.storage, orders: [order(2)] })
+  b.responses['stripeTerminal/startPayment'] = payment()
+  await start(b)
+  assert.strictEqual(b.instance.terminalPayment.id, 91)
+  assert.ok(b.instance.terminalNotice.includes('autres commandes'))
+  noSettlement(b)
+  b.page.beforeDestroy.call(b.instance)
+  const reloaded = make({ storage: a.storage })
+  await reloaded.initialize()
+  assert.strictEqual(count(reloaded, 'stripeTerminal/startPayment'), 0)
+  assert.strictEqual(reloaded.instance.terminalPayment.id, 91)
+})
+
+test('known mismatched session reconciles by ID without replaying unselected orders', async () => {
+  const saved = storage()
+  saved.setItem('cashregister-terminal:2:4', JSON.stringify({ orderIds: [1, 2], paymentId: 91 }))
+  const h = make({ storage: saved })
+  h.responses['stripeTerminal/refreshPayment'] = payment('processing', { orderIds: [1, 2], amountCents: 2400 })
+  await h.initialize()
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+  assert.strictEqual(h.instance.terminalPayment.id, 91)
+  noSettlement(h)
+})
+
+test('a settled allocation supplies the receipt total and discount rather than the stale order subtotal', async () => {
+  const h = make()
+  await start(h)
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', { amountCents: 1075 })
+  h.responses['orders/getAllOrder'] = () => {
+    h.state.orders = [order(1, { payment_status: 'paid', payment: 'Carte bancaire', payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91 })]
+    return true
+  }
+  await h.tick()
+  const printed = []
+  h.instance.printReceiptsForOrders = orders => printed.push(...orders)
+  await h.instance.confirmReceiptChoice(true)
+  assert.strictEqual(printed[0].subtotal, 10.75)
+  assert.strictEqual(printed[0].subtotal_before_discount, 12)
+  assert.strictEqual(printed[0].discount_amount, 1.25)
+  const { buildCashierReceiptPayload } = require('../helpers/cashierReceipt')
+  const receipt = buildCashierReceiptPayload({ order: printed[0], details: [], shopInfo: {} })
+  assert.strictEqual(receipt.totalAmount, 10.75)
+  assert.strictEqual(receipt.discountAmount, 1.25)
+  assert.strictEqual(receipt.subtotalBeforeDiscount, 12)
+})
+
+test('recovery explicitly switches the real store away from another cached payment ID', async () => {
+  const h = make()
+  await h.initialize()
+  const real = h.load(path.join(root, 'store/stripeTerminal.js'))
+  const terminal = real.state()
+  terminal.activePayment = payment('processing', { id: 92, orderIds: [2] })
+  const previousGet = h.instance.$store.get
+  h.instance.$store.get = key => key === 'stripeTerminal/activePayment' ? terminal.activePayment : previousGet(key)
+  const previousDispatch = h.instance.$store.dispatch
+  const localDispatch = (name, payload) => { terminal[name.slice(4)] = payload }
+  h.instance.$store.dispatch = (name, payload) => {
+    if (!['stripeTerminal/resetPayment', 'stripeTerminal/refreshPayment'].includes(name)) return previousDispatch(name, payload)
+    h.calls.push({ name, payload })
+    return real.actions[name.split('/')[1]].call({ $axios: {
+      get: () => Promise.resolve({ data: { code: 200, success: true, data: payment() } }),
+    } }, { state: terminal, dispatch: localDispatch }, payload)
+  }
+  h.instance.terminalAttempt = { orderIds: [1], paymentId: 91 }
+  await h.instance.retryTerminalPayment()
+  assert.strictEqual(h.instance.terminalState, 'processing')
+  assert.strictEqual(terminal.activePayment.id, 91)
+  assert.ok(h.calls.findIndex(x => x.name === 'stripeTerminal/resetPayment') < h.calls.findIndex(x => x.name === 'stripeTerminal/refreshPayment'))
+})
+
+test('mixed selection archives only succeeded session orders then leaves the other order payable', async () => {
+  const saved = storage()
+  saved.setItem('cashregister-terminal:2:4', JSON.stringify({ orderIds: [1], paymentId: 91 }))
+  const h = make({ storage: saved, orders: [order(), order(2)] })
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', { amountCents: 1075 })
+  h.responses['orders/getAllOrder'] = () => {
+    h.state.orders = [order(1, { payment_status: 'paid', payment: 'Carte bancaire', payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91 }), order(2)]
+    return true
+  }
+  await h.initialize()
+  assert.strictEqual(h.instance.receiptDialog, true)
+  await h.instance.confirmReceiptChoice(false)
+  assert.deepStrictEqual(h.calls.filter(x => x.name === 'orders/archiveOrder').map(x => x.payload.id), [1])
+  assert.deepStrictEqual(Array.from(h.instance.ordersToArchive), [2])
+  assert.strictEqual(h.instance.requiresPaymentMethod, true)
+  assert.strictEqual(h.instance.paymentControlsLocked, false)
+  assert.strictEqual(h.instance.dialog, 'true')
+  h.responses['stripeTerminal/startPayment'] = payment('processing', { id: 92, orderIds: [2] })
+  h.instance.selectPaymentMethod(terminalMethod)
+  await h.instance.requestReceiptChoice()
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 1)
+  assert.deepStrictEqual(Array.from(h.calls.find(x => x.name === 'stripeTerminal/startPayment').payload.orderIds), [2])
+})
+
+test('sub-minimum discounts keep the form editable and never create a recovery record', async () => {
+  for (const [type, value] of [['percent', 100], ['amount', 11.51], ['amount', 20]]) {
+    const h = make()
+    await h.initialize()
+    h.instance.selectedPaymentMethod = terminalMethod
+    h.instance.discountType = type
+    h.instance.discountValue = value
+    await h.instance.requestReceiptChoice()
+    assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+    assert.strictEqual(h.instance.terminalAttempt, null)
+    assert.strictEqual(h.storage.getItem('cashregister-terminal:2:4'), null)
+    assert.strictEqual(h.instance.paymentControlsLocked, false)
+    h.instance.selectPaymentMethod('Espèces')
+    assert.strictEqual(h.instance.selectedPaymentMethod, 'Espèces')
+    noSettlement(h)
+  }
+})
+
+test('close button is disabled throughout Terminal work', () => {
+  const parsed = compiler.parseComponent(fs.readFileSync(pagePath, 'utf8'))
+  const template = compiler.compile(parsed.template.content)
+  const find = node => {
+    if (node.attrsMap && node.attrsMap['aria-label'] === "Fermer la modal d'encaissement") return node
+    return (node.children || []).map(find).find(Boolean)
+  }
+  const button = find(template.ast)
+  assert.strictEqual(button.attrsMap[':disabled'], 'loadingBtn || terminalBusy')
+})
+
+test('paid recovery survives receipt dismissal and clears only after every allocated order closes', async () => {
+  const h = make({ orders: [order(), order(2)] })
+  h.responses['stripeTerminal/startPayment'] = payment('processing', { orderIds: [1, 2], amountCents: 2400 })
+  await start(h)
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', { orderIds: [1, 2], amountCents: 2150 })
+  await h.tick()
+  assert.strictEqual(Object.values(JSON.parse(h.storage.getItem('cashregister-terminal:2:4')).records)[0].paymentId, 91)
+  h.page.beforeDestroy.call(h.instance)
+  for (const id of [1, 2]) {
+    const reloaded = make({ storage: h.storage, orders: [order(id)] })
+    reloaded.responses['stripeTerminal/refreshPayment'] = payment('succeeded', { orderIds: [1, 2], amountCents: 2150 })
+    await reloaded.initialize()
+    assert.strictEqual(count(reloaded, 'stripeTerminal/startPayment'), 0)
+    assert.strictEqual(reloaded.instance.terminalReceiptOrders[0].subtotal, 10.75)
+    await reloaded.instance.confirmReceiptChoice(false)
+    if (id === 1) assert.ok(h.storage.getItem('cashregister-terminal:2:4'))
+    else assert.strictEqual(h.storage.getItem('cashregister-terminal:2:4'), null)
+  }
+})
+
+test('reconciled unrelated paid A remains recoverable without preventing a new payment for B', async () => {
+  const h = make({ orders: [order(2)] })
+  h.storage.setItem('cashregister-terminal:2:4', JSON.stringify({ orderIds: [1], paymentId: 91 }))
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded')
+  await start(h)
+  noSettlement(h)
+  assert.strictEqual(h.instance.paymentControlsLocked, false)
+  assert.ok(h.storage.getItem('cashregister-terminal:2:4'))
+  h.responses['stripeTerminal/startPayment'] = payment('processing', { id: 92, orderIds: [2] })
+  await h.instance.requestReceiptChoice()
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 1)
+  const ids = Object.values(JSON.parse(h.storage.getItem('cashregister-terminal:2:4')).records).map(x => x.paymentId)
+  assert.deepStrictEqual(ids, [91, 92])
+})
+
+test('mixed receipt identifies only the settled orders and preserves a failed paid archive retry', async () => {
+  const h = make({ orders: [order(), order(2)] })
+  h.storage.setItem('cashregister-terminal:2:4', JSON.stringify({ orderIds: [1], paymentId: 91 }))
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded')
+  await h.initialize()
+  assert.strictEqual(h.instance.receiptOrderNumbers, '#A1')
+  const template = compiler.parseComponent(fs.readFileSync(pagePath, 'utf8')).template.content
+  assert.ok(/cashregister-receipt-modal__copy[\s\S]*?\{\{ receiptOrderNumbers \}\}/.test(template))
+  h.responses['orders/archiveOrder'] = false
+  h.responses['orders/getAllOrder'] = false
+  await h.instance.confirmReceiptChoice(false)
+  assert.deepStrictEqual(Array.from(h.instance.ordersToArchive), [1, 2])
+  assert.deepStrictEqual(Array.from(h.instance.retryDueOrderIds), [2])
+  h.responses['orders/archiveOrder'] = true
+  await h.instance.requestReceiptChoice()
+  await h.instance.confirmReceiptChoice(false)
+  assert.deepStrictEqual(h.calls.filter(x => x.name === 'orders/archiveOrder').map(x => x.payload.id), [1, 1])
+  assert.deepStrictEqual(Array.from(h.instance.ordersToArchive), [2])
+  assert.strictEqual(h.instance.requiresPaymentMethod, true)
+  assert.strictEqual(h.instance.paymentControlsLocked, false)
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+})
+
+test('a selection paid elsewhere during preflight does not leave the form permanently starting', async () => {
+  const h = make()
+  await h.initialize()
+  h.responses['orders/getAllOrder'] = () => {
+    h.state.orders = [order(1, { payment_status: 'paid', payment: 'Espèces' })]
+    return true
+  }
+  h.instance.selectPaymentMethod(terminalMethod)
+  await h.instance.requestReceiptChoice()
+  assert.strictEqual(h.instance.terminalState, 'idle')
+  assert.strictEqual(h.instance.paymentControlsLocked, false)
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+  assert.strictEqual(h.storage.getItem('cashregister-terminal:2:4'), null)
+})
+
+test('successive paid sessions each use their own authoritative receipt without starting payment', async () => {
+  const h = make({ orders: [order(1, { payment_status: 'paid', payment: 'Carte bancaire', payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91 }),
+    order(2, { payment_status: 'paid', payment: 'Carte bancaire', payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 92 })] })
+  h.responses['stripeTerminal/refreshPayment'] = id => payment('succeeded', { id, orderIds: [id === 91 ? 1 : 2], amountCents: 1075 })
+  await h.initialize()
+  const printed = []
+  h.instance.printReceiptsForOrders = orders => printed.push(...orders)
+  await h.instance.confirmReceiptChoice(true)
+  await h.instance.requestReceiptChoice()
+  await h.instance.confirmReceiptChoice(true)
+  assert.deepStrictEqual(printed.map(o => [o.id, o.subtotal]), [[1, 10.75], [2, 10.75]])
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+  assert.strictEqual(count(h, 'stripeTerminal/refreshPayment'), 2)
 })
 
 const run = async () => {

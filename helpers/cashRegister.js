@@ -17,10 +17,45 @@ const normalizeOrderIds = (value) =>
     .map((id) => Number(id))
     .filter((id) => Number.isFinite(id))
 
-const matchesCashRegisterTerminalAttempt = (attempt, orderIds) => {
-  if (!attempt || !Array.isArray(attempt.orderIds) || !attempt.orderIds.length) return false
-  if (!attempt.orderIds.every((id) => Number.isSafeInteger(id) && id > 0)) return false
-  return normalizeOrderIds(orderIds).some((id) => attempt.orderIds.includes(id))
+const terminalOrderSignature = (ids) => Array.isArray(ids) && ids.length > 0 &&
+  ids.every((id) => Number.isSafeInteger(id) && id > 0) && new Set(ids).size === ids.length
+  ? ids.slice().sort((a, b) => a - b).join(',') : null
+
+const matchesCashRegisterTerminalAttempt = (attempt, orderIds) => Boolean(attempt &&
+  terminalOrderSignature(attempt.orderIds) &&
+  terminalOrderSignature(attempt.orderIds) === terminalOrderSignature(orderIds))
+
+const terminalAttemptKey = (attempt) => {
+  const signature = attempt && terminalOrderSignature(attempt.orderIds)
+  if (!signature) return null
+  if (attempt.paymentId != null && (!Number.isSafeInteger(attempt.paymentId) || attempt.paymentId <= 0)) return null
+  return `${attempt.paymentId || 'pending'}:${signature}`
+}
+
+const terminalRecoveryCollection = (stored) => {
+  const records = {}
+  const entries = stored && stored.version === 2 && stored.records && typeof stored.records === 'object'
+    ? Object.values(stored.records) : [stored]
+  entries.forEach((attempt) => {
+    const key = terminalAttemptKey(attempt)
+    if (key) records[key] = attempt
+  })
+  return { version: 2, records }
+}
+
+const terminalReceiptSnapshot = (orders, payment) => {
+  const { hasSettledTerminalAllocations } = require('./stripeTerminal')
+  if (!hasSettledTerminalAllocations(payment)) return []
+  return orders.filter((order) => payment.orderIds.includes(Number(order.id))).map((order) => {
+    const allocation = payment.allocations.find((a) => a.orderId === Number(order.id))
+    const baseCents = Math.round(Number(order.subtotal) * 100)
+    const discount = Math.max(0, baseCents - allocation.amountCents) / 100
+    return { ...order, subtotal: allocation.amountCents / 100,
+      subtotal_before_discount: baseCents / 100, discount_type: discount ? 'amount' : 'none',
+      discount_value: discount, discount_amount: discount, payment_status: 'paid',
+      payment_provider: 'stripe_terminal', payment: 'Carte bancaire - TPE Stripe',
+      stripe_terminal_payment_id: payment.id }
+  })
 }
 
 const cashRegisterTerminalPayload = ({ orderIds, discountType, discountValue }) => ({
@@ -207,6 +242,9 @@ module.exports = {
   normalizeOrderIds,
   matchesCashRegisterTerminalAttempt,
   cashRegisterTerminalPayload,
+  terminalAttemptKey,
+  terminalRecoveryCollection,
+  terminalReceiptSnapshot,
   resolveRetryDueOrderIds,
   summarizeArchiveResults,
 }
