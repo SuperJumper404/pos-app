@@ -432,6 +432,7 @@
               Connecter Stripe
               <v-icon small right>mdi-credit-card-check</v-icon>
             </v-btn>
+            <StripeTerminalReaders v-if="isAdmin" :stripe-ready="stripeReady" />
           </v-card>
         </v-col>
         <v-col cols="12" md="6">
@@ -651,6 +652,7 @@
 </template>
 <script>
 import Loading from '@/components/loading'
+import StripeTerminalReaders from '@/components/settings/StripeTerminalReaders'
 import formatdate from '@/helpers/formatdate'
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -666,6 +668,7 @@ const { normalizeShopHours } = require('@/helpers/shopHours')
 export default {
   components: {
     Loading,
+    StripeTerminalReaders,
 
     // QrcodeVue,
   },
@@ -838,6 +841,10 @@ export default {
       return [true, 1, '1', 'true'].includes(
         this.$store.get('shop/stripe_charges_enabled')
       )
+    },
+    isAdmin() {
+      const user = this.$store.get('users/user')
+      return Boolean(user && user.id != null && Number(user.access) === 0)
     },
     paymentBeforeOrder: {
       get() {
