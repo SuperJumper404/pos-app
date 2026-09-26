@@ -141,6 +141,18 @@ const run = async () => {
   assert.deepStrictEqual(JSON.parse(JSON.stringify(staffFailure.calls[3].payload || null)), { silent: true })
   assert.strictEqual(staffFailure.instance.listError, '')
 
+  const staleStaff = makeInstance({ ready: true })
+  staleStaff.responses['staff/getAll'] = undefined
+  await staleStaff.instance.loadData()
+  assert.strictEqual(staleStaff.instance.staffLoaded, false)
+  staleStaff.responses['staff/getAll'] = true
+  await staleStaff.instance.refreshReaders()
+  assert.deepStrictEqual(staleStaff.calls.map((call) => call.name), [
+    'stripeTerminal/getReaders', 'staff/getAll',
+    'stripeTerminal/refreshReaders', 'staff/getAll',
+  ])
+  assert.strictEqual(staleStaff.instance.staffLoaded, true)
+
   staffFailure.state.staff = [
     { id: 1, username: 'Admin', access: 0, status: 1 },
     { id: 2, username: 'Caisse', access: 1, status: '1' },
@@ -300,18 +312,19 @@ const run = async () => {
   reactive.stripeReady = true
   await Vue.nextTick()
   assert.strictEqual(reactiveCalls.length, 4)
-  firstReaders.resolve([])
-  firstStaff.resolve(true)
-  await Vue.nextTick()
-  await Promise.resolve()
-  assert.strictEqual(reactive.listLoaded, false)
-  assert.strictEqual(reactive.busy, true)
   reconnectedReaders.resolve([reader])
   reconnectedStaff.resolve(true)
   await Vue.nextTick()
   await Promise.resolve()
   assert.strictEqual(reactive.listLoaded, true)
   assert.strictEqual(reactive.busy, false)
+  assert.strictEqual(reactive.staffLoaded, true)
+  firstReaders.resolve([])
+  firstStaff.resolve(false)
+  await Vue.nextTick()
+  await Promise.resolve()
+  assert.strictEqual(reactive.listLoaded, true)
+  assert.strictEqual(reactive.staffLoaded, true)
   reactive.$destroy()
   Vue.config.silent = previousSilent
 }

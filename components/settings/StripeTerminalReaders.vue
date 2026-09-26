@@ -322,12 +322,13 @@ export default {
         ])
         if (version !== this.connectionVersion || !this.stripeReady) return
         this.listLoaded = readers !== false
-        this.staffLoaded = staff !== false
-        if (readers === false || staff === false) {
+        this.staffLoaded = staff === true
+        if (readers === false || !this.staffLoaded) {
           this.listError = 'Impossible de charger les TPE ou les caissiers. Actualisez pour réessayer.'
         }
       } catch (error) {
         if (version === this.connectionVersion && this.stripeReady) {
+          this.staffLoaded = false
           this.listError = 'Impossible de charger les TPE ou les caissiers. Actualisez pour réessayer.'
         }
       } finally {
@@ -346,12 +347,13 @@ export default {
         ])
         if (version !== this.connectionVersion || !this.stripeReady) return
         this.listLoaded = readers !== false
-        this.staffLoaded = staff !== false
-        if (readers === false || staff === false) {
+        this.staffLoaded = staff === true
+        if (readers === false || !this.staffLoaded) {
           this.listError = 'Actualisation impossible. Réessayez.'
         }
       } catch (error) {
         if (version === this.connectionVersion && this.stripeReady) {
+          this.staffLoaded = false
           this.listError = 'Actualisation impossible. Réessayez.'
         }
       } finally {
