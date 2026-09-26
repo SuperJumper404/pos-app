@@ -80,10 +80,11 @@ const persistAuthStorage = (user) => {
   }
   return true
 }
-const persistAuthenticatedUser = (dispatch, response) => {
+const persistAuthenticatedUser = async (dispatch, response) => {
   const payload = response.data.data
   const user = Array.isArray(payload) ? payload[0] : payload
   const servicePointSession = user.session_subject === 'service_point'
+  await dispatch('stripeTerminal/resetSession', null, { root: true })
   persistAuthStorage(user)
   dispatch('set/user.id', servicePointSession ? null : user.id)
   dispatch('set/user.access', user.access)
@@ -166,11 +167,11 @@ export const actions = {
   postLogin({ dispatch }, params) {
     return this.$axios
       .post('/baseurl/api/v1/login', params)
-      .then((response) => {
+      .then(async (response) => {
         console.log('REspondse DAta', response.data.data)
         localStorage.removeItem('table_access_token')
         qrSessionBootstrap = null
-        persistAuthenticatedUser(dispatch, response)
+        await persistAuthenticatedUser(dispatch, response)
         dispatch('set/user.qrSessionReady', false)
         dispatch('set/user.qrSessionToken', null)
         dispatch('set/message', response.data.message)
@@ -194,9 +195,9 @@ export const actions = {
     tableAccessRequestToken = normalizedToken
     tableAccessRequest = this.$axios
       .post('/baseurl/api/v1/table-access', { token: normalizedToken })
-      .then((response) => {
+      .then(async (response) => {
         localStorage.setItem('table_access_token', normalizedToken)
-        persistAuthenticatedUser(dispatch, response)
+        await persistAuthenticatedUser(dispatch, response)
         dispatch('set/user.qrSessionReady', false)
         dispatch('set/user.qrSessionToken', normalizedToken)
         dispatch('set/message', response.data.message)
@@ -247,9 +248,9 @@ export const actions = {
   postClickAndCollectAccess({ dispatch }, shopId) {
     return this.$axios
       .post(`/baseurl/api/v1/shopInfo/click-and-collect/${shopId}/session`)
-      .then((response) => {
+      .then(async (response) => {
         localStorage.removeItem('table_access_token')
-        const user = persistAuthenticatedUser(dispatch, response)
+        const user = await persistAuthenticatedUser(dispatch, response)
         dispatch('set/message', response.data.message)
         return user || true
       })
@@ -265,6 +266,7 @@ export const actions = {
     qrSessionBootstrap = null
     tableAccessRequest = null
     tableAccessRequestToken = null
+    dispatch('stripeTerminal/resetSession', null, { root: true })
     dispatch('set/user.id', null)
     dispatch('set/user.access', null)
     dispatch('set/user.token', null)

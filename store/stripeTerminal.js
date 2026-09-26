@@ -8,7 +8,9 @@ const paymentStatuses = ['creating', 'processing', 'succeeded', 'failed', 'cance
 const requestState = (state) => {
   if (!requestsByState.has(state)) {
     requestsByState.set(state, {
-      active: 0, readers: 0, currentReader: 0, payment: 0, error: 0,
+      active: 0, list: 0, admin: 0, currentReader: 0, payment: 0,
+      errors: { list: 0, admin: 0, currentReader: 0, payment: 0 },
+      errorOwner: null, mutation: 0, session: 0, currentRefresh: null,
     })
   }
   return requestsByState.get(state)
@@ -116,29 +118,43 @@ const paymentPayload = (input) => {
 const runRequest = async ({ dispatch, state }, scope, send, validDto, onSuccess, options = {}) => {
   const request = requestState(state)
   const generation = ++request[scope]
-  const errorGeneration = ++request.error
+  const errorGeneration = ++request.errors[scope]
+  const session = request.session
   request.active += 1
   dispatch('set/loading', true)
-  dispatch('set/error', null)
+  if (request.errorOwner === scope) {
+    request.errorOwner = null
+    dispatch('set/error', null)
+  }
   try {
     const response = await send()
     if (!validEnvelope(response) || !validDto(response.data.data)) {
       throw terminalError('TERMINAL_INVALID_RESPONSE')
     }
+    if (request.session !== session) return false
     const dto = response.data.data
-    if (options.onValidated) options.onValidated(dto, request)
     const samePayment = options.paymentId === undefined ||
       !state.activePayment || state.activePayment.id === options.paymentId
-    if (request[scope] === generation && samePayment) onSuccess(dto, request)
+    const fresh = request[scope] === generation && samePayment &&
+      (!options.isFresh || options.isFresh(request))
+    if (!fresh && !options.applyEverySuccess) return false
+    if (fresh || options.applyEverySuccess) onSuccess(dto, request)
+    if (options.afterSuccess) await options.afterSuccess(dto, request)
+    if (request.session !== session) return false
     return dto
   } catch (error) {
-    if (request.error === errorGeneration && request[scope] === generation) {
+    if (request.session === session && request.errors[scope] === errorGeneration &&
+      request[scope] === generation && (!options.isFresh || options.isFresh(request)) &&
+      (scope === 'payment' || request.errorOwner !== 'payment')) {
+      request.errorOwner = scope
       dispatch('set/error', normalizeError(error))
     }
     return false
   } finally {
-    request.active -= 1
-    if (request.active === 0) dispatch('set/loading', false)
+    if (request.session === session) {
+      request.active -= 1
+      if (request.active === 0) dispatch('set/loading', false)
+    }
   }
 }
 
@@ -148,10 +164,33 @@ const updateReader = (dispatch, state, reader) => {
   dispatch('set/readers', found ? readers : [...readers, reader])
 }
 
-const invalidateCurrentReader = (dispatch, state, reader, request) => {
-  request.currentReader += 1
+const runReaderMutation = (context, send, afterSuccess = () => {}) => {
+  const { dispatch, state } = context
+  const request = requestState(state)
+  return runRequest(context, 'admin', () => {
+    const result = send()
+    request.mutation += 1
+    return result
+  }, validReader, (reader) => {
+    request.mutation += 1
+    updateReader(dispatch, state, reader)
+  }, {
+    applyEverySuccess: true,
+    afterSuccess: (reader) => afterSuccess(reader, request),
+  })
+}
+
+const reconcileCurrentReader = async (context, reader, request) => {
+  const { dispatch, state } = context
   if (state.currentReader && state.currentReader.id === reader.id) {
     dispatch('set/currentReader', null)
+  }
+  let refresh = dispatch('getCurrentReader')
+  request.currentRefresh = refresh
+  while (refresh) {
+    await refresh
+    if (request.currentRefresh === refresh) break
+    refresh = request.currentRefresh
   }
 }
 
@@ -168,60 +207,49 @@ export const plugins = [EasyAccess()]
 
 export const actions = {
   getReaders(context) {
-    const { dispatch, state } = context
-    return runRequest(context, 'readers',
+    const { dispatch } = context
+    const mutation = requestState(context.state).mutation
+    return runRequest(context, 'list',
       () => this.$axios.get(`${baseUrl}/readers`, requestConfig()),
-      validReaders,
-      (readers, request) => {
-        dispatch('set/readers', readers)
-        if (state.currentReader) {
-          const current = readers.find((reader) => reader.id === state.currentReader.id)
-          if (!current || !current.isActive ||
-            current.assignedUserId !== state.currentReader.assignedUserId) {
-            request.currentReader += 1
-            dispatch('set/currentReader', null)
-          }
+      validReaders, (readers) => dispatch('set/readers', readers),
+      { isFresh: (request) => request.mutation === mutation })
+  },
+  registerReader(context, input) {
+    return runReaderMutation(context,
+      () => this.$axios.post(`${baseUrl}/readers`, readerPayload(input), requestConfig()),
+      (reader, request) => {
+        const user = context.rootState && context.rootState.users && context.rootState.users.user
+        if (user && Number(user.id) === reader.assignedUserId) {
+          return reconcileCurrentReader(context, reader, request)
         }
       })
   },
-  registerReader(context, input) {
-    const { dispatch, state } = context
-    return runRequest(context, 'readers',
-      () => this.$axios.post(`${baseUrl}/readers`, readerPayload(input), requestConfig()),
-      validReader,
-      (reader) => updateReader(dispatch, state, reader),
-      { onValidated: (reader, request) => invalidateCurrentReader(dispatch, state, reader, request) })
-  },
   assignReader(context, input) {
-    const { dispatch, state } = context
-    return runRequest(context, 'readers',
+    return runReaderMutation(context,
       () => {
         if (!validObject(input)) throw terminalError('TERMINAL_INVALID_INPUT')
         const id = requiredId(input.id)
         const assignedUserId = requiredId(input.assignedUserId)
         return this.$axios.patch(`${baseUrl}/readers/${id}/assignment`, { assignedUserId }, requestConfig())
-      }, validReader,
-      (reader) => updateReader(dispatch, state, reader),
-      { onValidated: (reader, request) => invalidateCurrentReader(dispatch, state, reader, request) })
+      }, (reader, request) => reconcileCurrentReader(context, reader, request))
   },
   setReaderActive(context, input) {
-    const { dispatch, state } = context
-    return runRequest(context, 'readers',
+    return runReaderMutation(context,
       () => {
         if (!validObject(input) || typeof input.isActive !== 'boolean') {
           throw terminalError('TERMINAL_INVALID_INPUT')
         }
         const id = requiredId(input.id)
         return this.$axios.patch(`${baseUrl}/readers/${id}/status`, { isActive: input.isActive }, requestConfig())
-      }, validReader,
-      (reader) => updateReader(dispatch, state, reader),
-      { onValidated: (reader, request) => invalidateCurrentReader(dispatch, state, reader, request) })
+      }, (reader, request) => reconcileCurrentReader(context, reader, request))
   },
   refreshReaders(context) {
     const { dispatch } = context
-    return runRequest(context, 'readers',
+    const mutation = requestState(context.state).mutation
+    return runRequest(context, 'list',
       () => this.$axios.post(`${baseUrl}/readers/refresh`, {}, requestConfig()),
-      validReaders, (readers) => dispatch('set/readers', readers))
+      validReaders, (readers) => dispatch('set/readers', readers),
+      { isFresh: (request) => request.mutation === mutation })
   },
   getCurrentReader(context) {
     const { dispatch } = context
@@ -261,8 +289,27 @@ export const actions = {
   resetPayment({ dispatch, state }) {
     const request = requestState(state)
     request.payment += 1
-    request.error += 1
+    request.errors.payment += 1
     dispatch('set/activePayment', null)
+    if (request.errorOwner === 'payment') {
+      request.errorOwner = null
+      dispatch('set/error', null)
+    }
+  },
+  resetSession({ dispatch, state }) {
+    const request = requestState(state)
+    request.session += 1
+    request.active = 0
+    request.currentRefresh = null
+    request.errorOwner = null
+    for (const scope of ['list', 'admin', 'currentReader', 'payment']) {
+      request[scope] += 1
+      request.errors[scope] += 1
+    }
+    dispatch('set/readers', [])
+    dispatch('set/currentReader', null)
+    dispatch('set/activePayment', null)
+    dispatch('set/loading', false)
     dispatch('set/error', null)
   },
 }

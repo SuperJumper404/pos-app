@@ -66,6 +66,9 @@ const harness = (result = { data: null }, rejection = null, responder = null) =>
   const dispatches = []
   const dispatch = (type, value) => {
     dispatches.push({ type, value })
+    if (type === 'getCurrentReader') {
+      return actions.getCurrentReader.call({ $axios: axios }, { dispatch, state: current })
+    }
     assert.ok(type.startsWith('set/'), `Unexpected dispatch: ${type}`)
     current[type.slice(4)] = value
   }
@@ -95,7 +98,7 @@ const run = async () => {
     [
       'getReaders', 'registerReader', 'assignReader', 'setReaderActive',
       'refreshReaders', 'getCurrentReader', 'startPayment',
-      'refreshPayment', 'cancelPayment', 'resetPayment',
+      'refreshPayment', 'cancelPayment', 'resetPayment', 'resetSession',
     ].sort()
   )
 
@@ -125,11 +128,15 @@ const run = async () => {
   ]
 
   for (const [name, input, method, url, body, dto, field] of routes) {
-    const h = harness({ data: dto })
+    const refetchesCurrent = ['assignReader', 'setReaderActive'].includes(name)
+    const h = refetchesCurrent
+      ? harness(null, null, (requestMethod) => Promise.resolve(ok(requestMethod === 'get' ? null : dto)))
+      : harness({ data: dto })
     const returned = await h.call(name, input)
     assert.deepStrictEqual(returned, dto, `${name} must return backend DTO`)
-    assert.strictEqual(h.calls.length, 1, `${name} must make one request`)
+    assert.strictEqual(h.calls.length, refetchesCurrent ? 2 : 1, `${name} request count`)
     assertRequest(h.calls[0], method, url, body)
+    if (refetchesCurrent) assertRequest(h.calls[1], 'get', `${base}/current-reader`)
     if (field) assert.deepStrictEqual(h.current[field], dto, `${name} must update ${field}`)
     assert.strictEqual(h.current.loading, false)
     assert.strictEqual(h.current.error, null)
@@ -172,13 +179,13 @@ const run = async () => {
     code: 'TERMINAL_REQUEST_FAILED', message: 'Impossible de contacter le terminal.',
   })
 
-  const reset = harness()
+  const reset = harness(null, { response: { data: { error: 'TERMINAL_PAYMENT_FAILED' } } })
+  await reset.call('startPayment', { orderIds: [3] })
   reset.current.activePayment = payment
-  reset.current.error = { code: 'TERMINAL_REQUEST_FAILED', message: 'Erreur' }
   await reset.call('resetPayment')
   assert.strictEqual(reset.current.activePayment, null)
   assert.strictEqual(reset.current.error, null)
-  assert.strictEqual(reset.calls.length, 0)
+  assert.strictEqual(reset.calls.length, 1)
 
   for (const invalid of [
     { name: 'registerReader', input: undefined },
@@ -242,6 +249,46 @@ const run = async () => {
   assert.strictEqual(errorRace.current.error, null)
   assert.deepStrictEqual(errorRace.current.readers, [reader])
 
+  const pendingPaymentFailure = deferred()
+  const unrelatedList = deferred()
+  const crossDomain = harness(null, null, (method, args) =>
+    args[0].includes('/payments') ? pendingPaymentFailure.promise : unrelatedList.promise)
+  const paymentRequest = crossDomain.call('startPayment', { orderIds: [3] })
+  const readerRequest = crossDomain.call('getReaders')
+  pendingPaymentFailure.reject({ response: { data: { error: 'TERMINAL_PAYMENT_FAILED' } } })
+  assert.strictEqual(await paymentRequest, false)
+  assert.deepStrictEqual(crossDomain.current.error, {
+    code: 'TERMINAL_PAYMENT_FAILED', message: 'Le paiement sur le terminal a echoue.',
+  })
+  unrelatedList.resolve(ok([reader]))
+  await readerRequest
+  assert.strictEqual(crossDomain.current.error.code, 'TERMINAL_PAYMENT_FAILED')
+
+  const laterReaderFailure = deferred()
+  const paymentError = new Error('Terminal payment failed')
+  paymentError.response = { data: { error: 'TERMINAL_PAYMENT_FAILED' } }
+  const retainedPaymentError = harness(null, null, (method, args) =>
+    args[0].includes('/readers') ? laterReaderFailure.promise : Promise.reject(paymentError))
+  const pendingList = retainedPaymentError.call('getReaders')
+  await retainedPaymentError.call('startPayment', { orderIds: [3] })
+  laterReaderFailure.reject({ response: { data: { error: 'TERMINAL_READER_NOT_FOUND' } } })
+  await pendingList
+  assert.strictEqual(retainedPaymentError.current.error.code, 'TERMINAL_PAYMENT_FAILED')
+
+  const pendingReaderFailure = deferred()
+  const paymentAfterReader = deferred()
+  const resetDomains = harness(null, null, (method, args) =>
+    args[0].includes('/readers') ? pendingReaderFailure.promise : paymentAfterReader.promise)
+  const reading = resetDomains.call('getReaders')
+  const paying = resetDomains.call('startPayment', { orderIds: [3] })
+  resetDomains.call('resetPayment')
+  pendingReaderFailure.reject({ response: { data: { error: 'TERMINAL_READER_NOT_FOUND' } } })
+  assert.strictEqual(await reading, false)
+  assert.strictEqual(resetDomains.current.error.code, 'TERMINAL_READER_NOT_FOUND')
+  paymentAfterReader.resolve(ok(payment))
+  await paying
+  assert.strictEqual(resetDomains.current.activePayment, null)
+
   const oldPayment = deferred()
   const newPayment = deferred()
   let paymentCalls = 0
@@ -265,6 +312,27 @@ const run = async () => {
   assert.strictEqual(resetRace.current.activePayment, null)
   assert.strictEqual(resetRace.current.loading, false)
 
+  const formerSession = deferred()
+  const sessionRace = harness(null, null, () => formerSession.promise)
+  const previousSessionPayment = sessionRace.call('startPayment', { orderIds: [3] })
+  sessionRace.call('resetSession')
+  formerSession.resolve(ok(payment))
+  assert.strictEqual(await previousSessionPayment, false)
+  assert.strictEqual(sessionRace.current.activePayment, null)
+  assert.deepStrictEqual(sessionRace.current.readers, [])
+
+  const postMutationFetch = deferred()
+  const oldAdmin = harness(null, null, (method) => method === 'patch'
+    ? Promise.resolve(ok({ ...reader, assignedUserId: 5 }))
+    : postMutationFetch.promise)
+  const previousAssignment = oldAdmin.call('assignReader', { id: 7, assignedUserId: 5 })
+  await Promise.resolve()
+  await Promise.resolve()
+  oldAdmin.call('resetSession')
+  postMutationFetch.resolve(ok(null))
+  assert.strictEqual(await previousAssignment, false)
+  assert.deepStrictEqual(oldAdmin.current.readers, [])
+
   const oldIdentity = deferred()
   const identityRace = harness(null, null, () => oldIdentity.promise)
   const refreshed = identityRace.call('refreshPayment', 13)
@@ -285,14 +353,82 @@ const run = async () => {
   await firstCurrent
   assert.strictEqual(currentRace.current.currentReader, null)
 
-  const assigned = harness({ data: { ...reader, assignedUserId: 5 } })
+  const earlierAssignment = deferred()
+  const laterSnapshot = deferred()
+  const assignmentRace = harness(null, null, (method, args) => method === 'patch'
+    ? earlierAssignment.promise
+    : args[0].includes('current-reader') ? Promise.resolve(ok(null)) : laterSnapshot.promise)
+  const assigning = assignmentRace.call('assignReader', { id: 7, assignedUserId: 5 })
+  const snapshot = assignmentRace.call('getReaders')
+  laterSnapshot.resolve(ok([reader]))
+  await snapshot
+  earlierAssignment.resolve(ok({ ...reader, assignedUserId: 5 }))
+  await assigning
+  assert.strictEqual(assignmentRace.current.readers[0].assignedUserId, 5)
+
+  const oldSnapshot = deferred()
+  const mutation = deferred()
+  const staleList = harness(null, null, (method, args) => method === 'patch'
+    ? mutation.promise
+    : args[0].includes('current-reader') ? Promise.resolve(ok(null)) : oldSnapshot.promise)
+  const listing = staleList.call('getReaders')
+  const changing = staleList.call('setReaderActive', { id: 7, isActive: false })
+  mutation.resolve(ok({ ...reader, isActive: false }))
+  await changing
+  oldSnapshot.resolve(ok([reader]))
+  assert.strictEqual(await listing, false)
+  assert.strictEqual(staleList.current.readers[0].isActive, false)
+
+  const unrelatedCurrent = deferred()
+  const unrelatedRegistration = deferred()
+  const registrationRace = harness(null, null, (method) =>
+    method === 'get' ? unrelatedCurrent.promise : unrelatedRegistration.promise)
+  const readingCurrent = registrationRace.call('getCurrentReader')
+  const registering = registrationRace.call('registerReader', {
+    registrationCode: 'code', label: 'Other', assignedUserId: 5,
+  })
+  unrelatedRegistration.resolve(ok({ ...reader, id: 8, assignedUserId: 5 }))
+  await registering
+  unrelatedCurrent.resolve(ok(reader))
+  await readingCurrent
+  assert.deepStrictEqual(registrationRace.current.currentReader, reader)
+
+  const replacementReader = { ...reader, id: 9 }
+  const authoritative = deferred()
+  const reassignment = harness(null, null, (method) => method === 'patch'
+    ? Promise.resolve(ok({ ...reader, assignedUserId: 5 }))
+    : authoritative.promise)
+  reassignment.current.currentReader = reader
+  let assignmentSettled = false
+  const changedReader = reassignment.call('assignReader', { id: 7, assignedUserId: 5 })
+    .then((value) => { assignmentSettled = true; return value })
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.strictEqual(assignmentSettled, false)
+  assert.ok(reassignment.calls.some((call) => call.args[0] === `${base}/current-reader`))
+  authoritative.resolve(ok(replacementReader))
+  await changedReader
+  assert.deepStrictEqual(reassignment.current.currentReader, replacementReader)
+  assert.strictEqual(reassignment.current.readers[0].assignedUserId, 5)
+
+  const disabled = harness(null, null, (method) => method === 'patch'
+    ? Promise.resolve(ok({ ...reader, isActive: false }))
+    : Promise.resolve(ok(null)))
+  disabled.current.currentReader = reader
+  await disabled.call('setReaderActive', { id: 7, isActive: false })
+  assert.strictEqual(disabled.current.currentReader, null)
+  assert.strictEqual(disabled.calls.filter((call) => call.args[0] === `${base}/current-reader`).length, 1)
+
+  const assigned = harness(null, null, (method) => Promise.resolve(ok(method === 'get'
+    ? null : { ...reader, assignedUserId: 5 })))
   assigned.current.currentReader = reader
   assigned.current.readers = [reader]
   await assigned.call('assignReader', { id: 7, assignedUserId: 5 })
   assert.strictEqual(assigned.current.currentReader, null)
   assert.strictEqual(assigned.current.readers[0].assignedUserId, 5)
 
-  const deactivated = harness({ data: { ...reader, isActive: false } })
+  const deactivated = harness(null, null, (method) => Promise.resolve(ok(method === 'get'
+    ? null : { ...reader, isActive: false })))
   deactivated.current.currentReader = reader
   deactivated.current.readers = [reader]
   await deactivated.call('setReaderActive', { id: 7, isActive: false })
@@ -300,11 +436,18 @@ const run = async () => {
 
   const pendingCurrent = deferred()
   const adminUpdate = deferred()
-  const adminRace = harness(null, null, (method) => method === 'get' ? pendingCurrent.promise : adminUpdate.promise)
+  const refreshedCurrent = deferred()
+  let adminGets = 0
+  const adminRace = harness(null, null, (method) => method === 'get'
+    ? ++adminGets === 1 ? pendingCurrent.promise : refreshedCurrent.promise
+    : adminUpdate.promise)
   adminRace.current.currentReader = reader
   const loadingCurrent = adminRace.call('getCurrentReader')
   const reassigning = adminRace.call('assignReader', { id: 7, assignedUserId: 5 })
   adminUpdate.resolve(ok({ ...reader, assignedUserId: 5 }))
+  await Promise.resolve()
+  await Promise.resolve()
+  refreshedCurrent.resolve(ok(null))
   await reassigning
   pendingCurrent.resolve(ok(reader))
   await loadingCurrent
@@ -338,7 +481,15 @@ const run = async () => {
   console.log('stripe terminal store tests passed')
 }
 
-run().catch((error) => {
+const watchdog = setTimeout(() => {
+  console.error(new Error('Terminal store test did not settle'))
+  process.exitCode = 1
+}, 5000)
+
+run().then(() => {
+  clearTimeout(watchdog)
+}).catch((error) => {
+  clearTimeout(watchdog)
   console.error(error)
   process.exitCode = 1
 })

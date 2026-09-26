@@ -81,7 +81,8 @@ actions.postTableAccess
     assert.strictEqual(storage.service_point_id, '31')
     assert.strictEqual(storage.service_point_name, 'Table 31')
     assert.strictEqual(storage.table_access_token, 'stable-qr-token')
-    assert.deepStrictEqual(dispatches.slice(0, 5), [
+    assert.deepStrictEqual(dispatches.slice(0, 6), [
+      { type: 'stripeTerminal/resetSession', payload: null, options: { root: true } },
       { type: 'set/user.id', payload: null, options: undefined },
       { type: 'set/user.access', payload: 2, options: undefined },
       {
@@ -92,7 +93,7 @@ actions.postTableAccess
       { type: 'set/user.shopid', payload: 8, options: undefined },
       { type: 'setAuthentication', payload: true, options: { root: true } },
     ])
-    assert.deepStrictEqual(dispatches.slice(5, 7), [
+    assert.deepStrictEqual(dispatches.slice(6, 8), [
       { type: 'set/user.module_permissions', payload: null, options: undefined },
       { type: 'set/user.is_primary_admin', payload: false, options: undefined },
     ])
