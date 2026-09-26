@@ -17,6 +17,22 @@ const normalizeOrderIds = (value) =>
     .map((id) => Number(id))
     .filter((id) => Number.isFinite(id))
 
+const matchesCashRegisterTerminalAttempt = (attempt, orderIds) => {
+  if (!attempt || !Array.isArray(attempt.orderIds) || !attempt.orderIds.length) return false
+  if (!attempt.orderIds.every((id) => Number.isSafeInteger(id) && id > 0)) return false
+  return normalizeOrderIds(orderIds).some((id) => attempt.orderIds.includes(id))
+}
+
+const cashRegisterTerminalPayload = ({ orderIds, discountType, discountValue }) => ({
+  orderIds: normalizeOrderIds(orderIds),
+  ...(discountType != null && {
+    discountType,
+    discountValue: discountType === 'amount'
+      ? Math.round(Number(discountValue) * 100)
+      : Number(discountValue) || 0,
+  }),
+})
+
 const summarizeArchiveResults = (orderIds, results = []) => {
   const normalizedOrderIds = normalizeOrderIds(orderIds)
   const successfulOrderIds = []
@@ -189,6 +205,8 @@ module.exports = {
   isCashRegisterOrderArchivable,
   isCashRegisterOrderPaid,
   normalizeOrderIds,
+  matchesCashRegisterTerminalAttempt,
+  cashRegisterTerminalPayload,
   resolveRetryDueOrderIds,
   summarizeArchiveResults,
 }

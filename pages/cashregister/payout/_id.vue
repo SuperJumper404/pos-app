@@ -12,6 +12,8 @@
           <v-btn
             icon
             :disabled="loadingBtn"
+            width="44"
+            height="44"
             aria-label="Fermer la modal d'encaissement"
             @click="btnNo"
           >
@@ -63,23 +65,25 @@
             </div>
             <v-radio-group
               v-model="selectedPaymentMethod"
+              :disabled="paymentControlsLocked"
               class="cashregister-payout-methods__group"
               hide-details
               row
             >
               <label
-                v-for="method in shop_payment_methods"
+                v-for="method in paymentMethods"
                 :key="method"
                 role="radio"
-                tabindex="0"
+                :tabindex="paymentControlsLocked ? -1 : 0"
+                :aria-disabled="paymentControlsLocked"
                 :aria-checked="selectedPaymentMethod === method"
                 :class="[
                   'cashregister-payout-method',
                   { 'cashregister-payout-method--active': selectedPaymentMethod === method },
                 ]"
-                @click="selectedPaymentMethod = method"
-                @keydown.enter="selectedPaymentMethod = method"
-                @keydown.space.prevent="selectedPaymentMethod = method"
+                @click="selectPaymentMethod(method)"
+                @keydown.enter="selectPaymentMethod(method)"
+                @keydown.space.prevent="selectPaymentMethod(method)"
               >
                 <v-radio
                   :value="method"
@@ -87,16 +91,28 @@
                   hide-details
                 ></v-radio>
                 <v-icon>{{ paymentMethodIcon(method) }}</v-icon>
-                <span>{{ method }}</span>
+                <span>{{ paymentMethodLabel(method) }}</span>
               </label>
             </v-radio-group>
           </section>
+          <TerminalPaymentStatus
+            v-if="showTerminalStatus"
+            :state="terminalState"
+            :reader-label="currentReader ? currentReader.label : ''"
+            :amount="terminalPayment ? formatCurrency(terminalPayment.amountCents / 100) : formatCurrency(effectiveDueAmount)"
+            :message="terminalNotice"
+            :busy="terminalBusy"
+            :canceling="terminalCanceling"
+            :can-cancel="canCancelTerminalPayment"
+            @retry="retryTerminalPayment"
+            @cancel="cancelTerminalPayment"
+          />
         </v-card-text>
 
         <v-card-actions class="cashregister-payout-actions">
           <v-btn
             v-if="requiresPaymentMethod"
-            :disabled="loadingBtn"
+            :disabled="paymentControlsLocked"
             outlined
             color="warning"
             class="cashregister-payout-action text-none"
@@ -108,7 +124,7 @@
           <v-spacer></v-spacer>
 
           <v-btn
-            :loading="loadingBtn"
+            :loading="loadingBtn || terminalBusy"
             :disabled="confirmDisabled"
             color="success"
             depressed
@@ -118,13 +134,13 @@
             <v-icon small right>mdi-cash-multiple</v-icon></v-btn
           >
           <v-btn
-            :disabled="loadingBtn"
+            :disabled="loadingBtn || terminalBusy"
             outlined
             color="primary"
             class="cashregister-payout-action text-none"
             @click="btnNo"
           >
-            Annuler <v-icon small right>mdi-close-circle</v-icon>
+            {{ showTerminalStatus ? 'Fermer' : 'Annuler' }} <v-icon small right>mdi-close-circle</v-icon>
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -247,6 +263,7 @@
 </template>
 <script>
 import price from '@/helpers/price'
+import TerminalPaymentStatus from '@/components/cashregister/TerminalPaymentStatus.vue'
 import { calculateDiscount } from '@/helpers/discount'
 import {
   buildCashierReceiptPayload,
@@ -257,10 +274,33 @@ const {
   getCashRegisterPaymentSummary,
   normalizeOrderIds,
   resolveRetryDueOrderIds,
+  matchesCashRegisterTerminalAttempt,
+  cashRegisterTerminalPayload,
 } = require('@/helpers/cashRegister')
+const {
+  isTerminalMethod,
+  isTerminalPaymentPending,
+  terminalErrorMessage,
+  terminalPaymentMessage,
+} = require('@/helpers/stripeTerminal')
 
 export default {
+  components: { TerminalPaymentStatus },
   mixins: [price],
+  beforeRouteLeave(to, from, next) {
+    if (this.loadingBtn && this.dialog) return next(false)
+    this.disposeTerminalFlow()
+    next()
+  },
+  beforeRouteUpdate(to, from, next) {
+    if (this.loadingBtn) {
+      const ids = normalizeOrderIds(to.query.orders)
+      const archiveRetry = to.params.id === this.id &&
+        ids.join(',') === this.ordersToArchive.join(',')
+      return next(archiveRetry ? undefined : false)
+    }
+    next()
+  },
   middleware: 'auth',
   data() {
     return {
@@ -280,9 +320,52 @@ export default {
       discountDraftValue: 0,
       retryActive: false,
       retryDueOrderIds: [],
+      terminalState: 'idle',
+      terminalPayment: null,
+      terminalAttempt: null,
+      terminalNotice: '',
+      terminalBusy: false,
+      terminalCanceling: false,
+      terminalChecking: true,
+      terminalReaderReady: false,
+      terminalPollTimer: null,
+      terminalPollCount: 0,
+      terminalGeneration: 0,
+      terminalDisposed: false,
     }
   },
   computed: {
+    cashierIdentity() {
+      const user = this.$store.get('users/user')
+      return this.$store.get('authenticated') && user && user.id && user.shopid
+        ? `${user.shopid}:${user.id}` : null
+    },
+    terminalStorageKey() {
+      return `cashregister-terminal:${this.cashierIdentity}`
+    },
+    currentReader() {
+      return this.$store.get('stripeTerminal/currentReader')
+    },
+    terminalAvailable() {
+      const user = this.$store.get('users/user')
+      return Boolean(this.terminalReaderReady && this.cashierIdentity && this.currentReader &&
+        this.currentReader.isActive &&
+        this.currentReader.assignedUserId === Number(user.id))
+    },
+    paymentMethods() {
+      const manual = (this.shop_payment_methods || []).filter((method) => !isTerminalMethod(method))
+      return this.terminalAvailable ? [...manual, 'stripe_terminal'] : manual
+    },
+    paymentControlsLocked() {
+      return this.loadingBtn || this.receiptDialog || this.terminalChecking ||
+        this.terminalBusy || ['starting', 'processing', 'recovery', 'succeeded'].includes(this.terminalState)
+    },
+    showTerminalStatus() {
+      return isTerminalMethod(this.selectedPaymentMethod) || this.terminalState !== 'idle'
+    },
+    canCancelTerminalPayment() {
+      return isTerminalPaymentPending(this.terminalPayment)
+    },
     shop_payment_methods() {
       return this.$store.get('shop/shop_payment_methods')
     },
@@ -381,6 +464,11 @@ export default {
       return (
         !this.ordersLoaded ||
         this.loadingBtn ||
+        this.receiptDialog ||
+        this.terminalChecking ||
+        this.terminalBusy ||
+        ['starting', 'processing', 'recovery'].includes(this.terminalState) ||
+        (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod && !this.terminalAvailable) ||
         !this.ordersToArchive.length ||
         (this.requiresPaymentMethod && this.selectedPaymentMethod === null)
       )
@@ -394,12 +482,255 @@ export default {
       return this.requiresPaymentMethod ? 'Encaisser' : 'Clôturer'
     },
   },
+  watch: {
+    $route(to) {
+      if (!to.path.startsWith('/cashregister/payout/')) return
+      const ids = normalizeOrderIds(to.query.orders)
+      if (to.params.id === this.id && ids.join(',') === this.ordersToArchive.join(',')) return
+      this.disposeTerminalFlow()
+      const generation = this.terminalGeneration
+      Object.assign(this, this.$options.data.call(this), { terminalGeneration: generation })
+      return this.initializePayout()
+    },
+    cashierIdentity() {
+      this.disposeTerminalFlow()
+      this.ordersLoaded = false
+      this.receiptDialog = false
+      this.dialog = false
+    },
+  },
   mounted() {
-    this.$store.dispatch('orders/getAllOrder').finally(() => {
-      this.ordersLoaded = true
-    })
+    return this.initializePayout()
+  },
+  beforeDestroy() {
+    this.disposeTerminalFlow()
   },
   methods: {
+    paymentMethodLabel(method) {
+      return isTerminalMethod(method) ? 'Carte bancaire - TPE Stripe' : method
+    },
+    selectPaymentMethod(method) {
+      if (this.paymentControlsLocked) return
+      this.selectedPaymentMethod = method
+      this.terminalState = 'idle'
+      this.terminalNotice = ''
+    },
+    stopTerminalPolling() {
+      if (this.terminalPollTimer !== null) clearTimeout(this.terminalPollTimer)
+      this.terminalPollTimer = null
+    },
+    disposeTerminalFlow() {
+      this.stopTerminalPolling()
+      this.terminalGeneration += 1
+      this.terminalDisposed = true
+    },
+    terminalRequestIsCurrent(generation) {
+      return !this.terminalDisposed && generation === this.terminalGeneration && Boolean(this.cashierIdentity)
+    },
+    rememberTerminalAttempt(attempt) {
+      this.terminalAttempt = attempt
+      try {
+        if (attempt) sessionStorage.setItem(this.terminalStorageKey, JSON.stringify(attempt))
+        else sessionStorage.removeItem(this.terminalStorageKey)
+      } catch (error) {
+        // Server idempotency still protects a retry when tab storage is unavailable.
+      }
+    },
+    readTerminalAttempt() {
+      try {
+        const attempt = JSON.parse(sessionStorage.getItem(this.terminalStorageKey))
+        return matchesCashRegisterTerminalAttempt(attempt, this.ordersToArchive) ? attempt : null
+      } catch (error) { return null }
+    },
+    terminalRecovery() {
+      this.stopTerminalPolling()
+      this.terminalState = 'recovery'
+      const error = this.$store.get('stripeTerminal/error')
+      this.terminalNotice = terminalErrorMessage(error && error.code) ||
+        'Le paiement doit être vérifié avant de poursuivre.'
+    },
+    async terminalDispatch(action, payload) {
+      try { return await this.$store.dispatch(action, payload) } catch (error) { return false }
+    },
+    async initializePayout() {
+      const generation = this.terminalGeneration
+      this.terminalChecking = true
+      const loaded = await this.terminalDispatch('orders/getAllOrder')
+      if (!this.terminalRequestIsCurrent(generation)) return
+      this.ordersLoaded = loaded === true
+      const reader = await this.terminalDispatch('stripeTerminal/getCurrentReader')
+      if (!this.terminalRequestIsCurrent(generation)) return
+      this.terminalReaderReady = reader !== false
+      this.terminalChecking = false
+      if (!this.ordersLoaded) { this.terminalRecovery(); return }
+      this.terminalAttempt = this.readTerminalAttempt()
+      const cached = this.$store.get('stripeTerminal/activePayment')
+      if (!this.terminalAttempt && matchesCashRegisterTerminalAttempt(cached, this.ordersToArchive)) {
+        this.terminalAttempt = { orderIds: cached.orderIds, paymentId: cached.id }
+      }
+      if (this.terminalAttempt) return this.retryTerminalPayment()
+    },
+    async startTerminalPayment() {
+      if (this.terminalBusy || this.terminalChecking || this.terminalDisposed || !this.terminalAvailable) return
+      this.terminalBusy = true
+      this.terminalState = 'starting'
+      this.terminalPollCount = 0
+      this.terminalNotice = ''
+      const generation = this.terminalGeneration
+      try {
+        if (!await this.refreshTerminalOrders(generation)) return
+        if (!this.requiresPaymentMethod) {
+          this.terminalState = 'succeeded'
+          return
+        }
+        // A fresh order snapshot and saved attempt are checked before any POST.
+        this.terminalAttempt = this.terminalAttempt || this.readTerminalAttempt()
+        const cached = this.$store.get('stripeTerminal/activePayment')
+        if (!this.terminalAttempt && matchesCashRegisterTerminalAttempt(cached, this.ordersToArchive) && isTerminalPaymentPending(cached)) {
+          this.terminalAttempt = { orderIds: cached.orderIds, paymentId: cached.id }
+        }
+        const attempt = this.terminalAttempt || cashRegisterTerminalPayload({
+          orderIds: this.retryActive ? this.retryDueOrderIds : this.paymentSummary.dueOrderIds,
+          discountType: this.discountType === null ? null : this.effectiveDiscountType,
+          discountValue: this.effectiveDiscountValue,
+        })
+        this.rememberTerminalAttempt(attempt)
+        const result = attempt.paymentId
+          ? await this.terminalDispatch('stripeTerminal/refreshPayment', attempt.paymentId)
+          : await this.terminalDispatch('stripeTerminal/startPayment', attempt)
+        if (!this.terminalRequestIsCurrent(generation)) return
+        await this.acceptTerminalPayment(result, generation)
+      } finally {
+        if (this.terminalRequestIsCurrent(generation)) {
+          this.terminalBusy = false
+          this.offerTerminalReceipt()
+        }
+      }
+    },
+    async refreshTerminalOrders(generation) {
+      const loaded = await this.terminalDispatch('orders/getAllOrder', { refresh: Date.now() })
+      if (!this.terminalRequestIsCurrent(generation)) return false
+      this.ordersLoaded = loaded === true
+      if (!this.ordersLoaded || this.selectedOrders.length !== this.ordersToArchive.length) {
+        this.terminalRecovery()
+        return false
+      }
+      if (this.retryActive) {
+        const retry = resolveRetryDueOrderIds({
+          failedOrderIds: this.ordersToArchive,
+          fallbackDueOrderIds: this.retryDueOrderIds,
+          refreshedOrders: this.dataOrders,
+          refreshSucceeded: true,
+        })
+        if (!retry.reliable) { this.terminalRecovery(); return false }
+        this.retryDueOrderIds = retry.dueOrderIds
+      }
+      return true
+    },
+    async retryTerminalPayment() {
+      if (this.terminalBusy || this.terminalDisposed) return
+      this.stopTerminalPolling()
+      this.terminalPollCount = 0
+      this.terminalBusy = true
+      this.terminalState = 'recovery'
+      const generation = this.terminalGeneration
+      try {
+        if (!await this.refreshTerminalOrders(generation)) return
+        if (!this.requiresPaymentMethod) {
+          this.terminalState = 'succeeded'
+          this.terminalNotice = 'Paiement accepté. Commandes à clôturer.'
+          this.rememberTerminalAttempt(null)
+          return
+        }
+        const attempt = this.terminalAttempt || this.readTerminalAttempt()
+        if (!attempt) {
+          this.terminalState = 'idle'
+          this.terminalNotice = ''
+          return
+        }
+        this.selectedPaymentMethod = 'stripe_terminal'
+        this.terminalAttempt = attempt
+        const result = attempt.paymentId
+          ? await this.terminalDispatch('stripeTerminal/refreshPayment', attempt.paymentId)
+          : await this.terminalDispatch('stripeTerminal/startPayment', attempt)
+        if (!this.terminalRequestIsCurrent(generation)) return
+        await this.acceptTerminalPayment(result, generation)
+      } finally {
+        if (this.terminalRequestIsCurrent(generation)) {
+          this.terminalBusy = false
+          this.offerTerminalReceipt()
+        }
+      }
+    },
+    async acceptTerminalPayment(payment, generation) {
+      this.stopTerminalPolling()
+      const attempt = this.terminalAttempt
+      if (!payment || !attempt || !Array.isArray(payment.orderIds) ||
+        payment.orderIds.length !== attempt.orderIds.length ||
+        !attempt.orderIds.every((id) => payment.orderIds.includes(id)) ||
+        (attempt.paymentId && payment.id !== attempt.paymentId)) {
+        this.terminalRecovery()
+        return
+      }
+      this.terminalPayment = payment
+      this.rememberTerminalAttempt({ ...attempt, paymentId: payment.id })
+      this.terminalNotice = terminalPaymentMessage(payment)
+      if (isTerminalPaymentPending(payment)) {
+        this.terminalState = payment.status === 'creating' ? 'starting' : 'processing'
+        this.scheduleTerminalPoll()
+      } else if (payment.status === 'succeeded') {
+        if (!await this.refreshTerminalOrders(generation)) return
+        if (this.requiresPaymentMethod) { this.terminalRecovery(); return }
+        this.terminalState = 'succeeded'
+        this.rememberTerminalAttempt(null)
+      } else if (['failed', 'canceled'].includes(payment.status)) {
+        this.terminalState = payment.status
+        this.rememberTerminalAttempt(null)
+      } else {
+        this.terminalRecovery()
+      }
+    },
+    offerTerminalReceipt() {
+      if (this.terminalState === 'succeeded' && !this.requiresPaymentMethod && !this.receiptDialog) {
+        this.requestReceiptChoice()
+      }
+    },
+    scheduleTerminalPoll() {
+      if (this.terminalDisposed) return
+      if (this.terminalPollCount >= 60) { this.terminalRecovery(); return }
+      this.terminalPollTimer = setTimeout(() => this.pollTerminalPayment(), 2000)
+    },
+    async pollTerminalPayment() {
+      this.stopTerminalPolling()
+      if (this.terminalDisposed || this.terminalBusy || !this.terminalPayment) return
+      const generation = this.terminalGeneration
+      this.terminalPollCount += 1
+      this.terminalBusy = true
+      const payment = await this.terminalDispatch('stripeTerminal/refreshPayment', this.terminalPayment.id)
+      if (!this.terminalRequestIsCurrent(generation)) return
+      await this.acceptTerminalPayment(payment, generation)
+      if (!this.terminalRequestIsCurrent(generation)) return
+      this.terminalBusy = false
+      this.offerTerminalReceipt()
+    },
+    async cancelTerminalPayment() {
+      if (!this.canCancelTerminalPayment || this.terminalBusy || this.terminalDisposed) return
+      this.stopTerminalPolling()
+      const generation = this.terminalGeneration
+      this.terminalBusy = true
+      this.terminalCanceling = true
+      this.terminalNotice = 'Annulation demandée. Confirmation en cours.'
+      const payment = await this.terminalDispatch('stripeTerminal/cancelPayment', this.terminalPayment.id)
+      if (!this.terminalRequestIsCurrent(generation)) return
+      await this.acceptTerminalPayment(payment, generation)
+      if (!this.terminalRequestIsCurrent(generation)) return
+      this.terminalBusy = false
+      this.terminalCanceling = false
+      if (isTerminalPaymentPending(payment)) {
+        this.terminalNotice = 'Annulation non confirmée. Le paiement est toujours en cours.'
+      }
+      this.offerTerminalReceipt()
+    },
     paymentMethodIcon(method) {
       const value = String(method || '')
         .normalize('NFD')
@@ -414,7 +745,7 @@ export default {
       return 'mdi-credit-card-outline'
     },
     openDiscountDialog() {
-      if (!this.requiresPaymentMethod || this.loadingBtn) return
+      if (!this.requiresPaymentMethod || this.paymentControlsLocked) return
       this.discountDraftType =
         !this.discountType || this.discountType === 'none'
           ? 'percent'
@@ -440,6 +771,7 @@ export default {
       this.discountDialog = false
     },
     orderDiscountPayload(orderId) {
+      if (this.terminalState === 'succeeded') return {}
       if (this.discountType === null) return {}
       if (this.effectiveDiscountType === 'none') {
         return {
@@ -465,13 +797,16 @@ export default {
     },
     requestReceiptChoice() {
       if (this.confirmDisabled) return
+      if (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod) {
+        return this.startTerminalPayment()
+      }
       this.pendingPaymentMethod = this.requiresPaymentMethod
         ? this.selectedPaymentMethod
         : null
       this.receiptDialog = true
     },
     confirmReceiptChoice(wantsReceipt) {
-      if (this.loadingBtn || this.receiptPrinting) return
+      if (this.loadingBtn || this.receiptPrinting || !this.receiptDialog) return
       this.receiptDialog = false
       return this.btnYes(wantsReceipt)
     },
@@ -526,6 +861,8 @@ export default {
     },
     btnNo() {
       if (this.loadingBtn) return
+      if (this.terminalBusy) return
+      this.disposeTerminalFlow()
 
       this.receiptDialog = false
       this.dialog = false
@@ -535,6 +872,9 @@ export default {
     },
     async btnYes(wantsReceipt = false) {
       if (this.loadingBtn) return
+      if (this.terminalBusy || this.terminalChecking ||
+        ['starting', 'processing', 'recovery'].includes(this.terminalState) ||
+        (isTerminalMethod(this.selectedPaymentMethod) && this.requiresPaymentMethod)) return
 
       this.loadingBtn = true
       const orderIds = this.ordersToArchive.slice()
@@ -711,6 +1051,7 @@ export default {
   font-weight: var(--se-weight-bold);
   line-height: var(--se-line-tight);
   margin: 2px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .cashregister-payout-order {
@@ -853,6 +1194,16 @@ export default {
   border-color: var(--se-color-primary);
 }
 
+.cashregister-payout-method:focus-visible {
+  outline: 2px solid var(--se-color-primary);
+  outline-offset: 2px;
+}
+
+.cashregister-payout-method[aria-disabled='true'] {
+  cursor: default;
+  background: var(--se-color-surface-muted);
+}
+
 .cashregister-payout-method__radio {
   margin: 0 !important;
 }
@@ -861,6 +1212,8 @@ export default {
   color: var(--se-color-text);
   font-size: var(--se-font-small);
   font-weight: var(--se-weight-semibold);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .cashregister-payout-actions {
@@ -873,6 +1226,7 @@ export default {
 .cashregister-payout-action {
   border-radius: var(--se-radius-md) !important;
   min-height: 44px;
+  letter-spacing: 0;
 }
 
 .cashregister-payout-action--confirm {
