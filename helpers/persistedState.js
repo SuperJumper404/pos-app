@@ -5,6 +5,7 @@ const sanitizePersistedState = (state) => {
 
   const nextState = { ...state }
   delete nextState.staticURL
+  delete nextState.stripeTerminal
   return nextState
 }
 

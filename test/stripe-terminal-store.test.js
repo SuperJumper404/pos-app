@@ -20,27 +20,43 @@ const executable = source
   .replace(/export const /g, 'const ')
 const storeFactory = vm.compileFunction(
   `${executable}\nreturn { state, actions }`,
-  ['EasyAccess', 'defaultMutations']
+  ['EasyAccess', 'defaultMutations', 'require']
 )
-const { state, actions } = storeFactory(() => ({}), () => ({}))
+const { state, actions } = storeFactory(() => ({}), () => ({}), require)
 const {
   isTerminalMethod,
   isTerminalPaymentPending,
   terminalPaymentMessage,
 } = require(helperPath)
 
-const reader = { id: 7, label: 'S710', status: 'online', isActive: true }
-const payment = { id: 13, readerId: 7, status: 'processing', orderIds: [3] }
+const reader = {
+  id: 7, label: 'S710', serialNumber: 's710-1', deviceType: 'stripe_s710',
+  status: 'online', assignedUserId: 4, assignedServicePointId: null,
+  isActive: true,
+}
+const payment = {
+  id: 13, readerId: 7, status: 'processing', amountCents: 1250,
+  currency: 'eur', orderIds: [3], failureCode: null, failureMessage: null,
+}
 const base = '/baseurl/api/v1/stripe/terminal'
+const ok = (data) => ({ data: { code: 200, success: true, data } })
+const deferred = () => {
+  let settle
+  let fail
+  const promise = new Promise((resolve, reject) => { settle = resolve; fail = reject })
+  return { promise, resolve: settle, reject: fail }
+}
 
-const harness = (result = { data: null }, rejection = null) => {
+const harness = (result = { data: null }, rejection = null, responder = null) => {
   const calls = []
   const current = state()
   const request = (method) => (...args) => {
     calls.push({ method, args })
-    return rejection
+    return responder
+      ? responder(method, args)
+      : rejection
       ? Promise.reject(rejection)
-      : Promise.resolve({ data: { data: result.data } })
+      : Promise.resolve(result.envelope || ok(result.data))
   }
   const axios = {
     get: request('get'),
@@ -96,13 +112,13 @@ const run = async () => {
       address: { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' },
     }, reader],
     ['assignReader', { id: 7, assignedUserId: 5, assignedServicePointId: 8, secret: 'omit' },
-      'patch', `${base}/readers/7/assignment`, { assignedUserId: 5 }, reader],
+      'patch', `${base}/readers/7/assignment`, { assignedUserId: 5 }, { ...reader, assignedUserId: 5 }],
     ['setReaderActive', { id: 7, isActive: false, secret: 'omit' },
-      'patch', `${base}/readers/7/status`, { isActive: false }, reader],
+      'patch', `${base}/readers/7/status`, { isActive: false }, { ...reader, isActive: false }],
     ['refreshReaders', undefined, 'post', `${base}/readers/refresh`, {}, [reader], 'readers'],
     ['getCurrentReader', undefined, 'get', `${base}/current-reader`, undefined, reader, 'currentReader'],
-    ['startPayment', { orderIds: [3], discountType: 'fixed', discountValue: 1, amountCents: 1, readerId: 7 },
-      'post', `${base}/payments`, { orderIds: [3], discountType: 'fixed', discountValue: 1 }, payment, 'activePayment'],
+    ['startPayment', { orderIds: [3], discountType: 'amount', discountValue: 100, amountCents: 1, readerId: 7 },
+      'post', `${base}/payments`, { orderIds: [3], discountType: 'amount', discountValue: 100 }, payment, 'activePayment'],
     ['refreshPayment', 13, 'get', `${base}/payments/13`, undefined, payment, 'activePayment'],
     ['cancelPayment', 13, 'post', `${base}/payments/13/cancel`, {},
       { ...payment, status: 'canceled' }, 'activePayment'],
@@ -127,10 +143,28 @@ const run = async () => {
   failed.current.readers = [reader]
   assert.strictEqual(await failed.call('getReaders'), false)
   assert.deepStrictEqual(failed.current.error, {
-    code: 'TERMINAL_READER_OFFLINE', message: 'Terminal hors ligne.',
+    code: 'TERMINAL_READER_OFFLINE', message: 'Le terminal est hors ligne.',
   })
   assert.strictEqual(failed.current.loading, false)
   assert.deepStrictEqual(failed.current.readers, [reader])
+
+  const knownSecret = harness(null, { response: { data: { error: 'TERMINAL_READER_OFFLINE', message: 'secret-token-123' } } })
+  assert.strictEqual(await knownSecret.call('startPayment', { orderIds: [3] }), false)
+  assert.deepStrictEqual(knownSecret.current.error, {
+    code: 'TERMINAL_READER_OFFLINE', message: 'Le terminal est hors ligne.',
+  })
+
+  const unknownSecret = harness(null, { response: { data: { error: 'TERMINAL_NOT_REAL', message: 'secret-token-123' } } })
+  assert.strictEqual(await unknownSecret.call('getReaders'), false)
+  assert.deepStrictEqual(unknownSecret.current.error, {
+    code: 'TERMINAL_REQUEST_FAILED', message: 'Impossible de contacter le terminal.',
+  })
+
+  const malformedCode = harness(null, { response: { data: { error: { toString: null }, message: 'secret-token-123' } } })
+  assert.strictEqual(await malformedCode.call('getReaders'), false)
+  assert.deepStrictEqual(malformedCode.current.error, {
+    code: 'TERMINAL_REQUEST_FAILED', message: 'Impossible de contacter le terminal.',
+  })
 
   const unknown = harness(null, { response: { data: { error: { secret: true }, message: { secret: true } } } })
   assert.strictEqual(await unknown.call('startPayment', { orderIds: [3] }), false)
@@ -146,6 +180,141 @@ const run = async () => {
   assert.strictEqual(reset.current.error, null)
   assert.strictEqual(reset.calls.length, 0)
 
+  for (const invalid of [
+    { name: 'registerReader', input: undefined },
+    { name: 'assignReader', input: null },
+    { name: 'setReaderActive', input: { id: 7 } },
+    { name: 'startPayment', input: null },
+    { name: 'startPayment', input: { orderIds: [3], discountType: 'percent', discountValue: NaN } },
+    { name: 'refreshPayment', input: null },
+  ]) {
+    const h = harness({ data: payment })
+    assert.strictEqual(await h.call(invalid.name, invalid.input), false, invalid.name)
+    assert.strictEqual(h.current.error.code, 'TERMINAL_INVALID_INPUT')
+    assert.strictEqual(h.current.loading, false)
+    assert.strictEqual(h.calls.length, 0)
+  }
+
+  for (const [name, result] of [
+    ['getReaders', { envelope: { data: { code: 200, success: false, data: [reader] } } }],
+    ['getReaders', { envelope: { data: { code: 200, success: true } } }],
+    ['getReaders', { data: [{ id: 'bad' }] }],
+    ['getReaders', { data: [{ id: 7, label: 'S710', status: 'online', isActive: true }] }],
+    ['startPayment', { data: { ...payment, status: 'impossible' } }],
+    ['startPayment', { data: { ...payment, amountCents: undefined } }],
+    ['cancelPayment', { data: { ...payment, id: 99 } }],
+  ]) {
+    const h = harness(result)
+    const input = name === 'startPayment' ? { orderIds: [3] } : name === 'cancelPayment' ? 13 : undefined
+    assert.strictEqual(await h.call(name, input), false, name)
+    assert.strictEqual(h.current.error.code, 'TERMINAL_INVALID_RESPONSE')
+    assert.strictEqual(h.current.loading, false)
+    assert.deepStrictEqual(h.current.readers, [])
+    assert.strictEqual(h.current.activePayment, null)
+  }
+
+  const oldList = deferred()
+  const newList = deferred()
+  let listCalls = 0
+  const listRace = harness(null, null, () => ++listCalls === 1 ? oldList.promise : newList.promise)
+  const firstList = listRace.call('getReaders')
+  const secondList = listRace.call('getReaders')
+  assert.strictEqual(listRace.current.loading, true)
+  const newestReader = { ...reader, label: 'New label' }
+  newList.resolve(ok([newestReader]))
+  assert.deepStrictEqual(await secondList, [newestReader])
+  assert.strictEqual(listRace.current.loading, true)
+  oldList.resolve(ok([reader]))
+  await firstList
+  assert.deepStrictEqual(listRace.current.readers, [newestReader])
+  assert.strictEqual(listRace.current.loading, false)
+
+  const staleFailure = deferred()
+  const freshSuccess = deferred()
+  let errorCalls = 0
+  const errorRace = harness(null, null, () => ++errorCalls === 1 ? staleFailure.promise : freshSuccess.promise)
+  const previous = errorRace.call('getReaders')
+  const latest = errorRace.call('getReaders')
+  freshSuccess.resolve(ok([reader]))
+  await latest
+  staleFailure.reject({ response: { data: { error: 'TERMINAL_READER_OFFLINE' } } })
+  assert.strictEqual(await previous, false)
+  assert.strictEqual(errorRace.current.error, null)
+  assert.deepStrictEqual(errorRace.current.readers, [reader])
+
+  const oldPayment = deferred()
+  const newPayment = deferred()
+  let paymentCalls = 0
+  const paymentRace = harness(null, null, () => ++paymentCalls === 1 ? oldPayment.promise : newPayment.promise)
+  const firstPayment = paymentRace.call('refreshPayment', 13)
+  const secondPayment = paymentRace.call('cancelPayment', 13)
+  const canceled = { ...payment, status: 'canceled' }
+  newPayment.resolve(ok(canceled))
+  await secondPayment
+  assert.deepStrictEqual(paymentRace.current.activePayment, canceled)
+  oldPayment.resolve(ok(payment))
+  await firstPayment
+  assert.deepStrictEqual(paymentRace.current.activePayment, canceled)
+
+  const pendingReset = deferred()
+  const resetRace = harness(null, null, () => pendingReset.promise)
+  const started = resetRace.call('startPayment', { orderIds: [3] })
+  resetRace.call('resetPayment')
+  pendingReset.resolve(ok(payment))
+  await started
+  assert.strictEqual(resetRace.current.activePayment, null)
+  assert.strictEqual(resetRace.current.loading, false)
+
+  const oldIdentity = deferred()
+  const identityRace = harness(null, null, () => oldIdentity.promise)
+  const refreshed = identityRace.call('refreshPayment', 13)
+  identityRace.current.activePayment = { ...payment, id: 99 }
+  oldIdentity.resolve(ok(payment))
+  await refreshed
+  assert.strictEqual(identityRace.current.activePayment.id, 99)
+
+  const oldCurrent = deferred()
+  const newCurrent = deferred()
+  let currentCalls = 0
+  const currentRace = harness(null, null, () => ++currentCalls === 1 ? oldCurrent.promise : newCurrent.promise)
+  const firstCurrent = currentRace.call('getCurrentReader')
+  const secondCurrent = currentRace.call('getCurrentReader')
+  newCurrent.resolve(ok(null))
+  await secondCurrent
+  oldCurrent.resolve(ok(reader))
+  await firstCurrent
+  assert.strictEqual(currentRace.current.currentReader, null)
+
+  const assigned = harness({ data: { ...reader, assignedUserId: 5 } })
+  assigned.current.currentReader = reader
+  assigned.current.readers = [reader]
+  await assigned.call('assignReader', { id: 7, assignedUserId: 5 })
+  assert.strictEqual(assigned.current.currentReader, null)
+  assert.strictEqual(assigned.current.readers[0].assignedUserId, 5)
+
+  const deactivated = harness({ data: { ...reader, isActive: false } })
+  deactivated.current.currentReader = reader
+  deactivated.current.readers = [reader]
+  await deactivated.call('setReaderActive', { id: 7, isActive: false })
+  assert.strictEqual(deactivated.current.currentReader, null)
+
+  const pendingCurrent = deferred()
+  const adminUpdate = deferred()
+  const adminRace = harness(null, null, (method) => method === 'get' ? pendingCurrent.promise : adminUpdate.promise)
+  adminRace.current.currentReader = reader
+  const loadingCurrent = adminRace.call('getCurrentReader')
+  const reassigning = adminRace.call('assignReader', { id: 7, assignedUserId: 5 })
+  adminUpdate.resolve(ok({ ...reader, assignedUserId: 5 }))
+  await reassigning
+  pendingCurrent.resolve(ok(reader))
+  await loadingCurrent
+  assert.strictEqual(adminRace.current.currentReader, null)
+
+  const unrelated = harness({ data: { ...reader, id: 8 } })
+  unrelated.current.currentReader = reader
+  await unrelated.call('registerReader', { registrationCode: 'code', label: 'S710', assignedUserId: 5 })
+  assert.deepStrictEqual(unrelated.current.currentReader, reader)
+
   assert.strictEqual(isTerminalMethod('stripe_terminal'), true)
   assert.strictEqual(isTerminalMethod('Terminal'), true)
   assert.strictEqual(isTerminalMethod('Carte bancaire'), false)
@@ -156,7 +325,12 @@ const run = async () => {
     assert.strictEqual(isTerminalPaymentPending({ status }), false, status)
   }
   assert.strictEqual(isTerminalPaymentPending(null), false)
-  assert.strictEqual(terminalPaymentMessage({ status: 'failed', failureMessage: 'Carte refusée.' }), 'Carte refusée.')
+  assert.strictEqual(terminalPaymentMessage({
+    status: 'failed', failureCode: 'TERMINAL_PAYMENT_FAILED', failureMessage: 'secret-token-123',
+  }), 'Le paiement sur le terminal a echoue.')
+  assert.strictEqual(terminalPaymentMessage({
+    status: 'failed', failureCode: 'UNKNOWN', failureMessage: 'secret-token-123',
+  }), 'Le paiement sur le terminal a echoue.')
   assert.strictEqual(typeof terminalPaymentMessage({ status: 'processing' }), 'string')
   assert.strictEqual(typeof terminalPaymentMessage({ status: 'succeeded' }), 'string')
   assert.strictEqual(typeof terminalPaymentMessage(null), 'string')
