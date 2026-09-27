@@ -86,6 +86,7 @@ const make = (options = {}) => {
     modals: 'true', orders: options.routeOrderIds || state.orders.map(x => x.id),
     ...(options.tableMode ? { mode: 'table', tableId: options.tableId || 7,
       settlementKey: options.settlementKey || 'table-key-1' } : {}),
+    ...(options.routeQuery || {}),
   }, path: '/cashregister/payout/Table%201' }
   const instance = {
     $route: route,
@@ -291,6 +292,35 @@ test('route identity changes reset table settlement state and reinitialize payou
     assert.strictEqual(h.instance.tableSettlement, null)
     assert.strictEqual(count(h, 'orders/getAllOrder'), before + 1)
   }
+})
+
+test('legacy route changing only to table mode resets once with the new settlement identity', async () => {
+  const h = make({
+    routeQuery: { tableId: 7, settlementKey: 'legacy-to-table-key' },
+  })
+  await h.initialize()
+  h.instance.tableSettlement = { id: 401 }
+  let disposeCount = 0
+  const disposeTerminalFlow = h.instance.disposeTerminalFlow
+  h.instance.disposeTerminalFlow = () => {
+    disposeCount += 1
+    return disposeTerminalFlow()
+  }
+  const refreshCount = count(h, 'orders/getAllOrder')
+  const to = {
+    ...h.instance.$route,
+    query: { ...h.instance.$route.query, mode: 'table' },
+  }
+  h.instance.$route = to
+
+  await h.page.watch.$route.call(h.instance, to)
+
+  assert.strictEqual(disposeCount, 1)
+  assert.strictEqual(count(h, 'orders/getAllOrder'), refreshCount + 1)
+  assert.strictEqual(h.instance.tableMode, true)
+  assert.strictEqual(h.instance.tableId, 7)
+  assert.strictEqual(h.instance.settlementKey, 'legacy-to-table-key')
+  assert.strictEqual(h.instance.tableSettlement, null)
 })
 
 test('Terminal choice requires the authenticated current cashier and active assignment', async () => {

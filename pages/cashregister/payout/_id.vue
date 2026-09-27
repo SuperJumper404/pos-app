@@ -529,7 +529,7 @@ export default {
       const currentRoute = {
         params: { id: this.id },
         query: {
-          mode: this.tableMode ? 'table' : this.$route.query.mode,
+          mode: this.tableMode ? 'table' : undefined,
           tableId: this.tableId,
           settlementKey: this.settlementKey,
           orders: this.ordersToArchive,
