@@ -13,7 +13,8 @@ const reader = {
   status: 'online', isActive: true, assignedUserId: 4, assignedServicePointId: null,
 }
 const order = (id = 1, extra = {}) => ({
-  id, ordernumber: `A${id}`, subtotal: 12, payment_status: 'unpaid',
+  id, ordernumber: `A${id}`, subtotal: 12, status: 3, service_point_id: 7,
+  customerID: 70, payment_status: 'unpaid',
   payment: 'Paiement au comptoir', ...extra,
 })
 const payment = (status = 'processing', extra = {}) => {
@@ -81,9 +82,10 @@ const make = (options = {}) => {
     return module.exports
   }
   const page = load(pagePath).default
-  const route = { params: { id: 'Table 1' }, query: {
-    modals: 'true', orders: state.orders.map(x => x.id),
-    ...(options.tableMode ? { mode: 'table', settlementKey: options.settlementKey || 'table-key-1' } : {}),
+  const route = { params: { id: options.tableName || 'Table 1' }, query: {
+    modals: 'true', orders: options.routeOrderIds || state.orders.map(x => x.id),
+    ...(options.tableMode ? { mode: 'table', tableId: options.tableId || 7,
+      settlementKey: options.settlementKey || 'table-key-1' } : {}),
   }, path: '/cashregister/payout/Table%201' }
   const instance = {
     $route: route,
@@ -189,11 +191,48 @@ test('table mode settles every order once with the manual method and global disc
   assert.strictEqual(h.instance.tableSettlement.id, 401)
 })
 
-test('table Terminal replay keeps its settlement key and never starts payment twice', async () => {
-  const h = make({ tableMode: true, orders: [order(), order(2)], settlementKey: 'stable-table-key' })
-  h.responses['stripeTerminal/startPayment'] = payment('processing', { orderIds: [1, 2], amountCents: 2400 })
-  await start(h)
-  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', { orderIds: [1, 2], amountCents: 2400 })
+test('manual table settlement restores and replays its immutable draft after reload', async () => {
+  const saved = storage()
+  const first = make({ tableMode: true, storage: saved, orders: [order(2), order(1)],
+    settlementKey: 'manual-replay-key', tableName: 'Terrasse' })
+  first.responses['orders/createTableSettlement'] = { ok: false, code: 'NETWORK_ERROR', message: 'Réponse perdue.' }
+  await first.initialize()
+  first.instance.selectedPaymentMethod = 'Espèces'
+  first.instance.discountType = 'amount'
+  first.instance.discountValue = 1.25
+  await first.instance.requestReceiptChoice()
+  await first.instance.confirmReceiptChoice(false)
+  const stored = JSON.parse(saved.getItem('cashregister-table-settlement:2:4'))
+  assert.deepStrictEqual(stored.records['manual-replay-key'], {
+    mode: 'table', settlementKey: 'manual-replay-key', tableId: 7, tableName: 'Terrasse',
+    orderIds: [1, 2], paymentMethod: 'Espèces', discountType: 'amount', discountValue: 1.25,
+  })
+
+  const reloaded = make({ tableMode: true, storage: saved, orders: [], routeOrderIds: [2, 1],
+    settlementKey: 'manual-replay-key', tableName: 'Terrasse' })
+  reloaded.responses['orders/createTableSettlement'] = {
+    ok: true, settlement: { id: 501, idempotentReplay: true, archivedOrders: [] },
+  }
+  await reloaded.initialize()
+  assert.strictEqual(count(reloaded, 'orders/createTableSettlement'), 1)
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(reloaded.calls.find(x => x.name === 'orders/createTableSettlement').payload)), {
+    orderIds: [1, 2], paymentMethod: 'Espèces', discountType: 'amount', discountValue: 1.25,
+    idempotencyKey: 'manual-replay-key',
+  })
+  assert.strictEqual(saved.getItem('cashregister-table-settlement:2:4'), null)
+})
+
+test('discounted table Terminal reload replays the immutable draft without another start', async () => {
+  const saved = storage()
+  const h = make({ tableMode: true, storage: saved, orders: [order(), order(2)], settlementKey: 'stable-table-key' })
+  h.responses['stripeTerminal/startPayment'] = payment('processing', { orderIds: [1, 2], amountCents: 2275 })
+  await h.initialize()
+  h.instance.selectedPaymentMethod = terminalMethod
+  h.instance.discountType = 'amount'
+  h.instance.discountValue = 1.25
+  await h.instance.requestReceiptChoice()
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', { orderIds: [1, 2], amountCents: 2275,
+    allocations: [{ orderId: 1, amountCents: 1138 }, { orderId: 2, amountCents: 1137 }] })
   h.responses['orders/getAllOrder'] = () => {
     h.state.orders = h.state.orders.map(item => ({ ...item, payment_status: 'paid', payment: 'Carte bancaire',
       payment_provider: 'stripe_terminal', stripe_terminal_payment_id: 91, stripe_terminal_amount_cents: 1200 }))
@@ -206,17 +245,52 @@ test('table Terminal replay keeps its settlement key and never starts payment tw
   assert.strictEqual(h.instance.terminalState, 'recovery')
   assert.strictEqual(h.instance.settlementKey, 'stable-table-key')
   assert.strictEqual(h.instance.terminalReceiptOrders.length, 2)
+  assert.deepStrictEqual(JSON.parse(saved.getItem('cashregister-table-settlement:2:4')).records['stable-table-key'], {
+    mode: 'table', settlementKey: 'stable-table-key', tableId: 7, tableName: 'Table 1',
+    orderIds: [1, 2], paymentMethod: 'stripe_terminal', discountType: 'amount', discountValue: 1.25,
+    terminalPaymentId: 91,
+  })
 
-  h.responses['orders/createTableSettlement'] = { ok: true, settlement: { id: 402, idempotentReplay: true, archivedOrders: [] } }
-  h.state.orders = []
-  await h.instance.retryTerminalPayment()
-  assert.strictEqual(h.instance.receiptDialog, true)
-  await h.instance.confirmReceiptChoice(false)
-  const settlementCalls = h.calls.filter(x => x.name === 'orders/createTableSettlement')
-  assert.strictEqual(settlementCalls.length, 2)
+  h.page.beforeDestroy.call(h.instance)
+  const reloaded = make({ tableMode: true, storage: saved, orders: [], routeOrderIds: [1, 2], settlementKey: 'stable-table-key' })
+  reloaded.responses['orders/createTableSettlement'] = { ok: true, settlement: { id: 402, idempotentReplay: true, archivedOrders: [] } }
+  await reloaded.initialize()
+  const replay = reloaded.calls.filter(x => x.name === 'orders/createTableSettlement')
+  assert.strictEqual(replay.length, 1)
   assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 1)
-  assert.ok(settlementCalls.every(call => call.payload.idempotencyKey === 'stable-table-key'))
-  assert.ok(settlementCalls.every(call => call.payload.terminalPaymentId === 91))
+  assert.strictEqual(count(reloaded, 'stripeTerminal/startPayment'), 0)
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(replay[0].payload)), {
+    orderIds: [1, 2], paymentMethod: 'stripe_terminal', discountType: 'amount', discountValue: 1.25,
+    terminalPaymentId: 91, idempotencyKey: 'stable-table-key',
+  })
+})
+
+test('table mode refuses a first payment when a selected order belongs to another table', async () => {
+  const h = make({ tableMode: true, orders: [order(1), order(2, { service_point_id: 99 })] })
+  await h.initialize()
+  h.instance.selectedPaymentMethod = terminalMethod
+  await h.instance.requestReceiptChoice()
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+  assert.strictEqual(count(h, 'orders/createTableSettlement'), 0)
+  assert.ok(h.calls.some(call => call.name === 'notifications/error' && call.payload.toLowerCase().includes('actualis')))
+})
+
+test('route identity changes reset table settlement state and reinitialize payout', async () => {
+  for (const queryChange of [
+    { settlementKey: 'other-key' },
+    { mode: 'customers' },
+    { tableId: 99 },
+  ]) {
+    const h = make({ tableMode: true })
+    await h.initialize()
+    h.instance.tableSettlement = { id: 401 }
+    const before = count(h, 'orders/getAllOrder')
+    const to = { ...h.instance.$route, query: { ...h.instance.$route.query, ...queryChange } }
+    h.instance.$route = to
+    await h.page.watch.$route.call(h.instance, to)
+    assert.strictEqual(h.instance.tableSettlement, null)
+    assert.strictEqual(count(h, 'orders/getAllOrder'), before + 1)
+  }
 })
 
 test('Terminal choice requires the authenticated current cashier and active assignment', async () => {

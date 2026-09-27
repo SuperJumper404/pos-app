@@ -16,6 +16,15 @@ const {
 } = require('../helpers/cashRegister')
 
 const root = path.resolve(__dirname, '..')
+const deferred = () => {
+  let settleResolve
+  let settleReject
+  const promise = new Promise((resolve, reject) => {
+    settleResolve = resolve
+    settleReject = reject
+  })
+  return { promise, resolve: settleResolve, reject: settleReject }
+}
 
 const loadModule = (filename) => {
   let source = fs.readFileSync(filename, 'utf8')
@@ -330,31 +339,48 @@ const runAsyncAssertions = async () => {
     { id: 33, status: 3, service_point_id: 7, subtotal: 5, payment_status: 'unpaid' },
   ]
   const navigationCalls = []
+  const refreshRequest = deferred()
+  let refreshCalls = 0
   const pageInstance = {
     selectedOrders: [],
     currentSelectedTable: null,
+    tableCheckoutPending: false,
     dataTables: [{ id: 7, name: 'Terrasse' }],
     getAllOrders: [{ id: 30, status: 3, service_point_id: 7, subtotal: 99, payment_status: 'unpaid' }],
     $store: {
-      dispatch: (name) => Promise.resolve().then(() => {
+      dispatch: (name) => {
         assert.strictEqual(name, 'orders/getAllOrder')
-        pageInstance.getAllOrders = refreshedOrders
-        return true
-      }),
+        refreshCalls += 1
+        return refreshRequest.promise.then(() => {
+          pageInstance.getAllOrders = refreshedOrders
+          return true
+        })
+      },
     },
     $router: { push: (route) => navigationCalls.push(route) },
   }
   for (const [name, method] of Object.entries(cashRegisterPage.methods)) {
     pageInstance[name] = method.bind(pageInstance)
   }
-  await pageInstance.goToTablePayout({
+  const firstNavigation = pageInstance.goToTablePayout({
     tableId: 7,
     tableName: 'Terrasse',
     finished: pageInstance.getAllOrders,
   })
+  const secondNavigation = pageInstance.goToTablePayout({
+    tableId: 7,
+    tableName: 'Terrasse',
+    finished: pageInstance.getAllOrders,
+  })
+  assert.strictEqual(pageInstance.tableCheckoutPending, true)
+  assert.strictEqual(refreshCalls, 1)
+  refreshRequest.resolve()
+  await Promise.all([firstNavigation, secondNavigation])
+  assert.strictEqual(pageInstance.tableCheckoutPending, false)
   assert.strictEqual(navigationCalls.length, 1)
   assert.strictEqual(navigationCalls[0].path, '/cashregister/payout/Terrasse')
   assert.strictEqual(navigationCalls[0].query.mode, 'table')
+  assert.strictEqual(navigationCalls[0].query.tableId, 7)
   assert.deepStrictEqual(Array.from(navigationCalls[0].query.orders), [31, 33])
   assert.match(navigationCalls[0].query.settlementKey, /^[0-9a-f]{8}-[0-9a-f-]{27}$/i)
 
@@ -363,6 +389,20 @@ const runAsyncAssertions = async () => {
   ).template.content
   assert.ok(cashRegisterTemplate.includes('Encaisser toute la table'))
   assert.ok(cashRegisterTemplate.includes('@click="goToTablePayout(table)"'))
+  assert.ok(cashRegisterTemplate.includes(':loading="tableCheckoutPending"'))
+
+  const failedNavigationCalls = []
+  const notifications = []
+  pageInstance.$router.push = (route) => failedNavigationCalls.push(route)
+  pageInstance.$store.dispatch = (name, message) => {
+    if (name === 'orders/getAllOrder') return Promise.reject(new Error('network down'))
+    notifications.push({ name, message })
+    return Promise.resolve(true)
+  }
+  await pageInstance.goToTablePayout({ tableId: 7, tableName: 'Terrasse', finished: [] })
+  assert.deepStrictEqual(failedNavigationCalls, [])
+  assert.strictEqual(notifications[0].name, 'notifications/error')
+  assert.ok(notifications[0].message.includes("Impossible d'actualiser"))
 
   const ordersStore = loadModule(path.join(root, 'store/orders.js'))
   const posts = []
@@ -402,6 +442,16 @@ const runAsyncAssertions = async () => {
     code: 'TABLE_ORDERS_CHANGED',
     message: 'Table orders changed.',
   })
+
+  const orderDispatches = []
+  const getAllResult = await ordersStore.actions.getAllOrder.call({
+    $axios: { get: () => Promise.reject(new Error('offline')) },
+  }, { dispatch: (...args) => orderDispatches.push(args) })
+  assert.strictEqual(getAllResult, false)
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(orderDispatches)), [
+    ['set/message', 'Impossible de récupérer les commandes.'],
+    ['set/dataOrders', []],
+  ])
 
   const payoutSource = fs.readFileSync(
     path.join(__dirname, '../pages/cashregister/payout/_id.vue'),

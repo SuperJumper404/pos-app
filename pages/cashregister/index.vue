@@ -167,7 +167,8 @@
             outlined
             color="primary"
             class="cashregister-action-table text-none"
-            :disabled="!tableHasEligibleOrders(table)"
+            :loading="tableCheckoutPending"
+            :disabled="tableCheckoutPending || !tableHasEligibleOrders(table)"
             @click="goToTablePayout(table)"
           >
             <v-icon small left>mdi-table-check</v-icon>
@@ -245,6 +246,7 @@ export default {
       WaitingOrderPerTable: [],
       CanceledOrderPerTable: [],
       tableGlobalData: [],
+      tableCheckoutPending: false,
     }
   },
   computed: {
@@ -389,37 +391,43 @@ export default {
       })
     },
     async goToTablePayout(table) {
-      const refreshed = await this.$store.dispatch('orders/getAllOrder')
-      if (refreshed !== true) {
+      if (this.tableCheckoutPending) return
+      this.tableCheckoutPending = true
+      try {
+        const refreshed = await this.$store.dispatch('orders/getAllOrder')
+        if (refreshed !== true) throw new Error('ORDER_REFRESH_FAILED')
+        const tableOrders = this.getAllOrders.filter(
+          (order) => Number(order.service_point_id || order.customerID) === Number(table.tableId)
+        )
+        const candidate = buildTableSettlementCandidate(tableOrders)
+        if (!candidate.hasEligibleOrders) {
+          this.$store.dispatch(
+            'notifications/error',
+            'Aucune commande à encaisser pour cette table.',
+            { root: true }
+          )
+          this.loadTableData()
+          return
+        }
+        this.$router.push({
+          path: `/cashregister/payout/${table.tableName}`,
+          query: {
+            modals: 'true',
+            mode: 'table',
+            tableId: table.tableId,
+            orders: candidate.orderIds,
+            settlementKey: uuidv4(),
+          },
+        })
+      } catch (error) {
         this.$store.dispatch(
           'notifications/error',
           "Impossible d'actualiser les commandes de la table.",
           { root: true }
         )
-        return
+      } finally {
+        this.tableCheckoutPending = false
       }
-      const tableOrders = this.getAllOrders.filter(
-        (order) => Number(order.service_point_id || order.customerID) === Number(table.tableId)
-      )
-      const candidate = buildTableSettlementCandidate(tableOrders)
-      if (!candidate.hasEligibleOrders) {
-        this.$store.dispatch(
-          'notifications/error',
-          'Aucune commande à encaisser pour cette table.',
-          { root: true }
-        )
-        this.loadTableData()
-        return
-      }
-      this.$router.push({
-        path: `/cashregister/payout/${table.tableName}`,
-        query: {
-          modals: 'true',
-          mode: 'table',
-          orders: candidate.orderIds,
-          settlementKey: uuidv4(),
-        },
-      })
     },
     goToDetails(table) {
       this.$router.push(

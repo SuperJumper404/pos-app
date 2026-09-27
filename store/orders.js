@@ -32,7 +32,9 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', error.response.data.data)
+        const message = error?.response?.data?.message ||
+          'Impossible de récupérer les commandes.'
+        dispatch('set/message', message)
         dispatch('set/dataOrders', [])
         return false
       })
