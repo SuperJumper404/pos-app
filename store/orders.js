@@ -185,6 +185,31 @@ export const actions = {
         return false
       })
   },
+  createTableSettlement({ dispatch }, params) {
+    return this.$axios
+      .post(
+        '/baseurl/api/v1/cash-register/settlements',
+        params,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          skipGlobalErrorNotification: true,
+        }
+      )
+      .then((response) => ({
+        ok: true,
+        settlement: response.data.data,
+      }))
+      .catch((error) => {
+        const response = error.response?.data || {}
+        const message = response.message || error.message ||
+          "Impossible d'encaisser toute la table."
+        const code = response.data?.code || response.code || null
+        dispatch('set/message', message)
+        return { ok: false, code, message }
+      })
+  },
   collectOrderPayment({ dispatch }, params) {
     return this.$axios
       .post(

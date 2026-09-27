@@ -313,6 +313,9 @@ export default {
     return {
       id: this.$route.params.id,
       dialog: this.$route.query.modals,
+      tableMode: this.$route.query.mode === 'table',
+      settlementKey: this.$route.query.settlementKey || null,
+      tableSettlement: null,
       ordersToArchive: normalizeOrderIds(this.$route.query.orders),
       loadingBtn: false,
       ordersLoaded: false,
@@ -704,6 +707,17 @@ export default {
     },
     async retryTerminalPayment() {
       if (this.terminalBusy || this.terminalDisposed) return
+      if (this.tableMode && this.terminalAttempt?.status === 'succeeded' &&
+        Number(this.terminalAttempt.paymentId) > 0) {
+        this.selectedPaymentMethod = 'stripe_terminal'
+        this.terminalPayment = this.terminalPayment || {
+          id: Number(this.terminalAttempt.paymentId),
+          status: 'succeeded',
+          orderIds: this.terminalAttempt.orderIds,
+        }
+        this.terminalState = 'succeeded'
+        return this.requestReceiptChoice()
+      }
       this.stopTerminalPolling()
       this.terminalPollCount = 0
       this.terminalBusy = true
@@ -929,6 +943,56 @@ export default {
       this.receiptDialog = false
       return this.btnYes(wantsReceipt)
     },
+    async finalizeTableSettlement({ orderIds, terminalArchive }) {
+      const terminalPaymentId = terminalArchive && Number(
+        this.terminalPayment?.id || this.terminalAttempt?.paymentId
+      )
+      const result = await this.$store.dispatch('orders/createTableSettlement', {
+        orderIds,
+        paymentMethod: terminalArchive
+          ? this.selectedPaymentMethod
+          : this.pendingPaymentMethod,
+        discountType: this.effectiveDiscountType,
+        discountValue: this.effectiveDiscountValue,
+        idempotencyKey: this.settlementKey,
+        ...(terminalPaymentId ? { terminalPaymentId } : {}),
+      })
+      if (!result || !result.ok) {
+        const tableChanged = result && result.code === 'TABLE_ORDERS_CHANGED'
+        const message = tableChanged
+          ? 'La table a changé. Actualisez les commandes avant de réessayer.'
+          : (result && result.message) || "Impossible d'encaisser toute la table. Réessayez."
+        this.$store.dispatch('notifications/error', message, { root: true })
+        if (terminalArchive) {
+          this.terminalRecovery()
+          this.terminalNotice = message
+        }
+        return false
+      }
+
+      this.tableSettlement = result.settlement
+      const archivedCount = Array.isArray(result.settlement?.archivedOrders)
+        ? result.settlement.archivedOrders.length
+        : orderIds.length
+      if (terminalArchive) {
+        this.rememberTerminalAttempt(null)
+        this.terminalReceiptOrders = []
+        this.terminalState = 'idle'
+      }
+      this.retryActive = false
+      this.retryDueOrderIds = []
+      this.pendingPaymentMethod = null
+      this.$store.dispatch(
+        'notifications/success',
+        `${archivedCount} commande(s) archivée(s) avec succès.`,
+        { root: true }
+      )
+      this.dialog = false
+      await Promise.resolve()
+        .then(() => this.$router.push('/cashregister'))
+        .catch(() => {})
+      return true
+    },
     async buildReceiptOrdersWithDetails(orders) {
       const printableOrders = Array.isArray(orders) ? orders : []
       const ordersWithDetails = []
@@ -993,7 +1057,10 @@ export default {
     },
     async btnYes(wantsReceipt = false) {
       if (this.loadingBtn) return
-      const terminalArchive = this.terminalReceiptOrders.length > 0
+      const terminalArchive = this.terminalReceiptOrders.length > 0 || Boolean(
+        this.tableMode && isTerminalMethod(this.selectedPaymentMethod) &&
+        Number(this.terminalPayment?.id || this.terminalAttempt?.paymentId) > 0
+      )
       if (this.terminalBusy || this.terminalChecking ||
         ['starting', 'processing', 'recovery'].includes(this.terminalState) ||
         (!terminalArchive && this.needsTerminalReceipt) ||
@@ -1001,7 +1068,11 @@ export default {
 
       this.loadingBtn = true
       const receiptOrders = (terminalArchive ? this.terminalReceiptOrders : this.selectedOrders).slice()
-      const orderIds = terminalArchive ? receiptOrders.map((order) => Number(order.id)) : this.ordersToArchive.slice()
+      const orderIds = this.tableMode
+        ? this.ordersToArchive.slice()
+        : terminalArchive
+          ? receiptOrders.map((order) => Number(order.id))
+          : this.ordersToArchive.slice()
       const untouchedOrderIds = this.ordersToArchive.filter((id) => !orderIds.includes(id))
       const paymentSummary = this.paymentSummary
       const initialDueOrderIds = this.retryActive
@@ -1011,9 +1082,6 @@ export default {
       const paymentMethod = requiresPaymentMethod
         ? this.pendingPaymentMethod
         : null
-      const receiptOrdersWithDetails = wantsReceipt
-        ? await this.buildReceiptOrdersWithDetails(receiptOrders)
-        : []
 
       try {
         if (!orderIds.length) {
@@ -1024,6 +1092,15 @@ export default {
           )
           return
         }
+
+        if (this.tableMode) {
+          await this.finalizeTableSettlement({ orderIds, terminalArchive })
+          return
+        }
+
+        const receiptOrdersWithDetails = wantsReceipt
+          ? await this.buildReceiptOrdersWithDetails(receiptOrders)
+          : []
 
         const archiveSummary = await archiveOrdersSafely(
           orderIds,

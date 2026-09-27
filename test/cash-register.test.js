@@ -1,8 +1,12 @@
 const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
+const vm = require('vm')
+const babel = require('@babel/core')
+const compiler = require('vue-template-compiler')
 const {
   archiveOrdersSafely,
+  buildTableSettlementCandidate,
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
   isCashRegisterOrderArchivable,
@@ -10,6 +14,35 @@ const {
   resolveRetryDueOrderIds,
   summarizeArchiveResults,
 } = require('../helpers/cashRegister')
+
+const root = path.resolve(__dirname, '..')
+
+const loadModule = (filename) => {
+  let source = fs.readFileSync(filename, 'utf8')
+  if (filename.endsWith('.vue')) {
+    source = compiler.parseComponent(source).script.content
+  }
+  const code = babel.transformSync(source, {
+    babelrc: false,
+    configFile: false,
+    plugins: ['@babel/plugin-transform-modules-commonjs'],
+  }).code
+  const module = { exports: {} }
+  vm.runInNewContext(code, {
+    module,
+    exports: module.exports,
+    localStorage: { getItem: () => 'test-token' },
+    require: (name) => {
+      if (!name.startsWith('@/') && !name.startsWith('.')) return require(name)
+      let target = name.startsWith('@/')
+        ? path.join(root, name.slice(2))
+        : path.resolve(path.dirname(filename), name)
+      if (!path.extname(target)) target += '.js'
+      return loadModule(target)
+    },
+  }, { filename })
+  return module.exports
+}
 
 const orders = [
   {
@@ -155,6 +188,24 @@ assert.deepStrictEqual(normalizeOrderIds(['1', 2, 'bad', null]), [1, 2])
 assert.deepStrictEqual(normalizeOrderIds('7'), [7])
 assert.deepStrictEqual(normalizeOrderIds(undefined), [])
 
+assert.deepStrictEqual(
+  buildTableSettlementCandidate([
+    { id: 8, status: 3, subtotal: 6.5, payment_status: 'unpaid' },
+    { id: '8', status: 3, subtotal: 6.5, payment_status: 'unpaid' },
+    { id: 9, status: 3, subtotal: 4, payment_status: 'paid', payment: 'Carte' },
+    { id: 10, status: 3, subtotal: 5, payment_status: 'requires_payment', payment_provider: 'stripe', stock_reservation_status: 'released' },
+    { id: 11, status: 2, subtotal: 7, payment_status: 'unpaid' },
+    { id: 12, status: 3, subtotal: 3.25, payment_status: 'requires_payment', payment_provider: 'stripe', stock_reservation_status: 'reserved' },
+  ]),
+  { orderIds: [8, 12], dueAmount: 9.75, hasEligibleOrders: true }
+)
+assert.deepStrictEqual(
+  buildTableSettlementCandidate([
+    { id: 20, status: 3, subtotal: 9, payment_status: 'paid', payment: 'Carte' },
+  ]),
+  { orderIds: [], dueAmount: 0, hasEligibleOrders: false }
+)
+
 assert.deepStrictEqual(summarizeArchiveResults([1, 2, 3], [true, false, true]), {
   successfulOrderIds: [1, 3],
   failedOrderIds: [2],
@@ -268,6 +319,88 @@ const runAsyncAssertions = async () => {
     successfulOrderIds: [4],
     failedOrderIds: [1, 2, 3],
     allSucceeded: false,
+  })
+
+  const cashRegisterPage = loadModule(
+    path.join(root, 'pages/cashregister/index.vue')
+  ).default
+  const refreshedOrders = [
+    { id: 31, status: 3, service_point_id: 7, subtotal: 8, payment_status: 'unpaid' },
+    { id: 32, status: 3, service_point_id: 7, subtotal: 4, payment_status: 'paid', payment: 'Carte' },
+    { id: 33, status: 3, service_point_id: 7, subtotal: 5, payment_status: 'unpaid' },
+  ]
+  const navigationCalls = []
+  const pageInstance = {
+    selectedOrders: [],
+    currentSelectedTable: null,
+    dataTables: [{ id: 7, name: 'Terrasse' }],
+    getAllOrders: [{ id: 30, status: 3, service_point_id: 7, subtotal: 99, payment_status: 'unpaid' }],
+    $store: {
+      dispatch: (name) => Promise.resolve().then(() => {
+        assert.strictEqual(name, 'orders/getAllOrder')
+        pageInstance.getAllOrders = refreshedOrders
+        return true
+      }),
+    },
+    $router: { push: (route) => navigationCalls.push(route) },
+  }
+  for (const [name, method] of Object.entries(cashRegisterPage.methods)) {
+    pageInstance[name] = method.bind(pageInstance)
+  }
+  await pageInstance.goToTablePayout({
+    tableId: 7,
+    tableName: 'Terrasse',
+    finished: pageInstance.getAllOrders,
+  })
+  assert.strictEqual(navigationCalls.length, 1)
+  assert.strictEqual(navigationCalls[0].path, '/cashregister/payout/Terrasse')
+  assert.strictEqual(navigationCalls[0].query.mode, 'table')
+  assert.deepStrictEqual(Array.from(navigationCalls[0].query.orders), [31, 33])
+  assert.match(navigationCalls[0].query.settlementKey, /^[0-9a-f]{8}-[0-9a-f-]{27}$/i)
+
+  const cashRegisterTemplate = compiler.parseComponent(
+    fs.readFileSync(path.join(root, 'pages/cashregister/index.vue'), 'utf8')
+  ).template.content
+  assert.ok(cashRegisterTemplate.includes('Encaisser toute la table'))
+  assert.ok(cashRegisterTemplate.includes('@click="goToTablePayout(table)"'))
+
+  const ordersStore = loadModule(path.join(root, 'store/orders.js'))
+  const posts = []
+  const storeContext = { dispatch: () => {} }
+  const settlement = { id: 71, archivedOrders: [{ id: 31 }] }
+  const success = await ordersStore.actions.createTableSettlement.call({
+    $axios: { post: (...args) => Promise.resolve().then(() => {
+      posts.push(args)
+      return { data: { data: settlement } }
+    }) },
+  }, storeContext, {
+    orderIds: [31, 33],
+    paymentMethod: 'Espèces',
+    discountType: 'percent',
+    discountValue: 10,
+    idempotencyKey: 'settlement-key',
+  })
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(success)), { ok: true, settlement })
+  assert.strictEqual(posts[0][0], '/baseurl/api/v1/cash-register/settlements')
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(posts[0][1])), {
+    orderIds: [31, 33],
+    paymentMethod: 'Espèces',
+    discountType: 'percent',
+    discountValue: 10,
+    idempotencyKey: 'settlement-key',
+  })
+
+  const settlementError = new Error('Table orders changed.')
+  settlementError.response = { data: {
+    message: 'Table orders changed.', data: { code: 'TABLE_ORDERS_CHANGED' },
+  } }
+  const failure = await ordersStore.actions.createTableSettlement.call({
+    $axios: { post: () => Promise.reject(settlementError) },
+  }, storeContext, { orderIds: [31] })
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(failure)), {
+    ok: false,
+    code: 'TABLE_ORDERS_CHANGED',
+    message: 'Table orders changed.',
   })
 
   const payoutSource = fs.readFileSync(

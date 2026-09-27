@@ -164,6 +164,16 @@
 
         <v-card-actions class="cashregister-actions">
           <v-btn
+            outlined
+            color="primary"
+            class="cashregister-action-table text-none"
+            :disabled="!tableHasEligibleOrders(table)"
+            @click="goToTablePayout(table)"
+          >
+            <v-icon small left>mdi-table-check</v-icon>
+            Encaisser toute la table
+          </v-btn>
+          <v-btn
             color="primary"
             class="cashregister-action-main text-none"
             depressed
@@ -197,9 +207,11 @@
 <script>
 import moment from 'moment'
 import price from '@/helpers/price'
+import { v4 as uuidv4 } from 'uuid'
 
 const {
   buildCashRegisterCustomerRows,
+  buildTableSettlementCandidate,
   getCashRegisterPaymentSummary,
 } = require('@/helpers/cashRegister')
 
@@ -357,6 +369,9 @@ export default {
         this.selectedOrders.length > 0
       )
     },
+    tableHasEligibleOrders(table) {
+      return buildTableSettlementCandidate(table.finished).hasEligibleOrders
+    },
     selectionHandler(tableName, selectionEvent) {
       if (this.currentSelectedTable !== tableName) {
         this.currentSelectedTable = tableName
@@ -371,6 +386,39 @@ export default {
       this.$router.push({
         path: `/cashregister/payout/${table.tableName}?modals=true`,
         query: { orders: this.OrderIdsToArchives() },
+      })
+    },
+    async goToTablePayout(table) {
+      const refreshed = await this.$store.dispatch('orders/getAllOrder')
+      if (refreshed !== true) {
+        this.$store.dispatch(
+          'notifications/error',
+          "Impossible d'actualiser les commandes de la table.",
+          { root: true }
+        )
+        return
+      }
+      const tableOrders = this.getAllOrders.filter(
+        (order) => Number(order.service_point_id || order.customerID) === Number(table.tableId)
+      )
+      const candidate = buildTableSettlementCandidate(tableOrders)
+      if (!candidate.hasEligibleOrders) {
+        this.$store.dispatch(
+          'notifications/error',
+          'Aucune commande à encaisser pour cette table.',
+          { root: true }
+        )
+        this.loadTableData()
+        return
+      }
+      this.$router.push({
+        path: `/cashregister/payout/${table.tableName}`,
+        query: {
+          modals: 'true',
+          mode: 'table',
+          orders: candidate.orderIds,
+          settlementKey: uuidv4(),
+        },
       })
     },
     goToDetails(table) {
@@ -672,14 +720,20 @@ export default {
 }
 
 .cashregister-actions {
+  flex-wrap: wrap;
   gap: var(--se-space-2);
   padding: 14px 20px 18px;
 }
 
+.cashregister-action-table,
 .cashregister-action-main,
 .cashregister-action-secondary {
   border-radius: var(--se-radius-sm) !important;
   min-height: 38px;
+}
+
+.cashregister-action-table {
+  flex: 1 0 100%;
 }
 
 .cashregister-action-main {
