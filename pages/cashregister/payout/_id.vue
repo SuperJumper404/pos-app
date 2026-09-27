@@ -269,6 +269,10 @@ import {
   buildCashierReceiptPayload,
   sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
+import {
+  buildCashierSettlementReceiptPayload,
+  sendCashierSettlementReceipt,
+} from '@/helpers/cashierSettlementReceipt'
 const {
   archiveOrdersSafely,
   getCashRegisterPaymentSummary,
@@ -1122,7 +1126,11 @@ export default {
         ...(terminalPaymentId ? { terminalPaymentId } : {}),
       }
     },
-    async finalizeTableSettlement({ terminalArchive = false, draft = null }) {
+    async finalizeTableSettlement({
+      terminalArchive = false,
+      draft = null,
+      wantsReceipt = false,
+    }) {
       let settlementDraft = draft || this.readTableSettlementDraft()
       if (!settlementDraft) {
         if (!terminalArchive && !await this.refreshTableSettlementOrders()) return false
@@ -1170,6 +1178,7 @@ export default {
         `${archivedCount} commande(s) archivée(s) avec succès.`,
         { root: true }
       )
+      if (wantsReceipt) this.printTableSettlementReceipt(result.settlement)
       this.dialog = false
       await Promise.resolve()
         .then(() => this.$router.push('/cashregister'))
@@ -1197,6 +1206,29 @@ export default {
       }
 
       return ordersWithDetails
+    },
+    printTableSettlementReceipt(settlement) {
+      if (!settlement) return
+      this.receiptPrinting = true
+      try {
+        sendCashierSettlementReceipt({
+          payload: buildCashierSettlementReceiptPayload(
+            settlement,
+            this.shopInfo
+          ),
+          smartPrint: this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.shop_printer_ip,
+          dispatch: this.$store.dispatch,
+        })
+      } catch (error) {
+        this.$store.dispatch(
+          'notifications/error',
+          "L'impression du ticket a echoue. Vous pourrez le reimprimer depuis l'historique.",
+          { root: true }
+        )
+      } finally {
+        this.receiptPrinting = false
+      }
     },
     printReceiptsForOrders(orders, paymentMethod) {
       const printableOrders = Array.isArray(orders) ? orders : []
@@ -1278,7 +1310,7 @@ export default {
         }
 
         if (this.tableMode) {
-          await this.finalizeTableSettlement({ terminalArchive })
+          await this.finalizeTableSettlement({ terminalArchive, wantsReceipt })
           return
         }
 
