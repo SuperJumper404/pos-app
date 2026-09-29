@@ -27,6 +27,7 @@ const historyStoreSource = fs.readFileSync(
   'utf8'
 )
 assert.ok(historyStoreSource.includes('sortArchivedOrdersByArchiveDate'))
-assert.ok(historyStoreSource.includes('dispatch(\'set/dataArchivedOrders\', sortedArchivedOrders)'))
+assert.ok(historyStoreSource.includes('normalizeArchivedHistory'))
+assert.ok(historyStoreSource.includes("dispatch('set/dataArchivedOrders', normalizedHistory)"))
 
 console.log('history archive ordering tests passed')

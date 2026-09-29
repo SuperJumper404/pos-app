@@ -59,19 +59,39 @@
         :items="dataArchivedOrders"
         :search="searchFilter"
         :expanded.sync="expanded"
-        item-key="id"
+        item-key="historyKey"
         show-expand
         single-expand
         :disable-sort="$vuetify.breakpoint.smAndDown"
       >
         <template #[`item.ordernumber`]="{ item }">
-          <div>#{{ item.ordernumber }}</div>
-          <TakeawayChip :value="item.is_takeaway" />
+          <div v-if="item.isSettlement" class="font-weight-medium">
+            {{ item.historyLabel }}
+          </div>
+          <template v-else>
+            <div>#{{ item.ordernumber }}</div>
+            <TakeawayChip :value="item.is_takeaway" />
+          </template>
         </template>
         <template #expanded-item="{ item }">
           <td colspan="12">
+            <div v-if="item.isSettlement" class="py-3">
+              <v-btn
+                v-for="order in item.archivedOrders"
+                :key="order.id"
+                :to="`/history/ticket/${order.id}`"
+                outlined
+                small
+                color="primary"
+                class="text-none mr-2 mb-2"
+              >
+                Commande #{{ order.ordernumber || order.id }}
+                <v-icon small right>mdi-open-in-new</v-icon>
+              </v-btn>
+            </div>
             <v-card
               v-for="(itm, i) in getArchivedOrderDetailsByOrderId(item.id)"
+              v-else
               :key="i"
               outlined
               class="
@@ -236,7 +256,7 @@
                 small
                 color="primary"
                 class="text-none"
-                @click="showInvoice(item.id)"
+                @click="showInvoice(item)"
                 >Ticket <v-icon small right>mdi-invoice-text</v-icon>
               </v-btn>
             </v-card-actions>
@@ -352,19 +372,9 @@ export default {
   },
   mounted() {
     this.loadPage = true
-    const archivedOrdersIds = this.dataArchivedOrders.map((x) => x.id)
-    console.log('id', archivedOrdersIds)
-
-    for (const id of archivedOrdersIds) {
-      this.$store.dispatch('history/getDetailArchivedOrder', id).then(() => {
-        const detail = this.$store.get('history/detailArchivedOrder')
-        console.log('DeTAILLL', detail)
-        this.dataAllDetailsArchivedOrders.push(detail)
-      })
-    }
-
-    console.log('result multi orders', this.result)
-    this.$store.dispatch('history/getAllArchivedOrders').finally(() => {
+    this.$store.dispatch('history/getAllArchivedOrders').then(() => {
+      this.loadArchivedOrderDetails()
+    }).finally(() => {
       this.loadPage = false
     })
   },
@@ -391,7 +401,23 @@ export default {
       console.log(id, ' archived Detail orders', result)
       return result
     },
-    showInvoice(id) {
+    loadArchivedOrderDetails() {
+      this.dataAllDetailsArchivedOrders = []
+      this.dataArchivedOrders
+        .filter((item) => !item.isSettlement)
+        .forEach((item) => {
+          this.$store.dispatch('history/getDetailArchivedOrder', item.id).then(() => {
+            const detail = this.$store.get('history/detailArchivedOrder')
+            this.dataAllDetailsArchivedOrders.push(detail)
+          })
+        })
+    },
+    showInvoice(item) {
+      if (item.isSettlement) {
+        this.$router.push(`/history/settlement/${item.cash_register_settlement_id}`)
+        return
+      }
+      const id = item.id
       const detailedArchive = this.$store
         .dispatch('history/getDetailArchivedOrder', id)
         .finally(() => {
@@ -401,7 +427,7 @@ export default {
       // this.$store.dispatch('history/getReceiptTokenByOrder', id).finally(() => {
       //   console.log('Archived Token')
       // })
-      this.$router.push(`history/ticket/${id}`)
+      this.$router.push(`/history/ticket/${id}`)
     },
     searchData() {
       this.$store.dispatch('orders/getAllOrder')

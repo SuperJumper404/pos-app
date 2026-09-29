@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "pretest": "node test/history-settlement.test.js",
     "predev": "node scripts/ensure-dev-port-free.js",
     "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=local nuxt",
     "network": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=network nuxt",

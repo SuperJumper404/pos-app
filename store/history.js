@@ -1,5 +1,56 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 const { sortArchivedOrdersByArchiveDate } = require('@/helpers/history')
+
+const hasSettlementId = (value) =>
+  value !== null && value !== undefined && value !== ''
+
+export const normalizeArchivedHistory = (orders = []) => {
+  const settlementItems = new Map()
+  const legacyItems = []
+
+  orders.forEach((order) => {
+    const settlementId = order.cash_register_settlement_id
+    if (!hasSettlementId(settlementId)) {
+      legacyItems.push({
+        ...order,
+        historyKey: `archive-${order.id}`,
+        isSettlement: false,
+      })
+      return
+    }
+
+    if (!settlementItems.has(String(settlementId))) {
+      const tableReference = order.settlement_table_reference || order.username || ''
+      settlementItems.set(String(settlementId), {
+        ...order,
+        id: Number(settlementId) || settlementId,
+        historyKey: `settlement-${settlementId}`,
+        isSettlement: true,
+        historyLabel: `Encaissement table ${tableReference}`,
+        ordernumber: `Encaissement table ${tableReference}`,
+        username: tableReference,
+        subtotal: order.settlement_total_amount,
+        payment: order.settlement_payment_method,
+        used_payment_method: order.settlement_payment_method,
+        payment_status: 'paid',
+        status: 3,
+        created: order.settlement_created_at || order.archived_at || order.created,
+        archived_at: order.settlement_created_at || order.archived_at,
+        archivedOrders: [],
+      })
+    }
+
+    const item = settlementItems.get(String(settlementId))
+    if (!item.archivedOrders.some((archivedOrder) => String(archivedOrder.id) === String(order.id))) {
+      item.archivedOrders.push(order)
+    }
+  })
+
+  return sortArchivedOrdersByArchiveDate([
+    ...settlementItems.values(),
+    ...legacyItems,
+  ])
+}
 export const state = () => ({
   dataArchivedOrders: [],
   // dataArchivedOrdersByUserId: [],
@@ -9,6 +60,7 @@ export const state = () => ({
   metrics: '',
   // AllDetailOrders: [],
   lastCreatedOrder: null,
+  cashRegisterSettlement: null,
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
@@ -21,10 +73,10 @@ export const actions = {
         },
       })
       .then((response) => {
-        const sortedArchivedOrders = sortArchivedOrdersByArchiveDate(
+        const normalizedHistory = normalizeArchivedHistory(
           response.data.data
         )
-        const lastCreatedOrder = sortedArchivedOrders
+        const lastCreatedOrder = normalizedHistory
           .map(function (e) {
             return e.archived_at || e.created
           })
@@ -32,12 +84,29 @@ export const actions = {
           .reverse()[0]
 
         dispatch('set/lastCreatedOrder', lastCreatedOrder)
-        dispatch('set/dataArchivedOrders', sortedArchivedOrders)
+        dispatch('set/dataArchivedOrders', normalizedHistory)
         return true
       })
       .catch((error) => {
         dispatch('set/message', error.response)
         dispatch('set/dataArchivedOrders', [])
+        return false
+      })
+  },
+  getCashRegisterSettlement({ dispatch }, id) {
+    return this.$axios
+      .get(`/baseurl/api/v1/cash-register/settlements/${id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+      .then((response) => {
+        dispatch('set/cashRegisterSettlement', response.data.data)
+        return true
+      })
+      .catch((error) => {
+        dispatch('set/message', error.response)
+        dispatch('set/cashRegisterSettlement', null)
         return false
       })
   },
