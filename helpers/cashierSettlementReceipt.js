@@ -10,6 +10,24 @@ const { formatPrice, roundPrice } = require('./price-functions')
 
 const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 
+const submittedPrintResult = () => ({ ok: true, status: 'submitted' })
+
+const failedPrintResult = () => ({
+  ok: false,
+  status: 'failed',
+  code: 'PRINT_SUBMISSION_FAILED',
+  message: "L'impression du ticket a echoue.",
+})
+
+const normalizePrintSubmission = (submission) =>
+  Promise.resolve(submission).then(
+    (result) =>
+      result === false || (result && result.ok === false)
+        ? failedPrintResult()
+        : submittedPrintResult(),
+    () => failedPrintResult()
+  )
+
 const optionalText = (value) => String(value == null ? '' : value).trim()
 
 const xmlEscape = (value) =>
@@ -240,17 +258,20 @@ const sendCashierSettlementReceipt = ({
   fetchImplementation,
 } = {}) => {
   if (!payload || !payload.settlementId) {
-    throw new TypeError("L'encaissement est introuvable pour l'impression.")
+    return Promise.reject(
+      new TypeError("L'encaissement est introuvable pour l'impression.")
+    )
   }
 
   if (isEnabled(smartPrint)) {
     const requestFetch =
       fetchImplementation || (typeof fetch === 'function' ? fetch : null)
     if (!requestFetch || !printerIp) {
-      throw new TypeError("SmartPrint n'est pas configuré.")
+      return Promise.reject(new TypeError("SmartPrint n'est pas configuré."))
     }
+    let submission
     try {
-      Promise.resolve(requestFetch(`http://${printerIp}:8989/print`, {
+      submission = requestFetch(`http://${printerIp}:8989/print`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -261,29 +282,41 @@ const sendCashierSettlementReceipt = ({
           ).toString('base64'),
           dataFormatXML: null,
         }),
-      })).catch(() => {})
+      })
     } catch (error) {
-      // The job was attempted; printer transport errors are intentionally ignored.
+      return Promise.resolve(failedPrintResult())
     }
-    if (typeof dispatch === 'function') {
-      dispatch('notifications/success', 'Impression envoyée.', { root: true })
-    }
-    return true
+    return normalizePrintSubmission(submission).then((result) => {
+      if (result.ok && typeof dispatch === 'function') {
+        try {
+          Promise.resolve(
+            dispatch('notifications/success', 'Impression envoyée.', {
+              root: true,
+            })
+          ).catch(() => {})
+        } catch (error) {}
+      }
+      return result
+    })
   }
 
   if (typeof dispatch !== 'function') {
-    throw new TypeError("Le service d'impression cloud est indisponible.")
+    return Promise.reject(
+      new TypeError("Le service d'impression cloud est indisponible.")
+    )
   }
+  let submission
   try {
-    Promise.resolve(dispatch('printing/postPrintingJob', {
+    submission = dispatch('printing/postPrintingJob', {
       requete: buildCashierSettlementCloudXml(payload),
       ticketType: payload.ticketType || 'caisse',
       orderId: payload.settlementId,
-    })).catch(() => {})
+      awaitResult: true,
+    })
   } catch (error) {
-    // The job was attempted; printer transport errors are intentionally ignored.
+    return Promise.resolve(failedPrintResult())
   }
-  return true
+  return normalizePrintSubmission(submission)
 }
 
 module.exports = {

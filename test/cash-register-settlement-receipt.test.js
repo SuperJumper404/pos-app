@@ -139,44 +139,117 @@ assert.strictEqual(occurrences(cloudXml, '<symbol type="qrcode"'), 1)
 assert.match(cloudXml, /review\?a=1&amp;b=2/)
 assert.strictEqual(occurrences(cloudXml, 'Made with smarteat.fr'), 1)
 
-const smartPrintCalls = []
-assert.strictEqual(sendCashierSettlementReceipt({
-  payload,
-  smartPrint: true,
-  printerIp: '192.168.1.20',
-  fetchImplementation: (url, options) => {
-    smartPrintCalls.push({ url, options })
-    return Promise.resolve({ ok: true })
-  },
-  dispatch: () => true,
-}), true)
-assert.strictEqual(smartPrintCalls.length, 1)
-assert.strictEqual(smartPrintCalls[0].url, 'http://192.168.1.20:8989/print')
-const smartPrintBody = JSON.parse(smartPrintCalls[0].options.body)
-assert.strictEqual(smartPrintBody.ticketType, 'caisse')
-assert.strictEqual(
-  Buffer.from(smartPrintBody.dataFormatESCPOS, 'base64').toString('latin1'),
-  escPos
-)
+const submittedPrintResult = { ok: true, status: 'submitted' }
+const failedPrintResult = {
+  ok: false,
+  status: 'failed',
+  code: 'PRINT_SUBMISSION_FAILED',
+  message: "L'impression du ticket a echoue.",
+}
 
-const cloudPrintCalls = []
-assert.strictEqual(sendCashierSettlementReceipt({
-  payload,
-  smartPrint: false,
-  dispatch: (action, params) => {
-    cloudPrintCalls.push({ action, params })
-    return Promise.resolve(true)
-  },
-}), true)
-assert.strictEqual(cloudPrintCalls.length, 1)
-assert.strictEqual(cloudPrintCalls[0].action, 'printing/postPrintingJob')
-assert.strictEqual(cloudPrintCalls[0].params.orderId, 701)
-assert.strictEqual(cloudPrintCalls[0].params.requete, cloudXml)
+const testTransportContract = async () => {
+  const smartPrintCalls = []
+  const smartPrintPromise = sendCashierSettlementReceipt({
+    payload,
+    smartPrint: true,
+    printerIp: '192.168.1.20',
+    fetchImplementation: (url, options) => {
+      smartPrintCalls.push({ url, options })
+      return Promise.resolve({ ok: true })
+    },
+    dispatch: () => true,
+  })
+  assert.ok(smartPrintPromise instanceof Promise)
+  assert.deepStrictEqual(await smartPrintPromise, submittedPrintResult)
+  assert.strictEqual(smartPrintCalls.length, 1)
+  assert.strictEqual(smartPrintCalls[0].url, 'http://192.168.1.20:8989/print')
+  const smartPrintBody = JSON.parse(smartPrintCalls[0].options.body)
+  assert.strictEqual(smartPrintBody.ticketType, 'caisse')
+  assert.strictEqual(
+    Buffer.from(smartPrintBody.dataFormatESCPOS, 'base64').toString('latin1'),
+    escPos
+  )
 
-assert.throws(
-  () => sendCashierSettlementReceipt({ payload: null }),
-  /encaissement est introuvable/
-)
+  const rejectedSmartPrintCalls = []
+  const rejectedSmartPrintResult = await sendCashierSettlementReceipt({
+    payload,
+    smartPrint: true,
+    printerIp: '192.168.1.20',
+    fetchImplementation: (...args) => {
+      rejectedSmartPrintCalls.push(args)
+      return Promise.reject(new Error('smart provider secret'))
+    },
+    dispatch: () => true,
+  })
+  assert.deepStrictEqual(rejectedSmartPrintResult, failedPrintResult)
+  assert.strictEqual(rejectedSmartPrintCalls.length, 1)
+  assert.doesNotMatch(JSON.stringify(rejectedSmartPrintResult), /provider secret/)
+
+  const cloudPrintCalls = []
+  const cloudPrintPromise = sendCashierSettlementReceipt({
+    payload,
+    smartPrint: false,
+    dispatch: (action, params) => {
+      cloudPrintCalls.push({ action, params })
+      return Promise.resolve(true)
+    },
+  })
+  assert.ok(cloudPrintPromise instanceof Promise)
+  assert.deepStrictEqual(await cloudPrintPromise, submittedPrintResult)
+  assert.strictEqual(cloudPrintCalls.length, 1)
+  assert.strictEqual(cloudPrintCalls[0].action, 'printing/postPrintingJob')
+  assert.strictEqual(cloudPrintCalls[0].params.orderId, 701)
+  assert.strictEqual(cloudPrintCalls[0].params.requete, cloudXml)
+
+  const rejectedCloudPrintCalls = []
+  const rejectedCloudPrintResult = await sendCashierSettlementReceipt({
+    payload,
+    smartPrint: false,
+    dispatch: (...args) => {
+      rejectedCloudPrintCalls.push(args)
+      return Promise.reject(new Error('cloud provider secret'))
+    },
+  })
+  assert.deepStrictEqual(rejectedCloudPrintResult, failedPrintResult)
+  assert.strictEqual(rejectedCloudPrintCalls.length, 1)
+  assert.doesNotMatch(JSON.stringify(rejectedCloudPrintResult), /provider secret/)
+
+  const printingStoreSource = fs.readFileSync(
+    path.join(root, 'store', 'printing.js'),
+    'utf8'
+  )
+  const printingStoreCode = babel.transformSync(printingStoreSource, {
+    babelrc: false,
+    configFile: false,
+    plugins: ['@babel/plugin-transform-modules-commonjs'],
+  }).code
+  const printingStoreModule = { exports: {} }
+  vm.runInNewContext(printingStoreCode, {
+    module: printingStoreModule,
+    exports: printingStoreModule.exports,
+    localStorage: { getItem: () => 'test-token' },
+    require,
+  })
+  const realCloudResult = await sendCashierSettlementReceipt({
+    payload,
+    smartPrint: false,
+    dispatch: (action, params) =>
+      printingStoreModule.exports.actions.postPrintingJob.call({
+        $axios: {
+          post: () => Promise.reject(new Error('axios provider secret')),
+        },
+      }, { dispatch: () => true }, params),
+  })
+  assert.deepStrictEqual(realCloudResult, failedPrintResult)
+  assert.doesNotMatch(JSON.stringify(realCloudResult), /provider secret/)
+
+  const missingPayloadPromise = sendCashierSettlementReceipt({ payload: null })
+  assert.ok(missingPayloadPromise instanceof Promise)
+  await assert.rejects(
+    missingPayloadPromise,
+    /encaissement est introuvable/
+  )
+}
 
 const root = path.resolve(__dirname, '..')
 const payoutPath = path.join(root, 'pages', 'cashregister', 'payout', '_id.vue')
@@ -218,8 +291,8 @@ const payoutHarness = ({ printError = null } = {}) => {
             },
             sendCashierSettlementReceipt: (options) => {
               printCalls.push({ type: 'send', options })
-              if (printError) throw printError
-              return true
+              if (printError) return Promise.reject(printError)
+              return Promise.resolve(submittedPrintResult)
             },
           }
         }
@@ -324,8 +397,13 @@ const testPayoutIntegration = async () => {
     wantsReceipt: true,
   }), true)
   assert.strictEqual(failed.instance.tableSettlement, failed.settlementResult)
+  assert.strictEqual(failed.instance.tableSettlementDraft, null)
   assert.strictEqual(
     failed.printCalls.filter((call) => call.type === 'send').length,
+    1
+  )
+  assert.strictEqual(
+    failed.calls.filter((call) => call.name === 'orders/createTableSettlement').length,
     1
   )
   const printNotification = failed.calls.find((call) =>
@@ -335,7 +413,7 @@ const testPayoutIntegration = async () => {
   assert.ok(failed.calls.some((call) => call.name === 'navigate'))
 }
 
-testPayoutIntegration().then(() => {
+testTransportContract().then(testPayoutIntegration).then(() => {
   console.log('cash register settlement receipt tests passed')
 }).catch((error) => {
   console.error(error)

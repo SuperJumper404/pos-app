@@ -1178,7 +1178,9 @@ export default {
         `${archivedCount} commande(s) archivée(s) avec succès.`,
         { root: true }
       )
-      if (wantsReceipt) this.printTableSettlementReceipt(result.settlement)
+      if (wantsReceipt) {
+        await this.printTableSettlementReceipt(result.settlement)
+      }
       this.dialog = false
       await Promise.resolve()
         .then(() => this.$router.push('/cashregister'))
@@ -1207,11 +1209,11 @@ export default {
 
       return ordersWithDetails
     },
-    printTableSettlementReceipt(settlement) {
+    async printTableSettlementReceipt(settlement) {
       if (!settlement) return
       this.receiptPrinting = true
       try {
-        sendCashierSettlementReceipt({
+        const printResult = await sendCashierSettlementReceipt({
           payload: buildCashierSettlementReceiptPayload(
             settlement,
             this.shopInfo
@@ -1220,6 +1222,13 @@ export default {
           printerIp: this.shopInfo.shop_printer_ip,
           dispatch: this.$store.dispatch,
         })
+        if (!printResult.ok) {
+          this.$store.dispatch(
+            'notifications/error',
+            "L'impression du ticket a echoue. Vous pourrez le reimprimer depuis l'historique.",
+            { root: true }
+          )
+        }
       } catch (error) {
         this.$store.dispatch(
           'notifications/error',
