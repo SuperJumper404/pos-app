@@ -107,6 +107,8 @@ const buildCashierSettlementReceiptPayload = (
   ).map((order = {}) => ({
     id: order.id,
     orderNumber: order.ordernumber || order.orderNumber || order.id || '',
+    paymentStatus: order.paymentStatus || order.payment_status || null,
+    refundStatus: order.refundStatus || order.refund_status || null,
     details: Array.isArray(order.details) ? order.details.slice() : [],
   }))
 

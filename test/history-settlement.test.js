@@ -6,6 +6,9 @@ const babel = require('@babel/core')
 const compiler = require('vue-template-compiler')
 const { normalizeArchivedHistory } = require('../helpers/history')
 const { buildArchivedClientRows } = require('../helpers/clients')
+const {
+  buildCashierSettlementReceiptPayload,
+} = require('../helpers/cashierSettlementReceipt')
 
 const root = path.resolve(__dirname, '..')
 
@@ -252,6 +255,7 @@ const run = async () => {
   assert.match(source, /sendCashierSettlementReceipt/)
   assert.match(source, /receiptPayload\.orders/)
   assert.match(source, /order\.details/)
+  assert.match(source, /orderPaymentStatusLabel\(order\)/)
   assert.match(source, /:to="`\/history\/ticket\/\$\{order\.id\}`"/)
   assert.match(source, /generateSettlementPdf/)
   assert.match(source, /const size = this\.createSettlementPdf\(0\)/)
@@ -260,7 +264,7 @@ const run = async () => {
   assert.match(source, /payload\.discountAmount/)
   assert.match(source, /payload\.totalAmount/)
   assert.match(source, /payload\.vatBreakdown/)
-  assert.ok(!/refund|rembours/i.test(source), 'settlement route must not expose a global refund action')
+  assert.doesNotMatch(source, /@click="[^"]*refund|Rembourser (?:tout|l'encaissement)/i)
 
   const printCalls = []
   const page = loadModule(pagePath, {
@@ -314,6 +318,26 @@ const run = async () => {
   for (const [name, method] of Object.entries(page.methods)) {
     instance[name] = method.bind(instance)
   }
+  assert.strictEqual(instance.orderPaymentStatusLabel({ paymentStatus: 'paid' }), 'Payée')
+  assert.strictEqual(
+    instance.orderPaymentStatusLabel({ paymentStatus: 'refund_pending', refundStatus: 'pending' }),
+    'Remboursement en cours'
+  )
+  assert.strictEqual(
+    instance.orderPaymentStatusLabel({ paymentStatus: 'refunded', refundStatus: 'succeeded' }),
+    'Remboursée'
+  )
+  const statusPayload = buildCashierSettlementReceiptPayload({
+    id: 901,
+    archivedOrders: [{
+      id: 31,
+      paymentStatus: 'refunded',
+      refundStatus: 'succeeded',
+      details: [],
+    }],
+  })
+  assert.strictEqual(statusPayload.orders[0].paymentStatus, 'refunded')
+  assert.strictEqual(statusPayload.orders[0].refundStatus, 'succeeded')
   let pdfGenerations = 0
   instance.generateSettlementPdf = () => { pdfGenerations += 1 }
   assert.strictEqual(await instance.loadSettlement(), false)

@@ -123,7 +123,17 @@
           <div class="settlement-order__header">
             <div>
               <h3>Commande #{{ order.orderNumber }}</h3>
-              <span>{{ order.details.length }} lignes</span>
+              <div class="settlement-order__meta">
+                <span>{{ order.details.length }} lignes</span>
+                <v-chip
+                  x-small
+                  label
+                  :color="orderPaymentStatusColor(order)"
+                  outlined
+                >
+                  {{ orderPaymentStatusLabel(order) }}
+                </v-chip>
+              </div>
             </div>
             <v-btn
               :to="`/history/ticket/${order.id}`"
@@ -230,6 +240,32 @@ export default {
     if (this.urlPDF && typeof URL !== 'undefined') URL.revokeObjectURL(this.urlPDF)
   },
   methods: {
+    orderPaymentStatusLabel(order = {}) {
+      if (order.refundStatus === 'succeeded' || order.paymentStatus === 'refunded') {
+        return 'Remboursée'
+      }
+      if (
+        ['creating', 'pending', 'requires_action'].includes(order.refundStatus) ||
+        order.paymentStatus === 'refund_pending'
+      ) {
+        return 'Remboursement en cours'
+      }
+      if (order.paymentStatus === 'paid') return 'Payée'
+      if (order.paymentStatus === 'requires_payment') return 'Paiement en attente'
+      return 'Statut inconnu'
+    },
+    orderPaymentStatusColor(order = {}) {
+      if (order.refundStatus === 'succeeded' || order.paymentStatus === 'refunded') {
+        return 'info'
+      }
+      if (
+        ['creating', 'pending', 'requires_action'].includes(order.refundStatus) ||
+        order.paymentStatus === 'refund_pending'
+      ) {
+        return 'warning'
+      }
+      return order.paymentStatus === 'paid' ? 'success' : 'grey'
+    },
     async loadSettlement() {
       this.loadPage = true
       try {
@@ -369,6 +405,7 @@ export default {
 .settlement-order:last-child { border-bottom: 0; }
 .settlement-order__header { margin-bottom: 12px; }
 .settlement-order__header span { color: #687386; font-size: 0.8rem; }
+.settlement-order__meta { align-items: center; display: flex; gap: 8px; margin-top: 4px; }
 @media (max-width: 760px) {
   .settlement-history-header,
   .settlement-history-header__actions,
