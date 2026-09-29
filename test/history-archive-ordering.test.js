@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 
 const { sortArchivedOrdersByArchiveDate } = require('../helpers/history')
+const { normalizeArchivedHistory } = require('../helpers/history')
 
 assert.deepStrictEqual(
   sortArchivedOrdersByArchiveDate([
@@ -27,7 +28,13 @@ const historyStoreSource = fs.readFileSync(
   'utf8'
 )
 assert.ok(historyStoreSource.includes('sortArchivedOrdersByArchiveDate'))
-assert.ok(historyStoreSource.includes('normalizeArchivedHistory'))
-assert.ok(historyStoreSource.includes("dispatch('set/dataArchivedOrders', normalizedHistory)"))
+assert.ok(!historyStoreSource.includes("dispatch('set/dataArchivedOrders', normalizedHistory)"))
+
+const historyPageSource = fs.readFileSync(
+  path.join(__dirname, '../pages/history/index.vue'),
+  'utf8'
+)
+assert.ok(historyPageSource.includes('normalizeArchivedHistory'))
+assert.strictEqual(normalizeArchivedHistory([{ id: 1 }]).length, 1)
 
 console.log('history archive ordering tests passed')

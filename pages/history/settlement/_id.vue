@@ -1,11 +1,11 @@
 <template>
   <v-container fluid class="settlement-history-page">
-    <v-card v-if="loadPage" outlined class="settlement-state-card">
+    <v-card v-if="isSettlementLoading" outlined class="settlement-state-card">
       <Loading />
       <p>Chargement de l'encaissement...</p>
     </v-card>
 
-    <v-card v-else-if="!settlement" outlined class="settlement-state-card">
+    <v-card v-else-if="settlementStatus === 'not-found'" outlined class="settlement-state-card">
       <v-icon color="primary" size="42">mdi-receipt-text-remove-outline</v-icon>
       <h1>Encaissement introuvable</h1>
       <p>Ce regroupement n'est plus disponible dans l'historique.</p>
@@ -13,6 +13,36 @@
         <v-icon left small>mdi-arrow-left</v-icon>
         Retour a l'historique
       </v-btn>
+    </v-card>
+
+    <v-card v-else-if="settlementStatus === 'forbidden'" outlined class="settlement-state-card">
+      <v-icon color="warning" size="42">mdi-shield-lock-outline</v-icon>
+      <h1>Acces non autorise</h1>
+      <p>Votre compte ne permet pas de consulter cet encaissement.</p>
+      <v-btn outlined color="primary" class="text-none" to="/history">
+        <v-icon left small>mdi-arrow-left</v-icon>
+        Retour a l'historique
+      </v-btn>
+    </v-card>
+
+    <v-card v-else-if="settlementStatus === 'error'" outlined class="settlement-state-card">
+      <v-icon color="error" size="42">mdi-alert-circle-outline</v-icon>
+      <h1>Impossible de charger l'encaissement</h1>
+      <p>Verifiez votre connexion puis reessayez.</p>
+      <v-btn
+        color="primary"
+        depressed
+        class="text-none"
+        @click="loadSettlement"
+      >
+        <v-icon left small>mdi-refresh</v-icon>
+        Reessayer
+      </v-btn>
+    </v-card>
+
+    <v-card v-else-if="!settlement" outlined class="settlement-state-card">
+      <h1>Encaissement indisponible</h1>
+      <p>Revenez a l'historique puis ouvrez de nouveau cet encaissement.</p>
     </v-card>
 
     <div v-else class="settlement-history-cockpit">
@@ -156,6 +186,12 @@ export default {
     settlement() {
       return this.$store.get('history/cashRegisterSettlement')
     },
+    settlementStatus() {
+      return this.$store.get('history/cashRegisterSettlementStatus') || 'idle'
+    },
+    isSettlementLoading() {
+      return this.loadPage || this.settlementStatus === 'loading'
+    },
     shopInfo() {
       return {
         shop_name: this.$store.get('shop/shop_name'),
@@ -202,6 +238,7 @@ export default {
           this.$route.params.id
         )
         if (loaded) this.generateSettlementPdf()
+        return loaded
       } finally {
         this.loadPage = false
       }

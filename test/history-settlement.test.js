@@ -4,6 +4,8 @@ const path = require('path')
 const vm = require('vm')
 const babel = require('@babel/core')
 const compiler = require('vue-template-compiler')
+const { normalizeArchivedHistory } = require('../helpers/history')
+const { buildArchivedClientRows } = require('../helpers/clients')
 
 const root = path.resolve(__dirname, '..')
 
@@ -44,7 +46,7 @@ const loadModule = (filename, overrides = {}) => {
 }
 
 const historyStore = loadModule(path.join(root, 'store', 'history.js'))
-assert.strictEqual(typeof historyStore.normalizeArchivedHistory, 'function')
+assert.strictEqual(typeof normalizeArchivedHistory, 'function')
 
 const rows = [
   {
@@ -57,6 +59,9 @@ const rows = [
     settlement_payment_method: 'Carte',
     settlement_created_at: '2026-09-27T12:00:00.000Z',
     payment_status: 'refunded',
+    customer: 'Alice',
+    phone: '0600000001',
+    subtotal: 12,
   },
   {
     id: 11,
@@ -74,6 +79,9 @@ const rows = [
     settlement_total_amount: 48,
     settlement_payment_method: 'Carte',
     settlement_created_at: '2026-09-27T12:00:00.000Z',
+    customer: 'Bob',
+    phone: '0600000002',
+    subtotal: 18,
   },
   {
     id: 12,
@@ -94,7 +102,7 @@ const rows = [
   },
 ]
 
-const normalized = historyStore.normalizeArchivedHistory(rows)
+const normalized = normalizeArchivedHistory(rows)
 assert.strictEqual(normalized.length, 3)
 assert.deepStrictEqual(
   Array.from(normalized, (item) => item.isSettlement ? item.cash_register_settlement_id : item.id),
@@ -113,7 +121,7 @@ assert.deepStrictEqual(
   [12, 11]
 )
 
-const tieSorted = historyStore.normalizeArchivedHistory([
+const tieSorted = normalizeArchivedHistory([
   { id: 20, archived_at: '2026-09-27T12:00:00.000Z', cash_register_settlement_id: null },
   {
     id: 19,
@@ -128,22 +136,92 @@ assert.deepStrictEqual(
   [21, 20]
 )
 
-const dispatched = []
-const settlementDto = { id: 901, totalAmount: 48, archivedOrders: [] }
-historyStore.actions.getCashRegisterSettlement.call({
-  $axios: { get: () => Promise.resolve({ data: { data: settlementDto } }) },
-}, { dispatch: (...args) => dispatched.push(args) }, 901).then((result) => {
-  assert.strictEqual(result, true)
-  assert.deepStrictEqual(dispatched[0], ['set/cashRegisterSettlement', settlementDto])
-}).then(async () => {
-  const failedDispatches = []
-  const notFoundError = new Error('not found')
-  notFoundError.response = { status: 404 }
-  const result = await historyStore.actions.getCashRegisterSettlement.call({
-    $axios: { get: () => Promise.reject(notFoundError) },
-  }, { dispatch: (...args) => failedDispatches.push(args) }, 999)
-  assert.strictEqual(result, false)
-  assert.deepStrictEqual(failedDispatches[1], ['set/cashRegisterSettlement', null])
+const errorWithStatus = (status) => {
+  const error = new Error(`request failed ${status || 'network'}`)
+  if (status) error.response = { status }
+  return error
+}
+
+const run = async () => {
+  const archiveDispatches = []
+  const archiveResult = await historyStore.actions.getAllArchivedOrders.call({
+    $axios: { get: () => Promise.resolve({ data: { data: rows } }) },
+  }, { dispatch: (...args) => archiveDispatches.push(args) })
+  assert.strictEqual(archiveResult, true)
+  const storedArchives = archiveDispatches.find(
+    ([name]) => name === 'set/dataArchivedOrders'
+  )[1]
+  assert.strictEqual(storedArchives.length, rows.length)
+  assert.deepStrictEqual(
+    Array.from(storedArchives, (order) => order.id).sort((a, b) => a - b),
+    rows.map((order) => order.id).sort((a, b) => a - b)
+  )
+  assert.strictEqual(storedArchives.filter((order) => order.id === 31).length, 2)
+  const clientRows = buildArchivedClientRows(storedArchives)
+  assert.strictEqual(clientRows.length, 2)
+  assert.strictEqual(clientRows.find((client) => client.phoneKey === '0600000001').totalSpent, 12)
+  assert.strictEqual(clientRows.find((client) => client.phoneKey === '0600000002').totalSpent, 18)
+
+  const ticketPath = path.join(root, 'pages', 'history', 'ticket', '_id.vue')
+  const ticketPage = loadModule(ticketPath, {
+    '@/components/orders/TakeawayChip': {},
+    'qrcode-js-package/qrcode.js': {},
+  }).default
+  const ticketInstance = {
+    $route: { params: { id: '31' } },
+    $store: { get: (key) => key === 'history/dataArchivedOrders' ? storedArchives : null },
+  }
+  assert.strictEqual(ticketPage.computed.dataArchivedOrder.call(ticketInstance).id, 31)
+  const ticketDispatches = []
+  await ticketPage.methods.loadReceiptData.call({
+    $route: ticketInstance.$route,
+    $store: {
+      dispatch: (name, payload) => {
+        ticketDispatches.push([name, payload])
+        return Promise.resolve(true)
+      },
+    },
+    generateReceiptPdf: () => {},
+  })
+  assert.deepStrictEqual(ticketDispatches, [
+    ['history/getAllArchivedOrders', undefined],
+    ['history/getDetailArchivedOrder', '31'],
+  ])
+
+  const settlementDto = { id: 901, totalAmount: 48, archivedOrders: [] }
+  const dispatched = []
+  const success = await historyStore.actions.getCashRegisterSettlement.call({
+    $axios: { get: () => Promise.resolve({ data: { data: settlementDto } }) },
+  }, { dispatch: (...args) => dispatched.push(args) }, 901)
+  assert.strictEqual(success, true)
+  assert.deepStrictEqual(dispatched, [
+    ['set/cashRegisterSettlement', null],
+    ['set/cashRegisterSettlementStatus', 'loading'],
+    ['set/cashRegisterSettlement', settlementDto],
+    ['set/cashRegisterSettlementStatus', 'success'],
+  ])
+
+  for (const [status, expectedState] of [
+    [404, 'not-found'],
+    [403, 'forbidden'],
+    [500, 'error'],
+    [null, 'error'],
+  ]) {
+    const failedDispatches = []
+    const result = await historyStore.actions.getCashRegisterSettlement.call({
+      $axios: { get: () => Promise.reject(errorWithStatus(status)) },
+    }, { dispatch: (...args) => failedDispatches.push(args) }, 999)
+    assert.strictEqual(result, false)
+    assert.deepStrictEqual(failedDispatches.slice(0, 2), [
+      ['set/cashRegisterSettlement', null],
+      ['set/cashRegisterSettlementStatus', 'loading'],
+    ])
+    assert.deepStrictEqual(failedDispatches.at(-1), [
+      'set/cashRegisterSettlementStatus',
+      expectedState,
+    ])
+    assert.doesNotMatch(JSON.stringify(failedDispatches), /request failed/)
+  }
 
   const pagePath = path.join(root, 'pages', 'history', 'settlement', '_id.vue')
   const source = fs.readFileSync(pagePath, 'utf8')
@@ -151,6 +229,11 @@ historyStore.actions.getCashRegisterSettlement.call({
   const compiled = compiler.compile(template)
   assert.deepStrictEqual(compiled.errors, [])
   assert.match(source, /history\/getCashRegisterSettlement/)
+  assert.match(source, /cashRegisterSettlementStatus/)
+  assert.match(source, /Encaissement introuvable/)
+  assert.match(source, /Acces non autorise/)
+  assert.match(source, /Impossible de charger l'encaissement/)
+  assert.match(source, /Reessayer/)
   assert.match(source, /buildCashierSettlementReceiptPayload/)
   assert.match(source, /sendCashierSettlementReceipt/)
   assert.match(source, /receiptPayload\.orders/)
@@ -187,11 +270,27 @@ historyStore.actions.getCashRegisterSettlement.call({
     totalAmount: 48,
     archivedOrders: [{ id: 31, refund_status: 'refunded', subtotal: 0, details: [] }],
   }
+  let requestCount = 0
+  let requestStatus = 'error'
+  let currentSettlement = null
   const instance = {
     $route: { params: { id: '901' } },
     $store: {
-      get: (key) => key === 'history/cashRegisterSettlement' ? authoritative : null,
-      dispatch: () => Promise.resolve(true),
+      get: (key) => ({
+        'history/cashRegisterSettlement': currentSettlement,
+        'history/cashRegisterSettlementStatus': requestStatus,
+      })[key],
+      dispatch: (name) => {
+        if (name !== 'history/getCashRegisterSettlement') return Promise.resolve(true)
+        requestCount += 1
+        if (requestCount === 1) {
+          requestStatus = 'error'
+          return Promise.resolve(false)
+        }
+        requestStatus = 'success'
+        currentSettlement = authoritative
+        return Promise.resolve(true)
+      },
     },
   }
   Object.assign(instance, page.data.call(instance))
@@ -201,6 +300,14 @@ historyStore.actions.getCashRegisterSettlement.call({
   for (const [name, method] of Object.entries(page.methods)) {
     instance[name] = method.bind(instance)
   }
+  let pdfGenerations = 0
+  instance.generateSettlementPdf = () => { pdfGenerations += 1 }
+  assert.strictEqual(await instance.loadSettlement(), false)
+  assert.strictEqual(instance.settlementStatus, 'error')
+  assert.strictEqual(await instance.loadSettlement(), true)
+  assert.strictEqual(instance.settlementStatus, 'success')
+  assert.strictEqual(requestCount, 2)
+  assert.strictEqual(pdfGenerations, 1)
   assert.strictEqual(instance.receiptPayload.totalAmount, 48)
   authoritative.archivedOrders[0].subtotal = -100
   assert.strictEqual(instance.receiptPayload.totalAmount, 48)
@@ -208,7 +315,9 @@ historyStore.actions.getCashRegisterSettlement.call({
   assert.strictEqual(printCalls[0].payload.totalAmount, 48)
 
   console.log('history settlement tests passed')
-}).catch((error) => {
+}
+
+run().catch((error) => {
   console.error(error)
   process.exitCode = 1
 })

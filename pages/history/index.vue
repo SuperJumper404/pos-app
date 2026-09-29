@@ -282,6 +282,7 @@ import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
 import { groupCustomizationSelections } from '@/helpers/customizations'
+import { normalizeArchivedHistory } from '@/helpers/history'
 const {
   getPaymentStatusText,
   getPaymentStatusColor,
@@ -347,7 +348,9 @@ export default {
     //   return this.result
     // },
     dataArchivedOrders() {
-      return this.$store.get('history/dataArchivedOrders')
+      return normalizeArchivedHistory(
+        this.$store.get('history/dataArchivedOrders') || []
+      )
     },
     detailArchivedOrder() {
       return this.$store.get('history/detailArchivedOrder')
