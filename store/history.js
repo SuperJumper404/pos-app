@@ -48,6 +48,7 @@ export const actions = {
     dispatch('set/cashRegisterSettlementStatus', 'loading')
     return this.$axios
       .get(`/baseurl/api/v1/cash-register/settlements/${id}`, {
+        skipGlobalErrorNotification: true,
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },

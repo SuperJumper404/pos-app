@@ -190,10 +190,24 @@ const run = async () => {
 
   const settlementDto = { id: 901, totalAmount: 48, archivedOrders: [] }
   const dispatched = []
+  const settlementRequests = []
   const success = await historyStore.actions.getCashRegisterSettlement.call({
-    $axios: { get: () => Promise.resolve({ data: { data: settlementDto } }) },
+    $axios: {
+      get: (...args) => {
+        settlementRequests.push(args)
+        return Promise.resolve({ data: { data: settlementDto } })
+      },
+    },
   }, { dispatch: (...args) => dispatched.push(args) }, 901)
   assert.strictEqual(success, true)
+  assert.strictEqual(
+    settlementRequests[0][0],
+    '/baseurl/api/v1/cash-register/settlements/901'
+  )
+  assert.strictEqual(
+    settlementRequests[0][1].skipGlobalErrorNotification,
+    true
+  )
   assert.deepStrictEqual(dispatched, [
     ['set/cashRegisterSettlement', null],
     ['set/cashRegisterSettlementStatus', 'loading'],
