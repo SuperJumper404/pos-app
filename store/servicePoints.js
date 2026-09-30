@@ -53,6 +53,22 @@ export const actions = {
   select({ dispatch }, id) {
     dispatch('set/selectedId', id == null ? null : Number(id))
   },
+  verifyKioskPin({ dispatch }, pin) {
+    return this.$axios
+      .post(
+        '/baseurl/api/v1/service-points/kiosk/verify-pin',
+        { pin },
+        { headers: { Authorization: `Bearer ${readToken()}` } }
+      )
+      .then((response) => response.data.data?.verified === true)
+      .catch((error) => {
+        dispatch(
+          'set/message',
+          error.response?.data?.message || 'Impossible de verifier le code.'
+        )
+        return false
+      })
+  },
   createKiosk({ dispatch }, name) {
     return this.$axios
       .post(

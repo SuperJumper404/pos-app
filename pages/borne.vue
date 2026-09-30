@@ -6,6 +6,15 @@
           <div class="kiosk-eyebrow">Commande borne</div>
           <h1>{{ shopName || 'Menu' }}</h1>
         </div>
+        <v-btn
+          icon
+          class="kiosk-exit-button"
+          aria-label="Quitter le mode borne"
+          :disabled="Boolean(checkoutLoading)"
+          @click="openExitDialog"
+        >
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
       </header>
 
       <main v-if="kioskStep === 'welcome'" class="kiosk-welcome">
@@ -485,6 +494,93 @@
           />
         </div>
       </v-dialog>
+
+      <v-dialog
+        :value="exitDialog"
+        max-width="380"
+        content-class="kiosk-exit-dialog"
+        @input="handleExitDialogInput"
+      >
+        <v-card class="kiosk-exit-card">
+          <v-card-title>
+            <span>Confirmer la déconnexion</span>
+            <v-spacer />
+            <v-btn
+              icon
+              aria-label="Fermer"
+              :disabled="exitLoading"
+              @click="closeExitDialog"
+            >
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+          <v-card-text>
+            <v-text-field
+              :value="exitPin"
+              label="Code PIN"
+              type="password"
+              inputmode="numeric"
+              maxlength="4"
+              outlined
+              readonly
+              hide-details
+              class="kiosk-exit-pin"
+            />
+            <div class="kiosk-exit-keypad">
+              <v-btn
+                v-for="digit in exitKeypadDigits"
+                :key="digit"
+                depressed
+                class="text-none"
+                :disabled="exitLoading"
+                @click="appendExitPin(digit)"
+              >
+                {{ digit }}
+              </v-btn>
+              <v-btn
+                icon
+                aria-label="Effacer le dernier chiffre"
+                :disabled="exitLoading || !exitPin"
+                @click="backspaceExitPin"
+              >
+                <v-icon>mdi-backspace-outline</v-icon>
+              </v-btn>
+              <v-btn
+                depressed
+                :disabled="exitLoading"
+                @click="appendExitPin('0')"
+              >
+                0
+              </v-btn>
+              <span aria-hidden="true"></span>
+            </div>
+            <v-alert v-if="exitError" type="error" dense class="mt-4 mb-0">
+              {{ exitError }}
+            </v-alert>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn
+              text
+              class="text-none"
+              :disabled="exitLoading"
+              @click="closeExitDialog"
+            >
+              Annuler
+            </v-btn>
+            <v-spacer />
+            <v-btn
+              color="primary"
+              depressed
+              class="text-none"
+              :loading="exitLoading"
+              :disabled="exitPin.length !== 4"
+              @click="confirmKioskExit"
+            >
+              Se déconnecter
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </div>
   </v-container>
 </template>
@@ -549,6 +645,12 @@ export default {
       stripePaymentReference: null,
       stripePaymentElementInstance: null,
       keyboardUppercase: true,
+      exitDialog: false,
+      exitPin: '',
+      exitError: '',
+      exitLoading: false,
+      exitDialogTimer: null,
+      exitKeypadDigits: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
       nameKeyboardRows: [
         ['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(
           (value) => ({ type: 'letter', value })
@@ -742,9 +844,63 @@ export default {
   },
   beforeDestroy() {
     this.stopWelcomeAnimationRotation()
+    this.clearExitDialogTimer()
     this.resetStripePaymentState()
   },
   methods: {
+    openExitDialog() {
+      if (this.checkoutLoading) return
+      this.clearExitDialogTimer()
+      this.exitPin = ''
+      this.exitError = ''
+      this.exitDialog = true
+      this.exitDialogTimer = setTimeout(() => {
+        this.closeExitDialog()
+      }, 15000)
+    },
+    handleExitDialogInput(value) {
+      if (!value) this.closeExitDialog()
+    },
+    closeExitDialog() {
+      this.clearExitDialogTimer()
+      this.exitDialog = false
+      this.exitPin = ''
+      this.exitError = ''
+      this.exitLoading = false
+    },
+    clearExitDialogTimer() {
+      if (!this.exitDialogTimer) return
+      clearTimeout(this.exitDialogTimer)
+      this.exitDialogTimer = null
+    },
+    appendExitPin(digit) {
+      if (this.exitLoading || this.exitPin.length >= 4) return
+      this.exitPin = `${this.exitPin}${digit}`
+      this.exitError = ''
+    },
+    backspaceExitPin() {
+      if (this.exitLoading) return
+      this.exitPin = this.exitPin.slice(0, -1)
+      this.exitError = ''
+    },
+    async confirmKioskExit() {
+      if (this.exitLoading || this.exitPin.length !== 4) return
+      this.exitLoading = true
+      const verified = await this.$store.dispatch(
+        'servicePoints/verifyKioskPin',
+        this.exitPin
+      )
+      if (!this.exitDialog) return
+      if (!verified) {
+        this.exitLoading = false
+        this.exitPin = ''
+        this.exitError =
+          this.$store.get('servicePoints/message') || 'Code incorrect.'
+        return
+      }
+      this.closeExitDialog()
+      await this.logout()
+    },
     startNewOrder() {
       this.customer = ''
       this.phone = ''
@@ -1425,6 +1581,39 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.kiosk-exit-button {
+  color: var(--se-color-text-muted);
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.kiosk-exit-card {
+  border-radius: 8px;
+}
+
+.kiosk-exit-card .v-card__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.kiosk-exit-pin {
+  margin-top: 8px;
+}
+
+.kiosk-exit-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(64px, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.kiosk-exit-keypad .v-btn {
+  min-width: 0;
+  height: 52px;
+  font-size: 1rem;
 }
 
 .kiosk-header h1 {

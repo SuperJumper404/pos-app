@@ -14,5 +14,7 @@ assert.match(tablesStore, /\.delete\(`\/baseurl\/api\/v1\/service-points\/tables
 const servicePointsStore = fs.readFileSync(servicePointsStorePath, 'utf8')
 assert.match(servicePointsStore, /\/service-points/)
 assert.match(servicePointsStore, /system_key === 'counter'/)
+assert.match(servicePointsStore, /verifyKioskPin/)
+assert.match(servicePointsStore, /\/service-points\/kiosk\/verify-pin/)
 
 console.log('service points store tests passed')

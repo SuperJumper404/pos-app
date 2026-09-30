@@ -169,6 +169,15 @@ assert.match(pageSource, /orders\/getDetailOrder/)
 assert.match(pageSource, /stripePaymentReference/)
 assert.match(pageSource, /kioskStep === 'payment' && !stripePaymentReady/)
 assert.match(pageSource, /:disabled="checkoutDisabled \|\| Boolean\(checkoutLoading\)"/)
+assert.match(pageSource, /class="kiosk-exit-button"/)
+assert.match(pageSource, /mdi-close/)
+assert.match(pageSource, /:value="exitDialog"/)
+assert.match(pageSource, /@input="handleExitDialogInput"/)
+assert.match(pageSource, /Confirmer la déconnexion/)
+assert.match(pageSource, /servicePoints\/verifyKioskPin/)
+assert.match(pageSource, /exitDialogTimer = setTimeout/)
+assert.match(pageSource, /15000/)
+assert.match(pageSource, /closeExitDialog/)
 
 const confirmStripePaymentStart = pageSource.indexOf(
   '    async confirmStripePayment() {'

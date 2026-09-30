@@ -93,7 +93,9 @@ const buildKioskCartLine = (product = {}, customization = {}) => {
 const isKioskProductAvailable = (product = {}) => {
   const hidden = [true, 1, '1', 'true'].includes(product.is_hidden)
   const archived = Number(product.archived || 0) !== 0
-  const outOfStock = product.stock != null && Number(product.stock) < 1
+  const tracksStock = [true, 1, '1', 'true'].includes(product.track_stock)
+  const outOfStock =
+    tracksStock && product.stock != null && Number(product.stock) < 1
 
   return !(
     hidden ||

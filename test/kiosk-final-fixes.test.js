@@ -38,7 +38,14 @@ assert.deepStrictEqual(
 assert.strictEqual(isKioskProductAvailable({ archived: 0, stock: 1 }), true)
 assert.strictEqual(isKioskProductAvailable({ archived: 1, stock: 10 }), false)
 assert.strictEqual(isKioskProductAvailable({ is_hidden: 1, stock: 10 }), false)
-assert.strictEqual(isKioskProductAvailable({ stock: 0 }), false)
+assert.strictEqual(
+  isKioskProductAvailable({ stock: 0, track_stock: 0 }),
+  true
+)
+assert.strictEqual(
+  isKioskProductAvailable({ stock: 0, track_stock: 1 }),
+  false
+)
 assert.strictEqual(
   isKioskProductAvailable({ stock: 10, customization_available: false }),
   false
