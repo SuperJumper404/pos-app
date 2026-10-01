@@ -35,6 +35,8 @@ const formatAmount = (value) => {
 
 const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 
+const optionalText = (value) => String(value == null ? '' : value).trim()
+
 const getSaleMode = (order = {}) =>
   order.sale_mode || order.saleMode ||
   (isEnabled(order.is_takeaway) ? 'À emporter' : 'Sur place')
@@ -272,6 +274,182 @@ const buildOrderTicketCloudXml = (payload = {}) => {
   )
 }
 
+const renderText = (text, options = {}) => ({
+  type: 'text',
+  text: String(text == null ? '' : text),
+  align: options.align || 'left',
+  bold: Boolean(options.bold),
+  size: options.size || 'normal',
+})
+
+const renderSeparator = () => ({ type: 'separator' })
+
+const renderFeed = (lines = 1) => ({ type: 'feed', lines })
+
+const renderCut = () => ({ type: 'cut' })
+
+const renderColumns = (columns, fallbackText, options = {}) => ({
+  type: 'columns',
+  columns,
+  fallbackText,
+  align: options.align || 'left',
+  bold: Boolean(options.bold),
+  size: options.size || 'normal',
+})
+
+const buildOrderTicketData = (payload = {}) => {
+  const shop = payload.shopInfo || {}
+  const details = Array.isArray(payload.details) ? payload.details : []
+  const items = details.map((item) => ({
+    name: optionalText(item.name),
+    qty: Number(item.qty) || 0,
+    price: Number(getItemPrice(item)) || 0,
+    customizations: customizationLines(item),
+  }))
+  const itemLines = [
+    renderText(ORDER_TICKET_PRODUCT_HEADER, { bold: true }),
+    renderSeparator(),
+    ...details.flatMap((item) => {
+      const qty = `${item.qty || 0}x`.padEnd(5)
+      const name = String(item.name || '')
+        .padEnd(ORDER_TICKET_PRODUCT_NAME_WIDTH)
+        .slice(0, ORDER_TICKET_PRODUCT_NAME_WIDTH)
+      const price = formatAmount(getItemPrice(item)).padStart(7)
+      return [
+        renderColumns(
+          [
+            { key: 'qty', text: `${item.qty || 0}x`, width: 5 },
+            {
+              key: 'name',
+              text: optionalText(item.name),
+              width: ORDER_TICKET_PRODUCT_NAME_WIDTH,
+            },
+            {
+              key: 'price',
+              text: `${formatAmount(getItemPrice(item))} EUR`,
+              width: 10,
+              align: 'right',
+            },
+          ],
+          `${qty}${name}${price} EUR`,
+          { bold: true, size: 'double' }
+        ),
+        ...customizationLines(item).flatMap((customization) =>
+          splitByWords(customization).map((line) =>
+            renderText(`  - ${line}`, { bold: true })
+          )
+        ),
+      ]
+    }),
+    renderSeparator(),
+  ]
+  const sections = [
+    {
+      id: 'shop_header',
+      lines: [
+        renderText(shop.shop_name || '', { align: 'center', bold: true }),
+      ],
+    },
+    {
+      id: 'order_header',
+      lines: [
+        renderText('Commande', {
+          align: 'center',
+          bold: true,
+          size: 'double',
+        }),
+        renderText(`#${payload.orderNumber || ''}`, {
+          align: 'center',
+          bold: true,
+          size: 'triple',
+        }),
+        renderText(payload.table || '', {
+          align: 'center',
+          bold: true,
+          size: 'double',
+        }),
+        renderText(`Client:${payload.customer || ''}`, {
+          align: 'center',
+          bold: true,
+          size: 'double',
+        }),
+        renderText(formatDate(payload.created), { align: 'center', bold: true }),
+      ],
+    },
+    { id: 'items', lines: itemLines },
+    {
+      id: 'totals',
+      lines: [
+        renderText(`TOTAL : ${formatAmount(payload.total)} EUR`, {
+          align: 'center',
+          bold: true,
+          size: 'double',
+        }),
+        renderText(payload.saleMode || '', {
+          align: 'center',
+          bold: true,
+          size: 'double',
+        }),
+      ],
+    },
+  ]
+  if (payload.paymentMethod) {
+    sections.push({
+      id: 'payment',
+      lines: [
+        renderText(`Paiement : ${payload.paymentMethod}`, {
+          align: 'center',
+          bold: true,
+        }),
+      ],
+    })
+  }
+  if (payload.remark) {
+    sections.push({
+      id: 'remark',
+      lines: [
+        renderText('----------', { align: 'center', bold: true }),
+        renderText(`NOTE: ${payload.remark}`),
+        renderText('----------', { align: 'center', bold: true }),
+      ],
+    })
+  }
+  sections.push({
+    id: 'footer',
+    lines: [
+      renderSeparator(),
+      renderText('Made with smarteat.fr', { align: 'center' }),
+      renderFeed(5),
+      renderCut(),
+    ],
+  })
+
+  return {
+    schemaVersion: 1,
+    kind: 'order_ticket',
+    business: {
+      orderId: payload.orderId,
+      orderNumber: payload.orderNumber,
+      shop: {
+        name: optionalText(shop.shop_name),
+      },
+      table: payload.table,
+      customer: payload.customer,
+      created: payload.created,
+      currentDate: formatDate(payload.created),
+      paymentMethod: payload.paymentMethod,
+      saleMode: payload.saleMode,
+      total: payload.total,
+      remark: payload.remark,
+      items,
+    },
+    render: {
+      paperWidth: 36,
+      sections,
+    },
+  }
+}
+
 const sendOrderTicket = ({
   payload,
   smartPrint,
@@ -296,7 +474,8 @@ const sendOrderTicket = ({
         body: JSON.stringify({
           ticketType: 'cuisine',
           dataFormatESCPOS: buildOrderTicketEscPos(payload).toString('base64'),
-          dataFormatXML: null,
+          dataFormatXML: buildOrderTicketCloudXml(payload),
+          ticketData: buildOrderTicketData(payload),
         }),
       })
     ).catch(() => {})
@@ -321,6 +500,7 @@ module.exports = {
   buildOrderTicketPayload,
   buildOrderTicketEscPos,
   buildOrderTicketCloudXml,
+  buildOrderTicketData,
   sendOrderTicket,
   formatAmount,
 }
