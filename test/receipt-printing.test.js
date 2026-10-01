@@ -46,7 +46,59 @@ const smartPrintResult = sendCashierReceipt({
 assert.strictEqual(smartPrintResult, true)
 assert.strictEqual(smartPrintCalls.length, 1)
 assert.strictEqual(smartPrintCalls[0].url, 'http://192.168.1.20:8989/print')
-assert.match(smartPrintCalls[0].options.body, /"ticketType":"caisse"/)
+const smartPrintBody = JSON.parse(smartPrintCalls[0].options.body)
+assert.strictEqual(smartPrintBody.ticketType, 'caisse')
+assert.ok(smartPrintBody.dataFormatESCPOS)
+assert.ok(smartPrintBody.dataFormatXML)
+assert.strictEqual(smartPrintBody.ticketData.schemaVersion, 1)
+assert.strictEqual(smartPrintBody.ticketData.kind, 'cashier_receipt')
+assert.strictEqual(smartPrintBody.ticketData.business.orderId, 42)
+assert.strictEqual(smartPrintBody.ticketData.business.shop.siret, '123')
+assert.strictEqual(smartPrintBody.ticketData.business.shop.phone, '0102030405')
+assert.strictEqual(smartPrintBody.ticketData.business.shop.address, '1 rue du Test')
+assert.ok(smartPrintBody.ticketData.render.sections.length > 0)
+assert.ok(
+  smartPrintBody.ticketData.render.sections.some(
+    (section) => section.id === 'items'
+  )
+)
+
+const legalPayload = buildCashierReceiptPayload({
+  order: { id: 420, ordernumber: 'L420', subtotal: 9, payment: 'Carte' },
+  details: [{ name: 'Plat', qty: 1, total: 9 }],
+  shopInfo: {
+    shop_name: 'Legal Shop',
+    shop_phone: '0203040506',
+    shop_adress: '2 rue Legale',
+    shop_siret: '987654321',
+    shop_naf: '5610A',
+    shop_vat_number: 'FR00987654321',
+  },
+})
+const legalSmartPrintCalls = []
+sendCashierReceipt({
+  payload: legalPayload,
+  smartPrint: true,
+  printerIp: '192.168.1.20',
+  fetchImplementation: (url, options) => {
+    legalSmartPrintCalls.push({ url, options })
+    return { ok: true }
+  },
+  dispatch: () => true,
+})
+const legalTicketData = JSON.parse(
+  legalSmartPrintCalls[0].options.body
+).ticketData
+assert.deepStrictEqual(legalTicketData.business.shop, {
+  name: 'Legal Shop',
+  phone: '0203040506',
+  address: '2 rue Legale',
+  siret: '987654321',
+  naf: '5610A',
+  vatNumber: 'FR00987654321',
+  receiptReviewQrUrl: '',
+  receiptReviewQrLabel: '',
+})
 
 const cloudCalls = []
 const cloudPrintResult = sendCashierReceipt({
