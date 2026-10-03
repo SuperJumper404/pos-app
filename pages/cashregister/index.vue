@@ -11,16 +11,29 @@
         </div>
       </div>
 
-      <v-btn
-        color="primary"
-        class="cashregister-refresh text-none"
-        depressed
-        :loading="isLoaded !== true"
-        @click="refreshCashRegister"
-      >
-        <v-icon small left>mdi-refresh</v-icon>
-        Actualiser
-      </v-btn>
+      <div class="cashregister-hero__actions">
+        <v-btn
+          outlined
+          color="primary"
+          class="cashregister-drawer-open text-none"
+          :disabled="!canOpenCashDrawer || cashDrawerOpening"
+          :loading="cashDrawerOpening"
+          @click="openCashDrawer"
+        >
+          <v-icon small left>mdi-cash-register</v-icon>
+          Ouvrir tiroir
+        </v-btn>
+        <v-btn
+          color="primary"
+          class="cashregister-refresh text-none"
+          depressed
+          :loading="isLoaded !== true"
+          @click="refreshCashRegister"
+        >
+          <v-icon small left>mdi-refresh</v-icon>
+          Actualiser
+        </v-btn>
+      </div>
     </div>
 
     <v-row class="cashregister-summary" dense>
@@ -202,6 +215,7 @@ const {
   buildCashRegisterCustomerRows,
   getCashRegisterPaymentSummary,
 } = require('@/helpers/cashRegister')
+const { sendCashDrawerOpen } = require('@/helpers/cashDrawer')
 
 export default {
   mixins: [price],
@@ -229,6 +243,7 @@ export default {
         },
       ],
       isLoaded: null,
+      cashDrawerOpening: false,
       totalPerTable: [],
       WaitingOrderPerTable: [],
       CanceledOrderPerTable: [],
@@ -241,6 +256,16 @@ export default {
     },
     getAllOrders() {
       return this.$store.get('orders/dataOrders') || []
+    },
+    shopInfo() {
+      return {
+        shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
+        smart_print_app: this.$store.get('shop/smart_print_app'),
+      }
+    },
+    canOpenCashDrawer() {
+      return Boolean(this.shopInfo.shop_printer_ip) &&
+        [true, 1, '1', 'true'].includes(this.shopInfo.smart_print_app)
     },
     activeTables() {
       return this.tableGlobalData.filter(
@@ -387,6 +412,31 @@ export default {
         this.loadTableData()
       })
     },
+    openCashDrawer() {
+      if (this.cashDrawerOpening) return
+      this.cashDrawerOpening = true
+      try {
+        const sent = sendCashDrawerOpen({
+          smartPrint: this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.shop_printer_ip,
+        })
+        this.$store.dispatch(
+          sent ? 'notifications/success' : 'notifications/error',
+          sent
+            ? 'Commande tiroir caisse envoyee.'
+            : 'SmartEat Printing App non configure.',
+          { root: true }
+        )
+      } catch (error) {
+        this.$store.dispatch(
+          'notifications/error',
+          error.message || 'Impossible d ouvrir le tiroir caisse.',
+          { root: true }
+        )
+      } finally {
+        this.cashDrawerOpening = false
+      }
+    },
     OrderIdsToArchives() {
       const result = this.selectedOrders.reduce((accumulator, currentOrder) => {
         return accumulator.concat(currentOrder.ids)
@@ -429,6 +479,14 @@ export default {
   gap: var(--se-space-4);
 }
 
+.cashregister-hero__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--se-space-3);
+  justify-content: flex-end;
+}
+
 .cashregister-hero__icon,
 .cashregister-kpi__icon {
   align-items: center;
@@ -458,7 +516,8 @@ export default {
   margin: 4px 0 0;
 }
 
-.cashregister-refresh {
+.cashregister-refresh,
+.cashregister-drawer-open {
   border-radius: var(--se-radius-sm) !important;
   min-height: 38px;
   min-width: 128px;
@@ -724,9 +783,15 @@ export default {
     text-align: left;
   }
 
+  .cashregister-hero__actions,
   .cashregister-refresh,
+  .cashregister-drawer-open,
   .cashregister-action-secondary {
     width: 100%;
+  }
+
+  .cashregister-hero__actions {
+    justify-content: stretch;
   }
 }
 

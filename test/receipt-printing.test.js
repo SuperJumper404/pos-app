@@ -1,6 +1,7 @@
 const assert = require('assert')
 const {
   buildCashierReceiptPayload,
+  buildGroupedCashierReceiptPayload,
   sendCashierReceipt,
 } = require('../helpers/cashierReceipt')
 
@@ -144,6 +145,77 @@ sendCashierReceipt({
   },
 })
 assert.strictEqual(commandCloudCalls[0].params.ticketType, 'commande')
+assert.strictEqual(
+  typeof buildGroupedCashierReceiptPayload,
+  'function',
+  'cash register grouped payout must build one receipt payload for multiple orders'
+)
+const groupedPayload = buildGroupedCashierReceiptPayload({
+  orders: [
+    {
+      id: 101,
+      ordernumber: 'A101',
+      service_point_name: 'Table 8',
+      customer: 'Alice',
+      created: '2026-08-10 12:30:00',
+      subtotal: 12,
+      receiptDetails: [{ name: 'Burger', qty: 1, total: 12 }],
+    },
+    {
+      id: 102,
+      ordernumber: 'A102',
+      service_point_name: 'Table 8',
+      customer: 'Bob',
+      created: '2026-08-10 12:35:00',
+      subtotal: 8,
+      receiptDetails: [{ name: 'Dessert', qty: 1, total: 8 }],
+    },
+  ],
+  shopInfo: { shop_name: 'Group Shop' },
+  fallbackPaymentMethod: 'Carte',
+  fallbackTable: 'Table 8',
+})
+assert.deepStrictEqual(groupedPayload.orderIds, [101, 102])
+assert.strictEqual(groupedPayload.orderId, '101-102')
+assert.strictEqual(groupedPayload.orderNumber, 'A101 / A102')
+assert.strictEqual(groupedPayload.totalAmount, 20)
+assert.strictEqual(groupedPayload.itemCount, 2)
+assert.strictEqual(groupedPayload.paymentMethod, 'Carte')
+assert.deepStrictEqual(
+  groupedPayload.orderGroups.map((group) => [
+    group.orderNumber,
+    group.customer,
+    group.details.map((item) => item.name),
+  ]),
+  [
+    ['A101', 'Alice', ['Burger']],
+    ['A102', 'Bob', ['Dessert']],
+  ]
+)
+const groupedSmartPrintCalls = []
+sendCashierReceipt({
+  payload: groupedPayload,
+  smartPrint: true,
+  printerIp: '192.168.1.20',
+  fetchImplementation: (url, options) => {
+    groupedSmartPrintCalls.push({ url, options })
+    return { ok: true }
+  },
+  dispatch: () => true,
+})
+assert.strictEqual(groupedSmartPrintCalls.length, 1)
+const groupedTicketData = JSON.parse(
+  groupedSmartPrintCalls[0].options.body
+).ticketData
+assert.deepStrictEqual(groupedTicketData.business.orderIds, [101, 102])
+assert.strictEqual(groupedTicketData.business.items.length, 2)
+assert.ok(
+  groupedTicketData.render.sections.some(
+    (section) =>
+      section.id === 'items' &&
+      section.lines.some((line) => /Commande #/.test(line.text || ''))
+  )
+)
 const { terminalReceiptSnapshot, terminalReceiptWithDetails } = require('../helpers/cashRegister')
 const settled = { id: 91, status: 'succeeded', amountCents: 1075, orderIds: [1],
   allocations: [{ orderId: 1, amountCents: 1075 }] }

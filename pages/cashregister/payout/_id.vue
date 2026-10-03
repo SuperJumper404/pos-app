@@ -267,8 +267,13 @@ import TerminalPaymentStatus from '@/components/cashregister/TerminalPaymentStat
 import { calculateDiscount } from '@/helpers/discount'
 import {
   buildCashierReceiptPayload,
+  buildGroupedCashierReceiptPayload,
   sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
+const {
+  isCashPaymentMethod,
+  sendCashDrawerOpen,
+} = require('@/helpers/cashDrawer')
 const {
   archiveOrdersSafely,
   getCashRegisterPaymentSummary,
@@ -956,19 +961,27 @@ export default {
       if (!printableOrders.length) return
       this.receiptPrinting = true
       try {
-        printableOrders.forEach((order) => {
-          sendCashierReceipt({
-            payload: buildCashierReceiptPayload({
-              order,
-              details: order.receiptDetails || [],
-              shopInfo: this.shopInfo,
-              fallbackPaymentMethod: paymentMethod || order.payment,
-              fallbackTable: this.id,
-            }),
-            smartPrint: this.shopInfo.smart_print_app,
-            printerIp: this.shopInfo.shop_printer_ip,
-            dispatch: this.$store.dispatch,
-          })
+        const order = printableOrders[0]
+        const payload =
+          printableOrders.length > 1
+            ? buildGroupedCashierReceiptPayload({
+                orders: printableOrders,
+                shopInfo: this.shopInfo,
+                fallbackPaymentMethod: paymentMethod,
+                fallbackTable: this.id,
+              })
+            : buildCashierReceiptPayload({
+                order,
+                details: order.receiptDetails || [],
+                shopInfo: this.shopInfo,
+                fallbackPaymentMethod: paymentMethod || order.payment,
+                fallbackTable: this.id,
+              })
+        sendCashierReceipt({
+          payload,
+          smartPrint: this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.shop_printer_ip,
+          dispatch: this.$store.dispatch,
         })
       } catch (error) {
         this.$store.dispatch(
@@ -978,6 +991,22 @@ export default {
         )
       } finally {
         this.receiptPrinting = false
+      }
+    },
+    openCashDrawerForCashPayment(paymentMethod) {
+      if (!isCashPaymentMethod(paymentMethod)) return false
+      try {
+        return sendCashDrawerOpen({
+          smartPrint: this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.shop_printer_ip,
+        })
+      } catch (error) {
+        this.$store.dispatch(
+          'notifications/error',
+          error.message || 'Impossible d ouvrir le tiroir caisse.',
+          { root: true }
+        )
+        return false
       }
     },
     btnNo() {
@@ -1107,6 +1136,10 @@ export default {
             { root: true }
           )
           return
+        }
+
+        if (archiveSummary.allSucceeded) {
+          this.openCashDrawerForCashPayment(paymentMethod)
         }
 
         if (wantsReceipt) {

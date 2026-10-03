@@ -189,6 +189,110 @@ const buildCashierReceiptPayload = ({
   }
 }
 
+const getReceiptDetails = (order = {}) =>
+  Array.isArray(order.receiptDetails)
+    ? order.receiptDetails
+    : Array.isArray(order.details)
+      ? order.details
+      : []
+
+const getOrderNumber = (order = {}) =>
+  order.ordernumber || order.orderNumber || order.id || order.orderId || ''
+
+const getOrderTable = (order = {}, fallbackTable = 'Comptoir') =>
+  order.service_point_name || order.username || order.table || fallbackTable
+
+const buildGroupedCashierReceiptPayload = ({
+  orders = [],
+  shopInfo = {},
+  fallbackPaymentMethod = '',
+  fallbackCustomer = 'Clients',
+  fallbackTable = 'Comptoir',
+  fallbackRemark = '',
+  ticketKind = 'caisse',
+} = {}) => {
+  const normalizedOrders = (Array.isArray(orders) ? orders : []).filter(Boolean)
+  const orderGroups = normalizedOrders.map((order) => {
+    const details = getReceiptDetails(order).slice()
+    const totalAmount = roundPrice(
+      order.subtotal == null ? sumDetails(details) : order.subtotal
+    )
+    const subtotalBeforeDiscount = roundPrice(
+      order.subtotal_before_discount == null
+        ? totalAmount
+        : order.subtotal_before_discount
+    )
+    const discountAmount = roundPrice(
+      order.discount_amount == null
+        ? Math.max(0, subtotalBeforeDiscount - totalAmount)
+        : order.discount_amount
+    )
+
+    return {
+      orderId: order.id || order.orderId,
+      orderNumber: getOrderNumber(order),
+      table: getOrderTable(order, fallbackTable),
+      customer: order.customer || order.customer_name || fallbackCustomer,
+      created: order.created,
+      totalAmount,
+      subtotalBeforeDiscount,
+      discountAmount,
+      details,
+    }
+  })
+  const orderIds = orderGroups
+    .map((group) => Number(group.orderId))
+    .filter((id) => Number.isSafeInteger(id) && id > 0)
+  const orderNumbers = orderGroups
+    .map((group) => optionalText(group.orderNumber))
+    .filter(Boolean)
+  const tables = [
+    ...new Set(orderGroups.map((group) => optionalText(group.table)).filter(Boolean)),
+  ]
+  const details = orderGroups.flatMap((group) => group.details)
+  const totalAmount = roundPrice(
+    orderGroups.reduce((sum, group) => sum + group.totalAmount, 0)
+  )
+  const subtotalBeforeDiscount = roundPrice(
+    orderGroups.reduce((sum, group) => sum + group.subtotalBeforeDiscount, 0)
+  )
+  const discountAmount = roundPrice(
+    orderGroups.reduce((sum, group) => sum + group.discountAmount, 0)
+  )
+  const groupId = orderIds.length
+    ? orderIds.join('-')
+    : orderNumbers.join('-') || `group-${Date.now()}`
+
+  return {
+    ...buildCashierReceiptPayload({
+      order: {
+        id: groupId,
+        ordernumber: orderNumbers.join(' / '),
+        service_point_name: tables.length === 1 ? tables[0] : fallbackTable,
+        customer: fallbackCustomer,
+        created: normalizedOrders[0] && normalizedOrders[0].created,
+        payment: fallbackPaymentMethod,
+        subtotal: totalAmount,
+        subtotal_before_discount: subtotalBeforeDiscount,
+        discount_amount: discountAmount,
+        discount_type: discountAmount > 0 ? 'grouped' : 'none',
+        discount_value: 0,
+      },
+      details,
+      shopInfo,
+      fallbackPaymentMethod,
+      fallbackCustomer,
+      fallbackTable,
+      fallbackRemark,
+      ticketKind,
+    }),
+    orderId: groupId,
+    orderIds,
+    orderGroups,
+    orderCount: orderGroups.length,
+  }
+}
+
 const appendOptionalLine = (lines, label, value) => {
   const normalized = optionalText(value)
   if (normalized) lines.push(`${label} : ${normalized}`)
@@ -213,6 +317,26 @@ const receiptOrderLines = (payload) => {
   appendOptionalLine(lines, 'Mode', payload.saleMode)
   appendOptionalLine(lines, 'Articles', payload.itemCount)
   return lines
+}
+
+const receiptDetailGroups = (payload = {}) => {
+  if (Array.isArray(payload.orderGroups) && payload.orderGroups.length > 1) {
+    return payload.orderGroups.map((group) => {
+      const labelParts = [`Commande #${group.orderNumber || group.orderId || ''}`]
+      if (group.customer) labelParts.push(group.customer)
+      return {
+        label: labelParts.filter(Boolean).join(' - '),
+        details: Array.isArray(group.details) ? group.details : [],
+      }
+    })
+  }
+
+  return [
+    {
+      label: '',
+      details: Array.isArray(payload.details) ? payload.details : [],
+    },
+  ]
 }
 
 const buildEscPosQrCode = (value, size = 6) => {
@@ -290,15 +414,20 @@ const buildCashierEscPos = (payload) => {
   )
   push(line())
 
-  payload.details.forEach((item) => {
-    push(
-      alignLeft(),
-      esc(`${formatReceiptProductLine(item, payload.isTvaActive)} `),
-      euroSymbol,
-      esc('\n')
-    )
-    receiptCustomizationLines(item).forEach((lineText) => {
-      push(alignLeft(), esc(`${lineText}\n`))
+  receiptDetailGroups(payload).forEach((group) => {
+    if (group.label) {
+      push(alignLeft(), boldOn(), esc(`${group.label}\n`), boldOff())
+    }
+    group.details.forEach((item) => {
+      push(
+        alignLeft(),
+        esc(`${formatReceiptProductLine(item, payload.isTvaActive)} `),
+        euroSymbol,
+        esc('\n')
+      )
+      receiptCustomizationLines(item).forEach((lineText) => {
+        push(alignLeft(), esc(`${lineText}\n`))
+      })
     })
   })
   push(line())
@@ -390,19 +519,27 @@ const buildCashierCloudXml = (payload) => {
         `<text align="left">${xmlEscape(line)}</text><feed line="1"/>`
     )
     .join('')
-  const productXml = payload.details
-    .map((item) => {
-      const customizationXml = receiptCustomizationLines(item)
-        .map(
-          (line) =>
-            `<text align="left">${xmlEscape(line)}</text><feed line="1"/>`
-        )
+  const productXml = receiptDetailGroups(payload)
+    .map((group) => {
+      const groupHeaderXml = group.label
+        ? `<text em="true" align="left">${xmlEscape(group.label)}</text><feed line="1"/>`
+        : ''
+      const linesXml = group.details
+        .map((item) => {
+          const customizationXml = receiptCustomizationLines(item)
+            .map(
+              (line) =>
+                `<text align="left">${xmlEscape(line)}</text><feed line="1"/>`
+            )
+            .join('')
+          return (
+            `<text em="true" align="left">${xmlEscape(formatReceiptProductLine(item, payload.isTvaActive))} \u20AC</text>` +
+            '<feed line="1"/>' +
+            customizationXml
+          )
+        })
         .join('')
-      return (
-        `<text em="true" align="left">${xmlEscape(formatReceiptProductLine(item, payload.isTvaActive))} \u20AC</text>` +
-        '<feed line="1"/>' +
-        customizationXml
-      )
+      return groupHeaderXml + linesXml
     })
     .join('')
   const vatXml = payload.isTvaActive
@@ -547,27 +684,30 @@ const buildCashierTicketData = (payload = {}) => {
           bold: true,
         }),
         renderSeparator(),
-        ...details.flatMap((item) => [
-          renderColumns(
-            [
-              { key: 'qty', text: `${item.qty || 0}x`, width: 4 },
-              { key: 'name', text: optionalText(item.name), width: 20 },
-              {
-                key: 'vatRate',
-                text: formatCompactVatRate(item),
-                width: payload.isTvaActive ? 5 : 0,
-                align: 'right',
-              },
-              {
-                key: 'total',
-                text: `${formatTicketNumber(item.total)} EUR`,
-                width: 8,
-                align: 'right',
-              },
-            ].filter((column) => column.width > 0),
-            `${formatReceiptProductLine(item, payload.isTvaActive)} EUR`
-          ),
-          ...receiptCustomizationLines(item).map((line) => renderText(line)),
+        ...receiptDetailGroups(payload).flatMap((group) => [
+          ...(group.label ? [renderText(group.label, { bold: true })] : []),
+          ...group.details.flatMap((item) => [
+            renderColumns(
+              [
+                { key: 'qty', text: `${item.qty || 0}x`, width: 4 },
+                { key: 'name', text: optionalText(item.name), width: 20 },
+                {
+                  key: 'vatRate',
+                  text: formatCompactVatRate(item),
+                  width: payload.isTvaActive ? 5 : 0,
+                  align: 'right',
+                },
+                {
+                  key: 'total',
+                  text: `${formatTicketNumber(item.total)} EUR`,
+                  width: 8,
+                  align: 'right',
+                },
+              ].filter((column) => column.width > 0),
+              `${formatReceiptProductLine(item, payload.isTvaActive)} EUR`
+            ),
+            ...receiptCustomizationLines(item).map((line) => renderText(line)),
+          ]),
         ]),
         renderSeparator(),
       ],
@@ -661,7 +801,17 @@ const buildCashierTicketData = (payload = {}) => {
       payload.ticketKind === 'commande' ? 'order_ticket' : 'cashier_receipt',
     business: {
       orderId: payload.orderId,
+      orderIds: payload.orderIds || [],
       orderNumber: payload.orderNumber,
+      orderGroups: Array.isArray(payload.orderGroups)
+        ? payload.orderGroups.map((group) => ({
+            orderId: group.orderId,
+            orderNumber: group.orderNumber,
+            table: group.table,
+            customer: group.customer,
+            totalAmount: group.totalAmount,
+          }))
+        : [],
       ticketKind: payload.ticketKind,
       ticketType: payload.ticketType,
       ticketTitle: payload.ticketTitle,
@@ -757,6 +907,7 @@ module.exports = {
   buildCashierCloudXml,
   buildCashierEscPos,
   buildCashierTicketData,
+  buildGroupedCashierReceiptPayload,
   buildCashierReceiptPayload,
   formatReceiptProductHeader,
   formatReceiptProductLine,
