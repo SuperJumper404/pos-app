@@ -152,4 +152,20 @@ export const actions = {
       return false
     }
   },
+
+  async deleteChoicePermanently({ dispatch }, id) {
+    try {
+      const response = await this.$axios.delete(
+        `/baseurl/api/v1/customization-choices/${id}/permanent`,
+        { headers: authorizationHeaders() }
+      )
+      dispatch('set/message', response.data.message)
+      await dispatch('getSteps')
+      dispatch('notifications/success', response.data.message, { root: true })
+      return true
+    } catch (error) {
+      dispatch('set/message', getErrorMessage(error))
+      return false
+    }
+  },
 }
