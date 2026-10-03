@@ -209,6 +209,15 @@
                     >
                       <v-icon>mdi-eye-outline</v-icon>
                     </v-btn>
+                    <v-btn
+                      icon
+                      small
+                      color="error"
+                      aria-label="Supprimer définitivement le choix"
+                      @click="requestChoicePermanentDeletion(choice)"
+                    >
+                      <v-icon>mdi-delete-forever-outline</v-icon>
+                    </v-btn>
                   </v-card-actions>
                 </v-card>
               </v-col>
@@ -374,6 +383,58 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="choiceDeleteDialog" max-width="560" persistent>
+      <v-card>
+        <v-card-title>Supprimer définitivement ce choix ?</v-card-title>
+        <v-card-text>
+          <p v-if="choiceToDelete">
+            Le choix « {{ choiceToDelete.name }} » sera supprimé définitivement
+            de cette étape.
+          </p>
+          <template v-if="choiceToDeleteProducts.length">
+            <p class="font-weight-bold mb-2">
+              Il sera aussi retiré de
+              {{ choiceToDeleteProducts.length }} produit(s) :
+            </p>
+            <v-chip
+              v-for="product in choiceToDeleteProducts"
+              :key="product.id"
+              small
+              class="mr-2 mb-2"
+            >
+              {{ product.name }}
+            </v-chip>
+          </template>
+          <v-alert v-else text dense type="info">
+            Aucun produit ne référence actuellement ce choix.
+          </v-alert>
+          <v-alert text dense type="warning" class="mt-3 mb-0">
+            Cette action est irréversible. Les commandes historiques resteront
+            inchangées.
+          </v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            text
+            class="text-none"
+            :disabled="savingChoice"
+            @click="cancelChoicePermanentDeletion"
+          >
+            Annuler
+          </v-btn>
+          <v-btn
+            color="error"
+            class="text-none"
+            :loading="savingChoice"
+            @click="confirmChoicePermanentDeletion"
+          >
+            Supprimer définitivement
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -398,8 +459,10 @@ export default {
       stepDeactivateDialog: false,
       stepDeleteDialog: false,
       choiceDeactivateDialog: false,
+      choiceDeleteDialog: false,
       editingChoice: null,
       choiceToDeactivate: null,
+      choiceToDelete: null,
       pendingStepPayload: null,
       stepToDeactivateId: null,
       stepToDeleteId: null,
@@ -447,6 +510,10 @@ export default {
       if (!this.stepToDelete) return []
       return this.productsUsingStep(this.stepToDelete)
     },
+    choiceToDeleteProducts() {
+      if (!this.choiceToDelete) return []
+      return this.productsUsingChoice(this.choiceToDelete)
+    },
     staticurl() {
       return String(this.$store.get('staticURL') || '').replace(/\/+$/, '')
     },
@@ -484,6 +551,20 @@ export default {
         (product.customization_steps || []).some(
           (productStep) =>
             String(productStep.step_id || productStep.id) === String(step.id)
+        )
+      )
+    },
+    productsUsingChoice(choice) {
+      return this.dataProducts.filter((product) =>
+        (product.customization_steps || []).some((productStep) =>
+          (productStep.choices || []).some(
+            (productChoice) =>
+              String(
+                productChoice.step_choice_id ||
+                  productChoice.id ||
+                  productChoice.product_step_choice_id
+              ) === String(choice.id)
+          )
         )
       )
     },
@@ -649,6 +730,33 @@ export default {
       if (!saved) return
       this.choiceDeactivateDialog = false
       this.choiceToDeactivate = null
+    },
+    requestChoicePermanentDeletion(choice) {
+      if (!choice) return
+      this.choiceToDelete = choice
+      this.choiceDeleteDialog = true
+    },
+    cancelChoicePermanentDeletion() {
+      if (this.savingChoice) return
+      this.choiceDeleteDialog = false
+      this.choiceToDelete = null
+    },
+    async confirmChoicePermanentDeletion() {
+      if (!this.choiceToDelete || this.savingChoice) return
+      const choiceId = this.choiceToDelete.id
+      this.savingChoice = true
+      let deleted = false
+      try {
+        deleted = await this.$store.dispatch(
+          'customizations/deleteChoicePermanently',
+          choiceId
+        )
+      } finally {
+        this.savingChoice = false
+      }
+      if (!deleted) return
+      this.choiceDeleteDialog = false
+      this.choiceToDelete = null
     },
     reactivateChoice(choice) {
       return this.$store.dispatch('customizations/updateChoice', {

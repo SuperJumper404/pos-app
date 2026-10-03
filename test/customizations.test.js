@@ -1379,6 +1379,19 @@ assert.ok(
   customizationAdminPageSource.includes('@click="cancelChoiceDeactivation"'),
   'canceling choice deactivation must explicitly clear its pending target'
 )
+assert.ok(
+  customizationAdminPageSource.includes('requestChoicePermanentDeletion(choice)'),
+  'choice cards must expose a separate permanent deletion action'
+)
+assert.ok(
+  customizationAdminPageSource.includes('choiceDeleteDialog: false') &&
+    customizationAdminPageSource.includes('choiceToDelete: null'),
+  'permanent choice deletion must use state separate from deactivation'
+)
+assert.ok(
+  customizationAdminPageSource.includes('Supprimer définitivement ce choix ?'),
+  'permanent choice deletion must require an explicit warning dialog'
+)
 
 const loadProductActions = () => {
   const source = fs.readFileSync(
@@ -1922,10 +1935,54 @@ const runReviewRegressionTests = async () => {
   )
 
   const productActions = loadProductActions()
+  const customizationStoreModule = loadStoreModule('../store/customizations.js')
   const originalLocalStorage = global.localStorage
   global.localStorage = { getItem: () => 'test-token' }
 
   try {
+    const permanentDeleteCalls = []
+    const permanentDeleteDispatches = []
+    const permanentDeleteResult =
+      await customizationStoreModule.actions.deleteChoicePermanently.call(
+        {
+          $axios: {
+            delete(url, options) {
+              permanentDeleteCalls.push([url, options])
+              return Promise.resolve({
+                data: { message: 'Choix de personnalisation supprimé.' },
+              })
+            },
+          },
+        },
+        {
+          dispatch(type, payload) {
+            permanentDeleteDispatches.push([type, payload])
+            return Promise.resolve(true)
+          },
+        },
+        44
+      )
+    assert.strictEqual(permanentDeleteResult, true)
+    assert.deepStrictEqual(permanentDeleteCalls.map(([url]) => url), [
+      '/baseurl/api/v1/customization-choices/44/permanent',
+    ])
+    assert.strictEqual(
+      permanentDeleteCalls[0][1].headers.Authorization,
+      'Bearer test-token'
+    )
+    assert.ok(
+      permanentDeleteDispatches.some(([type]) => type === 'getSteps'),
+      'permanent choice deletion must refresh the customization library'
+    )
+    assert.ok(
+      permanentDeleteDispatches.some(
+        ([type, payload]) =>
+          type === 'notifications/success' &&
+          payload === 'Choix de personnalisation supprimé.'
+      ),
+      'permanent choice deletion must notify the user with the backend message'
+    )
+
     for (const scenario of [
       {
         action: 'postProducts',
