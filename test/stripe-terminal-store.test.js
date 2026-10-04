@@ -98,7 +98,9 @@ const run = async () => {
     [
       'getReaders', 'registerReader', 'assignReader', 'setReaderActive',
       'refreshReaders', 'getCurrentReader', 'startPayment',
-      'refreshPayment', 'cancelPayment', 'resetPayment', 'resetSession',
+      'refreshPayment', 'cancelPayment', 'getKioskCurrentReader',
+      'startKioskPayment', 'refreshKioskPayment', 'cancelKioskPayment',
+      'resetPayment', 'resetSession',
     ].sort()
   )
 

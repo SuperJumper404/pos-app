@@ -60,6 +60,33 @@ const validPayment = (payment) => validObject(payment) && validId(payment.id) &&
   (payment.status !== 'succeeded' || hasSettledTerminalAllocations(payment)) &&
   (payment.failureCode === null || typeof payment.failureCode === 'string') &&
   (payment.failureMessage === null || typeof payment.failureMessage === 'string')
+const validKioskReader = (reader) => reader === null || (
+  validObject(reader) && validId(reader.id) &&
+  typeof reader.label === 'string' &&
+  ['online', 'offline'].includes(reader.status) &&
+  typeof reader.stripeReaderId === 'string'
+)
+const validCardTicket = (ticket) => ticket === null || (
+  validObject(ticket) &&
+  (ticket.brand === null || typeof ticket.brand === 'string') &&
+  (ticket.last4 === null || /^[0-9]{4}$/.test(ticket.last4)) &&
+  (ticket.chargeId === null || typeof ticket.chargeId === 'string') &&
+  validId(ticket.terminalPaymentId) &&
+  Number.isSafeInteger(ticket.amountCents) && ticket.amountCents >= 0 &&
+  !Object.prototype.hasOwnProperty.call(ticket, 'fullPan') &&
+  !Object.prototype.hasOwnProperty.call(ticket, 'client_secret') &&
+  !Object.prototype.hasOwnProperty.call(ticket, 'rawStripePayload')
+)
+const validKioskPayment = (payment) => validObject(payment) && validId(payment.id) &&
+  validId(payment.orderId) && validId(payment.readerId) &&
+  paymentStatuses.includes(payment.status) &&
+  ['pending', 'paid', 'counter', 'failed', 'canceled'].includes(payment.outcome) &&
+  Number.isSafeInteger(payment.amountCents) && payment.amountCents >= 0 &&
+  payment.currency === 'eur' && Array.isArray(payment.orderIds) &&
+  payment.orderIds.length > 0 && payment.orderIds.every(validId) &&
+  new Set(payment.orderIds).size === payment.orderIds.length &&
+  (payment.orderNumber === null || typeof payment.orderNumber === 'string') &&
+  validCardTicket(payment.cardTicket)
 const validEnvelope = (response) => {
   const data = response && response.data
   return validObject(data) && data.success === true &&
@@ -115,6 +142,18 @@ const paymentPayload = (input) => {
     ...(discountType !== undefined && { discountType }),
     ...(discountValue !== undefined && { discountValue }),
   }
+}
+
+const kioskCheckoutPayload = (input) => {
+  if (!validObject(input)) throw terminalError('TERMINAL_INVALID_INPUT')
+  const allowed = [
+    'customer', 'customerID', 'phone', 'remark', 'items', 'expected_total',
+    'discount_type', 'discount_value', 'is_takeaway', 'client_order_token',
+  ]
+  return allowed.reduce((payload, key) => {
+    if (input[key] !== undefined) payload[key] = input[key]
+    return payload
+  }, {})
 }
 
 const runRequest = async ({ dispatch, state }, scope, send, validDto, onSuccess, options = {}) => {
@@ -317,6 +356,46 @@ export const actions = {
         paymentId = requiredId(input)
         return this.$axios.post(`${baseUrl}/payments/${paymentId}/cancel`, {}, requestConfig())
       }, (payment) => validPayment(payment) && payment.id === paymentId,
+      (payment) => dispatch('set/activePayment', payment),
+      { get paymentId() { return paymentId } })
+  },
+  getKioskCurrentReader(context) {
+    const { dispatch } = context
+    const refresh = runRequest(context, 'currentReader',
+      () => this.$axios.get(`${baseUrl}/kiosk/current-reader`, requestConfig()),
+      validKioskReader,
+      (reader) => dispatch('set/currentReader', reader))
+    requestState(context.state).currentRefresh = refresh
+    return refresh
+  },
+  startKioskPayment(context, input) {
+    const { dispatch } = context
+    return runRequest(context, 'payment',
+      () => this.$axios.post(`${baseUrl}/kiosk/payments`, kioskCheckoutPayload(input), requestConfig()),
+      validKioskPayment,
+      (payment) => dispatch('set/activePayment', payment))
+  },
+  refreshKioskPayment(context, input) {
+    const { dispatch } = context
+    let paymentId
+    return runRequest(context, 'payment',
+      () => {
+        paymentId = requiredId(input)
+        return this.$axios.get(`${baseUrl}/kiosk/payments/${paymentId}`, requestConfig())
+      },
+      (payment) => validKioskPayment(payment) && payment.id === paymentId,
+      (payment) => dispatch('set/activePayment', payment),
+      { get paymentId() { return paymentId } })
+  },
+  cancelKioskPayment(context, input) {
+    const { dispatch } = context
+    let paymentId
+    return runRequest(context, 'payment',
+      () => {
+        paymentId = requiredId(input)
+        return this.$axios.post(`${baseUrl}/kiosk/payments/${paymentId}/cancel`, {}, requestConfig())
+      },
+      (payment) => validKioskPayment(payment) && payment.id === paymentId,
       (payment) => dispatch('set/activePayment', payment),
       { get paymentId() { return paymentId } })
   },
