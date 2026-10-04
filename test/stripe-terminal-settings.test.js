@@ -35,6 +35,7 @@ assert.match(page, /import StripeTerminalReaders from '@\/components\/settings\/
 for (const token of [
   'Connecter TPE', 'Code d’enregistrement', 'Nom du terminal', 'Adresse',
   'Code postal', 'Ville', 'Pays', 'Caissier', 'Aucun TPE connecté',
+  'Borne', 'Type d’affectation', 'assignedServicePointId',
   'En ligne', 'Hors ligne', 'Actif', 'Inactif', 'Désactiver', 'Réactiver',
   'Réaffecter', 'mdi-refresh', 'mdi-account-switch', 'mdi-power',
   'v-tooltip', 'aria-label', 'v-skeleton-loader', 'v-alert',
@@ -86,7 +87,7 @@ const deferred = () => {
 
 const makeInstance = ({ ready = false, admin = true, readers = [] } = {}) => {
   const calls = []
-  const state = { readers, loading: false, error: null, staff: [] }
+  const state = { readers, loading: false, error: null, staff: [], servicePoints: [] }
   const responses = {}
   const instance = {
     ...component.data(),
@@ -99,6 +100,7 @@ const makeInstance = ({ ready = false, admin = true, readers = [] } = {}) => {
         'stripeTerminal/loading': state.loading,
         'stripeTerminal/error': state.error,
         'staff/data': state.staff,
+        'servicePoints/items': state.servicePoints,
       })[key],
       dispatch: (name, payload) => {
         calls.push({ name, payload })
@@ -122,11 +124,11 @@ const run = async () => {
   gated.instance.stripeReady = true
   await gated.instance.loadData()
   assert.deepStrictEqual(gated.calls.map((call) => call.name), [
-    'stripeTerminal/getReaders', 'staff/getAll',
+    'stripeTerminal/getReaders', 'staff/getAll', 'servicePoints/getAll',
   ])
   assert.deepStrictEqual(JSON.parse(JSON.stringify(gated.calls[1].payload || null)), { silent: true })
   await gated.instance.loadData()
-  assert.strictEqual(gated.calls.length, 2)
+  assert.strictEqual(gated.calls.length, 3)
 
   const staffFailure = makeInstance({ ready: true })
   staffFailure.responses['staff/getAll'] = false
@@ -135,10 +137,10 @@ const run = async () => {
   staffFailure.responses['staff/getAll'] = true
   await staffFailure.instance.refreshReaders()
   assert.deepStrictEqual(staffFailure.calls.map((call) => call.name), [
-    'stripeTerminal/getReaders', 'staff/getAll',
-    'stripeTerminal/refreshReaders', 'staff/getAll',
+    'stripeTerminal/getReaders', 'staff/getAll', 'servicePoints/getAll',
+    'stripeTerminal/refreshReaders', 'staff/getAll', 'servicePoints/getAll',
   ])
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(staffFailure.calls[3].payload || null)), { silent: true })
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(staffFailure.calls[4].payload || null)), { silent: true })
   assert.strictEqual(staffFailure.instance.listError, '')
 
   const staleStaff = makeInstance({ ready: true })
@@ -148,8 +150,8 @@ const run = async () => {
   staleStaff.responses['staff/getAll'] = true
   await staleStaff.instance.refreshReaders()
   assert.deepStrictEqual(staleStaff.calls.map((call) => call.name), [
-    'stripeTerminal/getReaders', 'staff/getAll',
-    'stripeTerminal/refreshReaders', 'staff/getAll',
+    'stripeTerminal/getReaders', 'staff/getAll', 'servicePoints/getAll',
+    'stripeTerminal/refreshReaders', 'staff/getAll', 'servicePoints/getAll',
   ])
   assert.strictEqual(staleStaff.instance.staffLoaded, true)
 
@@ -161,6 +163,12 @@ const run = async () => {
     { id: 5, username: 'Compte désactivé', access: 0, status: '0' },
   ]
   assert.deepStrictEqual(staffFailure.instance.cashiers.map((cashier) => cashier.id), [1, 2])
+  staffFailure.state.servicePoints = [
+    { id: 10, name: 'Borne 1', type: 'kiosk', is_active: 1 },
+    { id: 11, name: 'Table 4', type: 'table', is_active: 1 },
+    { id: 12, name: 'Borne inactive', type: 'kiosk', is_active: 0 },
+  ]
+  assert.deepStrictEqual(staffFailure.instance.kioskServicePoints.map((point) => point.id), [10])
 
   const nonAdmin = makeInstance({ ready: true, admin: false })
   await nonAdmin.instance.loadData()
@@ -169,6 +177,7 @@ const run = async () => {
   const first = makeInstance({ ready: true })
   first.instance.registrationCode = ' 1234 '
   first.instance.readerLabel = ' Caisse '
+  first.instance.assignmentType = 'cashier'
   first.instance.assignedUserId = 4
   first.instance.address = { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' }
   await first.instance.registerReader()
@@ -180,11 +189,28 @@ const run = async () => {
     },
   })
   assert.strictEqual(first.instance.registrationCode, '')
+  assert.ok(!Object.hasOwnProperty.call(first.calls[0].payload, 'assignedServicePointId'))
+
+  const kioskRegistration = makeInstance({ ready: true })
+  kioskRegistration.instance.registrationCode = 'kiosk-code'
+  kioskRegistration.instance.readerLabel = 'Borne'
+  kioskRegistration.instance.assignmentType = 'kiosk'
+  kioskRegistration.instance.assignedServicePointId = 10
+  kioskRegistration.instance.address = { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' }
+  await kioskRegistration.instance.registerReader()
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(kioskRegistration.calls[0].payload)), {
+    registrationCode: 'kiosk-code',
+    label: 'Borne',
+    assignedServicePointId: 10,
+    address: { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' },
+  })
+  assert.ok(!Object.hasOwnProperty.call(kioskRegistration.calls[0].payload, 'assignedUserId'))
 
   const subsequent = makeInstance({ ready: true, readers: [reader] })
   subsequent.responses['stripeTerminal/registerReader'] = false
   subsequent.instance.registrationCode = '5678'
   subsequent.instance.readerLabel = 'Bar'
+  subsequent.instance.assignmentType = 'cashier'
   subsequent.instance.assignedUserId = 4
   subsequent.instance.dialogOpen = true
   await subsequent.instance.registerReader()
@@ -198,6 +224,7 @@ const run = async () => {
   concurrent.responses['stripeTerminal/registerReader'] = pendingRegistration.promise
   concurrent.instance.registrationCode = 'first-code'
   concurrent.instance.readerLabel = 'Caisse'
+  concurrent.instance.assignmentType = 'cashier'
   concurrent.instance.assignedUserId = 4
   concurrent.instance.address = { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' }
   const firstAttempt = concurrent.instance.registerReader()
@@ -216,6 +243,7 @@ const run = async () => {
   reconnectedForm.responses['stripeTerminal/registerReader'] = obsoleteRegistration.promise
   reconnectedForm.instance.registrationCode = 'old-code'
   reconnectedForm.instance.readerLabel = 'Ancien'
+  reconnectedForm.instance.assignmentType = 'cashier'
   reconnectedForm.instance.assignedUserId = 4
   reconnectedForm.instance.address = { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' }
   const oldAttempt = reconnectedForm.instance.registerReader()
@@ -252,13 +280,20 @@ const run = async () => {
 
   const actions = makeInstance({ ready: true, readers: [reader] })
   actions.instance.staffLoaded = true
+  actions.instance.servicePointsLoaded = true
   await actions.instance.assignReader(reader, 5)
+  actions.instance.assignmentType = 'kiosk'
+  actions.instance.assignmentServicePointId = 10
+  await actions.instance.assignReader(reader, 10)
   await actions.instance.setReaderActive(reader)
   await actions.instance.refreshReaders()
   assert.deepStrictEqual(JSON.parse(JSON.stringify(actions.calls)), [
     { name: 'stripeTerminal/assignReader', payload: { id: 7, assignedUserId: 5 } },
+    { name: 'stripeTerminal/assignReader', payload: { id: 7, assignedServicePointId: 10 } },
     { name: 'stripeTerminal/setReaderActive', payload: { id: 7, isActive: false } },
     { name: 'stripeTerminal/refreshReaders' },
+    { name: 'staff/getAll', payload: { silent: true } },
+    { name: 'servicePoints/getAll', payload: { silent: true } },
   ])
 
   const firstReaders = deferred()
@@ -268,6 +303,7 @@ const run = async () => {
   const queues = {
     'stripeTerminal/getReaders': [firstReaders.promise, reconnectedReaders.promise],
     'staff/getAll': [firstStaff.promise, reconnectedStaff.promise],
+    'servicePoints/getAll': [Promise.resolve([]), Promise.resolve([])],
   }
   const reactiveCalls = []
   const ReactiveComponent = Vue.extend(component)
@@ -288,30 +324,36 @@ const run = async () => {
   assert.deepStrictEqual(reactiveCalls, [])
   reactive.stripeReady = true
   await Vue.nextTick()
-  assert.strictEqual(reactiveCalls.length, 2)
+  assert.strictEqual(reactiveCalls.length, 3)
   assert.strictEqual(reactive.busy, true)
   reactive.dialogOpen = true
   reactive.registrationCode = 'one-time-code'
   reactive.readerLabel = 'Caisse'
   reactive.assignedUserId = 4
+  reactive.assignedServicePointId = 10
+  reactive.assignmentType = 'kiosk'
   reactive.address = { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' }
   reactive.editingReaderId = 7
   reactive.assignmentUserId = 4
+  reactive.assignmentServicePointId = 10
   reactive.stripeReady = false
   await Vue.nextTick()
   assert.strictEqual(reactive.dialogOpen, false)
   assert.strictEqual(reactive.registrationCode, '')
   assert.strictEqual(reactive.readerLabel, '')
   assert.strictEqual(reactive.assignedUserId, null)
+  assert.strictEqual(reactive.assignedServicePointId, null)
+  assert.strictEqual(reactive.assignmentType, 'cashier')
   assert.deepStrictEqual(JSON.parse(JSON.stringify(reactive.address)), {
     line1: '', postalCode: '', city: '', country: 'FR',
   })
   assert.strictEqual(reactive.editingReaderId, null)
   assert.strictEqual(reactive.assignmentUserId, null)
+  assert.strictEqual(reactive.assignmentServicePointId, null)
   assert.strictEqual(reactive.loadAttempted, false)
   reactive.stripeReady = true
   await Vue.nextTick()
-  assert.strictEqual(reactiveCalls.length, 4)
+  assert.strictEqual(reactiveCalls.length, 6)
   reconnectedReaders.resolve([reader])
   reconnectedStaff.resolve(true)
   await Vue.nextTick()

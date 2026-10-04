@@ -104,10 +104,11 @@ const readerPayload = (input) => {
   if (!validObject(input) || typeof input.registrationCode !== 'string' ||
     !input.registrationCode.trim() || typeof input.label !== 'string' ||
     !input.label.trim()) throw terminalError('TERMINAL_INVALID_INPUT')
+  const assignment = assignmentPayload(input)
   const payload = {
     registrationCode: input.registrationCode,
     label: input.label,
-    assignedUserId: requiredId(input.assignedUserId),
+    ...assignment,
   }
   if (input.address !== undefined) {
     const address = input.address
@@ -120,6 +121,14 @@ const readerPayload = (input) => {
     }
   }
   return payload
+}
+
+const assignmentPayload = (input) => {
+  if (!validObject(input)) throw terminalError('TERMINAL_INVALID_INPUT')
+  if (input.assignedServicePointId != null) {
+    return { assignedServicePointId: requiredId(input.assignedServicePointId) }
+  }
+  return { assignedUserId: requiredId(input.assignedUserId) }
 }
 
 const paymentPayload = (input) => {
@@ -295,8 +304,7 @@ export const actions = {
       () => {
         if (!validObject(input)) throw terminalError('TERMINAL_INVALID_INPUT')
         const id = requiredId(input.id)
-        const assignedUserId = requiredId(input.assignedUserId)
-        return this.$axios.patch(`${baseUrl}/readers/${id}/assignment`, { assignedUserId }, requestConfig())
+        return this.$axios.patch(`${baseUrl}/readers/${id}/assignment`, assignmentPayload(input), requestConfig())
       }, (reader, request) => reconcileCurrentReader(context, reader, request),
       () => Number(input.id))
   },

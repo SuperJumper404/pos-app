@@ -121,12 +121,12 @@ const run = async () => {
     ['registerReader', {
       registrationCode: 'code', label: 'S710', assignedUserId: 4,
       address: { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR', extra: 'omit' },
-      assignedServicePointId: 8, secret: 'omit',
+      secret: 'omit',
     }, 'post', `${base}/readers`, {
       registrationCode: 'code', label: 'S710', assignedUserId: 4,
       address: { line1: '1 rue A', postalCode: '75001', city: 'Paris', country: 'FR' },
     }, reader],
-    ['assignReader', { id: 7, assignedUserId: 5, assignedServicePointId: 8, secret: 'omit' },
+    ['assignReader', { id: 7, assignedUserId: 5, secret: 'omit' },
       'patch', `${base}/readers/7/assignment`, { assignedUserId: 5 }, { ...reader, assignedUserId: 5 }],
     ['setReaderActive', { id: 7, isActive: false, secret: 'omit' },
       'patch', `${base}/readers/7/status`, { isActive: false }, { ...reader, isActive: false }],
@@ -153,6 +153,36 @@ const run = async () => {
     assert.strictEqual(h.current.loading, false)
     assert.strictEqual(h.current.error, null)
   }
+
+  const kioskReader = {
+    ...reader,
+    assignedUserId: null,
+    assignedServicePointId: 12,
+  }
+  const registerKiosk = harness({ data: kioskReader })
+  assert.deepStrictEqual(await registerKiosk.call('registerReader', {
+    registrationCode: 'code',
+    label: 'S710 borne',
+    assignedServicePointId: 12,
+    assignedUserId: 4,
+    secret: 'omit',
+  }), kioskReader)
+  assertRequest(registerKiosk.calls[0], 'post', `${base}/readers`, {
+    registrationCode: 'code',
+    label: 'S710 borne',
+    assignedServicePointId: 12,
+  })
+
+  const assignKiosk = harness({ data: kioskReader })
+  assert.deepStrictEqual(await assignKiosk.call('assignReader', {
+    id: 7,
+    assignedServicePointId: 12,
+    assignedUserId: 4,
+    secret: 'omit',
+  }), kioskReader)
+  assertRequest(assignKiosk.calls[0], 'patch', `${base}/readers/7/assignment`, {
+    assignedServicePointId: 12,
+  })
 
   const absentReader = harness({ data: null })
   assert.strictEqual(await absentReader.call('getCurrentReader'), null)
