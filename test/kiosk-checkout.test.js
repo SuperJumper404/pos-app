@@ -31,18 +31,35 @@ assert.deepStrictEqual(payload, {
   stripe: false,
   source: 'borne',
 })
-assert.strictEqual(
+assert.deepStrictEqual(
   buildKioskCheckoutPayload({
     customer: 'Nora',
     phone: '0611223344',
     servicePointId: 42,
     total: 20,
-    payment: 'Stripe',
-    dataCart: [{ id: 7, qty: 2, price: 10 }],
-    stripe: true,
-    repriceConfirmation: true,
-  }).repriceConfirmation,
-  true
+    payment: 'Carte bancaire - TPE Stripe',
+    dataCart: [{ id: 7, qty: 2, price: 10, selectedChoiceIds: [12, 11] }],
+    terminal: true,
+    clientOrderToken: 'kiosk-terminal-abc',
+  }),
+  {
+    customer: { name: 'Nora', phone: '0611223344', remark: '' },
+    servicePointId: 42,
+    expected_total: 20,
+    items: [
+      {
+        product_id: 7,
+        quantity: 2,
+        selected_product_step_choice_ids: [11, 12],
+      },
+    ],
+    is_takeaway: false,
+    client_order_token: 'kiosk-terminal-abc',
+    payment: 'Carte bancaire - TPE Stripe',
+    terminal: true,
+    stripe: false,
+    source: 'borne',
+  }
 )
 assert.throws(
   () => buildKioskCheckoutPayload({ customer: 'Nora', phone: '06' }),

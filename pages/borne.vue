@@ -225,8 +225,15 @@
             >
               {{ checkoutErrorMessage }}
             </v-alert>
+            <v-alert
+              v-if="showStripePayment && !terminalCardAvailable"
+              type="warning"
+              dense
+            >
+              TPE indisponible : aucun TPE Stripe actif n'est affecté à cette borne.
+            </v-alert>
             <div
-              v-if="kioskStep === 'payment' && !stripePaymentReady"
+              v-if="kioskStep === 'payment' && !terminalPaymentInProgress"
               class="kiosk-payment-actions"
             >
               <v-btn
@@ -247,9 +254,9 @@
                 block
                 x-large
                 class="text-none"
-                :disabled="checkoutDisabled || Boolean(checkoutLoading)"
-                :loading="checkoutLoading === 'stripe'"
-                @click="submitStripe"
+                :disabled="checkoutDisabled || !terminalCardAvailable || Boolean(checkoutLoading)"
+                :loading="checkoutLoading === 'terminal'"
+                @click="submitTerminalPayment"
               >
                 Payer par carte
               </v-btn>
@@ -277,43 +284,16 @@
               </v-btn>
             </div>
             <v-btn
-              v-if="hasPreparedStripeAttempt && !stripePaymentReady"
+              v-if="terminalPaymentInProgress"
               text
               block
               class="text-none mt-2"
               :disabled="Boolean(checkoutLoading)"
-              @click="cancelStripePayment"
+              @click="cancelTerminalPayment"
             >
               <v-icon left>mdi-close</v-icon>
               Annuler la tentative de paiement
             </v-btn>
-            <div
-              v-show="stripePaymentReady && !confirmation"
-              class="kiosk-stripe-panel"
-            >
-              <div ref="stripePaymentElement"></div>
-              <v-btn
-                color="success"
-                block
-                x-large
-                class="text-none mt-4"
-                :disabled="checkoutLoading === 'stripe-confirm'"
-                :loading="checkoutLoading === 'stripe-confirm'"
-                @click="confirmStripePayment"
-              >
-                Confirmer le paiement
-              </v-btn>
-              <v-btn
-                text
-                block
-                class="text-none mt-2"
-                :disabled="Boolean(checkoutLoading)"
-                @click="cancelStripePayment"
-              >
-                <v-icon left>mdi-close</v-icon>
-                Annuler le paiement
-              </v-btn>
-            </div>
           </template>
         </section>
       </main>
@@ -586,7 +566,6 @@
 </template>
 
 <script>
-import { loadStripe } from '@stripe/stripe-js'
 import price from '@/helpers/price'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import { applyServerQuoteToCart } from '@/helpers/customizations'
@@ -594,13 +573,20 @@ import {
   buildOrderTicketPayload,
   sendOrderTicket,
 } from '@/helpers/orderTicket'
+import {
+  buildCashierReceiptPayload,
+  sendCashierReceipt,
+} from '@/helpers/cashierReceipt'
+import {
+  buildCardTicketPayload,
+  sendCardTicket,
+} from '@/helpers/cardTicket'
 
 const {
   buildKioskCartLine,
   buildKioskCheckoutPayload,
   getKioskPaymentAvailability,
   getKioskOrderReference,
-  getKioskStripeReturnOutcome,
   isKioskProductAvailable,
 } = require('@/helpers/kioskCheckout')
 
@@ -638,12 +624,10 @@ export default {
       checkoutFinalized: false,
       repriceConfirmation: false,
       confirmation: null,
-      stripe: null,
-      stripeElements: null,
-      stripePaymentReady: false,
-      stripePaymentOrderId: null,
-      stripePaymentReference: null,
-      stripePaymentElementInstance: null,
+      kioskTerminalReader: null,
+      kioskTerminalPayment: null,
+      kioskTerminalPollingTimer: null,
+      terminalClientOrderToken: null,
       keyboardUppercase: true,
       exitDialog: false,
       exitPin: '',
@@ -801,16 +785,22 @@ export default {
       return true
     },
     showStripePayment() {
-      return false
+      return this.paymentAvailability.stripe
     },
-    hasPreparedStripeAttempt() {
+    terminalCardAvailable() {
       return Boolean(
-        this.stripePaymentOrderId ||
-          this.$store.get('cart/clientOrderOrderId')
+        this.kioskTerminalReader &&
+          this.kioskTerminalReader.status === 'online'
+      )
+    },
+    terminalPaymentInProgress() {
+      return Boolean(
+        this.kioskTerminalPayment &&
+          this.kioskTerminalPayment.outcome === 'pending'
       )
     },
     checkoutInteractionLocked() {
-      return this.hasPreparedStripeAttempt || this.repriceConfirmation
+      return this.terminalPaymentInProgress || this.repriceConfirmation
     },
     checkoutDisabled() {
       return (
@@ -820,7 +810,7 @@ export default {
         !String(this.phone || '').trim() ||
         !this.servicePointId ||
         this.isKitchenClosed ||
-        this.hasPreparedStripeAttempt
+        this.terminalPaymentInProgress
       )
     },
     total() {
@@ -843,12 +833,12 @@ export default {
     ])
     this.activeCategory = this.categories[0] || ''
     this.startWelcomeAnimationRotation()
-    await this.restoreStripeReturn()
+    await this.loadKioskTerminalReader()
   },
   beforeDestroy() {
     this.stopWelcomeAnimationRotation()
     this.clearExitDialogTimer()
-    this.resetStripePaymentState()
+    this.resetTerminalPaymentState()
   },
   methods: {
     openExitDialog() {
@@ -870,6 +860,17 @@ export default {
       this.exitPin = ''
       this.exitError = ''
       this.exitLoading = false
+    },
+    async loadKioskTerminalReader() {
+      if (!this.showStripePayment) {
+        this.kioskTerminalReader = null
+        return null
+      }
+      const reader = await this.$store.dispatch(
+        'stripeTerminal/getKioskCurrentReader'
+      )
+      this.kioskTerminalReader = reader || null
+      return this.kioskTerminalReader
     },
     clearExitDialogTimer() {
       if (!this.exitDialogTimer) return
@@ -914,7 +915,7 @@ export default {
       this.checkoutAlertType = 'error'
       this.checkoutFinalized = false
       this.repriceConfirmation = false
-      this.resetStripePaymentState()
+      this.resetTerminalPaymentState()
       this.kioskStep = 'mode'
     },
     startWelcomeAnimationRotation() {
@@ -946,10 +947,11 @@ export default {
       this.keyboardTarget = 'phone'
       this.kioskStep = 'phone'
     },
-    openPaymentStep() {
+    async openPaymentStep() {
       if (!String(this.phone || '').trim()) return
       this.keyboardTarget = null
       this.kioskStep = 'payment'
+      await this.loadKioskTerminalReader()
     },
     appendKeyboardValue(value) {
       if (this.keyboardTarget === 'phone') {
@@ -1069,7 +1071,15 @@ export default {
       }
       this.cartItems.push({ ...line })
     },
-    buildPayload(payment, stripe) {
+    ensureTerminalClientOrderToken() {
+      if (!this.terminalClientOrderToken) {
+        this.terminalClientOrderToken = `kiosk-terminal-${Date.now()}-${Math.random()
+          .toString(16)
+          .slice(2)}`
+      }
+      return this.terminalClientOrderToken
+    },
+    buildPayload(payment, stripe, terminal = false) {
       return buildKioskCheckoutPayload({
         customer: this.customer,
         phone: this.phone,
@@ -1079,6 +1089,8 @@ export default {
         isTakeaway: this.saleMode === 'takeaway',
         dataCart: this.cartItems,
         stripe,
+        terminal,
+        clientOrderToken: terminal ? this.ensureTerminalClientOrderToken() : undefined,
         repriceConfirmation: this.repriceConfirmation,
         source: 'borne',
       })
@@ -1110,30 +1122,99 @@ export default {
         this.checkoutLoading = null
       }
     },
-    async submitStripe() {
-      if (this.checkoutDisabled || this.checkoutLoading) return
+    async submitTerminalPayment() {
+      if (
+        this.checkoutDisabled ||
+        !this.terminalCardAvailable ||
+        this.checkoutLoading
+      ) {
+        return
+      }
       this.checkoutErrorMessage = ''
       this.checkoutAlertType = 'error'
-      this.checkoutLoading = 'stripe'
+      this.checkoutLoading = 'terminal'
       try {
-        const result = await this.$store.dispatch(
-          'cart/checkoutOrder',
-          this.buildPayload('Stripe', true)
+        const payment = await this.$store.dispatch(
+          'stripeTerminal/startKioskPayment',
+          this.buildPayload('Carte bancaire - TPE Stripe', false, true)
         )
-        if (!result || !result.ok) {
+        if (!payment) {
           this.handleCheckoutFailure(
-            result?.error,
-            'Impossible de préparer le paiement.'
+            this.$store.get('stripeTerminal/error'),
+            'Impossible de lancer le paiement sur le TPE.'
           )
           return
         }
         this.repriceConfirmation = false
-        await this.mountStripePayment(result.data)
+        this.kioskTerminalPayment = payment
+        await this.resolveTerminalPayment(payment)
       } catch (error) {
         this.checkoutErrorMessage = error.message
-        await this.abandonPreparedCheckout({ preserveMessage: true })
       } finally {
         this.checkoutLoading = null
+      }
+    },
+    async resolveTerminalPayment(payment) {
+      if (!payment) return
+      this.kioskTerminalPayment = payment
+      if (payment.outcome === 'pending') {
+        this.scheduleKioskTerminalPolling(payment.id)
+        this.checkoutAlertType = 'info'
+        this.checkoutErrorMessage = 'Paiement en attente sur le TPE Stripe.'
+        return
+      }
+      await this.finishTerminalPayment(payment)
+    },
+    scheduleKioskTerminalPolling(paymentId) {
+      this.clearKioskTerminalPolling()
+      this.kioskTerminalPollingTimer = setTimeout(() => {
+        this.pollKioskTerminalPayment(paymentId)
+      }, 2000)
+    },
+    clearKioskTerminalPolling() {
+      if (!this.kioskTerminalPollingTimer) return
+      clearTimeout(this.kioskTerminalPollingTimer)
+      this.kioskTerminalPollingTimer = null
+    },
+    async pollKioskTerminalPayment(paymentId) {
+      if (!paymentId || this.checkoutFinalized) return
+      this.checkoutLoading = 'terminal-poll'
+      try {
+        const payment = await this.$store.dispatch(
+          'stripeTerminal/refreshKioskPayment',
+          paymentId
+        )
+        if (payment) await this.resolveTerminalPayment(payment)
+      } finally {
+        this.checkoutLoading = null
+      }
+    },
+    async finishTerminalPayment(payment) {
+      this.clearKioskTerminalPolling()
+      this.kioskTerminalPayment = payment
+      await this.$store.dispatch('cart/completeCheckout')
+      this.checkoutFinalized = true
+      const paid = payment.outcome === 'paid'
+      await this.finishCheckout(
+        {
+          ok: true,
+          data: {
+            orderId: payment.orderId,
+            orderNumber: payment.orderNumber,
+          },
+        },
+        paid ? 'Carte bancaire - TPE Stripe' : 'À encaisser',
+        {
+          outcome: paid ? 'paid' : 'counter',
+          payment,
+        }
+      )
+      if (!paid) {
+        this.checkoutAlertType = 'warning'
+        this.checkoutErrorMessage =
+          payment.outcome === 'canceled'
+            ? 'Paiement annulé. La commande est à payer au comptoir.'
+            : 'Paiement refusé. La commande est à payer au comptoir.'
       }
     },
     handleCheckoutFailure(error, fallbackMessage) {
@@ -1152,61 +1233,11 @@ export default {
       this.checkoutAlertType = 'error'
       this.checkoutErrorMessage = error?.message || fallbackMessage
     },
-    async mountStripePayment(payment) {
-      this.stripePaymentReference = getKioskOrderReference({ data: payment })
-      this.stripePaymentOrderId = this.stripePaymentReference.orderId
-      if (!payment || !payment.clientSecret || !payment.publishableKey) {
-        throw new Error('Donnees Stripe incompletes.')
-      }
-      this.stripe = await loadStripe(payment.publishableKey)
-      if (!this.stripe) throw new Error('Stripe est indisponible.')
-      this.stripeElements = this.stripe.elements({
-        clientSecret: payment.clientSecret,
-      })
-      await this.$nextTick()
-      const paymentElement = this.stripeElements.create('payment')
-      paymentElement.mount(this.$refs.stripePaymentElement)
-      this.stripePaymentElementInstance = paymentElement
-      this.stripePaymentReady = true
-    },
-    async confirmStripePayment() {
-      if (!this.stripe || !this.stripeElements) return
-      this.checkoutErrorMessage = ''
-      this.checkoutAlertType = 'error'
-      this.checkoutLoading = 'stripe-confirm'
-      try {
-        const result = await this.stripe.confirmPayment({
-          elements: this.stripeElements,
-          redirect: 'if_required',
-          confirmParams: {
-            return_url: `${window.location.origin}/borne`,
-          },
-        })
-        if (result.error) {
-          this.checkoutErrorMessage =
-            result.error.message || 'Le paiement a échoué.'
-          return
-        }
-        if (result.paymentIntent?.status !== 'succeeded') {
-          this.checkoutAlertType = 'info'
-          this.checkoutErrorMessage =
-            'Paiement en cours de vérification. Ne relancez pas la commande.'
-          return
-        }
-        await this.$store.dispatch('cart/completeCheckout')
-        this.checkoutFinalized = true
-        await this.finishCheckout(
-          { ok: true, data: this.stripePaymentReference },
-          'Stripe'
-        )
-      } catch (error) {
-        this.checkoutErrorMessage =
-          error.message || 'Le paiement a échoué.'
-      } finally {
-        this.checkoutLoading = null
-      }
-    },
-    async finishCheckout(result, paymentMethod = 'Paiement au comptoir') {
+    async finishCheckout(
+      result,
+      paymentMethod = 'Paiement au comptoir',
+      printOptions = {}
+    ) {
       const initialReference = getKioskOrderReference(result)
       const authoritativeOrder = await this.fetchKioskOrder(
         initialReference.orderId
@@ -1226,7 +1257,12 @@ export default {
         ...reference,
         printStatus: 'Ticket en cours d impression.',
       }
-      const printed = await this.printKioskReceipt(reference.orderId, paymentMethod)
+      const printed = await this.printKioskTicketSet({
+        orderId: reference.orderId,
+        paymentMethod,
+        outcome: printOptions.outcome || 'counter',
+        payment: printOptions.payment || null,
+      })
       this.confirmation.printStatus = printed
         ? 'Ticket imprime.'
         : 'Ticket indisponible.'
@@ -1246,62 +1282,12 @@ export default {
         return null
       }
     },
-    restoreCheckoutPayload(payload) {
-      if (!payload || typeof payload !== 'object') return
-      this.customer = payload.customer || ''
-      this.phone = payload.phone || ''
-      this.saleMode = payload.is_takeaway === true ? 'takeaway' : 'dine_in'
-      if (Array.isArray(payload.dataCart)) {
-        this.cartItems = JSON.parse(JSON.stringify(payload.dataCart))
-      }
-    },
-    async restoreStripeReturn() {
-      const query = this.$route.query || {}
-      const hasStripeReturn = Boolean(
-        query.redirect_status ||
-          query.payment_intent ||
-          query.payment_intent_client_secret
-      )
-      if (!hasStripeReturn) return
-
-      this.restoreCheckoutPayload(this.$store.get('cart/clientOrderPayload'))
-      const orderId = this.$store.get('cart/clientOrderOrderId')
-      if (!orderId) {
-        this.checkoutAlertType = 'error'
-        this.checkoutErrorMessage =
-          'Retour de paiement détecté, mais la référence de commande est introuvable. Contactez le comptoir.'
-        return
-      }
-
-      this.checkoutAlertType = 'info'
-      this.checkoutErrorMessage = 'Vérification du paiement en cours.'
-      const order = await this.fetchKioskOrder(orderId)
-      if (!order) {
-        this.checkoutErrorMessage =
-          'Le paiement ne peut pas encore être vérifié. Ne relancez pas la commande et contactez le comptoir.'
-        return
-      }
-
-      const outcome = getKioskStripeReturnOutcome(order)
-      if (outcome === 'paid') {
-        await this.$store.dispatch('cart/completeCheckout')
-        this.checkoutFinalized = true
-        await this.finishCheckout({ data: order }, 'Stripe')
-        return
-      }
-      if (outcome === 'failed') {
-        await this.$store.dispatch('cart/abandonCheckout', { safe: true })
-        this.resetStripePaymentState()
-        this.checkoutAlertType = 'error'
-        this.checkoutErrorMessage =
-          'Le paiement a échoué ou a été annulé. Vous pouvez recommencer.'
-        return
-      }
-
-      this.checkoutErrorMessage =
-        'Paiement en cours de vérification. Ne relancez pas la commande.'
-    },
-    async printKioskReceipt(orderId, paymentMethod) {
+    async printKioskTicketSet({
+      orderId,
+      paymentMethod,
+      outcome = 'counter',
+      payment = null,
+    } = {}) {
       if (!orderId) return false
       try {
         await Promise.all([
@@ -1311,84 +1297,122 @@ export default {
         const orders = this.$store.get('orders/dataOrders') || []
         const order = orders.find((item) => String(item.id) === String(orderId))
         if (!order) return false
-        const payload = buildOrderTicketPayload({
-          order: {
-            ...order,
-            customer: order.customer || this.customer || 'Client borne',
-            source: 'borne',
-            order_source: 'borne',
-          },
-          details: this.$store.get('orders/detailOrder') || [],
+        const details = this.$store.get('orders/detailOrder') || []
+        const orderForTickets = {
+          ...order,
+          customer: order.customer || this.customer || 'Client borne',
+          payment: paymentMethod,
+          source: 'borne',
+          order_source: 'borne',
+        }
+        const orderPayload = buildOrderTicketPayload({
+          order: orderForTickets,
+          details,
           shopInfo: this.shopInfo,
           fallbackPaymentMethod: paymentMethod,
           fallbackTable: 'Borne',
         })
-        return sendOrderTicket({
-          payload,
+        const smartPrint =
+          this.shopInfo.service_point_smart_print_app ||
+          this.shopInfo.smart_print_app
+        const printerIp =
+          this.shopInfo.service_point_printer_ip || this.shopInfo.shop_printer_ip
+        const orderPrinted = sendOrderTicket({
+          payload: orderPayload,
           smartPrint:
             this.shopInfo.service_point_smart_print_app ||
             this.shopInfo.smart_print_app,
-          printerIp: this.shopInfo.service_point_printer_ip || this.shopInfo.shop_printer_ip,
+          printerIp:
+            this.shopInfo.service_point_printer_ip ||
+            this.shopInfo.shop_printer_ip,
           dispatch: this.$store.dispatch,
         })
+        if (outcome !== 'paid') return orderPrinted
+
+        const receiptPayload = buildCashierReceiptPayload({
+          order: orderForTickets,
+          details,
+          shopInfo: this.shopInfo,
+          fallbackPaymentMethod: paymentMethod,
+          fallbackTable: 'Borne',
+        })
+        const receiptPrinted = sendCashierReceipt({
+          payload: receiptPayload,
+          smartPrint,
+          printerIp,
+          dispatch: this.$store.dispatch,
+        })
+        const cardPrinted = sendCardTicket({
+          payload: buildCardTicketPayload({
+            payment: payment || {},
+            order: orderForTickets,
+            shopInfo: this.shopInfo,
+          }),
+          smartPrint,
+          printerIp,
+          dispatch: this.$store.dispatch,
+        })
+        return orderPrinted && receiptPrinted && cardPrinted
       } catch (error) {
         return false
       }
     },
-    resetStripePaymentState() {
-      if (this.stripePaymentElementInstance) {
-        try {
-          this.stripePaymentElementInstance.unmount()
-        } catch (error) {
-          // The element may already be detached after a route change.
-        }
-      }
-      this.stripePaymentElementInstance = null
-      this.stripe = null
-      this.stripeElements = null
-      this.stripePaymentReady = false
-      this.stripePaymentOrderId = null
-      this.stripePaymentReference = null
+    resetTerminalPaymentState() {
+      this.clearKioskTerminalPolling()
+      this.kioskTerminalPayment = null
+      this.terminalClientOrderToken = null
+      this.$store.dispatch('stripeTerminal/resetPayment')
     },
     async abandonPreparedCheckout({ preserveMessage = false } = {}) {
-      const orderId =
-        this.stripePaymentOrderId ||
-        this.$store.get('cart/clientOrderOrderId') ||
-        null
-      if (orderId) {
-        const canceled = await this.$store.dispatch(
-          'cart/cancelStripeCheckout',
-          orderId
-        )
-        if (!canceled || !canceled.ok) {
-          this.checkoutAlertType = 'error'
-          this.checkoutErrorMessage =
-            canceled?.error?.message ||
-            "Impossible d'annuler le paiement préparé. Réessayez avant de quitter."
-          return false
-        }
+      if (this.terminalPaymentInProgress) {
+        return this.cancelTerminalPayment({ preserveMessage })
       }
 
-      const abandoned = await this.$store.dispatch(
-        'cart/abandonCheckout',
-        orderId ? { safe: true } : undefined
-      )
+      const abandoned = await this.$store.dispatch('cart/abandonCheckout', {
+        safe: true,
+      })
       if (!abandoned || !abandoned.ok) {
         this.checkoutAlertType = 'error'
         this.checkoutErrorMessage =
           abandoned?.error?.message ||
-          'La tentative de commande doit être résolue avant de quitter.'
+          'La tentative de commande doit etre resolue avant de quitter.'
         return false
       }
 
-      this.resetStripePaymentState()
+      this.resetTerminalPaymentState()
       this.repriceConfirmation = false
       if (!preserveMessage) this.checkoutErrorMessage = ''
       return true
     },
-    async cancelStripePayment() {
-      if (this.checkoutLoading) return
-      await this.abandonPreparedCheckout()
+    async cancelTerminalPayment({ preserveMessage = false } = {}) {
+      if (this.checkoutLoading) return false
+      const paymentId = this.kioskTerminalPayment && this.kioskTerminalPayment.id
+      if (!paymentId) {
+        this.resetTerminalPaymentState()
+        return true
+      }
+
+      this.checkoutLoading = 'terminal-cancel'
+      try {
+        const payment = await this.$store.dispatch(
+          'stripeTerminal/cancelKioskPayment',
+          paymentId
+        )
+        if (!payment) {
+          this.checkoutAlertType = 'error'
+          this.checkoutErrorMessage =
+            this.$store.get('stripeTerminal/error')?.message ||
+            "Impossible d'annuler le paiement sur le TPE."
+          return false
+        }
+        await this.resolveTerminalPayment(payment)
+        if (!preserveMessage && payment.outcome === 'pending') {
+          this.checkoutErrorMessage = ''
+        }
+        return payment.outcome !== 'pending'
+      } finally {
+        this.checkoutLoading = null
+      }
     },
     async resetKiosk() {
       await this.$store.dispatch('cart/abandonCheckout', { safe: true })
@@ -1403,7 +1427,7 @@ export default {
       this.checkoutAlertType = 'error'
       this.checkoutFinalized = false
       this.repriceConfirmation = false
-      this.resetStripePaymentState()
+      this.resetTerminalPaymentState()
     },
     async logout() {
       if (this.checkoutLoading) return
@@ -1902,13 +1926,6 @@ export default {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-}
-
-.kiosk-stripe-panel {
-  margin-top: 16px;
-  padding: 12px;
-  border: 1px solid var(--se-color-border);
-  border-radius: 8px;
 }
 
 .kiosk-confirmation {

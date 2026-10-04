@@ -1,5 +1,8 @@
 const { roundPrice } = require('./price-functions')
-const { buildConfigurationSignature } = require('./customizations')
+const {
+  buildCheckoutItems,
+  buildConfigurationSignature,
+} = require('./customizations')
 const {
   isCounterPaymentAllowed,
   isStripePaymentRequired,
@@ -22,6 +25,8 @@ const buildKioskCheckoutPayload = ({
   isTakeaway,
   dataCart,
   stripe = false,
+  terminal = false,
+  clientOrderToken,
   repriceConfirmation = false,
 } = {}) => {
   const normalizedServicePointId = Number(servicePointId || 0)
@@ -30,6 +35,28 @@ const buildKioskCheckoutPayload = ({
   }
   if (!Array.isArray(dataCart) || dataCart.length === 0) {
     throw new TypeError('Le panier est vide.')
+  }
+
+  if (terminal === true) {
+    return {
+      customer: {
+        name: requiredText(customer, 'Le nom'),
+        phone: requiredText(phone, 'Le numero'),
+        remark: '',
+      },
+      servicePointId: normalizedServicePointId,
+      expected_total: roundPrice(total),
+      items: buildCheckoutItems(dataCart),
+      is_takeaway: isTakeaway === true,
+      client_order_token: requiredText(
+        clientOrderToken,
+        'La reference de commande'
+      ),
+      payment: requiredText(payment, 'Le paiement'),
+      terminal: true,
+      stripe: false,
+      source: KIOSK_SOURCE,
+    }
   }
 
   return {
