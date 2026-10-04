@@ -693,6 +693,9 @@ export default {
         shop_phone: this.$store.get('shop/shop_phone'),
         shop_printer_ip: this.$store.get('shop/shop_printer_ip'),
         smart_print_app: this.$store.get('shop/smart_print_app'),
+        service_point_printer_ip: this.currentUser.service_point_printer_ip || '',
+        service_point_smart_print_app:
+          this.currentUser.service_point_smart_print_app,
         activate_tva: this.$store.get('shop/activate_tva'),
       }
     },
@@ -1322,8 +1325,10 @@ export default {
         })
         return sendOrderTicket({
           payload,
-          smartPrint: this.shopInfo.smart_print_app,
-          printerIp: this.shopInfo.shop_printer_ip,
+          smartPrint:
+            this.shopInfo.service_point_smart_print_app ||
+            this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.service_point_printer_ip || this.shopInfo.shop_printer_ip,
           dispatch: this.$store.dispatch,
         })
       } catch (error) {

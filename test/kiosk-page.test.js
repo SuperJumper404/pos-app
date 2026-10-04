@@ -162,6 +162,8 @@ assert.match(pageSource, /numero de commande/)
 assert.match(pageSource, /buildOrderTicketPayload/)
 assert.match(pageSource, /sendOrderTicket/)
 assert.match(pageSource, /printKioskReceipt/)
+assert.match(pageSource, /service_point_printer_ip/)
+assert.match(pageSource, /service_point_smart_print_app/)
 assert.match(pageSource, /Ticket imprime/)
 assert.match(pageSource, /Ticket indisponible/)
 assert.match(pageSource, /orders\/getAllOrder/)
@@ -197,5 +199,9 @@ assert.match(
 )
 assert.match(finishCheckoutSource, /Ticket imprime/)
 assert.match(finishCheckoutSource, /Ticket indisponible/)
+assert.match(
+  pageSource,
+  /printerIp:\s*this\.shopInfo\.service_point_printer_ip \|\| this\.shopInfo\.shop_printer_ip/
+)
 
 console.log('kiosk page tests passed')

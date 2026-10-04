@@ -25,6 +25,8 @@ export const state = () => ({
     session_subject: null,
     service_point_id: null,
     service_point_name: null,
+    service_point_printer_ip: '',
+    service_point_smart_print_app: false,
     order_source: null,
     qrSessionReady: false,
     qrSessionToken: null,
@@ -43,6 +45,8 @@ export const mutations = {
     currentState.user.session_subject = null
     currentState.user.service_point_id = null
     currentState.user.service_point_name = null
+    currentState.user.service_point_printer_ip = ''
+    currentState.user.service_point_smart_print_app = false
     currentState.user.order_source = null
     currentState.user.qrSessionReady = false
     currentState.user.qrSessionToken = null
@@ -75,6 +79,11 @@ const persistAuthStorage = (user) => {
       : ''
   )
   localStorage.setItem('order_source', user.source || user.order_source || '')
+  localStorage.setItem('service_point_printer_ip', user.service_point_printer_ip || '')
+  localStorage.setItem(
+    'service_point_smart_print_app',
+    user.service_point_smart_print_app ? '1' : '0'
+  )
   if (servicePointSession && user.qrSessionToken) {
     localStorage.setItem('table_access_token', user.qrSessionToken)
   }
@@ -103,6 +112,11 @@ const persistAuthenticatedUser = async (dispatch, response) => {
     servicePointSession ? user.username || user.service_point_name || null : null
   )
   dispatch('set/user.order_source', user.source || null)
+  dispatch('set/user.service_point_printer_ip', user.service_point_printer_ip || '')
+  dispatch(
+    'set/user.service_point_smart_print_app',
+    user.service_point_smart_print_app || false
+  )
   return user
 }
 const restoreAuthenticatedUser = (dispatch) => {
@@ -122,6 +136,11 @@ const restoreAuthenticatedUser = (dispatch) => {
   dispatch('set/user.session_subject', sessionSubject)
   dispatch('set/user.service_point_id', localStorage.getItem('service_point_id') || null)
   dispatch('set/user.service_point_name', localStorage.getItem('service_point_name') || null)
+  dispatch('set/user.service_point_printer_ip', localStorage.getItem('service_point_printer_ip') || '')
+  dispatch(
+    'set/user.service_point_smart_print_app',
+    localStorage.getItem('service_point_smart_print_app') === '1'
+  )
   dispatch('set/user.order_source', localStorage.getItem('order_source') || null)
   dispatch('setAuthentication', true, { root: true })
   return true
@@ -276,6 +295,8 @@ export const actions = {
     dispatch('set/user.session_subject', null)
     dispatch('set/user.service_point_id', null)
     dispatch('set/user.service_point_name', null)
+    dispatch('set/user.service_point_printer_ip', '')
+    dispatch('set/user.service_point_smart_print_app', false)
     dispatch('set/user.order_source', null)
     dispatch('set/user.qrSessionReady', false)
     dispatch('set/user.qrSessionToken', null)
@@ -304,6 +325,8 @@ export const actions = {
         localStorage.removeItem('session_subject')
         localStorage.removeItem('service_point_id')
         localStorage.removeItem('service_point_name')
+        localStorage.removeItem('service_point_printer_ip')
+        localStorage.removeItem('service_point_smart_print_app')
         localStorage.removeItem('order_source')
         localStorage.removeItem('table_access_token')
         dispatch('clearAuthenticatedUser')

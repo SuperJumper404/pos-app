@@ -20,6 +20,8 @@ const clearAuthState = (state) => {
   user.session_subject = null
   user.service_point_id = null
   user.service_point_name = null
+  user.service_point_printer_ip = ''
+  user.service_point_smart_print_app = false
   user.order_source = null
 }
 
@@ -61,6 +63,8 @@ const sanitizedAuthSnapshot = (state) => {
             session_subject: null,
             service_point_id: null,
             service_point_name: null,
+            service_point_printer_ip: '',
+            service_point_smart_print_app: false,
             order_source: null,
           },
         }),

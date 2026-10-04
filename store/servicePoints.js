@@ -69,11 +69,11 @@ export const actions = {
         return false
       })
   },
-  createKiosk({ dispatch }, name) {
+  createKiosk({ dispatch }, data) {
     return this.$axios
       .post(
         '/baseurl/api/v1/service-points/kiosks',
-        { name },
+        data,
         { headers: { Authorization: `Bearer ${readToken()}` } }
       )
       .then((response) => {
