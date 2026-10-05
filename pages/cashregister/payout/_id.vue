@@ -270,6 +270,10 @@ import {
   buildGroupedCashierReceiptPayload,
   sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
+import {
+  buildCardTicketPayload,
+  sendCardTicket,
+} from '@/helpers/cardTicket'
 const {
   isCashPaymentMethod,
   sendCashDrawerOpen,
@@ -983,6 +987,7 @@ export default {
           printerIp: this.shopInfo.shop_printer_ip,
           dispatch: this.$store.dispatch,
         })
+        this.printTerminalCardTickets(printableOrders)
       } catch (error) {
         this.$store.dispatch(
           'notifications/error',
@@ -992,6 +997,65 @@ export default {
       } finally {
         this.receiptPrinting = false
       }
+    },
+    printTerminalCardTickets(orders) {
+      const groups = new Map()
+      ;(Array.isArray(orders) ? orders : []).forEach((order) => {
+        const paymentId = Number(order && order.stripe_terminal_payment_id)
+        if (
+          order?.payment_provider !== 'stripe_terminal' ||
+          !Number.isSafeInteger(paymentId) ||
+          paymentId <= 0
+        ) {
+          return
+        }
+        if (!groups.has(paymentId)) groups.set(paymentId, [])
+        groups.get(paymentId).push(order)
+      })
+
+      groups.forEach((group, paymentId) => {
+        const orderIds = group.map((order) => Number(order.id)).filter(Boolean)
+        const orderNumber = group
+          .map((order) => order.ordernumber || order.orderNumber || order.id)
+          .filter(Boolean)
+          .join(' / ')
+        const allocatedAmountCents = group.reduce((sum, order) => {
+          const cents = Number(order.stripe_terminal_amount_cents)
+          return Number.isSafeInteger(cents) && cents >= 0 ? sum + cents : sum
+        }, 0)
+        const activePayment =
+          this.terminalPayment && Number(this.terminalPayment.id) === paymentId
+            ? this.terminalPayment
+            : {}
+        const order = group.length === 1
+          ? group[0]
+          : {
+              id: orderIds.join('-'),
+              ordernumber: orderNumber,
+              created: group[0] && group[0].created,
+            }
+        const payment = {
+          ...activePayment,
+          id: paymentId,
+          orderId: order.id,
+          orderNumber,
+          orderIds,
+          amountCents:
+            Number.isSafeInteger(activePayment.amountCents)
+              ? activePayment.amountCents
+              : allocatedAmountCents,
+        }
+        sendCardTicket({
+          payload: buildCardTicketPayload({
+            payment,
+            order,
+            shopInfo: this.shopInfo,
+          }),
+          smartPrint: this.shopInfo.smart_print_app,
+          printerIp: this.shopInfo.shop_printer_ip,
+          dispatch: this.$store.dispatch,
+        })
+      })
     },
     openCashDrawerForCashPayment(paymentMethod) {
       if (!isCashPaymentMethod(paymentMethod)) return false

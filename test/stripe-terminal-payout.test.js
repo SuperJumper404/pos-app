@@ -896,6 +896,39 @@ test('Terminal paid receipts scale order and line VAT while the manual snapshot 
   }
 })
 
+test('Terminal counter receipt also prints the card ticket', async () => {
+  const h = make({ details: [{ id: 10, name: 'Menu', qty: 1, total: 10.75 }] })
+  await h.initialize()
+  h.instance.selectPaymentMethod(terminalMethod)
+  await h.instance.requestReceiptChoice()
+  h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', {
+    amountCents: 1075,
+  })
+  h.responses['orders/getAllOrder'] = () => {
+    h.state.orders = [
+      order(1, {
+        subtotal: 10.75,
+        payment_status: 'paid',
+        payment: 'Carte bancaire - TPE Stripe',
+        payment_provider: 'stripe_terminal',
+        stripe_terminal_payment_id: 91,
+        stripe_terminal_amount_cents: 1075,
+      }),
+    ]
+    return true
+  }
+
+  await h.tick()
+  await h.instance.confirmReceiptChoice(true)
+
+  const printJobs = h.calls.filter((call) => call.name === 'printing/postPrintingJob')
+  assert.deepStrictEqual(
+    printJobs.map((job) => job.payload.ticketType),
+    ['caisse', 'carte']
+  )
+  assert.strictEqual(printJobs[1].payload.orderId, 1)
+})
+
 test('legacy invalid exact recovery is discarded so current discount edits can start a valid payment', async () => {
   for (const [discountType, discountValue] of [['percent', 100], ['amount', 1151], ['amount', 'invalid']]) {
     const h = make()
