@@ -634,6 +634,7 @@ export default {
       exitError: '',
       exitLoading: false,
       exitDialogTimer: null,
+      confirmationReturnTimer: null,
       exitKeypadDigits: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
       nameKeyboardRows: [
         ['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(
@@ -838,6 +839,7 @@ export default {
   beforeDestroy() {
     this.stopWelcomeAnimationRotation()
     this.clearExitDialogTimer()
+    this.clearConfirmationReturnTimer()
     this.resetTerminalPaymentState()
   },
   methods: {
@@ -877,6 +879,18 @@ export default {
       clearTimeout(this.exitDialogTimer)
       this.exitDialogTimer = null
     },
+    scheduleConfirmationReturn() {
+      this.clearConfirmationReturnTimer()
+      if (typeof window === 'undefined') return
+      this.confirmationReturnTimer = setTimeout(() => {
+        this.resetKiosk()
+      }, 10000)
+    },
+    clearConfirmationReturnTimer() {
+      if (!this.confirmationReturnTimer) return
+      clearTimeout(this.confirmationReturnTimer)
+      this.confirmationReturnTimer = null
+    },
     appendExitPin(digit) {
       if (this.exitLoading || this.exitPin.length >= 4) return
       this.exitPin = `${this.exitPin}${digit}`
@@ -906,6 +920,7 @@ export default {
       await this.logout()
     },
     startNewOrder() {
+      this.clearConfirmationReturnTimer()
       this.customer = ''
       this.phone = ''
       this.saleMode = 'dine_in'
@@ -1269,6 +1284,7 @@ export default {
       await this.$store.dispatch('cart/setTotal', 0)
       await this.$store.dispatch('cart/setIndex', 0)
       await this.$store.dispatch('cart/setTocart', null)
+      this.scheduleConfirmationReturn()
     },
     async fetchKioskOrder(orderId) {
       if (!orderId) return null
@@ -1415,6 +1431,7 @@ export default {
       }
     },
     async resetKiosk() {
+      this.clearConfirmationReturnTimer()
       await this.$store.dispatch('cart/abandonCheckout', { safe: true })
       this.cartItems = []
       this.customer = ''

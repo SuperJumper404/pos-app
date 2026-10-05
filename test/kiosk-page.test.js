@@ -192,6 +192,11 @@ assert.match(pageSource, /servicePoints\/verifyKioskPin/)
 assert.match(pageSource, /exitDialogTimer = setTimeout/)
 assert.match(pageSource, /15000/)
 assert.match(pageSource, /closeExitDialog/)
+assert.match(pageSource, /confirmationReturnTimer:\s*null/)
+assert.match(pageSource, /scheduleConfirmationReturn/)
+assert.match(pageSource, /clearConfirmationReturnTimer/)
+assert.match(pageSource, /this\.confirmationReturnTimer = setTimeout\(\(\) => \{[\s\S]*this\.resetKiosk\(\)[\s\S]*\}, 10000\)/)
+assert.match(pageSource, /beforeDestroy\(\) \{[\s\S]*this\.clearConfirmationReturnTimer\(\)/)
 
 const submitTerminalPaymentStart = pageSource.indexOf(
   '    async submitTerminalPayment() {'
@@ -204,7 +209,7 @@ const submitTerminalPaymentSource = pageSource.slice(
 assert.match(submitTerminalPaymentSource, /catch \(error\)[\s\S]*checkoutErrorMessage/)
 assert.match(submitTerminalPaymentSource, /this\.buildPayload\('Carte bancaire - TPE Stripe', false, true\)/)
 
-const resetKioskStart = pageSource.indexOf('    resetKiosk() {', finishCheckoutStart)
+const resetKioskStart = pageSource.indexOf('    async resetKiosk() {', finishCheckoutStart)
 const finishCheckoutSource = pageSource.slice(finishCheckoutStart, resetKioskStart)
 assert.match(
   finishCheckoutSource,
@@ -212,6 +217,10 @@ assert.match(
 )
 assert.match(finishCheckoutSource, /Ticket imprime/)
 assert.match(finishCheckoutSource, /Ticket indisponible/)
+assert.match(finishCheckoutSource, /this\.scheduleConfirmationReturn\(\)/)
+const resetKioskEnd = pageSource.indexOf('    async logout() {', resetKioskStart)
+const resetKioskSource = pageSource.slice(resetKioskStart, resetKioskEnd)
+assert.match(resetKioskSource, /this\.clearConfirmationReturnTimer\(\)/)
 assert.match(
   pageSource,
   /const printerIp =[\s\S]*this\.shopInfo\.service_point_printer_ip \|\| this\.shopInfo\.shop_printer_ip/
