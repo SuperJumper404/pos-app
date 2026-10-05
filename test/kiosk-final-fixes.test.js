@@ -57,7 +57,7 @@ assert.deepStrictEqual(getKioskPaymentAvailability('stripe_before_order'), {
 })
 assert.deepStrictEqual(getKioskPaymentAvailability('pay_at_counter'), {
   counter: true,
-  stripe: false,
+  stripe: true,
 })
 assert.deepStrictEqual(getKioskPaymentAvailability('unexpected'), {
   counter: false,

@@ -134,7 +134,7 @@ const isKioskProductAvailable = (product = {}) => {
 
 const getKioskPaymentAvailability = (mode) => ({
   counter: isCounterPaymentAllowed(mode),
-  stripe: isStripePaymentRequired(mode),
+  stripe: isStripePaymentRequired(mode) || isCounterPaymentAllowed(mode),
 })
 
 const getKioskStripeReturnOutcome = (order = {}) => {
