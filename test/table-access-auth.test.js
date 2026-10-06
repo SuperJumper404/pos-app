@@ -54,6 +54,8 @@ const responseUser = {
   service_point_id: 31,
   username: 'Table 31',
   source: 'table_qr',
+  service_point_printer_ip: '192.168.1.45',
+  service_point_smart_print_app: 1,
 }
 
 const axios = {
@@ -80,6 +82,8 @@ actions.postTableAccess
     assert.strictEqual(storage.session_subject, 'service_point')
     assert.strictEqual(storage.service_point_id, '31')
     assert.strictEqual(storage.service_point_name, 'Table 31')
+    assert.strictEqual(storage.service_point_printer_ip, '192.168.1.45')
+    assert.strictEqual(storage.service_point_smart_print_app, '1')
     assert.strictEqual(storage.table_access_token, 'stable-qr-token')
     assert.deepStrictEqual(dispatches.slice(0, 6), [
       { type: 'stripeTerminal/resetSession', payload: null, options: { root: true } },
@@ -96,6 +100,10 @@ actions.postTableAccess
     assert.deepStrictEqual(dispatches.slice(6, 8), [
       { type: 'set/user.module_permissions', payload: null, options: undefined },
       { type: 'set/user.is_primary_admin', payload: false, options: undefined },
+    ])
+    assert.deepStrictEqual(dispatches.slice(12, 14), [
+      { type: 'set/user.service_point_printer_ip', payload: '192.168.1.45', options: undefined },
+      { type: 'set/user.service_point_smart_print_app', payload: 1, options: undefined },
     ])
     console.log('table access auth tests passed')
   })

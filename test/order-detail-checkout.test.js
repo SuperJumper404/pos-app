@@ -208,9 +208,17 @@ assert.strictEqual(
   }),
   true
 )
-assert.strictEqual(
-  JSON.parse(smartPrintRequest.options.body).ticketType,
-  'cuisine'
+const smartPrintBody = JSON.parse(smartPrintRequest.options.body)
+assert.strictEqual(smartPrintBody.ticketType, 'cuisine')
+assert.ok(smartPrintBody.dataFormatESCPOS)
+assert.ok(smartPrintBody.dataFormatXML)
+assert.strictEqual(smartPrintBody.ticketData.schemaVersion, 1)
+assert.strictEqual(smartPrintBody.ticketData.kind, 'order_ticket')
+assert.strictEqual(smartPrintBody.ticketData.business.orderId, ticketPayload.orderId)
+assert.ok(
+  smartPrintBody.ticketData.render.sections.some(
+    (section) => section.id === 'items'
+  )
 )
 
 const enrichedPayload = buildOrderTicketPayload({
@@ -234,6 +242,28 @@ const enrichedPayload = buildOrderTicketPayload({
     },
   ],
 })
+let enrichedSmartPrintRequest
+sendOrderTicket({
+  payload: enrichedPayload,
+  smartPrint: true,
+  printerIp: '192.168.1.20',
+  fetchImplementation: (url, options) => {
+    enrichedSmartPrintRequest = { url, options }
+    return Promise.resolve({ ok: true })
+  },
+  dispatch: () => true,
+})
+const enrichedTicketData = JSON.parse(
+  enrichedSmartPrintRequest.options.body
+).ticketData
+const renderedLines = enrichedTicketData.render.sections
+  .flatMap((section) => section.lines || [])
+  .map((line) => line.text || line.fallbackText || '')
+  .join('\n')
+assert.match(renderedLines, /Sauces : Ketchup/)
+assert.match(renderedLines, /Sauces : Barbecue/)
+assert.match(renderedLines, /12,00/)
+assert.match(renderedLines, /TOTAL : 12,00/)
 const cloudXml = buildOrderTicketCloudXml(enrichedPayload)
 assert.match(cloudXml, /À emporter/)
 assert.match(cloudXml, /Sauces : Ketchup/)

@@ -38,7 +38,14 @@ assert.deepStrictEqual(
 assert.strictEqual(isKioskProductAvailable({ archived: 0, stock: 1 }), true)
 assert.strictEqual(isKioskProductAvailable({ archived: 1, stock: 10 }), false)
 assert.strictEqual(isKioskProductAvailable({ is_hidden: 1, stock: 10 }), false)
-assert.strictEqual(isKioskProductAvailable({ stock: 0 }), false)
+assert.strictEqual(
+  isKioskProductAvailable({ stock: 0, track_stock: 0 }),
+  true
+)
+assert.strictEqual(
+  isKioskProductAvailable({ stock: 0, track_stock: 1 }),
+  false
+)
 assert.strictEqual(
   isKioskProductAvailable({ stock: 10, customization_available: false }),
   false
@@ -50,7 +57,7 @@ assert.deepStrictEqual(getKioskPaymentAvailability('stripe_before_order'), {
 })
 assert.deepStrictEqual(getKioskPaymentAvailability('pay_at_counter'), {
   counter: true,
-  stripe: false,
+  stripe: true,
 })
 assert.deepStrictEqual(getKioskPaymentAvailability('unexpected'), {
   counter: false,
@@ -99,10 +106,12 @@ assert.strictEqual(
 const pageSource = fs.readFileSync(path.join(root, 'pages', 'borne.vue'), 'utf8')
 assert.match(pageSource, /this\.\$store\.get\('users\/user'\)/)
 assert.doesNotMatch(pageSource, /localStorage\.getItem\('service_point_id'\)/)
-assert.match(pageSource, /cart\/cancelStripeCheckout/)
+assert.doesNotMatch(pageSource, /cart\/cancelStripeCheckout/)
+assert.match(pageSource, /stripeTerminal\/cancelKioskPayment/)
+assert.match(pageSource, /stripeTerminal\/resetPayment/)
 assert.match(pageSource, /cart\/abandonCheckout/)
 assert.match(pageSource, /beforeRouteLeave/)
-assert.match(pageSource, /redirect_status/)
+assert.doesNotMatch(pageSource, /redirect_status/)
 assert.match(pageSource, /ORDER_REPRICE_REQUIRED/)
 assert.match(pageSource, /applyServerQuoteToCart/)
 assert.match(pageSource, /ordernumber/)

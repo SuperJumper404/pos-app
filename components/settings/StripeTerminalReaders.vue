@@ -4,7 +4,7 @@
     <div class="terminal-readers__heading">
       <div>
         <h4 id="terminal-readers-title">Terminaux de paiement</h4>
-        <p class="mb-0 mt-1">Gérez les TPE et leur caissier.</p>
+        <p class="mb-0 mt-1">Gérez les TPE et leur caissier ou leur borne.</p>
       </div>
       <div class="terminal-readers__toolbar">
         <v-tooltip bottom>
@@ -26,7 +26,7 @@
         <v-btn
           color="primary"
           class="text-none"
-          :disabled="!stripeReady || !listLoaded || !staffLoaded || !cashiers.length || busy"
+          :disabled="!stripeReady || !listLoaded || !staffLoaded || !servicePointsLoaded || !hasAssignableTarget || busy"
           @click="openRegistration"
         >
           <v-icon left small>mdi-credit-card-plus-outline</v-icon>
@@ -42,8 +42,8 @@
       <v-alert v-if="listError" type="error" text dense class="mt-4 mb-0" role="alert">
         {{ listError }}
       </v-alert>
-      <v-alert v-if="listLoaded && staffLoaded && !cashiers.length" type="info" text dense class="mt-4 mb-0">
-        Aucun caissier disponible pour affecter un TPE.
+      <v-alert v-if="listLoaded && staffLoaded && servicePointsLoaded && !hasAssignableTarget" type="info" text dense class="mt-4 mb-0">
+        Aucun caissier ou borne disponible pour affecter un TPE.
       </v-alert>
       <v-skeleton-loader v-if="!listLoaded && busy" type="list-item-two-line" class="mt-4" />
       <p v-else-if="listLoaded && !readers.length" class="terminal-readers__empty mb-0 mt-4">
@@ -54,7 +54,7 @@
           <div class="terminal-readers__details">
             <strong>{{ reader.label }}</strong>
             <span class="terminal-readers__meta">{{ reader.serialNumber || reader.deviceType || 'Terminal' }}</span>
-            <span class="terminal-readers__meta">Caissier : {{ cashierName(reader.assignedUserId) }}</span>
+            <span class="terminal-readers__meta">{{ assignmentLabel(reader) }}</span>
           </div>
           <div class="terminal-readers__controls">
             <div class="terminal-readers__chips">
@@ -102,6 +102,18 @@
           </div>
           <div v-if="editingReaderId === reader.id" class="terminal-readers__assignment">
             <v-select
+              v-model="assignmentType"
+              :items="assignmentTypeItems"
+              item-text="text"
+              item-value="value"
+              label="Type d’affectation"
+              dense
+              outlined
+              hide-details
+              :disabled="busy || !reader.isActive"
+            />
+            <v-select
+              v-if="assignmentType === 'cashier'"
               v-model="assignmentUserId"
               :items="cashiers"
               item-text="username"
@@ -112,16 +124,28 @@
               hide-details
               :disabled="busy || !reader.isActive"
             />
+            <v-select
+              v-else
+              v-model="assignmentServicePointId"
+              :items="kioskServicePoints"
+              item-text="name"
+              item-value="id"
+              label="Borne"
+              dense
+              outlined
+              hide-details
+              :disabled="busy || !reader.isActive"
+            />
             <v-tooltip bottom>
               <template #activator="{ on, attrs }">
                 <v-btn
                   icon
                   color="primary"
-                  :disabled="busy || !reader.isActive || !assignmentUserId"
+                  :disabled="busy || !reader.isActive || !selectedAssignmentId"
                   :aria-label="`Enregistrer l'affectation de ${reader.label}`"
                   v-bind="attrs"
                   v-on="on"
-                  @click="assignReader(reader, assignmentUserId)"
+                  @click="assignReader(reader, selectedAssignmentId)"
                 >
                   <v-icon>mdi-check</v-icon>
                 </v-btn>
@@ -172,11 +196,35 @@
               dense
             />
             <v-select
+              v-model="assignmentType"
+              :items="assignmentTypeItems"
+              item-text="text"
+              item-value="value"
+              label="Type d’affectation"
+              :rules="[required]"
+              :disabled="!stripeReady || busy"
+              outlined
+              dense
+            />
+            <v-select
+              v-if="assignmentType === 'cashier'"
               v-model="assignedUserId"
               :items="cashiers"
               item-text="username"
               item-value="id"
               label="Caissier"
+              :rules="[required]"
+              :disabled="!stripeReady || busy"
+              outlined
+              dense
+            />
+            <v-select
+              v-else
+              v-model="assignedServicePointId"
+              :items="kioskServicePoints"
+              item-text="name"
+              item-value="id"
+              label="Borne"
               :rules="[required]"
               :disabled="!stripeReady || busy"
               outlined
@@ -243,16 +291,20 @@ export default {
     connectionVersion: 0,
     listLoaded: false,
     staffLoaded: false,
+    servicePointsLoaded: false,
     loadAttempted: false,
     listError: '',
     actionError: '',
     dialogOpen: false,
     registrationCode: '',
     readerLabel: '',
+    assignmentType: 'cashier',
     assignedUserId: null,
+    assignedServicePointId: null,
     address: { line1: '', postalCode: '', city: '', country: 'FR' },
     editingReaderId: null,
     assignmentUserId: null,
+    assignmentServicePointId: null,
   }),
   computed: {
     readers() {
@@ -262,6 +314,28 @@ export default {
       return (this.$store.get('staff/data') || []).filter(
         (user) => [0, 1].includes(Number(user.access)) && Number(user.status) === 1
       )
+    },
+    servicePoints() {
+      return this.$store.get('servicePoints/items') || []
+    },
+    kioskServicePoints() {
+      return this.servicePoints.filter(
+        (point) => point && point.type === 'kiosk' && Number(point.is_active) === 1
+      )
+    },
+    hasAssignableTarget() {
+      return this.cashiers.length > 0 || this.kioskServicePoints.length > 0
+    },
+    assignmentTypeItems() {
+      return [
+        { text: 'Caissier', value: 'cashier' },
+        { text: 'Borne', value: 'kiosk' },
+      ]
+    },
+    selectedAssignmentId() {
+      return this.assignmentType === 'kiosk'
+        ? this.assignmentServicePointId
+        : this.assignmentUserId
     },
     firstLocation() {
       return this.readers.length === 0
@@ -294,12 +368,16 @@ export default {
       this.busy = false
       this.closeRegistration()
       this.readerLabel = ''
+      this.assignmentType = 'cashier'
       this.assignedUserId = null
+      this.assignedServicePointId = null
       this.address = { line1: '', postalCode: '', city: '', country: 'FR' }
       this.editingReaderId = null
       this.assignmentUserId = null
+      this.assignmentServicePointId = null
       this.listLoaded = false
       this.staffLoaded = false
+      this.servicePointsLoaded = false
       this.loadAttempted = false
       this.listError = ''
     },
@@ -316,19 +394,22 @@ export default {
       this.loadAttempted = true
       this.listError = ''
       try {
-        const [readers, staff] = await Promise.all([
+        const [readers, staff, servicePoints] = await Promise.all([
           this.$store.dispatch('stripeTerminal/getReaders'),
           this.$store.dispatch('staff/getAll', { silent: true }),
+          this.$store.dispatch('servicePoints/getAll', { silent: true }),
         ])
         if (version !== this.connectionVersion || !this.stripeReady) return
         this.listLoaded = readers !== false
         this.staffLoaded = staff === true
-        if (readers === false || !this.staffLoaded) {
+        this.servicePointsLoaded = servicePoints !== false
+        if (readers === false || !this.staffLoaded || !this.servicePointsLoaded) {
           this.listError = 'Impossible de charger les TPE ou les caissiers. Actualisez pour réessayer.'
         }
       } catch (error) {
         if (version === this.connectionVersion && this.stripeReady) {
           this.staffLoaded = false
+          this.servicePointsLoaded = false
           this.listError = 'Impossible de charger les TPE ou les caissiers. Actualisez pour réessayer.'
         }
       } finally {
@@ -341,19 +422,22 @@ export default {
       const version = this.connectionVersion
       this.listError = ''
       try {
-        const [readers, staff] = await Promise.all([
+        const [readers, staff, servicePoints] = await Promise.all([
           this.$store.dispatch('stripeTerminal/refreshReaders'),
-          this.staffLoaded ? Promise.resolve(true) : this.$store.dispatch('staff/getAll', { silent: true }),
+          this.$store.dispatch('staff/getAll', { silent: true }),
+          this.$store.dispatch('servicePoints/getAll', { silent: true }),
         ])
         if (version !== this.connectionVersion || !this.stripeReady) return
         this.listLoaded = readers !== false
         this.staffLoaded = staff === true
-        if (readers === false || !this.staffLoaded) {
+        this.servicePointsLoaded = servicePoints !== false
+        if (readers === false || !this.staffLoaded || !this.servicePointsLoaded) {
           this.listError = 'Actualisation impossible. Réessayez.'
         }
       } catch (error) {
         if (version === this.connectionVersion && this.stripeReady) {
           this.staffLoaded = false
+          this.servicePointsLoaded = false
           this.listError = 'Actualisation impossible. Réessayez.'
         }
       } finally {
@@ -366,8 +450,20 @@ export default {
       )
       return cashier ? cashier.username : 'Non attribué'
     },
+    kioskName(id) {
+      const kiosk = this.kioskServicePoints.find(
+        (item) => Number(item.id) === Number(id)
+      )
+      return kiosk ? kiosk.name : 'Non attribuée'
+    },
+    assignmentLabel(reader) {
+      if (reader.assignedServicePointId) {
+        return `Borne : ${this.kioskName(reader.assignedServicePointId)}`
+      }
+      return `Caissier : ${this.cashierName(reader.assignedUserId)}`
+    },
     openRegistration() {
-      if (!this.isAdmin || !this.stripeReady || !this.listLoaded || !this.staffLoaded) return
+      if (!this.isAdmin || !this.stripeReady || !this.listLoaded || !this.staffLoaded || !this.servicePointsLoaded) return
       this.actionError = ''
       this.dialogOpen = true
     },
@@ -390,7 +486,9 @@ export default {
         const payload = {
           registrationCode: this.registrationCode.trim(),
           label: this.readerLabel.trim(),
-          assignedUserId: this.assignedUserId,
+          ...(this.assignmentType === 'kiosk'
+            ? { assignedServicePointId: this.assignedServicePointId }
+            : { assignedUserId: this.assignedUserId }),
         }
         if (this.firstLocation) {
           payload.address = {
@@ -407,7 +505,9 @@ export default {
         } else {
           this.closeRegistration()
           this.readerLabel = ''
+          this.assignmentType = 'cashier'
           this.assignedUserId = null
+          this.assignedServicePointId = null
         }
       } catch (error) {
         if (version === this.connectionVersion && this.stripeReady) {
@@ -421,17 +521,22 @@ export default {
     startAssignment(reader) {
       if (!this.isAdmin || !this.stripeReady || this.busy || !reader.isActive) return
       this.editingReaderId = reader.id
+      this.assignmentType = reader.assignedServicePointId ? 'kiosk' : 'cashier'
       this.assignmentUserId = reader.assignedUserId
+      this.assignmentServicePointId = reader.assignedServicePointId
       this.listError = ''
     },
-    async assignReader(reader, assignedUserId) {
-      if (!this.isAdmin || !this.stripeReady || this.busy || !reader.isActive || !assignedUserId) return
+    async assignReader(reader, assignedId) {
+      if (!this.isAdmin || !this.stripeReady || this.busy || !reader.isActive || !assignedId) return
       const owner = this.acquireBusy()
       const version = this.connectionVersion
       this.listError = ''
       try {
         const result = await this.$store.dispatch('stripeTerminal/assignReader', {
-          id: reader.id, assignedUserId,
+          id: reader.id,
+          ...(this.assignmentType === 'kiosk'
+            ? { assignedServicePointId: assignedId }
+            : { assignedUserId: assignedId }),
         })
         if (version !== this.connectionVersion || !this.stripeReady) return
         if (result === false) this.listError = 'Affectation impossible. Réessayez.'

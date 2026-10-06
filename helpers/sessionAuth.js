@@ -55,6 +55,8 @@ const clearStoredAuth = (storage, { preserveTableAccessToken = true } = {}) => {
     'session_subject',
     'service_point_id',
     'service_point_name',
+    'service_point_printer_ip',
+    'service_point_smart_print_app',
     'order_source',
   ].forEach((key) => storage.removeItem(key))
 

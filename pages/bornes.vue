@@ -30,6 +30,21 @@
         <span>{{ visiblePin(item) }}</span>
       </template>
 
+      <template #[`item.printing`]="{ item }">
+        <div class="kiosk-printing-cell">
+          <v-chip
+            small
+            :color="Number(item.smart_print_app) === 1 ? 'success' : 'grey'"
+            dark
+          >
+            {{ Number(item.smart_print_app) === 1 ? 'Smart Print' : 'Inactif' }}
+          </v-chip>
+          <span v-if="Number(item.smart_print_app) === 1" class="kiosk-printing-cell__ip">
+            {{ item.printer_ip || 'IP non renseignee' }}
+          </span>
+        </div>
+      </template>
+
       <template #[`item.actions`]="{ item }">
         <v-tooltip top>
           <template #activator="{ on, attrs }">
@@ -75,7 +90,7 @@
       </template>
     </v-data-table>
 
-    <v-dialog v-model="formDialog" max-width="460" persistent>
+    <v-dialog v-model="formDialog" max-width="560" persistent>
       <v-card>
         <v-card-title>{{ form.id ? 'Modifier la borne' : 'Ajouter une borne' }}</v-card-title>
         <v-card-text>
@@ -84,8 +99,28 @@
               v-model.trim="form.name"
               label="Nom de la borne"
               :rules="requiredRules"
+              outlined
+              dense
               autofocus
             />
+            <div class="kiosk-printer-settings">
+              <v-text-field
+                v-model.trim="form.printer_ip"
+                label="Adresse IP de l'imprimante"
+                prepend-inner-icon="mdi-ip-network-outline"
+                :disabled="!form.smart_print_app"
+                :rules="printerIpRules"
+                placeholder="Inserez l'adresse IP de l'imprimante"
+                outlined
+                dense
+              />
+              <v-switch
+                v-model="form.smart_print_app"
+                class="mt-0"
+                label="Imprimer avec Smart Print App"
+                color="success"
+              />
+            </div>
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -129,6 +164,8 @@
 const emptyForm = () => ({
   id: null,
   name: '',
+  printer_ip: '',
+  smart_print_app: false,
 })
 
 export default {
@@ -152,6 +189,7 @@ export default {
         { text: 'Nom', value: 'name' },
         { text: 'Identifiant', value: 'kiosk_login_id' },
         { text: 'PIN', value: 'pin', sortable: false },
+        { text: 'Impression', value: 'printing', sortable: false },
         { text: 'Statut', value: 'is_active' },
         { text: 'Actions', value: 'actions', sortable: false },
       ],
@@ -161,6 +199,14 @@ export default {
   computed: {
     bornes() {
       return this.$store.get('servicePoints/kiosks') || []
+    },
+    printerIpRules() {
+      return [
+        (value) =>
+          !this.form.smart_print_app ||
+          !!value ||
+          "Adresse IP de l'imprimante requise",
+      ]
     },
   },
   mounted() {
@@ -183,6 +229,8 @@ export default {
       this.form = {
         id: item.id,
         name: item.name || '',
+        printer_ip: item.printer_ip || '',
+        smart_print_app: Number(item.smart_print_app) === 1,
       }
       this.formDialog = true
     },
@@ -194,12 +242,17 @@ export default {
     async submit() {
       if (!this.$refs.form.validate()) return
       this.submitting = true
+      const payload = {
+        name: this.form.name,
+        printer_ip: this.form.smart_print_app ? this.form.printer_ip : '',
+        smart_print_app: this.form.smart_print_app ? 1 : 0,
+      }
       const result = this.form.id
         ? await this.$store.dispatch('servicePoints/updateKiosk', {
           id: this.form.id,
-          data: { name: this.form.name },
+          data: payload,
         })
-        : await this.$store.dispatch('servicePoints/createKiosk', this.form.name)
+        : await this.$store.dispatch('servicePoints/createKiosk', payload)
       this.submitting = false
       if (!result) return
       this.closeForm()
@@ -259,3 +312,30 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.kiosk-printer-settings {
+  align-items: start;
+  display: grid;
+  gap: 12px 16px;
+  grid-template-columns: minmax(180px, 1fr) minmax(190px, 0.85fr);
+}
+
+.kiosk-printing-cell {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kiosk-printing-cell__ip {
+  color: var(--se-color-text-muted, #687386);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .kiosk-printer-settings {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
