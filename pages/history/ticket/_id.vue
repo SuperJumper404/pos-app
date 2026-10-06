@@ -196,6 +196,10 @@ import {
   receiptOrderLines,
   sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
+import {
+  buildCardTicketPayload,
+  sendCardTicket,
+} from '@/helpers/cardTicket'
 
 export default {
   components: { TakeawayChip },
@@ -279,6 +283,42 @@ export default {
     },
     paymentLabel() {
       return this.receiptPayload.paymentMethod || 'Paiement non renseigné'
+    },
+    hasTerminalCardTicket() {
+      const order = this.dataArchivedOrder || {}
+      const paymentId = Number(order.stripe_terminal_payment_id)
+      return (
+        order.payment_provider === 'stripe_terminal' &&
+        Number.isSafeInteger(paymentId) &&
+        paymentId > 0
+      )
+    },
+    terminalCardAmountCents() {
+      const order = this.dataArchivedOrder || {}
+      const allocated = Number(order.stripe_terminal_amount_cents)
+      if (Number.isSafeInteger(allocated) && allocated >= 0) return allocated
+      return Math.round(this.totalAmount * 100)
+    },
+    cardTicketPayload() {
+      if (!this.hasTerminalCardTicket) return null
+      const order = this.dataArchivedOrder || {}
+      const paymentId = Number(order.stripe_terminal_payment_id)
+      const amountCents = this.terminalCardAmountCents
+      return buildCardTicketPayload({
+        payment: {
+          id: paymentId,
+          orderId: order.id,
+          orderNumber: order.ordernumber || order.orderNumber || order.id,
+          amountCents,
+          cardTicket: {
+            chargeId: order.stripe_terminal_charge_id || null,
+            terminalPaymentId: paymentId,
+            amountCents,
+          },
+        },
+        order,
+        shopInfo: this.shopInfo,
+      })
     },
     receiptSummaryCards() {
       const vatTotal = this.roundPrice(
@@ -477,6 +517,7 @@ export default {
           printerIp: this.shopInfo.shop_printer_ip,
           dispatch: this.$store.dispatch,
         })
+        this.printTerminalCardTicket()
         this.markReceiptPrintSent()
       } catch (error) {
         // Receipt preparation errors do not come from the printer response.
@@ -494,6 +535,7 @@ export default {
           smartPrint: false,
           dispatch: this.$store.dispatch,
         })
+        this.printTerminalCardTicket()
         this.markReceiptPrintSent()
       } catch (error) {
         // Receipt preparation errors do not come from the printer response.
@@ -501,6 +543,16 @@ export default {
       } finally {
         this.unlockReceiptPrint()
       }
+    },
+
+    printTerminalCardTicket() {
+      if (!this.cardTicketPayload) return false
+      return sendCardTicket({
+        payload: this.cardTicketPayload,
+        smartPrint: this.shopInfo.smart_print_app,
+        printerIp: this.shopInfo.shop_printer_ip,
+        dispatch: this.$store.dispatch,
+      })
     },
 
     generateEscPos() {
@@ -775,6 +827,36 @@ export default {
           align: 'center',
           x: center,
           fontSize: 6,
+          gap: 4,
+        })
+      }
+
+      if (this.cardTicketPayload) {
+        y += 6
+        drawLine()
+        write('Ticket carte', {
+          align: 'center',
+          x: center,
+          fontSize: 8,
+          style: 'bold',
+          gap: 4,
+        })
+        ;[
+          ['Commande', this.cardTicketPayload.orderNumber],
+          ['Date', this.cardTicketPayload.currentDate],
+          ['Montant', `${this.formatTicketNumber(this.cardTicketPayload.amount)} €`],
+          ['Paiement', this.cardTicketPayload.paymentMethod],
+          ['Charge', this.cardTicketPayload.chargeId],
+          ['Paiement terminal', this.cardTicketPayload.terminalPaymentId],
+        ]
+          .filter((line) => this.safePdfText(line[1]).trim())
+          .forEach(([label, value]) => write(`${label} : ${value}`, { fontSize: 7.5 }))
+        drawLine()
+        write('Paiement accepte', {
+          align: 'center',
+          x: center,
+          fontSize: 8,
+          style: 'bold',
           gap: 4,
         })
       }
