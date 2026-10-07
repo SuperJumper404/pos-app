@@ -59,7 +59,9 @@ const validPayment = (payment) => validObject(payment) && validId(payment.id) &&
   new Set(payment.orderIds).size === payment.orderIds.length &&
   (payment.status !== 'succeeded' || hasSettledTerminalAllocations(payment)) &&
   (payment.failureCode === null || typeof payment.failureCode === 'string') &&
-  (payment.failureMessage === null || typeof payment.failureMessage === 'string')
+  (payment.failureMessage === null || typeof payment.failureMessage === 'string') &&
+  (!Object.prototype.hasOwnProperty.call(payment, 'cardTicket') ||
+    validCardTicket(payment.cardTicket))
 const validKioskReader = (reader) => reader === null || (
   validObject(reader) && validId(reader.id) &&
   typeof reader.label === 'string' &&
@@ -68,9 +70,22 @@ const validKioskReader = (reader) => reader === null || (
 )
 const validCardTicket = (ticket) => ticket === null || (
   validObject(ticket) &&
-  (ticket.brand === null || typeof ticket.brand === 'string') &&
-  (ticket.last4 === null || /^[0-9]{4}$/.test(ticket.last4)) &&
-  (ticket.chargeId === null || typeof ticket.chargeId === 'string') &&
+  Object.keys(ticket).every((key) => [
+    'brand', 'last4', 'network', 'networkTransactionId', 'readMethod', 'authorizationCode',
+    'authorizationResponseCode', 'applicationPreferredName', 'dedicatedFileName',
+    'applicationCryptogram', 'terminalVerificationResults',
+    'transactionStatusInformation', 'cardholderVerificationMethod',
+    'accountType', 'chargeId', 'terminalPaymentId', 'amountCents',
+  ].includes(key)) &&
+  (ticket.brand == null || typeof ticket.brand === 'string') &&
+  (ticket.last4 == null || /^[0-9]{4}$/.test(ticket.last4)) &&
+  [
+    'network', 'networkTransactionId', 'readMethod', 'authorizationCode', 'authorizationResponseCode',
+    'applicationPreferredName', 'dedicatedFileName', 'applicationCryptogram',
+    'terminalVerificationResults', 'transactionStatusInformation',
+    'cardholderVerificationMethod', 'accountType',
+  ].every((field) => ticket[field] == null || typeof ticket[field] === 'string') &&
+  (ticket.chargeId == null || typeof ticket.chargeId === 'string') &&
   validId(ticket.terminalPaymentId) &&
   Number.isSafeInteger(ticket.amountCents) && ticket.amountCents >= 0 &&
   !Object.prototype.hasOwnProperty.call(ticket, 'fullPan') &&

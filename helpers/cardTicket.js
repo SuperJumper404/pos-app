@@ -15,6 +15,10 @@ const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 const optionalText = (value) => String(value == null ? '' : value).trim()
 const centsToAmount = (value) => roundPrice((Number(value) || 0) / 100)
 const formatAmount = (value) => formatPrice(roundPrice(value))
+const cardText = (value) => {
+  const text = optionalText(value)
+  return text || null
+}
 
 const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}) => {
   const card = payment.cardTicket || {}
@@ -34,6 +38,18 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
     amount: centsToAmount(amountCents),
     brand: typeof card.brand === 'string' ? card.brand : null,
     last4: typeof card.last4 === 'string' ? card.last4 : null,
+    network: cardText(card.network),
+    networkTransactionId: cardText(card.networkTransactionId),
+    readMethod: cardText(card.readMethod),
+    authorizationCode: cardText(card.authorizationCode),
+    authorizationResponseCode: cardText(card.authorizationResponseCode),
+    applicationPreferredName: cardText(card.applicationPreferredName),
+    dedicatedFileName: cardText(card.dedicatedFileName),
+    applicationCryptogram: cardText(card.applicationCryptogram),
+    terminalVerificationResults: cardText(card.terminalVerificationResults),
+    transactionStatusInformation: cardText(card.transactionStatusInformation),
+    cardholderVerificationMethod: cardText(card.cardholderVerificationMethod),
+    accountType: cardText(card.accountType),
     chargeId: typeof card.chargeId === 'string' ? card.chargeId : null,
     terminalPaymentId: card.terminalPaymentId || payment.id || null,
     shopInfo,
@@ -46,6 +62,18 @@ const cardLines = (payload = {}) => [
   ['Montant', `${formatAmount(payload.amount)} EUR`],
   ['Paiement', payload.paymentMethod],
   ['Carte', [payload.brand, payload.last4 ? `**** ${payload.last4}` : ''].filter(Boolean).join(' ')],
+  ['Reseau', payload.network],
+  ['Ref. reseau', payload.networkTransactionId],
+  ['Lecture', payload.readMethod],
+  ['Autorisation', payload.authorizationCode],
+  ['R. autorisation', payload.authorizationResponseCode],
+  ['Application', payload.applicationPreferredName],
+  ['AID', payload.dedicatedFileName],
+  ['AC', payload.applicationCryptogram],
+  ['TVR', payload.terminalVerificationResults],
+  ['TSI', payload.transactionStatusInformation],
+  ['CVM', payload.cardholderVerificationMethod],
+  ['Compte', payload.accountType],
   ['Charge', payload.chargeId],
   ['Paiement terminal', payload.terminalPaymentId],
 ].filter((line) => optionalText(line[1]))
@@ -121,6 +149,18 @@ const buildCardTicketData = (payload = {}) => ({
     amount: payload.amount,
     brand: payload.brand,
     last4: payload.last4,
+    network: payload.network,
+    networkTransactionId: payload.networkTransactionId,
+    readMethod: payload.readMethod,
+    authorizationCode: payload.authorizationCode,
+    authorizationResponseCode: payload.authorizationResponseCode,
+    applicationPreferredName: payload.applicationPreferredName,
+    dedicatedFileName: payload.dedicatedFileName,
+    applicationCryptogram: payload.applicationCryptogram,
+    terminalVerificationResults: payload.terminalVerificationResults,
+    transactionStatusInformation: payload.transactionStatusInformation,
+    cardholderVerificationMethod: payload.cardholderVerificationMethod,
+    accountType: payload.accountType,
     chargeId: payload.chargeId,
     terminalPaymentId: payload.terminalPaymentId,
   },
@@ -200,5 +240,6 @@ module.exports = {
   buildCardTicketEscPos,
   buildCardTicketCloudXml,
   buildCardTicketData,
+  cardTicketLines: cardLines,
   sendCardTicket,
 }

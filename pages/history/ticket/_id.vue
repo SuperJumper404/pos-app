@@ -198,8 +198,22 @@ import {
 } from '@/helpers/cashierReceipt'
 import {
   buildCardTicketPayload,
+  cardTicketLines,
   sendCardTicket,
 } from '@/helpers/cardTicket'
+
+const parseCardReceiptDetails = (value) => {
+  if (!value) return {}
+  if (typeof value === 'object' && !Array.isArray(value)) return value
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed
+      : {}
+  } catch (error) {
+    return {}
+  }
+}
 
 export default {
   components: { TakeawayChip },
@@ -311,6 +325,7 @@ export default {
           orderNumber: order.ordernumber || order.orderNumber || order.id,
           amountCents,
           cardTicket: {
+            ...parseCardReceiptDetails(order.stripe_terminal_card_receipt_details),
             chargeId: order.stripe_terminal_charge_id || null,
             terminalPaymentId: paymentId,
             amountCents,
@@ -841,14 +856,7 @@ export default {
           style: 'bold',
           gap: 4,
         })
-        ;[
-          ['Commande', this.cardTicketPayload.orderNumber],
-          ['Date', this.cardTicketPayload.currentDate],
-          ['Montant', `${this.formatTicketNumber(this.cardTicketPayload.amount)} €`],
-          ['Paiement', this.cardTicketPayload.paymentMethod],
-          ['Charge', this.cardTicketPayload.chargeId],
-          ['Paiement terminal', this.cardTicketPayload.terminalPaymentId],
-        ]
+        cardTicketLines(this.cardTicketPayload)
           .filter((line) => this.safePdfText(line[1]).trim())
           .forEach(([label, value]) => write(`${label} : ${value}`, { fontSize: 7.5 }))
         drawLine()
