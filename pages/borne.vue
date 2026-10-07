@@ -575,12 +575,13 @@ import {
 } from '@/helpers/orderTicket'
 import {
   buildCashierReceiptPayload,
-  sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
 import {
   buildCardTicketPayload,
-  sendCardTicket,
 } from '@/helpers/cardTicket'
+import {
+  sendReceiptBundle,
+} from '@/helpers/receiptBundle'
 
 const {
   buildKioskCartLine,
@@ -1352,14 +1353,9 @@ export default {
           fallbackPaymentMethod: paymentMethod,
           fallbackTable: 'Borne',
         })
-        const receiptPrinted = sendCashierReceipt({
-          payload: receiptPayload,
-          smartPrint,
-          printerIp,
-          dispatch: this.$store.dispatch,
-        })
-        const cardPrinted = sendCardTicket({
-          payload: buildCardTicketPayload({
+        const receiptPrinted = sendReceiptBundle({
+          receiptPayload,
+          cardTicketPayload: buildCardTicketPayload({
             payment: payment || {},
             order: orderForTickets,
             shopInfo: this.shopInfo,
@@ -1368,7 +1364,7 @@ export default {
           printerIp,
           dispatch: this.$store.dispatch,
         })
-        return orderPrinted && receiptPrinted && cardPrinted
+        return orderPrinted && receiptPrinted
       } catch (error) {
         return false
       }

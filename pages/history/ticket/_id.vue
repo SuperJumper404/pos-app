@@ -194,13 +194,15 @@ import {
   formatReceiptProductLine,
   receiptHeaderLines,
   receiptOrderLines,
-  sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
 import {
   buildCardTicketPayload,
   cardTicketLines,
-  sendCardTicket,
 } from '@/helpers/cardTicket'
+import {
+  buildReceiptBundle,
+  sendReceiptBundle,
+} from '@/helpers/receiptBundle'
 
 const parseCardReceiptDetails = (value) => {
   if (!value) return {}
@@ -333,6 +335,12 @@ export default {
         },
         order,
         shopInfo: this.shopInfo,
+      })
+    },
+    receiptBundleTickets() {
+      return buildReceiptBundle({
+        receiptPayload: this.receiptPayload,
+        cardTicketPayload: this.cardTicketPayload,
       })
     },
     receiptSummaryCards() {
@@ -526,13 +534,13 @@ export default {
     printReceiptSmartPrint() {
       if (!this.lockReceiptPrint()) return
       try {
-        sendCashierReceipt({
-          payload: this.receiptPayload,
+        sendReceiptBundle({
+          receiptPayload: this.receiptPayload,
+          cardTicketPayload: this.cardTicketPayload,
           smartPrint: true,
           printerIp: this.shopInfo.shop_printer_ip,
           dispatch: this.$store.dispatch,
         })
-        this.printTerminalCardTicket()
         this.markReceiptPrintSent()
       } catch (error) {
         // Receipt preparation errors do not come from the printer response.
@@ -545,12 +553,12 @@ export default {
     printReceiptCloud() {
       if (!this.lockReceiptPrint()) return
       try {
-        sendCashierReceipt({
-          payload: this.receiptPayload,
+        sendReceiptBundle({
+          receiptPayload: this.receiptPayload,
+          cardTicketPayload: this.cardTicketPayload,
           smartPrint: false,
           dispatch: this.$store.dispatch,
         })
-        this.printTerminalCardTicket()
         this.markReceiptPrintSent()
       } catch (error) {
         // Receipt preparation errors do not come from the printer response.
@@ -558,16 +566,6 @@ export default {
       } finally {
         this.unlockReceiptPrint()
       }
-    },
-
-    printTerminalCardTicket() {
-      if (!this.cardTicketPayload) return false
-      return sendCardTicket({
-        payload: this.cardTicketPayload,
-        smartPrint: this.shopInfo.smart_print_app,
-        printerIp: this.shopInfo.shop_printer_ip,
-        dispatch: this.$store.dispatch,
-      })
     },
 
     generateEscPos() {
@@ -846,28 +844,30 @@ export default {
         })
       }
 
-      if (this.cardTicketPayload) {
-        y += 6
-        drawLine()
-        write('Ticket carte', {
-          align: 'center',
-          x: center,
-          fontSize: 8,
-          style: 'bold',
-          gap: 4,
+      this.receiptBundleTickets
+        .filter((ticket) => ticket.kind === 'card_ticket')
+        .forEach((ticket) => {
+          y += 6
+          drawLine()
+          write('Ticket carte', {
+            align: 'center',
+            x: center,
+            fontSize: 8,
+            style: 'bold',
+            gap: 4,
+          })
+          cardTicketLines(ticket.payload)
+            .filter((line) => this.safePdfText(line[1]).trim())
+            .forEach(([label, value]) => write(`${label} : ${value}`, { fontSize: 7.5 }))
+          drawLine()
+          write('Paiement accepte', {
+            align: 'center',
+            x: center,
+            fontSize: 8,
+            style: 'bold',
+            gap: 4,
+          })
         })
-        cardTicketLines(this.cardTicketPayload)
-          .filter((line) => this.safePdfText(line[1]).trim())
-          .forEach(([label, value]) => write(`${label} : ${value}`, { fontSize: 7.5 }))
-        drawLine()
-        write('Paiement accepte', {
-          align: 'center',
-          x: center,
-          fontSize: 8,
-          style: 'bold',
-          gap: 4,
-        })
-      }
 
       const blob = doc.output('blob')
       this.urlPDF = URL.createObjectURL(blob)

@@ -531,8 +531,10 @@ import { groupCustomizationSelections } from '@/helpers/customizations'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import {
   buildCashierReceiptPayload,
-  sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
+import {
+  sendReceiptBundle,
+} from '@/helpers/receiptBundle'
 import {
   buildOrderTicketPayload,
   sendOrderTicket,
@@ -1184,8 +1186,8 @@ export default {
         if (wantsReceipt) {
           this.receiptPrinting = true
           try {
-            sendCashierReceipt({
-              payload: buildCashierReceiptPayload({
+            sendReceiptBundle({
+              receiptPayload: buildCashierReceiptPayload({
                 order,
                 details,
                 shopInfo: this.shopInfo,

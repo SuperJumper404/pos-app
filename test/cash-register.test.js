@@ -314,7 +314,7 @@ const runAsyncAssertions = async () => {
   assert.ok(payoutSource.includes('confirmReceiptChoice(true)'))
   assert.ok(payoutSource.includes('confirmReceiptChoice(false)'))
   assert.ok(payoutSource.includes('buildCashierReceiptPayload'))
-  assert.ok(payoutSource.includes('sendCashierReceipt'))
+  assert.ok(payoutSource.includes('sendReceiptBundle'))
   assert.ok(
     payoutSource.includes("'orders/getDetailOrder'"),
     'la cloture caisse doit charger les lignes produits de la commande active avant archive'

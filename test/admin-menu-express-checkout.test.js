@@ -499,8 +499,13 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /buildCashierReceiptPayload|sendCashierReceipt/,
-  'express receipt printing must reuse the shared cashier receipt helper'
+  /buildCashierReceiptPayload[\s\S]*sendReceiptBundle/,
+  'express receipt printing must reuse the shared receipt bundle helper'
+)
+assert.doesNotMatch(
+  menusSource,
+  /sendCashierReceipt/,
+  'express receipt printing must not bypass the receipt bundle helper'
 )
 assert.match(
   menusSource,
@@ -519,8 +524,8 @@ assert.doesNotMatch(
 )
 assert.match(
   historyTicketSource,
-  /buildCashierReceiptPayload|sendCashierReceipt/,
-  'history receipt printing must use the shared cashier receipt helper'
+  /buildCashierReceiptPayload[\s\S]*sendReceiptBundle/,
+  'history receipt printing must use the shared receipt bundle helper'
 )
 assert.match(
   serviceDialogSource,

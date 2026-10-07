@@ -1185,8 +1185,10 @@ import {
 } from '@/helpers/customizations'
 import {
   buildCashierReceiptPayload,
-  sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
+import {
+  sendReceiptBundle,
+} from '@/helpers/receiptBundle'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import { calculateDiscount } from '@/helpers/discount'
 // import * as config from '@/nuxt.config'
@@ -2086,8 +2088,8 @@ export default {
         fallbackRemark: this.expressRemark,
       })
 
-      return sendCashierReceipt({
-        payload,
+      return sendReceiptBundle({
+        receiptPayload: payload,
         smartPrint: this.shopInfo.smart_print_app,
         printerIp: this.shopInfo.shop_printer_ip,
         dispatch: this.$store.dispatch,

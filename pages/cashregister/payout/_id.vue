@@ -268,12 +268,13 @@ import { calculateDiscount } from '@/helpers/discount'
 import {
   buildCashierReceiptPayload,
   buildGroupedCashierReceiptPayload,
-  sendCashierReceipt,
 } from '@/helpers/cashierReceipt'
 import {
   buildCardTicketPayload,
-  sendCardTicket,
 } from '@/helpers/cardTicket'
+import {
+  sendReceiptBundle,
+} from '@/helpers/receiptBundle'
 const {
   isCashPaymentMethod,
   sendCashDrawerOpen,
@@ -299,6 +300,19 @@ const {
   terminalPaymentMessage,
   hasSettledTerminalAllocations,
 } = require('@/helpers/stripeTerminal')
+
+const parseCardReceiptDetails = (value) => {
+  if (!value) return {}
+  if (typeof value === 'object' && !Array.isArray(value)) return value
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed
+      : {}
+  } catch (error) {
+    return {}
+  }
+}
 
 export default {
   components: { TerminalPaymentStatus },
@@ -981,13 +995,13 @@ export default {
                 fallbackPaymentMethod: paymentMethod || order.payment,
                 fallbackTable: this.id,
               })
-        sendCashierReceipt({
-          payload,
+        sendReceiptBundle({
+          receiptPayload: payload,
+          cardTicketPayloads: this.buildTerminalCardTicketPayloads(printableOrders),
           smartPrint: this.shopInfo.smart_print_app,
           printerIp: this.shopInfo.shop_printer_ip,
           dispatch: this.$store.dispatch,
         })
-        this.printTerminalCardTickets(printableOrders)
       } catch (error) {
         this.$store.dispatch(
           'notifications/error',
@@ -998,7 +1012,7 @@ export default {
         this.receiptPrinting = false
       }
     },
-    printTerminalCardTickets(orders) {
+    buildTerminalCardTicketPayloads(orders) {
       const groups = new Map()
       ;(Array.isArray(orders) ? orders : []).forEach((order) => {
         const paymentId = Number(order && order.stripe_terminal_payment_id)
@@ -1013,6 +1027,7 @@ export default {
         groups.get(paymentId).push(order)
       })
 
+      const payloads = []
       groups.forEach((group, paymentId) => {
         const orderIds = group.map((order) => Number(order.id)).filter(Boolean)
         const orderNumber = group
@@ -1027,12 +1042,13 @@ export default {
           this.terminalPayment && Number(this.terminalPayment.id) === paymentId
             ? this.terminalPayment
             : {}
+        const firstOrder = group[0] || {}
         const order = group.length === 1
           ? group[0]
           : {
               id: orderIds.join('-'),
               ordernumber: orderNumber,
-              created: group[0] && group[0].created,
+              created: firstOrder.created,
             }
         const payment = {
           ...activePayment,
@@ -1044,18 +1060,29 @@ export default {
             Number.isSafeInteger(activePayment.amountCents)
               ? activePayment.amountCents
               : allocatedAmountCents,
+          cardTicket: {
+            ...parseCardReceiptDetails(firstOrder.stripe_terminal_card_receipt_details),
+            ...(activePayment.cardTicket || {}),
+            chargeId:
+              activePayment.chargeId ||
+              firstOrder.stripe_terminal_charge_id ||
+              null,
+            terminalPaymentId: paymentId,
+            amountCents:
+              Number.isSafeInteger(activePayment.amountCents)
+                ? activePayment.amountCents
+                : allocatedAmountCents,
+          },
         }
-        sendCardTicket({
-          payload: buildCardTicketPayload({
+        payloads.push(
+          buildCardTicketPayload({
             payment,
             order,
             shopInfo: this.shopInfo,
-          }),
-          smartPrint: this.shopInfo.smart_print_app,
-          printerIp: this.shopInfo.shop_printer_ip,
-          dispatch: this.$store.dispatch,
-        })
+          })
+        )
       })
+      return payloads
     },
     openCashDrawerForCashPayment(paymentMethod) {
       if (!isCashPaymentMethod(paymentMethod)) return false

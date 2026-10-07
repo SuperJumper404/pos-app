@@ -22,8 +22,9 @@ assert.strictEqual(
 
 assert.doesNotMatch(kioskPageSource, /loadStripe/)
 assert.doesNotMatch(kioskPageSource, /stripePaymentElement/)
-assert.match(kioskPageSource, /sendCardTicket/)
-assert.match(kioskPageSource, /sendCashierReceipt/)
+assert.match(kioskPageSource, /sendReceiptBundle/)
+assert.doesNotMatch(kioskPageSource, /sendCardTicket/)
+assert.doesNotMatch(kioskPageSource, /sendCashierReceipt/)
 assert.match(kioskPageSource, /sendOrderTicket/)
 
 const kioskPayloadStart = storeSource.indexOf('const kioskCheckoutPayload =')
