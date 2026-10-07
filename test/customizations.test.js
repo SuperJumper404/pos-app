@@ -3009,6 +3009,80 @@ const runReviewRegressionTests = async () => {
     'refresh recreation with an unchanged Stripe payload must reuse the token'
   )
 
+  const alreadyProcessedState = cartModule.state()
+  const alreadyProcessedCalls = []
+  const alreadyProcessedCommits = []
+  const alreadyProcessedContext = {
+    state: alreadyProcessedState,
+    dispatch(type, payload) {
+      applyCartStateDispatch(alreadyProcessedState, type, payload)
+    },
+    commit(type, payload) {
+      alreadyProcessedCommits.push([type, payload])
+    },
+  }
+  const alreadyProcessedResult = await cartModule.actions.checkoutOrder.call(
+    {
+      $axios: {
+        post(url, payload) {
+          alreadyProcessedCalls.push([url, payload])
+          const error = new Error('Cette commande a deja ete traitee.')
+          error.response = {
+            status: 409,
+            data: {
+              message: 'Cette commande a deja ete traitee.',
+              data: { orderId: 501 },
+            },
+          }
+          return Promise.reject(error)
+        },
+      },
+    },
+    alreadyProcessedContext,
+    { ...checkoutInput, stripe: true, payment: 'Stripe' }
+  )
+  assert.strictEqual(alreadyProcessedResult.ok, false)
+  assert.strictEqual(alreadyProcessedResult.error.orderId, 501)
+  assert.deepStrictEqual(alreadyProcessedCommits, [['ADD_ORDER_SENT', 501]])
+  assert.strictEqual(
+    alreadyProcessedState.clientOrderToken,
+    null,
+    'an already processed Stripe replay must clear the stale checkout token'
+  )
+  assert.strictEqual(
+    cartModule.actions.abandonCheckout(alreadyProcessedContext).ok,
+    true,
+    'an already processed Stripe replay must not trap the cashier on the cart'
+  )
+
+  const retryAfterProcessedCalls = []
+  const retryAfterProcessedResult = await cartModule.actions.checkoutOrder.call(
+    {
+      $axios: {
+        post(url, payload) {
+          retryAfterProcessedCalls.push([url, payload])
+          return Promise.resolve({
+            data: {
+              data: {
+                orderId: 502,
+                clientSecret: 'fresh-secret',
+                publishableKey: 'pk_test',
+              },
+            },
+          })
+        },
+      },
+    },
+    alreadyProcessedContext,
+    { ...checkoutInput, stripe: true, payment: 'Stripe' }
+  )
+  assert.strictEqual(retryAfterProcessedResult.ok, true)
+  assert.notStrictEqual(
+    retryAfterProcessedCalls[0][1].client_order_token,
+    alreadyProcessedCalls[0][1].client_order_token,
+    'retrying after an already processed replay must use a fresh checkout token'
+  )
+
   const replayPreconditionState = {
     ...stripeState,
     clientOrderPayload: JSON.parse(

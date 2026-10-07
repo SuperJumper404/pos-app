@@ -47,6 +47,20 @@ const isSafePrewriteErrorCode = (code) =>
   typeof code === 'string' &&
   (code.startsWith('CUSTOMIZATION_') || SAFE_PREWRITE_ERROR_CODES.has(code))
 
+const normalizeErrorMessage = (message) =>
+  String(message || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036F]/g, '')
+    .toLowerCase()
+
+const isAlreadyProcessedStripeReplay = (error) =>
+  Number(error?.status) === 409 &&
+  error?.orderId &&
+  (error?.code === 'CHECKOUT_ALREADY_PROCESSED' ||
+    normalizeErrorMessage(error?.message).includes(
+      'commande a deja ete traitee'
+    ))
+
 const readAuthToken = () =>
   typeof localStorage === 'undefined' ? '' : localStorage.getItem('token')
 
@@ -250,6 +264,13 @@ export const actions = {
       return { ok: true, data, error: null }
     } catch (error) {
       const checkoutError = buildCheckoutError(error)
+      if (stripe && isAlreadyProcessedStripeReplay(checkoutError)) {
+        commit('ADD_ORDER_SENT', checkoutError.orderId)
+        clearCheckoutAttempt(dispatch)
+        dispatch('set/message', checkoutError.message)
+        return { ok: false, data: null, error: checkoutError }
+      }
+
       const isAuthenticationRejection = [401, 403].includes(
         Number(checkoutError.status)
       )

@@ -4,11 +4,8 @@ const config = require('../config/config.json')
 function getHost() {
   const env = process.env.ENV
   const currentEnvConfig = config.environments[env]
-  console.log(currentEnvConfig)
   return currentEnvConfig
 }
-console.log(config)
-console.log('HOST', getHost())
 export const state = () => ({
   authenticated: false,
   staticURL: getHost().backEndPoint.replace(/\/+$/, ''),
