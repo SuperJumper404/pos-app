@@ -61,13 +61,17 @@ sendReceiptBundle({
 
 assert.deepStrictEqual(
   smartPrintCalls.map((call) => call.body.ticketType),
-  ['caisse', 'carte'],
-  'SmartPrint must receive the same cashier-then-card order as the PDF preview'
+  ['caisse'],
+  'SmartPrint must receive one cashier receipt that contains the card ticket'
 )
 assert.deepStrictEqual(
   smartPrintCalls.map((call) => call.body.ticketData.kind),
-  ['cashier_receipt', 'card_ticket']
+  ['cashier_receipt']
 )
+const smartTicketText = JSON.stringify(smartPrintCalls[0].body)
+assert.match(smartTicketText, /Ticket carte/)
+assert.match(smartTicketText, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)
+assert.doesNotMatch(smartTicketText, /Paiement terminal|Charge/)
 
 const cloudCalls = []
 sendReceiptBundle({
@@ -82,7 +86,9 @@ sendReceiptBundle({
 
 assert.deepStrictEqual(
   cloudCalls.map((call) => call.params.ticketType),
-  ['caisse', 'carte'],
-  'cloud printing must keep the same cashier-then-card order'
+  ['caisse'],
+  'cloud printing must receive one cashier receipt that contains the card ticket'
 )
 assert.ok(cloudCalls.every((call) => call.action === 'printing/postPrintingJob'))
+assert.match(cloudCalls[0].params.requete, /Ticket carte/)
+assert.match(cloudCalls[0].params.requete, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)

@@ -46,11 +46,26 @@ const sendReceiptBundle = ({
   dispatch,
   fetchImplementation,
 } = {}) => {
-  const tickets = buildReceiptBundle({
-    receiptPayload,
+  const cardPayloads = normalizeCardTicketPayloads({
     cardTicketPayload,
     cardTicketPayloads,
   })
+
+  if (receiptPayload) {
+    sendCashierReceipt({
+      payload: {
+        ...receiptPayload,
+        cardTicketPayloads: cardPayloads,
+      },
+      smartPrint,
+      printerIp,
+      dispatch,
+      fetchImplementation,
+    })
+    return true
+  }
+
+  const tickets = buildReceiptBundle({ cardTicketPayloads: cardPayloads })
 
   tickets.forEach((ticket) => {
     const common = {

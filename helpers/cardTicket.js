@@ -19,6 +19,17 @@ const cardText = (value) => {
   const text = optionalText(value)
   return text || null
 }
+const normalizeBrand = (value) => {
+  const text = optionalText(value)
+  if (!text) return null
+  const normalized = text.toLowerCase().replace(/[\s_-]+/g, '')
+  if (normalized === 'mastercard') return 'MASTERCARD'
+  if (normalized === 'visa') return 'VISA'
+  if (normalized === 'amex' || normalized === 'americanexpress') return 'AMEX'
+  if (normalized === 'cartesbancaires' || normalized === 'cb') return 'CB'
+  return text.toUpperCase()
+}
+const maskPan = (last4) => (/^[0-9]{4}$/.test(String(last4 || '')) ? `************${last4}` : null)
 
 const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}) => {
   const card = payment.cardTicket || {}
@@ -36,8 +47,9 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
     paymentMethod: PAYMENT_METHOD,
     amountCents,
     amount: centsToAmount(amountCents),
-    brand: typeof card.brand === 'string' ? card.brand : null,
+    brand: normalizeBrand(card.brand),
     last4: typeof card.last4 === 'string' ? card.last4 : null,
+    maskedPan: maskPan(card.last4),
     network: cardText(card.network),
     networkTransactionId: cardText(card.networkTransactionId),
     readMethod: cardText(card.readMethod),
@@ -59,23 +71,21 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
 const cardLines = (payload = {}) => [
   ['Commande', payload.orderNumber],
   ['Date', payload.currentDate],
+  ['Carte', payload.brand],
+  ['PAN', payload.maskedPan],
   ['Montant', `${formatAmount(payload.amount)} EUR`],
-  ['Paiement', payload.paymentMethod],
-  ['Carte', [payload.brand, payload.last4 ? `**** ${payload.last4}` : ''].filter(Boolean).join(' ')],
-  ['Reseau', payload.network],
-  ['Ref. reseau', payload.networkTransactionId],
-  ['Lecture', payload.readMethod],
   ['Autorisation', payload.authorizationCode],
   ['R. autorisation', payload.authorizationResponseCode],
   ['Application', payload.applicationPreferredName],
   ['AID', payload.dedicatedFileName],
   ['AC', payload.applicationCryptogram],
+  ['Lecture', payload.readMethod],
+  ['Reseau', payload.network],
+  ['Ref. reseau', payload.networkTransactionId],
   ['TVR', payload.terminalVerificationResults],
   ['TSI', payload.transactionStatusInformation],
   ['CVM', payload.cardholderVerificationMethod],
   ['Compte', payload.accountType],
-  ['Charge', payload.chargeId],
-  ['Paiement terminal', payload.terminalPaymentId],
 ].filter((line) => optionalText(line[1]))
 
 const buildCardTicketEscPos = (payload = {}) => {
@@ -149,6 +159,7 @@ const buildCardTicketData = (payload = {}) => ({
     amount: payload.amount,
     brand: payload.brand,
     last4: payload.last4,
+    maskedPan: payload.maskedPan,
     network: payload.network,
     networkTransactionId: payload.networkTransactionId,
     readMethod: payload.readMethod,
@@ -161,8 +172,6 @@ const buildCardTicketData = (payload = {}) => ({
     transactionStatusInformation: payload.transactionStatusInformation,
     cardholderVerificationMethod: payload.cardholderVerificationMethod,
     accountType: payload.accountType,
-    chargeId: payload.chargeId,
-    terminalPaymentId: payload.terminalPaymentId,
   },
   render: {
     paperWidth: 32,

@@ -903,6 +903,11 @@ test('Terminal counter receipt also prints the card ticket', async () => {
   await h.instance.requestReceiptChoice()
   h.responses['stripeTerminal/refreshPayment'] = payment('succeeded', {
     amountCents: 1075,
+    cardTicket: {
+      brand: 'visa',
+      last4: '4242',
+      authorizationCode: '123456',
+    },
   })
   h.responses['orders/getAllOrder'] = () => {
     h.state.orders = [
@@ -924,9 +929,11 @@ test('Terminal counter receipt also prints the card ticket', async () => {
   const printJobs = h.calls.filter((call) => call.name === 'printing/postPrintingJob')
   assert.deepStrictEqual(
     printJobs.map((job) => job.payload.ticketType),
-    ['caisse', 'carte']
+    ['caisse']
   )
-  assert.strictEqual(printJobs[1].payload.orderId, 1)
+  assert.strictEqual(printJobs[0].payload.orderId, 1)
+  assert.match(printJobs[0].payload.requete, /Ticket carte/)
+  assert.match(printJobs[0].payload.requete, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)
 })
 
 test('legacy invalid exact recovery is discarded so current discount edits can start a valid payment', async () => {
