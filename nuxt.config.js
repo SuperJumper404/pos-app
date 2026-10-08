@@ -164,6 +164,7 @@ export default {
     },
   },
   build: {
+    transpile: ['chart.js'],
     splitChunks: {
       layouts: false,
       pages: false,

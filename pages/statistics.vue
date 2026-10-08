@@ -151,90 +151,7 @@
             ></v-select>
           </div>
 
-          <div class="statistics-chart">
-            <div
-              v-if="!paymentRevenueChart.rows.length"
-              class="statistics-chart__empty"
-            >
-              Aucun revenu sur cette période
-            </div>
-            <template v-else>
-              <svg
-                class="statistics-chart__svg"
-                viewBox="0 0 100 118"
-                preserveAspectRatio="none"
-                role="img"
-                aria-label="Revenus par moyen de paiement"
-              >
-                <line
-                  v-for="tick in chartYTicks"
-                  :key="tick.value"
-                  x1="4"
-                  x2="96"
-                  :y1="tick.y"
-                  :y2="tick.y"
-                  class="statistics-chart__grid"
-                />
-                <g v-for="row in paymentRevenueChart.rows" :key="row.date">
-                  <rect
-                    v-for="segment in row.segments"
-                    :key="`${row.date}-${segment.method}`"
-                    :x="row.x - chartBarWidth / 2"
-                    :y="segment.y"
-                    :width="chartBarWidth"
-                    :height="segment.height"
-                    :fill="paymentRevenueChart.colors[segment.method]"
-                    rx="1.4"
-                  />
-                </g>
-                <polyline
-                  v-if="chartLinePoints"
-                  :points="chartLinePoints"
-                  class="statistics-chart__line"
-                />
-                <circle
-                  v-for="point in paymentRevenueChart.linePoints"
-                  :key="`${point.x}-${point.y}`"
-                  :cx="point.x"
-                  :cy="point.y"
-                  r="1.15"
-                  class="statistics-chart__point"
-                />
-              </svg>
-
-              <div class="statistics-chart__labels">
-                <span
-                  v-for="(row, index) in paymentRevenueChart.rows"
-                  :key="`${row.date}-label`"
-                >
-                  {{ shouldShowChartLabel(index) ? row.label : '' }}
-                </span>
-              </div>
-
-              <div class="statistics-chart__axis">
-                <span>{{ formatCurrency(paymentRevenueChart.maxTotal) }}</span>
-                <span>0 €</span>
-              </div>
-
-              <div class="statistics-chart__legend">
-                <span
-                  v-for="method in paymentRevenueChart.methods"
-                  :key="method"
-                  class="statistics-chart__legend-item"
-                >
-                  <span
-                    class="statistics-chart__swatch"
-                    :style="{ backgroundColor: paymentRevenueChart.colors[method] }"
-                  ></span>
-                  {{ method }}
-                </span>
-                <span class="statistics-chart__legend-item">
-                  <span class="statistics-chart__line-key"></span>
-                  Total jour
-                </span>
-              </div>
-            </template>
-          </div>
+          <PaymentRevenueChart :chart-config="paymentRevenueChartConfig" />
         </v-card>
       </v-col>
     </v-row>
@@ -339,12 +256,14 @@
 <script>
 import listdashboard from '@/helpers/listdashboard'
 import Loading from '@/components/loading'
+import PaymentRevenueChart from '@/components/statistics/PaymentRevenueChart'
 import price from '@/helpers/price'
-import { buildPaymentRevenueChart } from '@/helpers/statisticsCharts'
+import { buildPaymentRevenueChartConfig } from '@/helpers/statisticsCharts'
 
 export default {
   components: {
     Loading,
+    PaymentRevenueChart,
   },
   mixins: [listdashboard, price],
   layout() {
@@ -455,24 +374,10 @@ export default {
     paymentRows() {
       return this.metrics.paymentsSummary || []
     },
-    paymentRevenueChart() {
-      return buildPaymentRevenueChart(this.metrics.revenueByDayAndPayment || [])
-    },
-    chartLinePoints() {
-      return this.paymentRevenueChart.linePoints
-        .map((point) => `${point.x},${point.y}`)
-        .join(' ')
-    },
-    chartBarWidth() {
-      const count = this.paymentRevenueChart.rows.length || 1
-      return Math.max(2.4, Math.min(7.2, 56 / count))
-    },
-    chartYTicks() {
-      return [
-        { value: 100, y: 0 },
-        { value: 50, y: 40 },
-        { value: 0, y: 80 },
-      ]
+    paymentRevenueChartConfig() {
+      return buildPaymentRevenueChartConfig(
+        this.metrics.revenueByDayAndPayment || []
+      )
     },
     productRows() {
       return this.metrics.topProducts || []
@@ -602,12 +507,6 @@ export default {
       this.from = start.toISOString().slice(0, 10)
       this.to = today.toISOString().slice(0, 10)
       if (fetch) this.fetchMetrics()
-    },
-    shouldShowChartLabel(index) {
-      const count = this.paymentRevenueChart.rows.length
-      if (count <= 10) return true
-      const step = count <= 18 ? 2 : 4
-      return index === 0 || index === count - 1 || index % step === 0
     },
   },
 }
@@ -796,111 +695,6 @@ export default {
   min-height: 36px !important;
 }
 
-.statistics-chart {
-  padding: 18px 20px 16px 58px;
-  position: relative;
-}
-
-.statistics-chart__svg {
-  display: block;
-  height: 210px;
-  width: 100%;
-}
-
-.statistics-chart__grid {
-  stroke: var(--se-color-border-soft);
-  stroke-width: 0.35;
-}
-
-.statistics-chart__line {
-  fill: none;
-  stroke: var(--se-color-text);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 0.9;
-}
-
-.statistics-chart__point {
-  fill: #ffffff;
-  stroke: var(--se-color-text);
-  stroke-width: 0.6;
-}
-
-.statistics-chart__labels {
-  color: var(--se-color-text-muted);
-  display: flex;
-  font-size: var(--se-font-caption);
-  font-weight: var(--se-weight-semibold);
-  justify-content: space-between;
-  margin: 4px 0 0;
-  min-height: 18px;
-}
-
-.statistics-chart__labels span {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.statistics-chart__axis {
-  bottom: 70px;
-  color: var(--se-color-text-muted);
-  display: flex;
-  flex-direction: column;
-  font-size: var(--se-font-caption);
-  font-weight: var(--se-weight-semibold);
-  justify-content: space-between;
-  left: 20px;
-  position: absolute;
-  top: 22px;
-  width: 34px;
-}
-
-.statistics-chart__legend {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  margin-top: 12px;
-}
-
-.statistics-chart__legend-item {
-  align-items: center;
-  color: var(--se-color-text-body);
-  display: inline-flex;
-  font-size: var(--se-font-meta);
-  font-weight: var(--se-weight-semibold);
-  gap: 7px;
-}
-
-.statistics-chart__swatch {
-  border-radius: var(--se-radius-sm);
-  display: inline-block;
-  height: 10px;
-  width: 10px;
-}
-
-.statistics-chart__line-key {
-  background: var(--se-color-text);
-  border-radius: var(--se-radius-pill);
-  display: inline-block;
-  height: 2px;
-  width: 18px;
-}
-
-.statistics-chart__empty {
-  align-items: center;
-  color: var(--se-color-text-muted);
-  display: flex;
-  font-size: var(--se-font-meta);
-  font-weight: var(--se-weight-semibold);
-  justify-content: center;
-  min-height: 220px;
-}
-
 .statistics-bar-cell {
   align-items: center;
   display: grid;
@@ -977,17 +771,6 @@ export default {
     display: none;
   }
 
-  .statistics-chart {
-    padding-left: 20px;
-  }
-
-  .statistics-chart__axis {
-    display: none;
-  }
-
-  .statistics-chart__svg {
-    height: 180px;
-  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

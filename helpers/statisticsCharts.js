@@ -1,4 +1,3 @@
-const CHART_HEIGHT = 80
 const PAYMENT_COLORS = [
   '#1976d2',
   '#00a86b',
@@ -19,13 +18,11 @@ const MONTHS = [
   'sept.',
   'oct.',
   'nov.',
-  'dec.',
+  'déc.',
 ]
 
 const roundMoney = (value) =>
   Math.round(((Number(value) || 0) + Number.EPSILON) * 100) / 100
-
-const chartNumber = (value) => Number(Number(value).toFixed(12))
 
 const formatChartDate = (date) => {
   const parsed = new Date(`${date}T00:00:00`)
@@ -43,60 +40,127 @@ const collectPaymentMethods = (rows) => {
   return methods
 }
 
-const buildPaymentRevenueChart = (series = []) => {
+const formatCurrency = (value) =>
+  `${roundMoney(value).toLocaleString('fr-FR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} €`
+
+const buildPaymentRevenueChartConfig = (series = []) => {
   const rows = Array.isArray(series) ? series : []
-  const methods = collectPaymentMethods(rows)
-  const maxTotal = Math.max(0, ...rows.map((row) => Number(row.total) || 0))
-  const step = rows.length > 1 ? 80 / (rows.length - 1) : 0
-
-  const chartRows = rows.map((row, rowIndex) => {
-    let cursor = CHART_HEIGHT
-    const segments = methods
-      .map((method) => {
-        const amount = roundMoney(row.payments && row.payments[method])
-        if (!amount || !maxTotal) return null
-        const height = (amount / maxTotal) * CHART_HEIGHT
-        cursor -= height
-        return {
-          method,
-          amount,
-          y: chartNumber(cursor),
-          height: chartNumber(height),
-        }
-      })
-      .filter(Boolean)
-
-    return {
-      date: row.date,
-      label: formatChartDate(row.date),
-      total: roundMoney(row.total),
-      x: rows.length > 1 ? 10 + rowIndex * step : 50,
-      segments,
-    }
-  })
-
-  const linePoints = chartRows.map((row) => ({
-    x: chartNumber(row.x),
-    y: chartNumber(
-      maxTotal ? CHART_HEIGHT - (row.total / maxTotal) * CHART_HEIGHT : CHART_HEIGHT
-    ),
+  const labels = rows.map((row) => formatChartDate(row.date))
+  const paymentMethods = collectPaymentMethods(rows)
+  const maxTotal = roundMoney(Math.max(0, ...rows.map((row) => Number(row.total) || 0)))
+  const paymentDatasets = paymentMethods.map((method, index) => ({
+    type: 'bar',
+    label: method,
+    data: rows.map((row) => roundMoney(row.payments && row.payments[method])),
+    backgroundColor: PAYMENT_COLORS[index % PAYMENT_COLORS.length],
+    borderColor: PAYMENT_COLORS[index % PAYMENT_COLORS.length],
+    borderRadius: 6,
+    borderSkipped: false,
+    maxBarThickness: 44,
+    stack: 'payments',
+    order: 2,
   }))
 
   return {
-    labels: chartRows.map((row) => row.label),
-    methods,
-    colors: methods.reduce((acc, method, index) => {
-      acc[method] = PAYMENT_COLORS[index % PAYMENT_COLORS.length]
-      return acc
-    }, {}),
-    maxTotal: roundMoney(maxTotal),
-    rows: chartRows,
-    linePoints,
+    maxTotal,
+    paymentMethods,
+    data: {
+      labels,
+      datasets: [
+        ...paymentDatasets,
+        {
+          type: 'line',
+          label: 'Total jour',
+          data: rows.map((row) => roundMoney(row.total)),
+          borderColor: '#121826',
+          backgroundColor: '#ffffff',
+          borderWidth: 2,
+          pointBackgroundColor: '#ffffff',
+          pointBorderColor: '#121826',
+          pointBorderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          tension: 0.32,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index',
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxHeight: 10,
+            boxWidth: 10,
+            color: '#1f2933',
+            font: {
+              family: 'Poppins, sans-serif',
+              size: 12,
+              weight: '600',
+            },
+            usePointStyle: true,
+          },
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label(context) {
+              return `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: {
+            display: false,
+          },
+          ticks: {
+            color: '#687386',
+            font: {
+              family: 'Poppins, sans-serif',
+              size: 11,
+              weight: '600',
+            },
+            maxRotation: 0,
+          },
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          suggestedMax: maxTotal || undefined,
+          grid: {
+            color: '#e8edf3',
+          },
+          ticks: {
+            color: '#687386',
+            callback(value) {
+              return formatCurrency(value)
+            },
+            font: {
+              family: 'Poppins, sans-serif',
+              size: 11,
+              weight: '600',
+            },
+          },
+        },
+      },
+    },
   }
 }
 
 module.exports = {
-  CHART_HEIGHT,
-  buildPaymentRevenueChart,
+  buildPaymentRevenueChartConfig,
   formatChartDate,
 }

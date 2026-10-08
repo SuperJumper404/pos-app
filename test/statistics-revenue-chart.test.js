@@ -1,10 +1,12 @@
 const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
 
 const {
-  buildPaymentRevenueChart,
+  buildPaymentRevenueChartConfig,
 } = require('../helpers/statisticsCharts')
 
-const chart = buildPaymentRevenueChart([
+const chart = buildPaymentRevenueChartConfig([
   {
     date: '2026-10-01',
     total: 12,
@@ -27,19 +29,34 @@ const chart = buildPaymentRevenueChart([
   },
 ])
 
-assert.deepStrictEqual(chart.methods, ['Espèces', 'Stripe'])
+assert.deepStrictEqual(chart.data.labels, ['1 oct.', '2 oct.', '3 oct.'])
 assert.strictEqual(chart.maxTotal, 15)
-assert.deepStrictEqual(chart.labels, ['1 oct.', '2 oct.', '3 oct.'])
-assert.deepStrictEqual(chart.rows[0].segments, [
-  { method: 'Espèces', amount: 7, y: 42.666666666667, height: 37.333333333333 },
-  { method: 'Stripe', amount: 5, y: 16, height: 26.666666666667 },
+assert.deepStrictEqual(chart.paymentMethods, ['Espèces', 'Stripe'])
+assert.deepStrictEqual(chart.data.datasets.map((dataset) => dataset.label), [
+  'Espèces',
+  'Stripe',
+  'Total jour',
 ])
-assert.deepStrictEqual(chart.rows[1].segments, [])
-assert.deepStrictEqual(chart.linePoints, [
-  { x: 10, y: 16 },
-  { x: 50, y: 80 },
-  { x: 90, y: 0 },
+assert.deepStrictEqual(chart.data.datasets.map((dataset) => dataset.type), [
+  'bar',
+  'bar',
+  'line',
 ])
+assert.deepStrictEqual(chart.data.datasets[0].data, [7, 0, 0])
+assert.deepStrictEqual(chart.data.datasets[1].data, [5, 0, 15])
+assert.deepStrictEqual(chart.data.datasets[2].data, [12, 0, 15])
+assert.strictEqual(chart.data.datasets[0].stack, 'payments')
+assert.strictEqual(chart.data.datasets[1].stack, 'payments')
+assert.strictEqual(chart.options.scales.x.stacked, true)
+assert.strictEqual(chart.options.scales.y.stacked, true)
+assert.strictEqual(chart.options.plugins.tooltip.mode, 'index')
+
+const statisticsSource = fs.readFileSync(
+  path.join(__dirname, '../pages/statistics.vue'),
+  'utf8'
+)
+assert.match(statisticsSource, /<PaymentRevenueChart/)
+assert.doesNotMatch(statisticsSource, /statistics-chart__svg/)
 
 const packageJson = require('../package.json')
 assert.ok(
