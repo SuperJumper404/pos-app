@@ -126,6 +126,120 @@
     </v-row>
 
     <v-row class="mt-4" dense>
+      <v-col cols="12">
+        <v-card outlined class="statistics-panel statistics-chart-panel">
+          <div class="statistics-panel__header statistics-panel__header--chart">
+            <div>
+              <div class="statistics-panel__title">
+                <v-icon color="primary" left>mdi-chart-bar-stacked</v-icon>
+                Revenus par moyen de paiement
+              </div>
+              <div class="statistics-panel__subtitle">
+                Barres empilées par paiement et courbe du revenu total
+              </div>
+            </div>
+            <v-select
+              v-model="chartRange"
+              :items="chartRangeOptions"
+              item-text="label"
+              item-value="value"
+              dense
+              outlined
+              hide-details
+              class="statistics-chart-range"
+              @change="applyChartRange"
+            ></v-select>
+          </div>
+
+          <div class="statistics-chart">
+            <div
+              v-if="!paymentRevenueChart.rows.length"
+              class="statistics-chart__empty"
+            >
+              Aucun revenu sur cette période
+            </div>
+            <template v-else>
+              <svg
+                class="statistics-chart__svg"
+                viewBox="0 0 100 118"
+                preserveAspectRatio="none"
+                role="img"
+                aria-label="Revenus par moyen de paiement"
+              >
+                <line
+                  v-for="tick in chartYTicks"
+                  :key="tick.value"
+                  x1="4"
+                  x2="96"
+                  :y1="tick.y"
+                  :y2="tick.y"
+                  class="statistics-chart__grid"
+                />
+                <g v-for="row in paymentRevenueChart.rows" :key="row.date">
+                  <rect
+                    v-for="segment in row.segments"
+                    :key="`${row.date}-${segment.method}`"
+                    :x="row.x - chartBarWidth / 2"
+                    :y="segment.y"
+                    :width="chartBarWidth"
+                    :height="segment.height"
+                    :fill="paymentRevenueChart.colors[segment.method]"
+                    rx="1.4"
+                  />
+                </g>
+                <polyline
+                  v-if="chartLinePoints"
+                  :points="chartLinePoints"
+                  class="statistics-chart__line"
+                />
+                <circle
+                  v-for="point in paymentRevenueChart.linePoints"
+                  :key="`${point.x}-${point.y}`"
+                  :cx="point.x"
+                  :cy="point.y"
+                  r="1.15"
+                  class="statistics-chart__point"
+                />
+              </svg>
+
+              <div class="statistics-chart__labels">
+                <span
+                  v-for="(row, index) in paymentRevenueChart.rows"
+                  :key="`${row.date}-label`"
+                >
+                  {{ shouldShowChartLabel(index) ? row.label : '' }}
+                </span>
+              </div>
+
+              <div class="statistics-chart__axis">
+                <span>{{ formatCurrency(paymentRevenueChart.maxTotal) }}</span>
+                <span>0 €</span>
+              </div>
+
+              <div class="statistics-chart__legend">
+                <span
+                  v-for="method in paymentRevenueChart.methods"
+                  :key="method"
+                  class="statistics-chart__legend-item"
+                >
+                  <span
+                    class="statistics-chart__swatch"
+                    :style="{ backgroundColor: paymentRevenueChart.colors[method] }"
+                  ></span>
+                  {{ method }}
+                </span>
+                <span class="statistics-chart__legend-item">
+                  <span class="statistics-chart__line-key"></span>
+                  Total jour
+                </span>
+              </div>
+            </template>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-row class="mt-4" dense>
       <v-col cols="12" lg="6">
         <v-card outlined class="statistics-panel">
           <div class="statistics-panel__header">
@@ -226,6 +340,7 @@
 import listdashboard from '@/helpers/listdashboard'
 import Loading from '@/components/loading'
 import price from '@/helpers/price'
+import { buildPaymentRevenueChart } from '@/helpers/statisticsCharts'
 
 export default {
   components: {
@@ -248,6 +363,14 @@ export default {
       currentDateButton: 1,
       from: '',
       to: '',
+      chartRange: 7,
+      chartRangeOptions: [
+        { label: '7 derniers jours', value: 7 },
+        { label: '14 derniers jours', value: 14 },
+        { label: '30 derniers jours', value: 30 },
+        { label: 'Mois en cours', value: 'month' },
+        { label: 'Période personnalisée', value: 'custom' },
+      ],
       paymentHeaders: [
         { text: 'Moyen', value: 'name' },
         { text: 'Montant', value: 'amount' },
@@ -332,6 +455,25 @@ export default {
     paymentRows() {
       return this.metrics.paymentsSummary || []
     },
+    paymentRevenueChart() {
+      return buildPaymentRevenueChart(this.metrics.revenueByDayAndPayment || [])
+    },
+    chartLinePoints() {
+      return this.paymentRevenueChart.linePoints
+        .map((point) => `${point.x},${point.y}`)
+        .join(' ')
+    },
+    chartBarWidth() {
+      const count = this.paymentRevenueChart.rows.length || 1
+      return Math.max(2.4, Math.min(7.2, 56 / count))
+    },
+    chartYTicks() {
+      return [
+        { value: 100, y: 0 },
+        { value: 50, y: 40 },
+        { value: 0, y: 80 },
+      ]
+    },
     productRows() {
       return this.metrics.topProducts || []
     },
@@ -356,13 +498,17 @@ export default {
     }
 
     if (this.accessUser === 0) {
+      this.applyChartRange(false)
       apiCalls.push(
         this.$store.dispatch('products/getProducts'),
         this.$store.dispatch('categories/getAllCategories'),
         this.$store.dispatch('stocks/getAllStock'),
         this.$store.dispatch('orders/getAllOrder'),
         this.$store.dispatch('tables/getAllTables'),
-        this.$store.dispatch('history/getMetrics'),
+        this.$store.dispatch('history/getMetrics', {
+          from: this.from,
+          to: this.to,
+        }),
         this.$store.dispatch('shop/getShopInfo')
       )
     }
@@ -385,6 +531,7 @@ export default {
     },
     setToday() {
       this.currentDateButton = 1
+      this.chartRange = 'custom'
       const today = new Date()
       const iso = today.toISOString().slice(0, 10)
       this.from = iso
@@ -393,6 +540,7 @@ export default {
     },
     setYesterday() {
       this.currentDateButton = 2
+      this.chartRange = 'custom'
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
       const iso = yesterday.toISOString().slice(0, 10)
@@ -402,6 +550,7 @@ export default {
     },
     setThisWeek() {
       this.currentDateButton = 3
+      this.chartRange = 'custom'
       const today = new Date()
       const dayOfWeek = today.getDay()
       const monday = new Date(today)
@@ -414,8 +563,9 @@ export default {
       this.to = toIso
       this.fetchMetrics()
     },
-    setThisMonth() {
+    setThisMonth(fetch = true) {
       this.currentDateButton = 4
+      this.chartRange = 'month'
       const today = new Date()
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 
@@ -424,7 +574,7 @@ export default {
 
       this.from = fromIso
       this.to = toIso
-      this.fetchMetrics()
+      if (fetch) this.fetchMetrics()
     },
     percentageWidth(value) {
       return Math.min(100, Math.max(0, Number(value) || 0))
@@ -432,6 +582,32 @@ export default {
     revenueWidth(value) {
       if (!this.maxProductRevenue) return 0
       return Math.min(100, ((Number(value) || 0) / this.maxProductRevenue) * 100)
+    },
+    applyChartRange(fetch = true) {
+      if (this.chartRange === 'custom') {
+        if (fetch) this.fetchMetrics()
+        return
+      }
+      if (this.chartRange === 'month') {
+        this.setThisMonth(fetch)
+        return
+      }
+      this.setRollingDays(Number(this.chartRange) || 7, fetch)
+    },
+    setRollingDays(days, fetch = true) {
+      this.currentDateButton = `last-${days}`
+      const today = new Date()
+      const start = new Date(today)
+      start.setDate(today.getDate() - Math.max(0, days - 1))
+      this.from = start.toISOString().slice(0, 10)
+      this.to = today.toISOString().slice(0, 10)
+      if (fetch) this.fetchMetrics()
+    },
+    shouldShowChartLabel(index) {
+      const count = this.paymentRevenueChart.rows.length
+      if (count <= 10) return true
+      const step = count <= 18 ? 2 : 4
+      return index === 0 || index === count - 1 || index % step === 0
     },
   },
 }
@@ -585,6 +761,10 @@ export default {
   padding: 18px 20px 14px;
 }
 
+.statistics-panel__header--chart {
+  gap: 16px;
+}
+
 .statistics-panel__title {
   align-items: center;
   color: var(--se-color-text);
@@ -601,6 +781,124 @@ export default {
 
 .statistics-table {
   color: var(--se-color-text-body);
+}
+
+.statistics-chart-panel {
+  min-height: 340px;
+}
+
+.statistics-chart-range {
+  flex: 0 0 190px;
+  max-width: 190px;
+}
+
+.statistics-chart-range ::v-deep .v-input__slot {
+  min-height: 36px !important;
+}
+
+.statistics-chart {
+  padding: 18px 20px 16px 58px;
+  position: relative;
+}
+
+.statistics-chart__svg {
+  display: block;
+  height: 210px;
+  width: 100%;
+}
+
+.statistics-chart__grid {
+  stroke: var(--se-color-border-soft);
+  stroke-width: 0.35;
+}
+
+.statistics-chart__line {
+  fill: none;
+  stroke: var(--se-color-text);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.9;
+}
+
+.statistics-chart__point {
+  fill: #ffffff;
+  stroke: var(--se-color-text);
+  stroke-width: 0.6;
+}
+
+.statistics-chart__labels {
+  color: var(--se-color-text-muted);
+  display: flex;
+  font-size: var(--se-font-caption);
+  font-weight: var(--se-weight-semibold);
+  justify-content: space-between;
+  margin: 4px 0 0;
+  min-height: 18px;
+}
+
+.statistics-chart__labels span {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statistics-chart__axis {
+  bottom: 70px;
+  color: var(--se-color-text-muted);
+  display: flex;
+  flex-direction: column;
+  font-size: var(--se-font-caption);
+  font-weight: var(--se-weight-semibold);
+  justify-content: space-between;
+  left: 20px;
+  position: absolute;
+  top: 22px;
+  width: 34px;
+}
+
+.statistics-chart__legend {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 12px;
+}
+
+.statistics-chart__legend-item {
+  align-items: center;
+  color: var(--se-color-text-body);
+  display: inline-flex;
+  font-size: var(--se-font-meta);
+  font-weight: var(--se-weight-semibold);
+  gap: 7px;
+}
+
+.statistics-chart__swatch {
+  border-radius: var(--se-radius-sm);
+  display: inline-block;
+  height: 10px;
+  width: 10px;
+}
+
+.statistics-chart__line-key {
+  background: var(--se-color-text);
+  border-radius: var(--se-radius-pill);
+  display: inline-block;
+  height: 2px;
+  width: 18px;
+}
+
+.statistics-chart__empty {
+  align-items: center;
+  color: var(--se-color-text-muted);
+  display: flex;
+  font-size: var(--se-font-meta);
+  font-weight: var(--se-weight-semibold);
+  justify-content: center;
+  min-height: 220px;
 }
 
 .statistics-bar-cell {
@@ -650,6 +948,16 @@ export default {
   .statistics-refresh {
     justify-self: start;
   }
+
+  .statistics-panel__header--chart {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .statistics-chart-range {
+    flex: 0 0 auto;
+    max-width: 260px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -667,6 +975,18 @@ export default {
 
   .statistics-date-separator {
     display: none;
+  }
+
+  .statistics-chart {
+    padding-left: 20px;
+  }
+
+  .statistics-chart__axis {
+    display: none;
+  }
+
+  .statistics-chart__svg {
+    height: 180px;
   }
 }
 
