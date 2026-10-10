@@ -867,6 +867,10 @@ export default {
       if (!this.terminalRequestIsCurrent(generation)) return
       this.terminalBusy = false
       this.terminalCanceling = false
+      if (payment && payment.status === 'canceled') {
+        this.btnNo()
+        return
+      }
       if (isTerminalPaymentPending(payment)) {
         this.terminalNotice = 'Annulation non confirmée. Le paiement est toujours en cours.'
       }

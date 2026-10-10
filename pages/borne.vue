@@ -1375,6 +1375,22 @@ export default {
       this.terminalClientOrderToken = null
       this.$store.dispatch('stripeTerminal/resetPayment')
     },
+    async handleCanceledKioskTerminalPayment(
+      payment,
+      { preserveMessage = false } = {}
+    ) {
+      this.clearKioskTerminalPolling()
+      this.kioskTerminalPayment = payment
+      await this.$store.dispatch('cart/completeCheckout')
+      this.resetTerminalPaymentState()
+      this.repriceConfirmation = false
+      if (!preserveMessage) {
+        this.checkoutAlertType = 'warning'
+        this.checkoutErrorMessage =
+          'Paiement annulé. La commande a été annulée.'
+      }
+      return true
+    },
     async abandonPreparedCheckout({ preserveMessage = false } = {}) {
       if (this.terminalPaymentInProgress) {
         return this.cancelTerminalPayment({ preserveMessage })
@@ -1416,6 +1432,11 @@ export default {
             this.$store.get('stripeTerminal/error')?.message ||
             "Impossible d'annuler le paiement sur le TPE."
           return false
+        }
+        if (payment.outcome === 'canceled') {
+          return this.handleCanceledKioskTerminalPayment(payment, {
+            preserveMessage,
+          })
         }
         await this.resolveTerminalPayment(payment)
         if (!preserveMessage && payment.outcome === 'pending') {
