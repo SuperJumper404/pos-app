@@ -6,15 +6,25 @@
           <div class="kiosk-eyebrow">Commande borne</div>
           <h1>{{ shopName || 'Menu' }}</h1>
         </div>
-        <v-btn
-          icon
-          class="kiosk-exit-button"
-          aria-label="Quitter le mode borne"
-          :disabled="Boolean(checkoutLoading)"
-          @click="openExitDialog"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
+        <div class="kiosk-header-actions">
+          <v-btn
+            icon
+            class="kiosk-refresh-button"
+            aria-label="Rafraichir la borne"
+            @click="refreshKioskPage"
+          >
+            <v-icon>mdi-refresh</v-icon>
+          </v-btn>
+          <v-btn
+            icon
+            class="kiosk-exit-button"
+            aria-label="Quitter le mode borne"
+            :disabled="Boolean(checkoutLoading)"
+            @click="openExitDialog"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </div>
       </header>
 
       <main v-if="kioskStep === 'welcome'" class="kiosk-welcome">
@@ -591,6 +601,8 @@ const {
   isKioskProductAvailable,
 } = require('@/helpers/kioskCheckout')
 
+const KIOSK_TERMINAL_SESSION_TIMEOUT_MS = 35 * 1000
+
 export default {
   components: {
     ProductCustomizationWizard,
@@ -628,6 +640,7 @@ export default {
       kioskTerminalReader: null,
       kioskTerminalPayment: null,
       kioskTerminalPollingTimer: null,
+      kioskTerminalSessionTimer: null,
       terminalClientOrderToken: null,
       keyboardUppercase: true,
       exitDialog: false,
@@ -841,9 +854,19 @@ export default {
     this.stopWelcomeAnimationRotation()
     this.clearExitDialogTimer()
     this.clearConfirmationReturnTimer()
+    this.clearKioskTerminalSessionTimeout()
     this.resetTerminalPaymentState()
   },
   methods: {
+    refreshKioskPage() {
+      if (
+        typeof window !== 'undefined' &&
+        window.location &&
+        typeof window.location.reload === 'function'
+      ) {
+        window.location.reload()
+      }
+    },
     openExitDialog() {
       if (this.checkoutLoading) return
       this.clearExitDialogTimer()
@@ -1162,6 +1185,7 @@ export default {
           return
         }
         this.repriceConfirmation = false
+        this.clearKioskTerminalSessionTimeout()
         this.kioskTerminalPayment = payment
         await this.resolveTerminalPayment(payment)
       } catch (error) {
@@ -1175,6 +1199,7 @@ export default {
       this.kioskTerminalPayment = payment
       if (payment.outcome === 'pending') {
         this.scheduleKioskTerminalPolling(payment.id)
+        this.scheduleKioskTerminalSessionTimeout(payment.id)
         this.checkoutAlertType = 'info'
         this.checkoutErrorMessage = 'Paiement en attente sur le TPE Stripe.'
         return
@@ -1192,6 +1217,63 @@ export default {
       clearTimeout(this.kioskTerminalPollingTimer)
       this.kioskTerminalPollingTimer = null
     },
+    scheduleKioskTerminalSessionTimeout(paymentId) {
+      if (this.kioskTerminalSessionTimer) return
+      this.kioskTerminalSessionTimer = setTimeout(() => {
+        this.handleKioskTerminalSessionTimeout(paymentId)
+      }, KIOSK_TERMINAL_SESSION_TIMEOUT_MS)
+    },
+    clearKioskTerminalSessionTimeout() {
+      if (!this.kioskTerminalSessionTimer) return
+      clearTimeout(this.kioskTerminalSessionTimer)
+      this.kioskTerminalSessionTimer = null
+    },
+    async handleKioskTerminalSessionTimeout(paymentId) {
+      const currentPaymentId =
+        this.kioskTerminalPayment && this.kioskTerminalPayment.id
+      if (
+        !paymentId ||
+        String(currentPaymentId) !== String(paymentId) ||
+        !this.terminalPaymentInProgress ||
+        this.checkoutFinalized
+      ) {
+        return
+      }
+
+      this.clearKioskTerminalPolling()
+      this.clearKioskTerminalSessionTimeout()
+      this.checkoutLoading = 'terminal-timeout'
+      try {
+        const payment = await this.$store.dispatch(
+          'stripeTerminal/refreshKioskPayment',
+          paymentId
+        )
+        if (payment && payment.outcome !== 'pending') {
+          await this.finishTerminalPayment(payment)
+          this.checkoutLoading = null
+          await this.resetKiosk()
+          return
+        }
+      } catch (error) {}
+
+      try {
+        const canceled = await this.$store.dispatch(
+          'stripeTerminal/cancelKioskPayment',
+          paymentId
+        )
+        if (canceled && canceled.outcome === 'canceled') {
+          await this.handleCanceledKioskTerminalPayment(canceled, {
+            preserveMessage: true,
+          })
+        }
+      } catch (error) {}
+
+      this.checkoutAlertType = 'warning'
+      this.checkoutErrorMessage =
+        'Session TPE expiree. Retour a une nouvelle commande.'
+      this.checkoutLoading = null
+      await this.resetKiosk()
+    },
     async pollKioskTerminalPayment(paymentId) {
       if (!paymentId || this.checkoutFinalized) return
       this.checkoutLoading = 'terminal-poll'
@@ -1207,6 +1289,7 @@ export default {
     },
     async finishTerminalPayment(payment) {
       this.clearKioskTerminalPolling()
+      this.clearKioskTerminalSessionTimeout()
       this.kioskTerminalPayment = payment
       await this.$store.dispatch('cart/completeCheckout')
       this.checkoutFinalized = true
@@ -1371,6 +1454,7 @@ export default {
     },
     resetTerminalPaymentState() {
       this.clearKioskTerminalPolling()
+      this.clearKioskTerminalSessionTimeout()
       this.kioskTerminalPayment = null
       this.terminalClientOrderToken = null
       this.$store.dispatch('stripeTerminal/resetPayment')
@@ -1646,6 +1730,13 @@ export default {
   justify-content: space-between;
 }
 
+.kiosk-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kiosk-refresh-button,
 .kiosk-exit-button {
   color: var(--se-color-text-muted);
   min-width: 44px;
