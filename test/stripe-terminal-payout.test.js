@@ -558,6 +558,18 @@ test('cancellation control stays present but locked during cancellation confirma
   assert.strictEqual(count(h, 'stripeTerminal/cancelPayment'), 1)
 })
 
+test('confirmed cancellation closes the cash-register terminal modal without settlement', async () => {
+  const h = make()
+  await start(h)
+  await h.instance.cancelTerminalPayment()
+  assert.strictEqual(h.instance.terminalBusy, false)
+  assert.strictEqual(h.instance.terminalCanceling, false)
+  assert.strictEqual(h.instance.dialog, false)
+  assert.strictEqual(h.instance.receiptDialog, false)
+  assert.deepStrictEqual(h.calls.filter(x => x.name === 'navigate').map(x => x.payload), ['/cashregister'])
+  noSettlement(h)
+})
+
 test('a fresh retry after final failure receives a new bounded polling budget', async () => {
   const h = make()
   await start(h)
