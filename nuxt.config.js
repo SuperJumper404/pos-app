@@ -121,6 +121,9 @@ export default {
   env: {
     ENV: process.env.ENV,
     privateURL: getHost().backEndPoint,
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+    SUPABASE_BUCKET: process.env.SUPABASE_BUCKET,
   },
   axios: {
     proxy: false,

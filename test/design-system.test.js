@@ -94,6 +94,7 @@ assert.match(
 )
 
 const searchSurfaces = [
+  'components/products/ProductImageLibraryPicker.vue',
   'pages/clients.vue',
   'pages/history/index.vue',
   'pages/orders/index.vue',

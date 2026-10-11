@@ -5,7 +5,29 @@
     </v-alert>
     <v-row class="mt-5">
       <v-col md="4" sm="5" cols="12">
-        <ImageCropper v-model="productImg" />
+        <v-card outlined class="pa-4">
+          <v-btn-toggle
+            v-model="imageInputMode"
+            mandatory
+            dense
+            class="mb-4"
+          >
+            <v-btn value="upload" class="text-none">
+              <v-icon left>mdi-cloud-upload</v-icon>
+              Upload
+            </v-btn>
+            <v-btn value="library" class="text-none">
+              <v-icon left>mdi-image-search-outline</v-icon>
+              Bibliotheque
+            </v-btn>
+          </v-btn-toggle>
+          <ImageCropper ref="productImageCropper" v-model="productImg" />
+          <ProductImageLibraryPicker
+            v-if="imageInputMode === 'library'"
+            class="mt-4"
+            @select="useLibraryImage"
+          />
+        </v-card>
       </v-col>
       <v-col>
         <v-form v-model="isValue" @submit.prevent="submitProduct">
@@ -147,14 +169,16 @@
 
 <script>
 import ProductStepConfigurator from '@/components/customizations/ProductStepConfigurator'
+import ProductImageLibraryPicker from '@/components/products/ProductImageLibraryPicker'
 import { serializeProductCustomizationConfig } from '@/helpers/customizations'
 import price from '@/helpers/price'
 
 export default {
-  components: { ProductStepConfigurator },
+  components: { ProductImageLibraryPicker, ProductStepConfigurator },
   mixins: [price],
   middleware: 'auth',
   data: () => ({
+    imageInputMode: 'upload',
     productImg: null,
     isValue: false,
     loadingBtn: false,
@@ -208,6 +232,10 @@ export default {
     setConfigurationValidity({ valid, errors }) {
       this.configurationValid = valid
       this.configurationError = valid ? '' : errors[0]
+    },
+    useLibraryImage(file) {
+      if (!file || !this.$refs.productImageCropper) return
+      this.$refs.productImageCropper.loadFile(file)
     },
     async submitProduct() {
       if (!this.configurationValid) return
