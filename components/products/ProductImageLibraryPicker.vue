@@ -130,6 +130,7 @@ export default {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+              prefix: '',
               limit: 200,
               offset: 0,
               sortBy: { column: 'name', order: 'asc' },

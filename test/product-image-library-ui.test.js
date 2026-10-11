@@ -20,6 +20,19 @@ assert.match(newProduct, /@click="openImageLibrary"/)
 assert.match(newProduct, /imageLibraryDialog: false/)
 assert.match(newProduct, /loadFile\(file\)/)
 assert.match(newProduct, /this\.imageLibraryDialog = false/)
+assert.match(
+  fs.readFileSync(
+    path.join(
+      __dirname,
+      '..',
+      'components',
+      'products',
+      'ProductImageLibraryPicker.vue'
+    ),
+    'utf8'
+  ),
+  /prefix:\s*''/
+)
 assert.match(cropper, /loadFile\(file\)/)
 assert.match(cropper, /this\.rawInput = file/)
 
