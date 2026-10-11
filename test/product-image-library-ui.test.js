@@ -15,7 +15,11 @@ const cropper = fs.readFileSync(
 assert.match(newProduct, /ProductImageLibraryPicker/)
 assert.match(newProduct, /@select="useLibraryImage"/)
 assert.match(newProduct, /ref="productImageCropper"/)
+assert.match(newProduct, /v-dialog\s+v-model="imageLibraryDialog"/)
+assert.match(newProduct, /@click="openImageLibrary"/)
+assert.match(newProduct, /imageLibraryDialog: false/)
 assert.match(newProduct, /loadFile\(file\)/)
+assert.match(newProduct, /this\.imageLibraryDialog = false/)
 assert.match(cropper, /loadFile\(file\)/)
 assert.match(cropper, /this\.rawInput = file/)
 
