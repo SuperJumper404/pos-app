@@ -42,6 +42,10 @@ jobs:
 
             cd "$APP_DIR"
 
+            SUPABASE_URL="$(grep -m1 '^SUPABASE_URL=' .env.staging | cut -d= -f2-)"
+            SUPABASE_ANON_KEY="$(grep -m1 '^SUPABASE_ANON_KEY=' .env.staging | cut -d= -f2-)"
+            SUPABASE_BUCKET="$(grep -m1 '^SUPABASE_BUCKET=' .env.staging | cut -d= -f2-)"
+
             cat > .env.staging <<EOF
             ENV=staging
             NODE_ENV=staging
@@ -49,6 +53,9 @@ jobs:
             PORT=3000
             HOST=0.0.0.0
             CONTAINER_NAME=frontend_smart_eat_staging
+            SUPABASE_URL=${SUPABASE_URL}
+            SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+            SUPABASE_BUCKET=${SUPABASE_BUCKET}
             EOF
 
 

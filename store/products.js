@@ -51,7 +51,7 @@ export const actions = {
   },
   postProducts({ dispatch }, params) {
     return this.$axios
-      .post('baseurl/api/v1/product', params, {
+      .post('/baseurl/api/v1/product', params, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },

@@ -153,20 +153,25 @@ export default {
     },
 
     onPick() {
-      // Nettoyage URLs précédentes
-      this.cleanup()
-
       // v-file-input avec multiple => tableau; sans multiple => File direct
       const file = Array.isArray(this.rawInput)
         ? this.rawInput[0]
         : this.rawInput
+      this.loadFile(file)
+    },
+
+    loadFile(file) {
+      // Nettoyage URLs précédentes
+      this.cleanup()
       if (!file) return
 
+      this.rawInput = file
       this.inputUrl = URL.createObjectURL(file)
       this.src = this.inputUrl
 
       // reset preview + valeur v-model (on n'a pas encore crop)
       this.previewUrl = null
+      this.previewUrlLocal = null
       this.$emit('input', null)
     },
 

@@ -85,6 +85,33 @@ assert.match(ticketDataText, /AC : 9F2608ABCDEF12345678/)
 assert.match(ticketDataText, /TVR : 8000008000/)
 assert.match(ticketDataText, /TSI : E800/)
 assert.match(ticketDataText, /CVM : online_pin/)
+;[
+  'Commande : B100',
+  'Date :',
+  'Carte : VISA',
+  'PAN : ************4242',
+  'Montant : 20,00 EUR',
+  'Lecture : contactless_emv',
+  'Reseau : cartes_bancaires',
+  'Ref. reseau : net_123',
+  'Autorisation : 123456',
+  'R. autorisation : 00',
+  'Application : CB',
+  'AID : A0000000421010',
+  'AC : 9F2608ABCDEF12345678',
+  'TVR : 8000008000',
+  'TSI : E800',
+  'CVM : online_pin',
+  'Compte : credit',
+  'Paiement accepte',
+].reduce((previousIndex, expectedLine) => {
+  const currentIndex = ticketDataText.indexOf(expectedLine)
+  assert.ok(
+    currentIndex > previousIndex,
+    `TPE card ticket line "${expectedLine}" must be present in the expected order`
+  )
+  return currentIndex
+}, -1)
 assert.doesNotMatch(ticketDataText, /Paiement :/)
 assert.doesNotMatch(ticketDataText, /Charge/)
 assert.doesNotMatch(ticketDataText, /Paiement terminal/)

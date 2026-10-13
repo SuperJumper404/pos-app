@@ -11,6 +11,9 @@ services:
       NODE_ENV: ${NODE_ENV:?NODE_ENV must be set}
       HOST: ${HOST:-0.0.0.0}
       PORT: ${PORT:?PORT must be set}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_BUCKET: ${SUPABASE_BUCKET:-}
       HOME: /tmp
       NPM_CONFIG_CACHE: /tmp/.npm
     volumes:

@@ -5,7 +5,20 @@
     </v-alert>
     <v-row class="mt-5">
       <v-col md="4" sm="5" cols="12">
-        <ImageCropper v-model="productImg" />
+        <v-card outlined class="product-image-panel pa-4">
+          <div class="product-image-panel__actions mb-4">
+            <v-btn
+              outlined
+              color="primary"
+              class="text-none"
+              @click="openImageLibrary"
+            >
+              <v-icon left>mdi-image-search-outline</v-icon>
+              Bibliotheque
+            </v-btn>
+          </div>
+          <ImageCropper ref="productImageCropper" v-model="productImg" />
+        </v-card>
       </v-col>
       <v-col>
         <v-form v-model="isValue" @submit.prevent="submitProduct">
@@ -142,19 +155,45 @@
         </v-form>
       </v-col>
     </v-row>
+
+    <v-dialog v-model="imageLibraryDialog" max-width="980" scrollable>
+      <v-card class="image-library-dialog">
+        <v-card-title class="image-library-dialog__header">
+          <div class="image-library-dialog__title">
+            <v-icon color="primary" class="mr-2">
+              mdi-image-search-outline
+            </v-icon>
+            Bibliotheque d'images
+          </div>
+          <v-btn
+            icon
+            title="Fermer"
+            aria-label="Fermer"
+            @click="imageLibraryDialog = false"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-card-text class="image-library-dialog__body">
+          <ProductImageLibraryPicker @select="useLibraryImage" />
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script>
 import ProductStepConfigurator from '@/components/customizations/ProductStepConfigurator'
+import ProductImageLibraryPicker from '@/components/products/ProductImageLibraryPicker'
 import { serializeProductCustomizationConfig } from '@/helpers/customizations'
 import price from '@/helpers/price'
 
 export default {
-  components: { ProductStepConfigurator },
+  components: { ProductImageLibraryPicker, ProductStepConfigurator },
   mixins: [price],
   middleware: 'auth',
   data: () => ({
+    imageLibraryDialog: false,
     productImg: null,
     isValue: false,
     loadingBtn: false,
@@ -209,6 +248,14 @@ export default {
       this.configurationValid = valid
       this.configurationError = valid ? '' : errors[0]
     },
+    openImageLibrary() {
+      this.imageLibraryDialog = true
+    },
+    useLibraryImage(file) {
+      if (!file || !this.$refs.productImageCropper) return
+      this.imageLibraryDialog = false
+      this.$refs.productImageCropper.loadFile(file)
+    },
     async submitProduct() {
       if (!this.configurationValid) return
 
@@ -252,3 +299,39 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.product-image-panel__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.image-library-dialog {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.image-library-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e8edf3;
+  padding: 14px 18px;
+}
+
+.image-library-dialog__title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: #121826;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.image-library-dialog__body {
+  padding: 18px;
+  background: #f7f9fc;
+}
+</style>
