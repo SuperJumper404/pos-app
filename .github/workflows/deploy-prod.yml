@@ -42,6 +42,10 @@ jobs:
 
             cd "$APP_DIR"
 
+            SUPABASE_URL="$(grep -m1 '^SUPABASE_URL=' .env.production | cut -d= -f2-)"
+            SUPABASE_ANON_KEY="$(grep -m1 '^SUPABASE_ANON_KEY=' .env.production | cut -d= -f2-)"
+            SUPABASE_BUCKET="$(grep -m1 '^SUPABASE_BUCKET=' .env.production | cut -d= -f2-)"
+
             cat > .env.production <<EOF
             ENV=production
             NODE_ENV=production
@@ -49,6 +53,9 @@ jobs:
             PORT=3000
             HOST=0.0.0.0
             CONTAINER_NAME=frontend_smart_eat_production
+            SUPABASE_URL=${SUPABASE_URL}
+            SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+            SUPABASE_BUCKET=${SUPABASE_BUCKET}
             EOF
 
 

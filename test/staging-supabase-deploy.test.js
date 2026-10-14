@@ -1,7 +1,8 @@
 const assert = require('assert')
 const fs = require('fs')
 
-const workflow = fs.readFileSync('.github/workflows/deploy-staging.yml', 'utf8')
+const stagingWorkflow = fs.readFileSync('.github/workflows/deploy-staging.yml', 'utf8')
+const productionWorkflow = fs.readFileSync('.github/workflows/deploy-prod.yml', 'utf8')
 const compose = fs.readFileSync('compose.yml', 'utf8')
 const productsStore = fs.readFileSync('store/products.js', 'utf8')
 
@@ -10,10 +11,16 @@ for (const variable of [
   'SUPABASE_ANON_KEY',
   'SUPABASE_BUCKET',
 ]) {
-  assert.ok(
-    workflow.includes(`${variable}=`),
-    `staging deploy workflow must preserve ${variable} in .env.staging`
-  )
+  for (const [environment, workflow, envFile] of [
+    ['staging', stagingWorkflow, '.env.staging'],
+    ['production', productionWorkflow, '.env.production'],
+  ]) {
+    assert.ok(
+      workflow.includes(`${variable}=`),
+      `${environment} deploy workflow must preserve ${variable} in ${envFile}`
+    )
+  }
+
   assert.ok(
     compose.includes(`${variable}:`),
     `compose service must expose ${variable} to npm run generate`
@@ -26,4 +33,4 @@ assert.ok(
 )
 
 // eslint-disable-next-line no-console
-console.log('staging supabase deploy tests passed')
+console.log('Supabase deploy env tests passed')
