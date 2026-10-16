@@ -39,7 +39,19 @@
         required
       ></v-text-field>
       <p class="text-subtitle-2 mb-2">Image carrée (facultative)</p>
+      <div class="d-flex justify-end mb-3">
+        <v-btn
+          outlined
+          color="primary"
+          class="text-none"
+          @click="imageLibraryDialog = true"
+        >
+          <v-icon left>mdi-image-search-outline</v-icon>
+          Bibliothèque
+        </v-btn>
+      </div>
       <ImageCropper
+        ref="choiceImageCropper"
         v-model="image"
         :ratio="1"
         :preview-url-prop="simplePreviewUrl"
@@ -105,12 +117,37 @@
         <v-icon small right>mdi-content-save</v-icon>
       </v-btn>
     </div>
+    <v-dialog v-model="imageLibraryDialog" max-width="980" scrollable>
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <span class="text-subtitle-1">Bibliothèque d'images</span>
+          <v-spacer />
+          <v-btn
+            icon
+            title="Fermer"
+            aria-label="Fermer"
+            @click="imageLibraryDialog = false"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-card-text>
+          <ProductImageLibraryPicker
+            v-if="imageLibraryDialog && form.choice_type === 'simple'"
+            @select="useLibraryImage"
+          />
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </v-form>
 </template>
 
 <script>
+import ProductImageLibraryPicker from '@/components/products/ProductImageLibraryPicker'
+
 export default {
   name: 'ChoiceEditor',
+  components: { ProductImageLibraryPicker },
   props: {
     value: {
       type: Object,
@@ -133,6 +170,7 @@ export default {
     return {
       valid: false,
       image: null,
+      imageLibraryDialog: false,
       form: {
         choice_type: 'simple',
         name: '',
@@ -178,6 +216,7 @@ export default {
       deep: true,
       handler(value) {
         this.image = null
+        this.imageLibraryDialog = false
         this.form = {
           choice_type: (value && value.choice_type) || 'simple',
           name: (value && value.name) || '',
@@ -191,12 +230,22 @@ export default {
     },
   },
   methods: {
+    useLibraryImage(file) {
+      if (
+        !file ||
+        this.form.choice_type !== 'simple' ||
+        !this.$refs.choiceImageCropper
+      ) return
+      this.imageLibraryDialog = false
+      this.$refs.choiceImageCropper.loadFile(file)
+    },
     productImageSrc(image) {
       return `${this.staticurl}/api/v1/imgproducts/${image || 'default.png'}`
     },
     resetTypeFields() {
       if (this.isEditing) return
       this.image = null
+      this.imageLibraryDialog = false
       this.form.name = ''
       this.form.linked_product_id = null
     },
