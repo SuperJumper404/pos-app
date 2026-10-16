@@ -2,11 +2,11 @@
 
 Date : 2026-10-16
 
-Statut : perimetre valide en conversation ; specification ecrite soumise a relecture.
+Statut : specification ecrite validee en conversation le 2026-10-16 ; plan d'implementation a relire avant execution.
 
 Ce document couvre le frontend `pos-app` et le backend voisin `express-pos`.
 Il decrit la conception, pas un plan de travaux ni une fonctionnalite deja disponible.
-Les choix techniques identifies comme propositions ci-dessous restent soumis a la relecture de ce document.
+Les choix techniques identifies comme propositions ci-dessous ont ete valides avec ce document. Leur mise en oeuvre est decrite dans le plan d'implementation distinct.
 
 ## 1. Objectif et decisions validees
 
