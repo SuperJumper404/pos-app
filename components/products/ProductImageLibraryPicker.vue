@@ -16,7 +16,8 @@
         :loading="loading"
         :disabled="loading"
         title="Rafraichir"
-        @click="loadImages"
+        aria-label="Rafraichir"
+        @click="loadImages()"
       >
         <v-icon>mdi-refresh</v-icon>
       </v-btn>
@@ -26,7 +27,7 @@
       {{ error }}
     </v-alert>
 
-    <div v-else-if="loading" class="image-library__state">
+    <div v-else-if="loading && images.length === 0" class="image-library__state">
       <v-progress-circular indeterminate color="primary" />
       <span>Chargement des images</span>
     </div>
@@ -43,10 +44,12 @@
         type="button"
         class="image-library__item"
         :class="{ 'image-library__item--selected': selectedPath === image.path }"
+        :aria-pressed="selectedPath === image.path"
         @click="selectImage(image)"
       >
         <v-img
           :src="image.previewUrl"
+          :alt="image.title"
           aspect-ratio="1"
           class="image-library__thumb"
         >
@@ -58,6 +61,19 @@
         </v-img>
         <span class="image-library__title text-caption">{{ image.title }}</span>
       </button>
+    </div>
+    <div v-if="hasMore && !error" class="d-flex justify-center mt-4">
+      <v-btn
+        outlined
+        color="primary"
+        class="text-none"
+        :loading="loading"
+        :disabled="loading"
+        @click="loadImages({ append: true })"
+      >
+        <v-icon left>mdi-chevron-down</v-icon>
+        Charger plus
+      </v-btn>
     </div>
   </v-sheet>
 </template>
@@ -77,14 +93,18 @@ export default {
       config: null,
       error: '',
       images: [],
+      hasMore: false,
       loading: false,
+      offset: 0,
+      requestId: 0,
       search: '',
+      searchTimer: null,
       selectedPath: '',
     }
   },
   computed: {
     filteredImages() {
-      return filterImageLibraryItems(this.images, this.search).map((image) => ({
+      return filterImageLibraryItems(this.images, '').map((image) => ({
         ...image,
         previewUrl: buildSupabasePublicUrl({
           url: this.config.url,
@@ -92,6 +112,19 @@ export default {
           path: image.path,
         }),
       }))
+    },
+  },
+  watch: {
+    search() {
+      if (!this.config) return
+      clearTimeout(this.searchTimer)
+      this.requestId += 1
+      this.images = []
+      this.hasMore = false
+      this.offset = 0
+      this.error = ''
+      this.loading = true
+      this.searchTimer = setTimeout(() => this.loadImages(), 300)
     },
   },
   mounted() {
@@ -106,6 +139,10 @@ export default {
       this.error = error.message
     }
   },
+  beforeDestroy() {
+    clearTimeout(this.searchTimer)
+    this.requestId += 1
+  },
   methods: {
     requestHeaders() {
       return {
@@ -113,8 +150,15 @@ export default {
         Authorization: `Bearer ${this.config.anonKey}`,
       }
     },
-    async loadImages() {
-      if (!this.config) return
+    async loadImages({ append = false } = {}) {
+      if (!this.config || (append && (!this.hasMore || this.loading))) return
+      clearTimeout(this.searchTimer)
+      const requestId = ++this.requestId
+      if (!append) {
+        this.images = []
+        this.offset = 0
+        this.hasMore = false
+      }
       this.loading = true
       this.error = ''
 
@@ -131,8 +175,9 @@ export default {
             },
             body: JSON.stringify({
               prefix: '',
+              search: String(this.search || '').trim(),
               limit: 200,
-              offset: 0,
+              offset: this.offset,
               sortBy: { column: 'name', order: 'asc' },
             }),
           }
@@ -142,12 +187,16 @@ export default {
           throw new Error('Impossible de charger la bibliotheque.')
         }
 
-        this.images = await response.json()
+        const images = await response.json()
+        if (requestId !== this.requestId) return
+        this.images = append ? [...this.images, ...images] : images
+        this.offset += images.length
+        this.hasMore = images.length === 200
       } catch (error) {
-        this.images = []
+        if (requestId !== this.requestId) return
         this.error = error.message || 'Impossible de charger la bibliotheque.'
       } finally {
-        this.loading = false
+        if (requestId === this.requestId) this.loading = false
       }
     },
     async selectImage(image) {
