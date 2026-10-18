@@ -268,6 +268,124 @@ test('I1 original guest stays guest through later personal login and exact check
   page.$destroy()
 })
 
+for (const outcome of ['link', 'replay', 'error']) {
+  test(`ROUND3 renewal rechecks authority after real store settlement: ${outcome}`, async () => {
+    const f = trackingFixture(); authenticate(f)
+    const page = await mountTrackingCart(f)
+    const expires = Date.now() + 60000
+    f.store.commit('customer/SESSION', { ...personalSession(), expiresAt: new Date(expires).toISOString() })
+    await page.finishDeliveryCheckout(await f.checkout(31, { customerSession: f.store.state.customer.session }))
+    page.deliveryTrackingUrl = null
+    page.deliveryTrackingError = 'Previous tracking outcome'
+    page.checkoutErrorMessage = 'Existing financial outcome'
+    const generation = f.store.state.cart.deliveryTrackingGeneration
+    const dispatch = f.store.dispatch.bind(f.store)
+    const now = Date.now
+    let acceptedBeforeExpiry = false
+    const expire = () => { acceptedBeforeExpiry = Date.now() < expires; Date.now = () => expires + 1 }
+    f.store.dispatch = (type, ...args) => {
+      const pending = dispatch(type, ...args)
+      if (type !== 'cart/rotateDeliveryTracking') return pending
+      return pending.then(result => { assert.equal(result.discarded, undefined); expire(); return result },
+        error => { expire(); throw error })
+    }
+    try {
+      const pending = page.renewDeliveryTracking()
+      await drain()
+      const call = f.calls[f.calls.length - 1]
+      if (outcome === 'error') call.reject(new Error('Lost accepted current-context response'))
+      else call.resolve({ trackingUrl: outcome === 'link' ? '/livraison/suivi#' + token : null, idempotentReplay: outcome === 'replay' })
+      await pending
+      assert.equal(acceptedBeforeExpiry, true, outcome)
+      assert.equal(f.store.state.cart.deliveryTrackingGeneration, generation, 'Only the clock changes across the store/page boundary')
+      assert.equal(await dispatch('cart/hasDeliveryTrackingConfirmation'), false, outcome)
+      assert.equal(Boolean(page.deliveryTrackingUrl), false, outcome)
+      assert.equal(page.deliveryTrackingRecovery, false, outcome)
+      assert.equal(page.deliveryTrackingConfirmation, null, outcome)
+      assert.equal(page.deliveryTrackingError, '', outcome)
+      assert.equal(page.deliveryTrackingBusy, false, outcome)
+      assert.equal(page.checkoutErrorMessage, 'Existing financial outcome')
+    } finally { Date.now = now; page.$destroy() }
+  })
+}
+
+test('ROUND3 late renewal expiry outcome/finally cannot alter a newer verified confirmation and busy request', async () => {
+  for (const failure of [false, true]) {
+    const f = trackingFixture(); authenticate(f)
+    const page = await mountTrackingCart(f)
+    const expires = Date.now() + 60000
+    f.store.commit('customer/SESSION', { ...personalSession(), expiresAt: new Date(expires).toISOString() })
+    await page.finishDeliveryCheckout(await f.checkout(31, { customerSession: f.store.state.customer.session }))
+    page.deliveryTrackingUrl = null
+    const dispatch = f.store.dispatch.bind(f.store)
+    const now = Date.now
+    let intercepted = false; let currentRenewal
+    const replace = async () => {
+      Date.now = () => expires + 1
+      f.store.commit('customer/AUTHENTICATED', personalSession('202'))
+      await page.finishDeliveryCheckout(await f.checkout(32, { customerSession: f.store.state.customer.session }))
+      page.deliveryTrackingUrl = null
+      currentRenewal = page.renewDeliveryTracking()
+      await drain()
+    }
+    f.store.dispatch = (type, ...args) => {
+      const pending = dispatch(type, ...args)
+      if (type !== 'cart/rotateDeliveryTracking' || intercepted) return pending
+      intercepted = true
+      return pending.then(async result => { await replace(); return result }, async error => { await replace(); throw error })
+    }
+    try {
+      const oldRenewal = page.renewDeliveryTracking()
+      await drain()
+      const oldCall = f.calls[f.calls.length - 1]
+      if (failure) oldCall.reject(new Error('Lost old response'))
+      else oldCall.resolve({ trackingUrl: '/livraison/suivi#' + token })
+      await oldRenewal
+      assert.equal(page.deliveryTrackingBusy, true)
+      assert.equal(page.deliveryTrackingRecovery, true)
+      assert.equal(Boolean(page.deliveryTrackingUrl), false)
+      assert.equal(page.deliveryTrackingError, '')
+      f.calls[f.calls.length - 1].resolve({ trackingUrl: '/livraison/suivi#' + 'b'.repeat(43) })
+      await currentRenewal
+      assert.equal(page.deliveryTrackingBusy, false)
+      assert.equal(Boolean(page.deliveryTrackingUrl && page.deliveryTrackingUrl.endsWith('b'.repeat(43))), true)
+    } finally { Date.now = now; page.$destroy() }
+  }
+})
+
+test('ROUND3 post-store boundary keeps valid same-account SESSION refresh and original guest renewal usable', async () => {
+  for (const verified of [true, false]) {
+    const f = trackingFixture()
+    if (verified) authenticate(f)
+    const page = await mountTrackingCart(f)
+    const expires = Date.now() + 60000
+    f.store.commit('customer/SESSION', { ...personalSession(), expiresAt: new Date(expires).toISOString() })
+    await page.finishDeliveryCheckout(await f.checkout(31, verified ? { customerSession: f.store.state.customer.session } : {}))
+    page.deliveryTrackingUrl = null
+    const dispatch = f.store.dispatch.bind(f.store)
+    const now = Date.now
+    f.store.dispatch = (type, ...args) => {
+      const pending = dispatch(type, ...args)
+      if (type !== 'cart/rotateDeliveryTracking') return pending
+      return pending.then(result => {
+        if (verified) f.store.commit('customer/SESSION', personalSession('101', 'd'.repeat(64)))
+        Date.now = () => expires + 1
+        return result
+      })
+    }
+    try {
+      const renewal = page.renewDeliveryTracking()
+      await drain()
+      f.calls[f.calls.length - 1].resolve({ trackingUrl: '/livraison/suivi#' + token })
+      await renewal
+      assert.equal(await dispatch('cart/hasDeliveryTrackingConfirmation'), true)
+      assert.equal(Boolean(page.deliveryTrackingUrl), true)
+      assert.equal(page.deliveryTrackingBusy, false)
+      assert.equal(page.deliveryTrackingError, '')
+    } finally { Date.now = now; page.$destroy() }
+  }
+})
+
 test('I1 verified publication rechecks current session authority after its await, without needing a reactive mutation', async () => {
   const f = trackingFixture(); authenticate(f)
   const page = await mountTrackingCart(f)

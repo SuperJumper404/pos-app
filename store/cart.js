@@ -276,19 +276,20 @@ export const actions = {
   async rotateDeliveryTracking({ state, rootState, commit }, expectedId) {
     const record = trackingRecord(this, state, rootState, commit)
     const context = trackingConfirmation(this, rootState, state, record)
-    if (!context || (expectedId && context.id !== expectedId) || context.busy) throw new Error('Confirmation privee indisponible.')
-    const current = () => trackingConfirmation(this, rootState, state, record) === context
+    const current = () => Boolean(context) && (!expectedId || context.id === expectedId) &&
+      trackingConfirmation(this, rootState, state, record) === context
+    if (!current() || context.busy) throw Object.assign(new Error('Confirmation privee indisponible.'), { isCurrent: current })
     context.busy = true
     if (!context.key) context.key = uuidv4()
     try {
       const result = await buildTrackingApi({ baseURL: process.env.privateURL }).rotate({ deliveryId: context.deliveryId,
         idempotencyKey: context.key, privateCheckoutContext: context.privateCheckoutContext })
-      if (!current()) return { discarded: true }
+      if (!current()) return { discarded: true, isCurrent: current }
       context.key = null
-      return result
+      return { ...result, isCurrent: current }
     } catch (error) {
-      if (!current()) return { discarded: true }
-      throw error
+      if (!current()) return { discarded: true, isCurrent: current }
+      throw Object.assign(error, { isCurrent: current })
     } finally { context.busy = false }
   },
   setTotal({ dispatch }, params) {

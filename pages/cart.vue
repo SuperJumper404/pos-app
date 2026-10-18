@@ -903,11 +903,14 @@ export default {
       this.deliveryTrackingBusy = true
       try {
         const result = await this.$store.dispatch('cart/rotateDeliveryTracking', confirmation)
-        if (!current() || result.discarded) return
+        if (!current()) return
+        if (result.discarded || !result.isCurrent()) { this.invalidateDeliveryTracking(); return }
         this.deliveryTrackingUrl = result.trackingUrl
         this.deliveryTrackingError = result.trackingUrl ? '' : 'Ce renouvellement a deja ete traite. Demandez un nouveau lien.'
-      } catch (_) {
-        if (current()) this.deliveryTrackingError = 'Suivi indisponible. Reprenez le renouvellement pour verifier son resultat.'
+      } catch (error) {
+        if (!current()) return
+        if (!error.isCurrent || !error.isCurrent()) { this.invalidateDeliveryTracking(); return }
+        this.deliveryTrackingError = 'Suivi indisponible. Reprenez le renouvellement pour verifier son resultat.'
       } finally { if (current()) this.deliveryTrackingBusy = false }
     },
     async copyDeliveryTracking() {
