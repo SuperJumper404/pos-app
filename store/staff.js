@@ -1,5 +1,5 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
-const { isStaffAccess } = require('../helpers/staffRoles')
+const { isStaffAccess, isDeliveryAdmin } = require('../helpers/staffRoles')
 const latestRequests = new WeakMap()
 
 const authHeaders = () => ({
@@ -9,13 +9,17 @@ const authHeaders = () => ({
 const errorMessage = (error) =>
   error?.response?.data?.message || 'Une erreur est survenue.'
 
-const staffPayload = (params) => ({
-  username: params.username,
-  access: params.access,
-  status: params.status,
-  module_permissions: params.module_permissions,
-  service_point_id: params.service_point_id,
-})
+const staffPayload = (params) => {
+  const payload = {
+    username: params.username,
+    access: params.access,
+    status: params.status,
+    module_permissions: params.module_permissions,
+    service_point_id: params.service_point_id,
+  }
+  if (Number(params.access) === 6) { payload.module_permissions = []; payload.service_point_id = null }
+  return payload
+}
 
 export const state = () => ({
   data: [],
@@ -26,7 +30,8 @@ export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 
 export const actions = {
-  async getAll({ dispatch, state }, options = {}) {
+  async getAll({ dispatch, state, rootState }, options = {}) {
+    if (rootState && !isDeliveryAdmin(rootState.users && rootState.users.user)) { dispatch('set/data', []); return false }
     const silent = options && options.silent === true
     const request = {}
     latestRequests.set(state, request)
@@ -55,7 +60,8 @@ export const actions = {
     }
   },
 
-  async create({ dispatch }, params) {
+  async create({ dispatch, rootState }, params) {
+    if (rootState && !isDeliveryAdmin(rootState.users && rootState.users.user)) return false
     try {
       const response = await this.$axios.post('/baseurl/api/v1/register', staffPayload(params), {
         headers: authHeaders(),
@@ -70,7 +76,8 @@ export const actions = {
     }
   },
 
-  async update({ dispatch }, { id, data }) {
+  async update({ dispatch, rootState }, { id, data }) {
+    if (rootState && !isDeliveryAdmin(rootState.users && rootState.users.user)) return false
     try {
       const response = await this.$axios.patch(`/baseurl/api/v1/user/${id}`, staffPayload(data), {
         headers: authHeaders(),
@@ -85,7 +92,8 @@ export const actions = {
     }
   },
 
-  async provisionCredentials({ dispatch }, { id }) {
+  async provisionCredentials({ dispatch, rootState }, { id }) {
+    if (rootState && !isDeliveryAdmin(rootState.users && rootState.users.user)) return false
     try {
       const response = await this.$axios.patch(
         `/baseurl/api/v1/user/${id}/staff-credentials`,
@@ -102,7 +110,8 @@ export const actions = {
     }
   },
 
-  async remove({ dispatch }, id) {
+  async remove({ dispatch, rootState }, id) {
+    if (rootState && !isDeliveryAdmin(rootState.users && rootState.users.user)) return false
     try {
       const response = await this.$axios.delete(`/baseurl/api/v1/user/${id}`, {
         headers: authHeaders(),

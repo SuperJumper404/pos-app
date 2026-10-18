@@ -222,6 +222,7 @@ const {
 const { isKioskRoute } = require('@/helpers/kioskAccess')
 export default {
   mixins: [listdashboard],
+  middleware: 'delivery',
   data() {
     return {
       clipped: false,
@@ -244,7 +245,9 @@ export default {
     navigationItems() {
       return getAccessibleNavigationItems(
         this.userAccess,
-        this.list,
+        [...this.list.filter(item => item.to !== '/livraison'), {
+          title: 'Livraison', to: '/livraison', routeName: 'livraison', moduleKey: 'delivery', icon: 'mdi-truck-delivery-outline',
+        }],
         this.modulePermissions,
         this.isPrimaryAdmin
       )
@@ -259,6 +262,7 @@ export default {
             'products',
             'caisse-menu',
             'orders',
+            'livraison',
             'cashregister',
           ],
           names: [],
@@ -368,6 +372,7 @@ export default {
       )
     },
     currentPage() {
+      if (this.$route.path === '/livraison') return { title: 'Livraison', icon: 'mdi-truck-delivery-outline' }
       const title = this.list.find(
         (item) => item.routeName === this.$route.name
       ) || {

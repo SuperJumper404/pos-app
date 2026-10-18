@@ -5,6 +5,7 @@ const ACCESS = {
   CLICK_AND_COLLECT: 3,
   SERVER: 4,
   KITCHEN: 5,
+  COURIER: 6,
 }
 
 const ROLE_OPTIONS = [
@@ -13,6 +14,7 @@ const ROLE_OPTIONS = [
   { text: 'Serveur', value: ACCESS.SERVER },
   { text: 'Cuisine', value: ACCESS.KITCHEN },
 ]
+const PERSONAL_ROLE_OPTIONS = [...ROLE_OPTIONS, { text: 'Livreur', value: ACCESS.COURIER }]
 
 const ROLE_LABELS = {
   [ACCESS.ADMIN]: 'Admin',
@@ -21,6 +23,7 @@ const ROLE_LABELS = {
   [ACCESS.CLICK_AND_COLLECT]: 'Click-and-Collect',
   [ACCESS.SERVER]: 'Serveur',
   [ACCESS.KITCHEN]: 'Cuisine',
+  [ACCESS.COURIER]: 'Livreur',
 }
 
 const STAFF_MODULE_KEYS = [
@@ -33,6 +36,7 @@ const STAFF_MODULE_KEYS = [
   'tables',
   'reports',
   'website',
+  'delivery',
 ]
 
 const MODULE_OPTIONS = [
@@ -45,6 +49,7 @@ const MODULE_OPTIONS = [
   { text: 'Tables', value: 'tables' },
   { text: 'Rapports', value: 'reports' },
   { text: 'Site web', value: 'website' },
+  { text: 'Livraison', value: 'delivery' },
 ]
 
 const DEFAULT_MODULES_BY_ACCESS = {
@@ -94,7 +99,7 @@ const MODULE_PERMISSION_BY_NAV_KEY = {
 
 const PRIMARY_ADMIN_MODULES = new Set(['staff', 'settings'])
 
-const isStaffAccess = (access) => ROLE_OPTIONS.some(
+const isStaffAccess = (access) => PERSONAL_ROLE_OPTIONS.some(
   (role) => role.value === Number(access)
 )
 
@@ -113,7 +118,11 @@ const canAccessModule = (
   isPrimaryAdmin = false,
   legacyModuleKey = moduleKey
 ) => {
-  if (isPrimaryAdmin) return true
+  if (Number(access) === ACCESS.COURIER) return false
+  if (moduleKey === 'delivery') return access != null && (Number(access) === ACCESS.ADMIN ||
+    (Number(access) === ACCESS.CASHIER && Array.isArray(modulePermissions) && modulePermissions.includes('delivery')))
+  if (access == null) return false
+  if (isPrimaryAdmin && Number(access) === ACCESS.ADMIN) return true
   if (PRIMARY_ADMIN_MODULES.has(moduleKey)) return false
 
   if (!Array.isArray(modulePermissions)) {
@@ -134,6 +143,7 @@ const getAccessibleNavigationItems = (
 ) => items.filter(
   (item) => item.name === 'logout' || (
     !item.hiddenFromMainNavigation &&
+    !['categories', 'customizations', 'stocks'].includes(item.moduleKey) &&
     item.to && canAccessModule(
       access,
       item.moduleKey,
@@ -144,9 +154,16 @@ const getAccessibleNavigationItems = (
   )
 )
 
+const isDeliveryAdmin = user => Boolean(user && user.id && user.shopid && user.access != null &&
+  user.session_subject !== 'service_point' && user.session_subject !== 'customer' && Number(user.status) !== 0 && Number(user.access) === ACCESS.ADMIN)
+const canOperateDelivery = user => Boolean(user && user.id && user.shopid && user.access != null &&
+  user.session_subject !== 'service_point' && user.session_subject !== 'customer' && Number(user.status) !== 0 &&
+  canAccessModule(user.access, 'delivery', user.module_permissions))
+
 module.exports = {
   ACCESS,
   ROLE_OPTIONS,
+  PERSONAL_ROLE_OPTIONS,
   MODULE_OPTIONS,
   STAFF_MODULE_KEYS,
   canAccessModule,
@@ -155,4 +172,6 @@ module.exports = {
   getRoleLabel,
   isStaffAccess,
   isTableQrAccess,
+  canOperateDelivery,
+  isDeliveryAdmin,
 }

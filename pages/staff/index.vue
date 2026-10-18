@@ -84,8 +84,8 @@
               :rules="accessRules"
               @change="applyRolePreset"
             />
-            <div v-if="!isEditingPrimaryAdmin" class="text-subtitle-2 mb-2">Modules accessibles</div>
-            <v-row v-if="!isEditingPrimaryAdmin" no-gutters>
+            <div v-if="!isEditingPrimaryAdmin && form.access !== 6" class="text-subtitle-2 mb-2">Modules accessibles</div>
+            <v-row v-if="!isEditingPrimaryAdmin && form.access !== 6" no-gutters>
               <v-col
                 v-for="module in MODULE_OPTIONS"
                 :key="module.value"
@@ -176,7 +176,7 @@
 <script>
 const {
   MODULE_OPTIONS,
-  ROLE_OPTIONS,
+  PERSONAL_ROLE_OPTIONS: ROLE_OPTIONS,
   getRoleLabel,
   getRoleModuleDefaults,
 } = require('@/helpers/staffRoles')
@@ -193,7 +193,7 @@ const emptyForm = () => ({
 })
 
 export default {
-  middleware: 'auth',
+  middleware: ['auth', 'delivery'],
   data() {
     return {
       MODULE_OPTIONS,
@@ -211,6 +211,7 @@ export default {
       credentialResult: null,
       showCredentialPin: false,
       removeTarget: null,
+      handledCourierQuery: false,
       headers: [
         { text: 'Nom', value: 'username' },
         { text: 'ID caisse', value: 'staff_login_id' },
@@ -249,12 +250,22 @@ export default {
       }[Number(access)] || 'grey'
     },
     isPrimaryAdmin(user) {
-      return Number(user.is_primary_admin) === 1
+      return Number(user.access) === 0 && Number(user.is_primary_admin) === 1
     },
     async refresh() {
       this.loading = true
       await this.$store.dispatch('staff/getAll')
       this.loading = false
+      if (this.handledCourierQuery) return
+      this.handledCourierQuery = true
+      const courierId = Number(this.$route && this.$route.query.courier)
+      const target = this.staff.find(user => user.id === courierId && Number(user.access) === 6)
+      if (target && !this.formDialog && !this.credentialsDialog) this.openEdit(target)
+      if (this.$route && this.$route.query.create === 'courier' && !this.formDialog) {
+        this.openCreate()
+        this.form.access = 6
+        this.applyRolePreset(6)
+      }
     },
     openCreate() {
       this.form = emptyForm()
@@ -267,7 +278,7 @@ export default {
         username: user.username || '',
         staff_login_id: user.staff_login_id || '',
         access,
-        module_permissions: Array.isArray(user.module_permissions)
+        module_permissions: access === 6 ? [] : Array.isArray(user.module_permissions)
           ? user.module_permissions
           : getRoleModuleDefaults(access),
         service_point_id: user.service_point_id || null,
