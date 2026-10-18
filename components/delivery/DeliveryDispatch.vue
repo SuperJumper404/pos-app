@@ -46,29 +46,38 @@
       <v-card><v-card-title>Remboursement manuel complet</v-card-title><v-card-text>
         <v-alert v-if="operator.error" type="error" text role="alert">{{ operator.error }}</v-alert>
         <v-progress-linear v-if="refundLoading" indeterminate />
+        <v-alert v-if="refundReadFailed && !refundLoading" type="warning" text>Lecture de l'eligibilite indisponible. Aucune nouvelle restitution ne peut etre confirmee.</v-alert>
         <template v-if="refundEligibility && refundEligibility.eligible">
           <p>Montant complet, frais inclus : <strong>{{ money(refundEligibility.amountCents) }}</strong></p>
           <p v-if="refundEligibility.method === 'cash'">Detenteur initial : {{ courierName(refundEligibility.originalCourierId) }}.</p>
           <v-select v-model="returnSource" :items="refundSources" label="Restitution effectuee par" outlined dense :disabled="refundLocked" />
-          <p v-if="returnSource === 'register'">La caisse restitue les especes. Le solde du detenteur initial reste du au restaurant.</p>
+          <p v-if="returnSource === 'register'">Une restitution par la caisse laisse la detention d'especes du livreur initial inchangee.</p>
           <p v-if="returnSource === 'courier'">La restitution reduit uniquement les especes encore detenues par le livreur initial.</p>
           <v-textarea v-model="reason" label="Motif du remboursement" rows="3" outlined maxlength="2000" :disabled="refundLocked" />
           <v-checkbox v-model="refundConfirmed" :label="refundDeclaration" :disabled="refundLocked" />
         </template>
-        <v-alert v-else-if="!refundLoading" type="warning" text>Le paiement actuel n'est pas eligible au remboursement manuel complet.</v-alert>
+        <v-alert v-else-if="!refundLoading && !refundReadFailed && !refundResult" type="warning" text>Le paiement actuel n'est pas eligible au remboursement manuel complet.</v-alert>
         <v-alert v-if="refundPending" type="warning" text>{{ refundPending.status === 'conflict' ? 'Paiement et solde relus. Verifiez la source puis confirmez a nouveau.' : 'Resultat inconnu. Reprenez la meme tentative avant toute autre restitution.' }}</v-alert>
         <v-alert v-if="refundResult" type="success" text>Restitution enregistree : {{ money(refundResult.amountCents) }}. Declaration restaurant.</v-alert>
+        <template v-if="refundResult && refundResult.method === 'cash'">
+          <p v-if="refundResult.returnSource === 'register'">Restitution par la caisse : detention du livreur initial inchangee.</p>
+          <p v-else>Restitution par le livreur initial enregistree.</p>
+          <p v-if="refundResult.originalHolderBalance" role="status">Solde restant du detenteur initial {{ courierName(refundResult.originalCourierId) }} : <strong>{{ money(refundResult.originalHolderBalance.remainingDueCents) }}</strong></p>
+          <v-alert v-else type="warning" text>Solde du detenteur initial indisponible. Verifiez son solde avant toute autre operation.</v-alert>
+        </template>
       </v-card-text><v-card-actions class="flex-wrap"><v-spacer /><v-btn text :disabled="refundLocked" @click="refundOpen = false">Fermer</v-btn><v-btn v-if="!refundResult" color="primary" :loading="refundSending" :disabled="!refundValid || refundSending || (refundPending && refundPending.status === 'conflict' && !refundPending.reloaded)" @click="confirmRefund(Boolean(refundPending && refundPending.status === 'conflict'))">{{ refundLocked ? 'Reprendre la tentative' : refundPending ? 'Confirmer a nouveau' : 'Confirmer la restitution' }}</v-btn></v-card-actions></v-card>
     </v-dialog>
   </section>
 </template>
 
 <script>
+import { operatorIdentity } from '@/store/delivery'
+const { v4: refundReadKey } = require('uuid')
 const { isDeliveryAdmin } = require('@/helpers/staffRoles')
 export default {
   data: () => ({ filter: 'operational', search: '', selected: null, operation: '', actionOpen: false, detailsOpen: false,
     courierId: null, reason: '', resolutionAction: 'resume', physicalTransferConfirmed: false,
-    refundOpen: false, refundLoading: false, returnSource: null, refundConfirmed: false, refundResult: null,
+    refundOpen: false, refundLoading: false, refundReadId: null, refundReadFailed: false, returnSource: null, refundConfirmed: false, refundResult: null,
     historyLabel: 'Historique recent : jusqu\'a 100 dossiers termines, classes par creation.',
     filters: [{ text: 'Toutes les missions actives', value: 'operational' }, { text: 'A attribuer', value: 'unassigned' },
       { text: 'Attribuees / en cours', value: 'ongoing' }, { text: 'Problemes', value: 'issue' }, { text: 'Terminees recentes', value: 'closed' }],
@@ -77,6 +86,7 @@ export default {
     resolutions: [{ text: 'Reprendre', value: 'resume' }, { text: 'Nouvelle tentative', value: 'retry' }, { text: 'Retour restaurant', value: 'return' },
       { text: 'Clore en echec', value: 'fail' }, { text: 'Annuler la livraison', value: 'cancel' }, { text: 'Livree avec impaye', value: 'confirm_unpaid_delivery' }] }),
   computed: {
+    identity() { return operatorIdentity(this.$store.state) },
     operator() { return this.$store.state.delivery.operator },
     pendingAttempts() {
       return Object.entries(this.operator.pending).filter(([slot, pending]) => pending && /^(assign|reportIssue|resolveIssue|correctTerminal|refund):/.test(slot))
@@ -94,22 +104,29 @@ export default {
       })
     },
     availableCouriers() { return this.operator.couriers.filter(row => Number(row.status) === 1 && Number(row.available) === 1) },
-    currentDelivery() { return this.operator.missions.find(row => this.selected && row.id === this.selected.id) || this.selected || {} },
+    currentDelivery() { return this.operator.identity === this.identity ? this.operator.missions.find(row => this.selected && row.id === this.selected.id) || this.selected || {} : {} },
     pending() { return this.selected && this.operator.pending[`${this.operation}:${this.selected.id}`] },
     locked() { return Boolean(this.pending && ['sending', 'unresolved'].includes(this.pending.status)) },
     sending() { return Boolean(this.pending && this.pending.status === 'sending') },
     actionValid() { return this.locked || (this.operation === 'assign' ? Number.isSafeInteger(this.courierId) : this.reason.trim().length > 0) },
-    refundEligibility() { return this.selected && this.operator.eligibility[this.selected.id] },
+    refundEligibility() {
+      const check = this.selected && this.operator.eligibilityChecks[this.selected.id]
+      return this.operator.identity === this.identity && check && check.status === 'ready' && check.confirmationId === this.refundReadId ? this.operator.eligibility[this.selected.id] : null
+    },
     refundPending() { return this.selected && this.operator.pending[`refund:${this.selected.id}`] },
     refundLocked() { return Boolean(this.refundPending && ['sending', 'unresolved'].includes(this.refundPending.status)) },
     refundSending() { return Boolean(this.refundPending && this.refundPending.status === 'sending') },
-    refundValid() { return this.refundLocked || Boolean(this.refundEligibility && this.refundEligibility.eligible && this.returnSource && this.reason.trim() && this.refundConfirmed) },
+    refundValid() { return this.refundLocked || Boolean(this.refundOpen && !this.refundLoading && !this.refundReadFailed && this.refundEligibility && this.refundEligibility.eligible && this.returnSource && this.reason.trim() && this.refundConfirmed) },
     refundSources() { return (this.refundEligibility && this.refundEligibility.returnSources || []).map(value => ({ value, text: { register: 'Caisse du restaurant', courier: 'Livreur detenteur initial', external_card: 'TPE independant' }[value] })) },
     refundDeclaration() { return this.refundEligibility && this.refundEligibility.method === 'external_card'
       ? 'Je declare le remboursement complet effectue sur le TPE independant. Aucune verification Stripe.'
       : 'Je confirme que la totalite des especes a ete restituee au client par la source selectionnee.' },
   },
+  watch: { identity() { this.resetPrivateState() } },
+  beforeDestroy() { this.resetPrivateState() },
   methods: {
+    resetPrivateState() { Object.assign(this.$data, this.$options.data.call(this)) },
+    currentIdentity(identity) { return !this._isDestroyed && identity === this.identity },
     money(cents) { return ((cents || 0) / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) },
     courierName(id) { const row = [...this.operator.couriers, ...this.operator.holders].find(row => row.id === id); return row ? row.username : id ? `Livreur #${id}` : 'Non attribuee' },
     preparationLabel(value) { return { 0: 'Recue', 1: 'Recue', 2: 'En preparation', 3: 'Prete' }[value] || String(value) },
@@ -121,7 +138,9 @@ export default {
         ...this.pendingAttempts.filter(attempt => attempt.deliveryId === item.id).map(attempt => attempt.operation)])]
     },
     async resumeAttempt(attempt) {
+      const identity = this.identity
       const item = await this.$store.dispatch('delivery/operatorLoad', { resource: 'detail', deliveryId: attempt.deliveryId })
+      if (!this.currentIdentity(identity)) return
       const selected = item || { id: attempt.deliveryId, orderReference: `#${attempt.deliveryId}` }
       if (attempt.operation === 'refund') await this.openRefund(selected)
       else this.openAction(selected, attempt.operation)
@@ -132,19 +151,26 @@ export default {
     },
     async confirmAction(reconfirm = false) {
       if (!this.selected || !this.actionValid) return
+      const identity = this.identity
       const result = await this.$store.dispatch('delivery/operatorCommand', { operation: this.operation, deliveryId: this.selected.id,
         courierId: this.courierId, reason: this.reason, action: this.resolutionAction, physicalTransferConfirmed: this.physicalTransferConfirmed, reconfirm })
-      if (result) this.actionOpen = false
+      if (result && this.currentIdentity(identity)) this.actionOpen = false
     },
     async openRefund(item) {
-      this.selected = item; this.refundOpen = true; this.reason = ''; this.returnSource = null; this.refundConfirmed = false; this.refundResult = null; this.refundLoading = true
-      const result = await this.$store.dispatch('delivery/operatorLoad', { resource: 'eligibility', deliveryId: item.id })
+      const identity = this.identity
+      const readId = refundReadKey()
+      this.selected = item; this.refundOpen = true; this.reason = ''; this.returnSource = null; this.refundConfirmed = false; this.refundResult = null; this.refundLoading = true; this.refundReadFailed = false; this.refundReadId = readId
+      const result = await this.$store.dispatch('delivery/operatorLoad', { resource: 'eligibility', deliveryId: item.id, confirmationId: readId })
+      if (!this.currentIdentity(identity) || this.refundReadId !== readId || !this.refundOpen) return
       if (result && result.eligible && result.returnSources.length === 1) this.returnSource = result.returnSources[0]
+      this.refundReadFailed = !result
       this.refundLoading = false
     },
     async confirmRefund(reconfirm = false) {
       if (!this.selected || !this.refundValid) return
-      this.refundResult = await this.$store.dispatch('delivery/operatorCommand', { operation: 'refund', deliveryId: this.selected.id, returnSource: this.returnSource, reason: this.reason, reconfirm })
+      const identity = this.identity
+      const result = await this.$store.dispatch('delivery/operatorCommand', { operation: 'refund', deliveryId: this.selected.id, returnSource: this.returnSource, reason: this.reason, reconfirm, eligibilityReadId: this.refundReadId })
+      if (this.currentIdentity(identity)) this.refundResult = result
     },
   },
 }

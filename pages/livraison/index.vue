@@ -4,14 +4,16 @@
       <h1>Livraison</h1>
       <v-btn icon :loading="busy" title="Actualiser la livraison" aria-label="Actualiser la livraison" @click="refresh"><v-icon>mdi-refresh</v-icon></v-btn>
     </header>
-    <v-tabs v-model="tab" show-arrows class="mb-5">
-      <v-tab v-for="item in tabs" :key="item.value" :disabled="item.value === 'settings' && !admin">{{ item.text }}</v-tab>
-    </v-tabs>
-    <v-alert v-if="error" type="error" text role="alert">{{ error }}</v-alert>
-    <DeliveryDispatch v-show="tab === 0" />
-    <DeliveryCouriers v-show="tab === 1" />
-    <DeliveryCashRemittances v-show="tab === 2" />
-    <DeliverySettings v-if="admin" v-show="tab === 3" />
+    <template v-if="scopeReady">
+      <v-tabs v-model="tab" show-arrows class="mb-5">
+        <v-tab v-for="item in tabs" :key="item.value" :disabled="item.value === 'settings' && !admin">{{ item.text }}</v-tab>
+      </v-tabs>
+      <v-alert v-if="error" type="error" text role="alert">{{ error }}</v-alert>
+      <DeliveryDispatch v-show="tab === 0" :key="`dispatch:${actorKey}`" />
+      <DeliveryCouriers v-show="tab === 1" :key="`couriers:${actorKey}`" />
+      <DeliveryCashRemittances v-show="tab === 2" :key="`cash:${actorKey}`" />
+      <DeliverySettings v-if="admin" v-show="tab === 3" :key="`settings:${actorKey}`" />
+    </template>
   </v-container>
 </template>
 
@@ -20,6 +22,7 @@ import DeliveryDispatch from '@/components/delivery/DeliveryDispatch.vue'
 import DeliveryCouriers from '@/components/delivery/DeliveryCouriers.vue'
 import DeliveryCashRemittances from '@/components/delivery/DeliveryCashRemittances.vue'
 import DeliverySettings from '@/components/delivery/DeliverySettings.vue'
+import { operatorIdentity } from '@/store/delivery'
 const { isDeliveryAdmin, canOperateDelivery } = require('@/helpers/staffRoles')
 
 export default {
@@ -29,7 +32,9 @@ export default {
     { value: 'cash', text: "Remises d'especes" }, { value: 'settings', text: 'Reglages' }] }),
   computed: {
     admin() { return isDeliveryAdmin(this.$store.state.users.user) },
-    actorKey() { return JSON.stringify(this.$store.state.users.user) },
+    actorKey() { return operatorIdentity(this.$store.state) },
+    authorized() { return this.$store.state.authenticated !== false && canOperateDelivery(this.$store.state.users.user) },
+    scopeReady() { return this.authorized && this.$store.state.delivery.operator.identity === this.actorKey },
     error() { return this.$store.state.delivery.operator.error },
     busy() { return this.$store.state.delivery.operator.loading > 0 },
   },
@@ -37,9 +42,12 @@ export default {
   mounted() { this.refresh() },
   methods: {
     async refresh() {
-      if (!canOperateDelivery(this.$store.state.users.user)) return this.$router.replace('/login')
+      const identity = this.actorKey
       await this.$store.dispatch('delivery/operatorInitialize')
+      if (identity !== this.actorKey || this._isDestroyed) return
+      if (!this.authorized) return this.$router.replace('/login')
       for (const resource of ['missions', 'couriers', 'holders', ...(this.admin ? ['settings'] : [])]) {
+        if (identity !== this.actorKey || this._isDestroyed) return
         await this.$store.dispatch('delivery/operatorLoad', { resource })
       }
     },

@@ -5,7 +5,7 @@ const { v4: operatorKey } = require('uuid')
 const { buildCheckoutItems } = require('../helpers/customizations')
 const { canOperateDelivery, isDeliveryAdmin } = require('../helpers/staffRoles')
 const operatorState = () => ({ identity: null, sequence: 0, missions: [], couriers: [], holders: [], settings: null,
-  balances: {}, eligibility: {}, pending: {}, reads: {}, error: null, loading: 0 })
+  balances: {}, eligibility: {}, eligibilityChecks: {}, pending: {}, reads: {}, error: null, loading: 0 })
 
 export const namespaced = true
 export const state = () => ({ shopId: null, enabled: false, loaded: false, epoch: 0, quoteSequence: 0,
@@ -71,9 +71,10 @@ const asError = failure => {
 const actorIdentity = user => JSON.stringify([user && user.shopid, user && user.id, user && user.access,
   user && user.status, user && user.session_subject, user && user.module_permissions])
 const operatorUser = rootState => rootState.users && rootState.users.user
+export const operatorIdentity = rootState => JSON.stringify([rootState.authenticated !== false, actorIdentity(operatorUser(rootState))])
 const assertOperator = (rootState, admin = false) => {
   const user = operatorUser(rootState)
-  if (!(admin ? isDeliveryAdmin(user) : canOperateDelivery(user))) throw new Error('Acces livraison refuse.')
+  if (rootState.authenticated === false || !(admin ? isDeliveryAdmin(user) : canOperateDelivery(user))) throw new Error('Acces livraison refuse.')
   return user
 }
 const commandSlot = input => `${input.operation}:${input.deliveryId || input.courierId}`
@@ -92,6 +93,10 @@ export const mutations = {
   OPERATOR_RESET(state, identity) { state.operator = { ...operatorState(), identity, sequence: state.operator.sequence + 1 } },
   OPERATOR_ERROR(state, error) { state.operator.error = error },
   OPERATOR_PENDING(state, { slot, pending }) { state.operator.pending = { ...state.operator.pending, [slot]: pending } },
+  OPERATOR_ELIGIBILITY_CHECK(state, { deliveryId, check }) {
+    state.operator.eligibilityChecks = { ...state.operator.eligibilityChecks, [deliveryId]: check }
+    if (['loading', 'failed'].includes(check.status)) state.operator.eligibility = { ...state.operator.eligibility, [deliveryId]: null }
+  },
   OPERATOR_READING(state, { key, token, delta }) {
     state.operator.reads = { ...state.operator.reads, [key]: token }
     state.operator.loading += delta
@@ -109,15 +114,16 @@ export const mutations = {
 
 export const actions = {
   operatorInitialize({ state, rootState, commit }) {
-    const user = assertOperator(rootState)
-    const identity = actorIdentity(user)
+    const identity = rootState.authenticated !== false && canOperateDelivery(operatorUser(rootState)) ? operatorIdentity(rootState) : null
     if (state.operator.identity !== identity) commit('OPERATOR_RESET', identity)
+    return identity
   },
   async operatorLoad({ state, rootState, commit, dispatch }, input) {
     const { resource, courierId, deliveryId } = input
-    const initialIdentity = actorIdentity(assertOperator(rootState, resource === 'settings'))
+    const initialIdentity = operatorIdentity(rootState)
     await dispatch('operatorInitialize')
-    if (initialIdentity !== actorIdentity(operatorUser(rootState))) return null
+    if (initialIdentity !== operatorIdentity(rootState)) { await dispatch('operatorInitialize'); return null }
+    assertOperator(rootState, resource === 'settings')
     const requests = {
       missions: { path: '/deliveries' }, couriers: { path: '/delivery/couriers' },
       holders: { path: '/delivery/couriers', params: { financialHolders: true } },
@@ -131,28 +137,36 @@ export const actions = {
     const sequence = state.operator.sequence
     const key = `${resource}:${courierId || deliveryId || ''}`
     const token = operatorKey()
-    const current = () => state.operator.identity === identity && state.operator.sequence === sequence && actorIdentity(operatorUser(rootState)) === identity
+    const confirmationId = typeof input.confirmationId === 'string' && input.confirmationId ? input.confirmationId : null
+    const eligibilityCheck = status => commit('OPERATOR_ELIGIBILITY_CHECK', { deliveryId, check: { token, confirmationId, status } })
+    const current = () => state.operator.identity === identity && state.operator.sequence === sequence && operatorIdentity(rootState) === identity
     commit('OPERATOR_READING', { key, token, delta: 1 })
+    if (resource === 'eligibility') eligibilityCheck('loading')
     try {
       const result = unwrap(await api(this).request(requests[resource]))
       if (!current() || state.operator.reads[key] !== token) return null
       if (result == null) throw new Error('Reponse livraison invalide.')
       commit('OPERATOR_DATA', { resource, result, courierId, deliveryId })
+      if (resource === 'eligibility') eligibilityCheck('ready')
       return result
     } catch (failure) {
-      if (current()) commit('OPERATOR_ERROR', asError(failure).message)
+      if (current() && state.operator.reads[key] === token) {
+        if (resource === 'eligibility') eligibilityCheck('failed')
+        commit('OPERATOR_ERROR', asError(failure).message)
+      }
       return null
     } finally { if (current()) commit('OPERATOR_READING', { key, token: state.operator.reads[key], delta: -1 }) }
   },
   async operatorCommand({ state, rootState, commit, dispatch }, input) {
     const { operation, deliveryId, courierId, reconfirm = false } = input
-    const initialIdentity = actorIdentity(assertOperator(rootState, ['correctTerminal', 'adjust'].includes(operation)))
+    const initialIdentity = operatorIdentity(rootState)
     await dispatch('operatorInitialize')
-    if (initialIdentity !== actorIdentity(operatorUser(rootState))) return null
+    if (initialIdentity !== operatorIdentity(rootState)) { await dispatch('operatorInitialize'); return null }
+    assertOperator(rootState, ['correctTerminal', 'adjust'].includes(operation))
     const operator = state.operator
     const identity = operator.identity
     const sequence = operator.sequence
-    const current = () => state.operator.identity === identity && state.operator.sequence === sequence && actorIdentity(operatorUser(rootState)) === identity
+    const current = () => state.operator.identity === identity && state.operator.sequence === sequence && operatorIdentity(rootState) === identity
     const slot = commandSlot(input)
     let pending = operator.pending[slot]
     if (pending && (pending.status === 'sending' || (pending.status === 'conflict' && (!reconfirm || !pending.reloaded)))) return null
@@ -180,7 +194,9 @@ export const actions = {
         path = `/delivery/couriers/${courierId}/remittances`
       } else if (operation === 'refund') {
         const eligibility = operator.eligibility[deliveryId]
-        if (!eligibility || !eligibility.eligible || !eligibility.returnSources.includes(input.returnSource)) return null
+        const check = operator.eligibilityChecks[deliveryId]
+        if (!input.eligibilityReadId || !check || check.status !== 'ready' || check.confirmationId !== input.eligibilityReadId ||
+          !eligibility || !eligibility.eligible || !eligibility.returnSources.includes(input.returnSource)) return null
         Object.assign(body, { reason: input.reason, returnSource: input.returnSource })
         path = `/deliveries/${deliveryId}/refund`
       } else if (operation === 'adjust') {
@@ -190,16 +206,23 @@ export const actions = {
       if (['refund', 'adjust', 'reportIssue', 'resolveIssue', 'correctTerminal'].includes(operation) &&
         (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.length > 2000)) return null
       pending = { path, body: clone(body), status: 'sending', originalCourierId: operation === 'refund' ? operator.eligibility[deliveryId].originalCourierId : null }
+      if (operation === 'refund') commit('OPERATOR_ELIGIBILITY_CHECK', { deliveryId, check: { ...operator.eligibilityChecks[deliveryId], status: 'consumed' } })
     }
     commit('OPERATOR_PENDING', { slot, pending: { ...pending, status: 'sending' } })
     commit('OPERATOR_ERROR', null)
+    let originalHolderBalance = null
     const refresh = async () => {
       const reads = []
       if (deliveryId) reads.push({ resource: 'detail', deliveryId })
-      if (operation === 'refund') reads.push({ resource: 'eligibility', deliveryId }, { resource: 'balance', courierId: pending.originalCourierId })
+      if (operation === 'refund') reads.push({ resource: 'eligibility', deliveryId, confirmationId: input.eligibilityReadId }, { resource: 'balance', courierId: pending.originalCourierId })
       if (['remit', 'adjust'].includes(operation)) reads.push({ resource: 'balance', courierId })
       let loaded = true
-      for (const read of reads) { if (!await dispatch('operatorLoad', read)) loaded = false }
+      for (const read of reads) {
+        if (!current()) return false
+        const result = await dispatch('operatorLoad', read)
+        if (!result) loaded = false
+        if (operation === 'refund' && read.resource === 'balance') originalHolderBalance = result
+      }
       return loaded
     }
     try {
@@ -208,7 +231,8 @@ export const actions = {
       if (!result) throw new Error('Confirmation serveur indisponible.')
       commit('OPERATOR_PENDING', { slot, pending: null })
       await refresh()
-      return current() ? result : null
+      if (!current()) return null
+      return operation === 'refund' ? { ...result, originalCourierId: pending.originalCourierId, originalHolderBalance } : result
     } catch (failure) {
       if (!current()) return null
       const error = asError(failure)
@@ -222,30 +246,35 @@ export const actions = {
     }
   },
   async operatorAvailability({ rootState, dispatch }, { courierId, available }) {
+    const identity = operatorIdentity(rootState)
+    await dispatch('operatorInitialize')
+    if (identity !== operatorIdentity(rootState)) { await dispatch('operatorInitialize'); return null }
     assertOperator(rootState)
     try {
       const result = unwrap(await api(this).request({ method: 'patch', path: `/delivery/couriers/${courierId}/availability`, body: { available } }))
+      if (identity !== operatorIdentity(rootState)) return null
       await dispatch('operatorLoad', { resource: 'couriers' })
-      return result
-    } catch (failure) { await dispatch('operatorLoad', { resource: 'couriers' }); throw asError(failure) }
+      return identity === operatorIdentity(rootState) ? result : null
+    } catch (failure) { if (identity !== operatorIdentity(rootState)) return null; await dispatch('operatorLoad', { resource: 'couriers' }); throw asError(failure) }
   },
   async operatorSaveSettings({ rootState, state, dispatch, commit }, settings) {
-    const initialIdentity = actorIdentity(assertOperator(rootState, true))
+    const initialIdentity = operatorIdentity(rootState)
     await dispatch('operatorInitialize')
-    if (initialIdentity !== actorIdentity(operatorUser(rootState))) return null
+    if (initialIdentity !== operatorIdentity(rootState)) { await dispatch('operatorInitialize'); return null }
+    assertOperator(rootState, true)
     const identity = state.operator.identity
     const sequence = state.operator.sequence
     const body = { ...clone(settings), expectedRevision: settings.revision }
     delete body.shopId
     try {
       const result = unwrap(await api(this).request({ method: 'put', path: '/delivery/settings', body }))
-      if (sequence !== state.operator.sequence || identity !== actorIdentity(operatorUser(rootState))) return null
+      if (sequence !== state.operator.sequence || identity !== operatorIdentity(rootState)) return null
       commit('OPERATOR_DATA', { resource: 'settings', result })
       return result
     } catch (failure) {
-      if (sequence === state.operator.sequence && identity === actorIdentity(operatorUser(rootState))) {
+      if (sequence === state.operator.sequence && identity === operatorIdentity(rootState)) {
         await dispatch('operatorLoad', { resource: 'settings' })
-        commit('OPERATOR_ERROR', asError(failure).message)
+        if (sequence === state.operator.sequence && identity === operatorIdentity(rootState)) commit('OPERATOR_ERROR', asError(failure).message)
       }
       return null
     }

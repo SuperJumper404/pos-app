@@ -85,8 +85,7 @@ function fixture(user = admin, reply = () => null) {
   return { store, calls, dispatch, component }
 }
 
-function mountedComponent(f, name) {
-  const file = `components/delivery/${name}.vue`
+function compiledComponent(file) {
   const source = compiler.parseComponent(fs.readFileSync(path.join(root, file), 'utf8')).template.content
   const compiled = compiler.compile(source)
   const leaf = { functional: true, render(h, ctx) {
@@ -102,8 +101,32 @@ function mountedComponent(f, name) {
   } }
   const options = load(file).default
   const components = Object.fromEntries([...new Set(source.match(/v-[a-z-]+/g))].map(tag => [tag, leaf]))
-  return new Vue({ ...options, components: { ...options.components, ...components }, store: f.store,
-    render: vm.compileFunction(compiled.render, []), staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])) }).$mount()
+  return { ...options, components: { ...options.components, ...components },
+    render: vm.compileFunction(compiled.render, []), staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])) }
+}
+function mountedComponent(f, name) {
+  return new Vue({ ...compiledComponent(`components/delivery/${name}.vue`), store: f.store }).$mount()
+}
+function mountedPage(f) {
+  const options = compiledComponent('pages/livraison/index.vue')
+  const redirects = []
+  const components = { ...options.components }
+  for (const name of ['DeliveryDispatch', 'DeliveryCouriers', 'DeliveryCashRemittances', 'DeliverySettings']) {
+    components[name] = compiledComponent(`components/delivery/${name}.vue`)
+  }
+  const page = new Vue({ ...options, components, store: f.store, beforeCreate() {
+    this.$router = { replace(path) { redirects.push({ path, missions: copy(f.store.state.delivery.operator.missions), pending: copy(f.store.state.delivery.operator.pending) }) } }
+  } }).$mount()
+  const child = name => page.$children.find(component => component.$vnode.componentOptions.tag === name)
+  return { page, child, redirects }
+}
+async function drainVue() {
+  for (let index = 0; index < 60; index++) { await Promise.resolve(); await Vue.nextTick() }
+}
+function deferred() {
+  let complete
+  const promise = new Promise(resolve => { complete = resolve })
+  return { promise, resolve: complete }
 }
 
 test('operator role gate denies courier and forged primary flags; one Delivery entry and hidden internal modules', () => {
@@ -462,5 +485,264 @@ test('refund dialog renders the server source-insufficiency refusal alongside it
   await component.confirmRefund()
   await Vue.nextTick()
   assert.match(component.$el.textContent, /source ne detient plus assez d'especes/)
+  component.$destroy()
+})
+
+test('round1 I1 retained page replaces private children across shops then clears forbidden and logout scopes before redirect', async () => {
+  const f = fixture(admin, call => {
+    const shopId = f.store.state.users.user.shopid
+    if (call.path === '/deliveries' || call.path === `/deliveries/${mission().id}`) {
+      const row = { ...mission(), shopId, addressSnapshot: { street: `Private shop ${shopId}`, postalCode: '75001', city: 'Paris' }, contactSnapshot: { name: `Contact ${shopId}` } }
+      return { data: call.path === '/deliveries' ? [row] : row }
+    }
+    if (call.path === '/delivery/settings') return { data: { ...settings(), shopId } }
+  })
+  const retained = mountedPage(f)
+  await drainVue()
+  const first = retained.child('DeliveryDispatch')
+  const oldCash = retained.child('DeliveryCashRemittances')
+  await first.openDetails(f.store.state.delivery.operator.missions[0])
+  first.reason = 'Shop7 internal reason'
+  oldCash.reason = 'Shop7 cash reason'; oldCash.result = { remittanceId: 'private-receipt', remainingDueCents: 750 }
+  await Vue.nextTick()
+  assert.match(retained.page.$el.textContent, /Private shop 7/)
+  f.store.state.users.user = { ...admin, shopid: 8 }
+  await drainVue()
+  const second = retained.child('DeliveryDispatch')
+  assert.equal(first._isDestroyed, true)
+  assert.notEqual(second, first)
+  assert.equal(second.detailsOpen, false)
+  assert.equal(second.selected, null)
+  assert.equal(second.reason, '')
+  assert.equal(retained.child('DeliveryCashRemittances').result, null)
+  assert.equal(retained.child('DeliveryCashRemittances').reason, '')
+  assert.doesNotMatch(retained.page.$el.textContent, /Private shop 7|Shop7|private-receipt/)
+  await second.openDetails(f.store.state.delivery.operator.missions[0])
+  f.store.state.users.user = copy(courier)
+  await drainVue()
+  assert.equal(second._isDestroyed, true)
+  assert.equal(retained.child('DeliveryDispatch'), undefined)
+  assert.equal(f.store.state.delivery.operator.identity, null)
+  assert.equal(f.store.state.delivery.operator.missions.length, 0)
+  assert.equal(retained.redirects.at(-1).missions.length, 0)
+  assert.deepEqual(retained.redirects.at(-1).pending, {})
+  f.store.state.users.user = copy(admin)
+  await drainVue()
+  f.store.state.authenticated = false
+  await drainVue()
+  assert.equal(retained.child('DeliveryDispatch'), undefined)
+  assert.equal(f.store.state.delivery.operator.identity, null)
+  assert.equal(f.store.state.delivery.operator.missions.length, 0)
+  retained.page.$destroy()
+})
+
+test('round1 I1 forbidden store entry clears existing private scope before throwing; same identity retains recovery', async () => {
+  for (const [action, payload] of [['operatorLoad', { resource: 'missions' }], ['operatorCommand', { operation: 'refund', deliveryId: mission().id }], ['operatorSaveSettings', settings()], ['operatorAvailability', { courierId: 11, available: true }]]) {
+    const f = fixture(admin)
+    await f.dispatch('operatorLoad', { resource: 'missions' })
+    f.store.state.delivery.operator.pending = { 'refund:private': { status: 'unresolved', body: { reason: 'private' } } }
+    await f.dispatch('operatorInitialize')
+    assert.ok(f.store.state.delivery.operator.pending['refund:private'])
+    f.store.state.users.user = copy(courier)
+    await assert.rejects(f.dispatch(action, payload))
+    assert.equal(f.store.state.delivery.operator.missions.length, 0)
+    assert.deepEqual(copy(f.store.state.delivery.operator.pending), {})
+    assert.equal(f.store.state.delivery.operator.identity, null)
+  }
+})
+
+test('round1 I1 late eligibility and receipt results cannot repopulate retained page after shop/forbidden changes', async () => {
+  const read = deferred()
+  const receipt = deferred()
+  const f = fixture(admin, call => call.path.endsWith('/refund-eligibility') ? read.promise : call.path.endsWith('/remittances') ? receipt.promise : null)
+  const retained = mountedPage(f)
+  await drainVue()
+  const first = retained.child('DeliveryDispatch')
+  const cash = retained.child('DeliveryCashRemittances')
+  await cash.selectHolder(11)
+  cash.received = '5.00'
+  const remitting = cash.confirmRemittance()
+  const opening = first.openRefund({ ...mission(), addressSnapshot: { street: 'Old private street' } })
+  await drainVue()
+  f.store.state.users.user = { ...admin, shopid: 8 }
+  await drainVue()
+  const next = retained.child('DeliveryDispatch')
+  f.store.state.users.user = copy(courier)
+  await drainVue()
+  read.resolve({ data: { eligible: true, method: 'cash', originalCourierId: 11, amountCents: 1250, returnSources: ['register', 'courier'] } })
+  receipt.resolve({ data: { remittanceId: 'late-private-receipt', remainingDueCents: 750 } })
+  await Promise.all([opening, remitting])
+  await drainVue()
+  assert.equal(first._isDestroyed, true)
+  assert.equal(next._isDestroyed, true)
+  assert.equal(f.store.state.delivery.operator.missions.length, 0)
+  assert.deepEqual(copy(f.store.state.delivery.operator.eligibility), {})
+  assert.equal(first.refundOpen, false)
+  assert.equal(cash.result, null)
+  assert.doesNotMatch(retained.page.$el.textContent, /Old private|late-private/)
+  retained.page.$destroy()
+})
+
+test('round1 I2 cached eligible data cannot authorize new refund during or after a failed dialog read', async () => {
+  const read = deferred()
+  let mode = 'cached'
+  const f = fixture(cashier, call => call.path.endsWith('/refund-eligibility') ? mode === 'inflight' ? read.promise : mode === 'failed' ? { status: 503, code: 'DELIVERY_UNAVAILABLE' } : null : null)
+  await f.dispatch('operatorLoad', { resource: 'eligibility', deliveryId: mission().id })
+  mode = 'inflight'
+  const component = mountedComponent(f, 'DeliveryDispatch')
+  const opening = component.openRefund(mission())
+  await drainVue()
+  component.reason = 'Physical return'; component.returnSource = 'register'; component.refundConfirmed = true
+  assert.equal(component.refundLoading, true)
+  assert.equal(component.refundValid, false)
+  await f.dispatch('operatorCommand', { operation: 'refund', deliveryId: mission().id, returnSource: 'register', reason: 'No current read', eligibilityReadId: component.refundReadId })
+  assert.equal(f.calls.some(call => call.path.endsWith('/refund')), false)
+  read.resolve({ status: 503, code: 'DELIVERY_UNAVAILABLE' })
+  await opening
+  await Vue.nextTick()
+  assert.equal(component.refundValid, false)
+  assert.match(component.$el.textContent, /eligibilite.*indisponible/i)
+  await component.confirmRefund()
+  assert.equal(f.calls.some(call => call.path.endsWith('/refund')), false)
+  mode = 'failed'
+  await f.dispatch('operatorCommand', { operation: 'refund', deliveryId: mission().id, returnSource: 'register', reason: 'Still no proof', eligibilityReadId: component.refundReadId })
+  assert.equal(f.calls.some(call => call.path.endsWith('/refund')), false)
+  component.$destroy()
+})
+
+test('round1 I2 fresh command rejects a cached successful read from another dialog; unresolved exact-key replay survives failed/ineligible reads', async () => {
+  let mode = 'eligible'
+  let lost = true
+  const f = fixture(cashier, call => call.path.endsWith('/refund-eligibility') ? mode === 'failed' ? { status: 503, code: 'DELIVERY_UNAVAILABLE' } : mode === 'ineligible' ? { data: { eligible: false } } : null
+    : call.path.endsWith('/refund') ? lost ? { lost: true } : { data: { refundId: 'recovered', method: 'cash', returnSource: 'courier', amountCents: 1250 } } : null)
+  await f.dispatch('operatorLoad', { resource: 'eligibility', deliveryId: mission().id })
+  await f.dispatch('operatorCommand', { operation: 'refund', deliveryId: mission().id, returnSource: 'courier', reason: 'Stale proof', eligibilityReadId: 'different-dialog' })
+  assert.equal(f.calls.some(call => call.path.endsWith('/refund')), false)
+  const component = f.component('DeliveryDispatch')
+  await component.openRefund(mission())
+  component.reason = 'Original physical return'; component.returnSource = 'courier'; component.refundConfirmed = true
+  await component.confirmRefund()
+  const original = copy(f.calls.find(call => call.path.endsWith('/refund')).body)
+  for (const nextMode of ['ineligible', 'failed']) {
+    mode = nextMode
+    await component.openRefund(mission())
+    assert.equal(component.refundValid, true)
+    component.reason = 'Different'; component.returnSource = 'register'
+    await component.confirmRefund()
+    assert.deepEqual(f.calls.filter(call => call.path.endsWith('/refund')).at(-1).body, original)
+  }
+  lost = false
+  await component.confirmRefund()
+  assert.equal(component.refundResult.refundId, 'recovered')
+  component.$destroy()
+})
+
+for (const source of ['register', 'courier']) {
+  for (const remaining of [750, 0]) {
+    test(`round1 I3 ${source} refund displays authoritative original-holder custody ${remaining}`, async () => {
+      let posted = false
+      const f = fixture(cashier, call => {
+        if (call.path.endsWith('/refund')) { posted = true; return { data: { refundId: '91', method: 'cash', returnSource: source, amountCents: 1250, physicalHolderId: source === 'register' ? 10 : 11 } } }
+        if (call.path.endsWith('/refund-eligibility') && posted) return { data: { eligible: false } }
+        if (call.path.endsWith('/cash-balance')) return { data: balance(5, remaining) }
+      })
+      const component = mountedComponent(f, 'DeliveryDispatch')
+      await component.openRefund({ ...mission(), courierId: 15 })
+      component.reason = 'Full physical return'; component.returnSource = source; component.refundConfirmed = true
+      await component.confirmRefund()
+      await Vue.nextTick()
+      assert.match(component.$el.textContent, /Solde restant du detenteur initial/)
+      assert.ok(component.$el.textContent.includes(component.money(remaining)))
+      assert.equal(component.refundResult.originalCourierId, 11)
+      assert.equal(component.refundResult.originalHolderBalance.remainingDueCents, remaining)
+      assert.equal(f.calls.some(call => call.path === '/delivery/couriers/15/cash-balance'), false)
+      assert.doesNotMatch(component.$el.textContent, /reste du au restaurant/)
+      if (source === 'register') assert.match(component.$el.textContent, /inchangee/)
+      component.$destroy()
+    })
+  }
+  test(`round1 I3 ${source} refund reports unavailable resulting custody instead of a cached balance`, async () => {
+    let posted = false
+    const f = fixture(cashier, call => {
+      if (call.path.endsWith('/refund')) { posted = true; return { data: { refundId: '92', method: 'cash', returnSource: source, amountCents: 1250 } } }
+      if (call.path.endsWith('/cash-balance') && posted) return { status: 503, code: 'DELIVERY_UNAVAILABLE' }
+    })
+    await f.dispatch('operatorLoad', { resource: 'balance', courierId: 11 })
+    const component = mountedComponent(f, 'DeliveryDispatch')
+    await component.openRefund(mission())
+    component.reason = 'Return'; component.returnSource = source; component.refundConfirmed = true
+    await component.confirmRefund()
+    await Vue.nextTick()
+    assert.equal(component.refundResult.refundId, '92')
+    assert.equal(component.refundResult.originalHolderBalance, null)
+    assert.match(component.$el.textContent, /Solde du detenteur initial indisponible/)
+    component.$destroy()
+  })
+}
+
+test('round1 I1 an actor transition during initialization cancels the old read without throwing into the retained page', async () => {
+  const f = fixture(admin)
+  await f.dispatch('operatorLoad', { resource: 'missions' })
+  const old = f.dispatch('operatorLoad', { resource: 'missions' })
+  f.store.state.users.user = copy(courier)
+  assert.equal(await old, null)
+  assert.equal(f.store.state.delivery.operator.identity, null)
+  assert.equal(f.store.state.delivery.operator.missions.length, 0)
+})
+
+test('round1 I1 same-identity page refresh retains its child and exact unresolved remittance', async () => {
+  const f = fixture(admin, call => call.path.endsWith('/remittances') ? { lost: true } : null)
+  const retained = mountedPage(f)
+  await drainVue()
+  const cash = retained.child('DeliveryCashRemittances')
+  await cash.selectHolder(11)
+  cash.received = '5.00'
+  await cash.confirmRemittance()
+  const original = copy(f.store.state.delivery.operator.pending['remit:11'])
+  await retained.page.refresh()
+  await drainVue()
+  assert.equal(retained.child('DeliveryCashRemittances'), cash)
+  assert.deepEqual(copy(f.store.state.delivery.operator.pending['remit:11']), original)
+  await cash.confirmRemittance()
+  assert.deepEqual(f.calls.filter(call => call.path.endsWith('/remittances')).at(-1).body, original.body)
+  retained.page.$destroy()
+})
+
+test('round1 I1 protected route clears a forbidden scope before redirect', async () => {
+  const f = fixture(admin)
+  await f.dispatch('operatorLoad', { resource: 'missions' })
+  f.store.state.users.user = copy(courier)
+  let atRedirect
+  await load('middleware/delivery.js').default({ store: f.store, route: { path: '/livraison' }, redirect() { atRedirect = copy(f.store.state.delivery.operator) } })
+  assert.equal(atRedirect.identity, null)
+  assert.deepEqual(atRedirect.missions, [])
+})
+
+test('round1 I1 logout navigation clears operator scope even after leaving the protected page', async () => {
+  const f = fixture(admin)
+  await f.dispatch('operatorLoad', { resource: 'missions' })
+  f.store.state.authenticated = false
+  let redirected = false
+  await load('middleware/delivery.js').default({ store: f.store, route: { path: '/login' }, redirect() { redirected = true } })
+  assert.equal(f.store.state.delivery.operator.identity, null)
+  assert.equal(f.store.state.delivery.operator.missions.length, 0)
+  assert.equal(redirected, false)
+})
+
+test('round1 I2 overlapping dialog reads cannot restore an older eligible source after a newer refusal', async () => {
+  const old = deferred()
+  let count = 0
+  const f = fixture(cashier, call => call.path.endsWith('/refund-eligibility') ? ++count === 1 ? old.promise : { data: { eligible: false } } : null)
+  const component = f.component('DeliveryDispatch')
+  const first = component.openRefund(mission())
+  await drainVue()
+  await component.openRefund(mission())
+  old.resolve({ data: { eligible: true, method: 'cash', originalCourierId: 11, amountCents: 1250, returnSources: ['courier'] } })
+  await first
+  component.reason = 'Return'; component.returnSource = 'courier'; component.refundConfirmed = true
+  assert.equal(component.refundEligibility.eligible, false)
+  assert.equal(component.refundValid, false)
+  await component.confirmRefund()
+  assert.equal(f.calls.some(call => call.path.endsWith('/refund')), false)
   component.$destroy()
 })
