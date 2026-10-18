@@ -7,7 +7,7 @@
     <v-skeleton-loader v-if="opening" type="heading, list-item-two-line, actions" />
     <v-alert v-else-if="!account.shopId" type="warning" text role="alert">Ouvrez le compte depuis le restaurant de votre choix.</v-alert>
     <template v-else-if="!account.session">
-      <customer-code-login :key="`login-${account.epoch}`" @authenticated="authenticated" />
+      <customer-code-login :key="`login-${account.epoch}`" />
     </template>
     <template v-else>
       <div class="customer-section-heading">
@@ -38,7 +38,7 @@ import CustomerAddressBook from '@/components/customer/CustomerAddressBook.vue'
 export default {
   components: { CustomerCodeLogin, CustomerAddressBook },
   layout: 'customer',
-  data() { return { opening: true, loadingBook: false, linking: false, linked: false, selectedAddress: '', openSequence: 0 } },
+  data() { return { opening: true, loadingBook: false, linking: false, linked: false, selectedAddress: '', openSequence: 0, bookEpoch: null } },
   computed: {
     account() { return this.$store.state.customer },
     guestRoute() {
@@ -48,7 +48,17 @@ export default {
   },
   watch: {
     '$route.query.shopId'(shopId) { this.openShop(shopId) },
-    'account.epoch'() { this.linking = false; this.linked = false; this.selectedAddress = '' },
+    'account.epoch'() {
+      this.linking = false
+      this.linked = false
+      this.selectedAddress = ''
+      this.loadingBook = false
+      this.bookEpoch = null
+    },
+    'account.session'(session) {
+      if (session) this.authenticated()
+      else { this.loadingBook = false; this.bookEpoch = null }
+    },
   },
   mounted() { this.openShop(this.$route.query.shopId) },
   beforeDestroy() { this.openSequence++; this.$store.dispatch('customer/resetForShop', null) },
@@ -61,13 +71,17 @@ export default {
       await this.$store.dispatch('customer/loadSession', { shopId })
       if (sequence !== this.openSequence || this._isDestroyed) return
       this.opening = false
-      if (this.account.session) await this.authenticated()
     },
     async authenticated() {
+      const { session, epoch, shopId } = this.account
+      if (!session || this.bookEpoch === epoch) return
+      this.bookEpoch = epoch
       this.loadingBook = true
-      const epoch = this.account.epoch
-      await this.$store.dispatch('customer/loadAddresses')
-      if (epoch === this.account.epoch) this.loadingBook = false
+      try {
+        await this.$store.dispatch('customer/loadAddresses')
+      } finally {
+        if (!this._isDestroyed && epoch === this.account.epoch && shopId === this.account.shopId) this.loadingBook = false
+      }
     },
     logout() { return this.$store.dispatch('customer/logout') },
     cancelLink() { this.$store.dispatch('customer/clearChallenge'); this.linking = false },

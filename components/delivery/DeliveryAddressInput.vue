@@ -35,11 +35,16 @@ export default {
     const snapshot = this.value && this.value.addressSnapshot
     return { draft: { ...empty(), ...postal(snapshot || {}), country: (snapshot && snapshot.country) || 'FR',
       complement: (snapshot && snapshot.complement) || '', instructions: (snapshot && snapshot.instructions) || '' },
-    resolution: null, candidates: [], error: '', resolving: false, sequence: 0, timer: null }
+    resolution: null, candidates: [], selectedCandidate: null, error: '', resolving: false, sequence: 0, timer: null }
   },
   computed: {
     complete() { return Boolean(this.draft.street.trim() && /^\d{5}$/.test(this.draft.postalCode) && this.draft.city.trim() && this.draft.country === 'FR') },
     unchangedPostal() { return this.value && JSON.stringify(postal(this.draft)) === JSON.stringify(postal(this.value.addressSnapshot)) },
+    postalKey() { return JSON.stringify(postal(this.draft)) },
+    currentCandidateId() {
+      return this.selectedCandidate && this.selectedCandidate.postalKey === this.postalKey && this.selectedCandidate.contextKey === this.contextKey
+        ? this.selectedCandidate.id : null
+    },
   },
   watch: {
     draft: { deep: true, handler() { this.schedule() } },
@@ -51,34 +56,39 @@ export default {
   },
   beforeDestroy() { this.invalidate() },
   methods: {
-    invalidate() {
+    invalidate(keepCandidate = false) {
       clearTimeout(this.timer)
       this.sequence++
       this.resolution = null
       this.candidates = []
+      if (!keepCandidate) this.selectedCandidate = null
       this.error = ''
       this.resolving = false
       this.$emit('resolved', null)
     },
     schedule() {
-      this.invalidate()
+      this.invalidate(Boolean(this.currentCandidateId))
       if (this.complete && !this.disabled) this.timer = setTimeout(() => this.resolve(), 300)
     },
     chooseCandidate(candidate) { return this.resolve(candidate.providerId) },
     async resolve(candidateId) {
       clearTimeout(this.timer)
-      if (!this.complete || this.disabled) return null
+      if (!this.complete || this.disabled || this._isDestroyed) return null
       const sequence = ++this.sequence
+      const { postalKey, contextKey } = this
+      const selectedId = typeof candidateId === 'string' ? candidateId : this.currentCandidateId
+      const current = () => sequence === this.sequence && !this._isDestroyed && postalKey === this.postalKey && contextKey === this.contextKey
       this.resolution = null
       this.error = ''
       this.resolving = true
       const request = this.unchangedPostal ? { addressId: this.value.id } : {
-        address: postal(this.draft), ...(typeof candidateId === 'string' ? { candidateId } : {}),
+        address: postal(this.draft), ...(selectedId ? { candidateId: selectedId } : {}),
       }
       try {
         const result = await this.resolver(request)
-        if (sequence !== this.sequence || this._isDestroyed || !result) return null
+        if (!current() || !result) return null
         this.candidates = []
+        this.selectedCandidate = selectedId && !request.addressId ? { id: selectedId, postalKey, contextKey } : null
         this.resolution = {
           ...result,
           addressId: this.value ? this.value.id : null,
@@ -89,9 +99,10 @@ export default {
         this.$emit('resolved', this.resolution)
         return this.resolution
       } catch (error) {
-        if (sequence !== this.sequence || this._isDestroyed) return null
+        if (!current()) return null
         this.error = error.message || 'Adresse indisponible. Reessayez.'
         this.candidates = error.candidates || []
+        if (this.candidates.length) this.selectedCandidate = null
         return null
       } finally {
         if (sequence === this.sequence) this.resolving = false

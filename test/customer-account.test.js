@@ -5,12 +5,57 @@ const path = require('path')
 const vm = require('vm')
 const { test } = require('node:test')
 const babel = require('@babel/core')
+require('axios/lib/adapters/xhr')
+
+// Initialize Vue's real DOM patcher against the review probe's memory boundary.
+class MemoryNode {
+  constructor(tag, type = 1, text = '') {
+    this.tagName = tag && tag.toUpperCase()
+    this.nodeType = type
+    this.data = text
+    this.childNodes = []
+    this.parentNode = null
+    this.attrs = {}
+    this.style = { setProperty() {} }
+  }
+
+  appendChild(node) { return this.insertBefore(node, null) }
+  insertBefore(node, before) {
+    if (node.parentNode) node.parentNode.removeChild(node)
+    const index = before ? this.childNodes.indexOf(before) : -1
+    if (index < 0) this.childNodes.push(node)
+    else this.childNodes.splice(index, 0, node)
+    node.parentNode = this
+    return node
+  }
+
+  removeChild(node) { this.childNodes.splice(this.childNodes.indexOf(node), 1); node.parentNode = null; return node }
+  setAttribute(key, value) { this.attrs[key] = value }
+  removeAttribute(key) { delete this.attrs[key] }
+  hasAttribute(key) { return Object.hasOwn(this.attrs, key) }
+  getAttribute(key) { return this.attrs[key] || null }
+  addEventListener() {}
+  removeEventListener() {}
+  get nextSibling() { return this.parentNode && this.parentNode.childNodes[this.parentNode.childNodes.indexOf(this) + 1] }
+  get textContent() { return this.nodeType === 1 ? this.childNodes.map(node => node.textContent).join('') : this.data }
+  set textContent(value) { this.childNodes = []; this.data = value }
+}
+global.window = { navigator: { userAgent: 'node-account-test' }, addEventListener() {}, removeEventListener() {} }
+global.document = {
+  createElement: tag => new MemoryNode(tag),
+  createElementNS: (ns, tag) => new MemoryNode(tag),
+  createTextNode: text => new MemoryNode(null, 3, text),
+  createComment: text => new MemoryNode(null, 8, text),
+  createEvent: () => ({ timeStamp: Date.now() }),
+}
 const compiler = require('vue-template-compiler')
 const Vue = require('vue')
 const Vuex = require('vuex')
 const axios = require('axios')
 const settle = require('axios/lib/core/settle')
 Vue.use(Vuex)
+Vue.config.productionTip = false
+Vue.config.devtools = false
 
 const root = path.resolve(__dirname, '..')
 const clone = value => JSON.parse(JSON.stringify(value))
@@ -114,10 +159,10 @@ function make(options = {}) {
       } else if (call.method === 'post') { const row = savedAddress('9007199254740997', 'Adresse 4'); addresses.push(row); result = { data: row } }
       else result = { data: addresses }
     }
-    const response = { status: result.status || 200, statusText: '', headers: {}, config, data: {
+    const response = { status: result.status || 200, statusText: '', headers: {}, config, data: JSON.stringify({
       success: !result.error, data: clone(result.data || null), error: result.error,
       message: 'Never display raw provider details',
-    } }
+    }) }
     return new Promise((resolve, reject) => settle(resolve, reject, response))
   }
   const plugin = load('plugins/customerApi.client.js')
@@ -147,6 +192,168 @@ function make(options = {}) {
   const component = (file, propsData = {}, clocks) => new Vue({ ...load(file, clocks).default, store, propsData })
   return { store, dispatch, calls, api, snapshot, component, storage, get state() { return store.state.customer } }
 }
+
+async function drainVue() {
+  for (let index = 0; index < 20; index++) {
+    await Promise.resolve()
+    await Vue.nextTick()
+  }
+}
+
+function mountAccount(fixture, shopId = '7') {
+  const options = load('pages/compte/index.vue').default
+  const sfc = compiler.parseComponent(fs.readFileSync(path.join(root, 'pages/compte/index.vue'), 'utf8'))
+  const compiled = compiler.compile(sfc.template.content)
+  assert.deepStrictEqual(compiled.errors, [])
+  const route = Vue.observable({ query: { shopId } })
+  const leaf = { functional: true, render: (h, context) => h('div', context.children) }
+  const page = new Vue({
+    ...options,
+    store: fixture.store,
+    components: {
+      CustomerCodeLogin: { ...load('components/customer/CustomerCodeLogin.vue').default, render(h) { return h('div') } },
+      CustomerAddressBook: leaf,
+      'v-btn': leaf, 'v-icon': leaf, 'v-skeleton-loader': leaf, 'v-alert': leaf,
+    },
+    beforeCreate() { this.$route = route },
+    render: vm.compileFunction(compiled.render, []),
+    staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])),
+  })
+  page.$mount(document.createElement('div'))
+  return { page, route }
+}
+
+test('I1 mounted compiled account loads the book once after login destroys its event sender', async () => {
+  const f = make({ authenticated: false })
+  const { page } = mountAccount(f)
+  try {
+    await drainVue()
+    assert.equal(page.opening, false)
+    const login = page.$children.find(child => typeof child.verify === 'function')
+    assert.ok(login, 'Actual mounted login must exist')
+    login.destination = 'me@example.test'
+    await login.sendCode()
+    login.code = '123456'
+    await login.verify()
+    await drainVue()
+    assert.equal(login._isDestroyed, true)
+    assert.ok(f.state.session)
+    assert.equal(f.calls.filter(call => call.method === 'get' && call.path.endsWith('/addresses')).length, 1)
+    assert.deepStrictEqual(clone(f.state.addresses), [savedAddress()])
+    assert.equal(page.loadingBook, false)
+    assert.ok(!f.calls.some(call => /quote|address-resolutions/.test(call.path)))
+  } finally { page.$destroy() }
+})
+
+test('I1 mounted account restores one book and ignores old-shop completion while the new book is loading', async () => {
+  const old = deferred()
+  const next = deferred()
+  const f = make({ reply: call => {
+    if (call.path.endsWith('/session')) return { data: session(call.params.shopId) }
+    if (call.path.endsWith('/addresses')) return call.params.shopId === 7 ? old.promise : next.promise
+    return null
+  } })
+  const { page, route } = mountAccount(f)
+  try {
+    await drainVue()
+    assert.equal(page.loadingBook, true)
+    route.query.shopId = '8'
+    await drainVue()
+    assert.equal(f.state.shopId, 8)
+    assert.equal(page.loadingBook, true)
+    old.resolve({ status: 401, error: 'CUSTOMER_SESSION_INVALID' })
+    await drainVue()
+    assert.equal(page.loadingBook, true)
+    assert.equal(f.state.session.shopId, 8)
+    next.resolve({ data: [savedAddress('888', 'Adresse 8')] })
+    await drainVue()
+    assert.equal(page.loadingBook, false)
+    assert.equal(f.state.addresses[0].id, '888')
+    for (const shopId of [7, 8]) assert.equal(f.calls.filter(call => call.path.endsWith('/addresses') && call.params.shopId === shopId).length, 1)
+  } finally { old.resolve({ data: [] }); next.resolve({ data: [] }); page.$destroy() }
+})
+
+test('I1 mounted account clears an old loading indicator when the next shop has no session', async () => {
+  const old = deferred()
+  const f = make({ reply: call => call.path.endsWith('/addresses') ? old.promise : null })
+  const { page, route } = mountAccount(f)
+  try {
+    await drainVue()
+    assert.equal(page.loadingBook, true)
+    route.query.shopId = '8'
+    await drainVue()
+    assert.equal(f.state.session, null)
+    assert.equal(page.loadingBook, false)
+    old.resolve({ data: [savedAddress()] })
+    await drainVue()
+    assert.equal(f.state.addresses.length, 0)
+    assert.equal(page.loadingBook, false)
+  } finally { old.resolve({ data: [] }); page.$destroy() }
+})
+
+for (const changed of [false, true]) {
+  test(`I2 chosen server candidate survives fresh SAVE for ${changed ? 'changed' : 'new'} postal address`, async () => {
+    const f = make({ reply: call => {
+      if (!call.path.endsWith('/address-resolutions')) return null
+      if (call.body.candidateId !== 'candidate-2') return { status: 422, error: 'DELIVERY_ADDRESS_INVALID', data: {
+        candidates: [{ providerId: 'candidate-2', providerLabel: '14 rue de la Paix 75002 Paris' }],
+      } }
+      return { data: { ...proof(), addressSnapshot: { ...proof().addressSnapshot, street: '14 rue de la Paix' } } }
+    } })
+    await f.dispatch('loadSession', { shopId: 7 })
+    await f.dispatch('loadAddresses')
+    const book = f.component('components/customer/CustomerAddressBook.vue')
+    book.editAddress(changed ? f.state.addresses[0] : null)
+    const input = f.component('components/delivery/DeliveryAddressInput.vue', { value: book.selected, resolver: book.resolveAddress }, timers())
+    book.$refs.addressInput = input
+    try {
+      input.draft = { ...postal, street: '14 rue de la Paix', complement: 'Etage prive', instructions: 'Interphone prive' }
+      await Vue.nextTick()
+      await input.resolve()
+      assert.equal(input.candidates.length, 1)
+      await input.chooseCandidate(input.candidates[0])
+      assert.equal(input.resolution.addressResolutionToken, 'fresh-server-proof')
+      input.draft.instructions = 'Autre interphone prive'
+      await Vue.nextTick()
+      const before = f.calls.length
+      await book.save()
+      const resolution = f.calls.slice(before).find(call => call.path.endsWith('/address-resolutions'))
+      assert.equal(resolution.body.candidateId, 'candidate-2')
+      assert.deepStrictEqual(resolution.body.address, { ...postal, street: '14 rue de la Paix' })
+      const mutation = f.calls.slice(before).find(call => call.method === (changed ? 'patch' : 'post') && /\/addresses(?:\/\d+)?$/.test(call.path))
+      assert.ok(mutation, 'Candidate selection must reach the address mutation')
+      assert.equal(mutation.body.addressResolutionToken, 'fresh-server-proof')
+      assert.equal(mutation.body.complement, 'Etage prive')
+      assert.equal(mutation.body.instructions, 'Autre interphone prive')
+      assert.equal(book.editing, false)
+      assert.ok(!f.calls.some(call => /quote/.test(call.path)))
+      assert.ok(!Object.hasOwn(resolution.body.address, 'latitude'))
+    } finally { input.$destroy(); book.$destroy() }
+  })
+}
+
+test('I2 candidate authority is invalidated by postal/context changes and destruction', async () => {
+  for (const change of ['postal', 'context', 'destroy']) {
+    const f = make()
+    await f.dispatch('loadSession', { shopId: 7 })
+    const input = f.component('components/delivery/DeliveryAddressInput.vue', {
+      resolver: payload => f.dispatch('resolveAddress', payload), contextKey: 'shop7',
+    }, timers())
+    try {
+      input.draft = { ...postal, complement: '', instructions: '' }
+      await Vue.nextTick()
+      await input.chooseCandidate({ providerId: 'candidate-2' })
+      if (change === 'postal') input.draft.street = '14 rue de la Paix'
+      else if (change === 'context') input.contextKey = 'shop8'
+      else input.$destroy()
+      await Vue.nextTick()
+      const before = f.calls.length
+      await input.resolve()
+      if (change === 'destroy') assert.equal(f.calls.length, before)
+      else assert.ok(!Object.hasOwn(f.calls[before].body, 'candidateId'))
+    } finally { input.$destroy() }
+  }
+})
 
 test('independent Axios ignores poisoned global/staff defaults and logout interceptors', async () => {
   const previousHeaders = axios.defaults.headers
