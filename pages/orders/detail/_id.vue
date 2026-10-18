@@ -392,7 +392,7 @@
 
     <v-dialog v-model="deliveryEditDialog" :persistent="deliveryEditBusy || Boolean(deliveryEditAttempt)" max-width="640">
       <v-card>
-        <v-card-title>Modifier la livraison</v-card-title>
+        <v-card-title>Modifier le prix de la livraison</v-card-title>
         <v-card-text>
           <v-alert v-if="deliveryEditError" type="error" text>{{ deliveryEditError }}</v-alert>
           <template v-if="deliveryEdit">
@@ -1076,7 +1076,9 @@ export default {
         if (error.response && error.response.status >= 400 && error.response.status < 500) {
           this.deliveryEditAttempt = null
           this.deliveryEditReady = false
-          this.deliveryEditError = 'La commande ou les frais ont change. Rechargez puis confirmez un nouveau devis.'
+          this.deliveryEditError = error.response.data?.data?.code === 'DELIVERY_ADDRESS_CHANGE_NOT_ALLOWED'
+            ? "Conservez l'adresse deja validee pour garder les complements et consignes enregistres."
+            : 'La commande ou les frais ont change. Rechargez puis confirmez un nouveau devis.'
         } else {
           this.deliveryEditError = 'Reponse indisponible. Reprenez pour verifier cette modification.'
         }

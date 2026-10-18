@@ -244,6 +244,22 @@ test('delivery edit uncertain response retries the same body and blocks route de
   assert.deepStrictEqual(calls[1], calls[0])
   assert.equal(i.deliveryEditAttempt, null)
 })
+test('Round1 price editor reports a changed destination without expanding the frozen request body', async () => {
+  const page = load('pages/orders/detail/_id.vue', { localStorage: { getItem: () => 'fixture-only' } }).default
+  const body = { delivery_idempotency_key: 'existing-frozen-key', address_resolution_token: 'verified-postal-proof' }
+  const i = instance(page, { deliveryEditBusy: false, deliveryEdit: { order: { id: 31 } },
+    deliveryEditAttempt: body, deliveryEditReady: true, $axios: { patch: (url, submitted) => {
+      assert.strictEqual(submitted, body)
+      assert.deepStrictEqual(Object.keys(submitted), ['delivery_idempotency_key', 'address_resolution_token'])
+      return Promise.reject(Object.assign(new Error('Fictional destination refusal'), {
+        response: { status: 409, data: { data: { code: 'DELIVERY_ADDRESS_CHANGE_NOT_ALLOWED' } } },
+      }))
+    } } })
+  await i.confirmDeliveryEdit()
+  assert.equal(i.deliveryEditAttempt, null)
+  assert.equal(i.deliveryEditReady, false)
+  assert.match(i.deliveryEditError, /adresse.*conserve|conserve.*adresse/i)
+})
 test('payout edit link opens the eligible delivery after the actual detail loading state clears', async () => {
   const page = load('pages/orders/detail/_id.vue').default
   const route = { params: { id: '31' }, query: { deliveryEdit: '1' } }
@@ -258,7 +274,7 @@ test('payout edit link opens the eligible delivery after the actual detail loadi
 
 ;(async () => {
   let failed = 0
-  for (const { name, run } of tests) {
+  for (const { name, run } of tests.filter(test => !process.env.TASK15_RECEIPT_FILTER || test.name.includes(process.env.TASK15_RECEIPT_FILTER))) {
     try { await run(); console.log(`PASS ${name}`) } catch (error) { failed++; console.error(`FAIL ${name}: ${error.stack}`) }
   }
   process.exitCode = failed ? 1 : 0
