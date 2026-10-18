@@ -5,6 +5,49 @@ const path = require('path')
 const vm = require('vm')
 const { test } = require('node:test')
 const babel = require('@babel/core')
+require('axios/lib/adapters/xhr')
+
+// Use Vue's real DOM patcher/lifecycle with the existing account-test memory boundary.
+class MemoryNode {
+  constructor(tag, type = 1, text = '') {
+    this.tagName = tag && tag.toUpperCase()
+    this.nodeType = type
+    this.data = text
+    this.childNodes = []
+    this.parentNode = null
+    this.attrs = {}
+    this.style = { setProperty() {} }
+  }
+
+  appendChild(node) { return this.insertBefore(node, null) }
+  insertBefore(node, before) {
+    if (node.parentNode) node.parentNode.removeChild(node)
+    const index = before ? this.childNodes.indexOf(before) : -1
+    if (index < 0) this.childNodes.push(node)
+    else this.childNodes.splice(index, 0, node)
+    node.parentNode = this
+    return node
+  }
+
+  removeChild(node) { this.childNodes.splice(this.childNodes.indexOf(node), 1); node.parentNode = null; return node }
+  setAttribute(key, value) { this.attrs[key] = value }
+  removeAttribute(key) { delete this.attrs[key] }
+  hasAttribute(key) { return Object.hasOwn(this.attrs, key) }
+  getAttribute(key) { return this.attrs[key] || null }
+  addEventListener() {}
+  removeEventListener() {}
+  get nextSibling() { return this.parentNode && this.parentNode.childNodes[this.parentNode.childNodes.indexOf(this) + 1] }
+  get textContent() { return this.nodeType === 1 ? this.childNodes.map(node => node.textContent).join('') : this.data }
+  set textContent(value) { this.childNodes = []; this.data = value }
+}
+global.window = { navigator: { userAgent: 'node-delivery-test' }, addEventListener() {}, removeEventListener() {} }
+global.document = {
+  createElement: tag => new MemoryNode(tag),
+  createElementNS: (ns, tag) => new MemoryNode(tag),
+  createTextNode: text => new MemoryNode(null, 3, text),
+  createComment: text => new MemoryNode(null, 8, text),
+  createEvent: () => ({ timeStamp: Date.now() }),
+}
 const Vue = require('vue')
 const Vuex = require('vuex')
 const compiler = require('vue-template-compiler')
@@ -30,7 +73,9 @@ function load(relative, globals = {}) {
   const code = babel.transformSync(source, { babelrc: false, configFile: false, plugins: ['@babel/plugin-transform-modules-commonjs'] }).code
   const module = { exports: {} }
   vm.compileFunction(code, ['module', 'exports', 'require', 'crypto', 'setTimeout', 'clearTimeout', 'process'])(module, module.exports,
-    name => name.startsWith('@/') ? load(name.slice(2)) : require(name.startsWith('.') ? path.resolve(path.dirname(filename), name) : name),
+    name => globals.imports && globals.imports[name] || (name === '@stripe/stripe-js'
+      ? { loadStripe() { throw new Error('A local Stripe UI double is required in this test') } }
+      : name.startsWith('@/') ? load(name.slice(2), globals) : require(name.startsWith('.') ? path.resolve(path.dirname(filename), name) : name)),
     require('crypto').webcrypto, globals.setTimeout || setTimeout, globals.clearTimeout || clearTimeout, process)
   return module.exports
 }
@@ -40,7 +85,7 @@ const proof = suffix => ({ addressResolutionToken: `proof-${suffix}`, expiresAt:
 const quote = (fee = 0, discount = 0) => ({ shopId: 7, settingsRevision: 1, ...proof('one'), itemsTotalCents: 2500, itemsDiscountCents: discount,
   itemsNetCents: 2500 - discount, deliveryFeeCents: fee, grandTotalCents: 2500 - discount + fee, quoteToken: `quote-${fee}-${discount}`, expiresAt: '2099-01-01T00:00:00Z' })
 const personal = { subject: 'customer', shopId: 7, customerId: '9007199254740993', csrfToken: 'a'.repeat(64), expiresAt: '2099-01-01T00:00:00Z' }
-function fixture(reply = () => null) {
+function fixture(reply = () => null, { fetchBoundary = false } = {}) {
   const calls = []
   const adapter = async config => {
     const call = { path: config.url, method: config.method, body: config.data && JSON.parse(config.data), headers: copy(config.headers), credentials: config.withCredentials, params: config.params }
@@ -55,7 +100,7 @@ function fixture(reply = () => null) {
   const cartModule = load('store/cart.js')
   const customer = load('store/customer.js')
   const easy = require('vuex-easy-access').default
-  const store = new Vuex.Store({ modules: {
+  const store = new Vuex.Store({ state: { staticURL: 'http://fixture.invalid' }, modules: {
     delivery: { ...delivery, state: delivery.state() },
     customer: { ...customer, state: customer.state() },
     cart: { ...cartModule, namespaced: true, state: cartModule.state() },
@@ -66,12 +111,266 @@ function fixture(reply = () => null) {
     products: { namespaced: true, state: { dataProduct: [] } },
     notifications: { namespaced: true, actions: { success() {} } },
   }, plugins: [easy()] })
-  store.$deliveryApi = delivery.buildDeliveryApi({ baseURL: 'http://fixture.invalid', adapter })
+  store.$deliveryApi = delivery.buildDeliveryApi({ baseURL: 'http://fixture.invalid', ...(fetchBoundary ? {
+    fetch: async (url, options) => {
+      const pending = adapter({ url: new URL(url).pathname, method: options.method.toLowerCase(), data: options.body,
+        headers: options.headers, withCredentials: options.credentials === 'include', validateStatus: () => true })
+      calls[calls.length - 1].fetchCredentials = options.credentials
+      const response = await pending
+      return { ...response, headers: new Map(), text: () => Promise.resolve(response.data) }
+    },
+  } : { adapter }) })
   store.$axios = axios.create({ adapter })
   const dispatch = (name, payload) => store.dispatch(`delivery/${name}`, payload)
   const component = (propsData = {}) => new Vue({ ...load('components/delivery/DeliveryCheckout.vue').default, store, propsData: { shopId: 7, cart, ...propsData } })
   return { store, calls, dispatch, component }
 }
+
+const deferred = () => {
+  let complete
+  const promise = new Promise(resolve => { complete = resolve })
+  return { promise, resolve: complete }
+}
+async function drainVue() {
+  for (let index = 0; index < 20; index++) {
+    await Promise.resolve()
+    await Vue.nextTick()
+  }
+}
+function compiledComponent(file, imports = {}) {
+  const options = load(file, { imports }).default
+  const source = compiler.parseComponent(fs.readFileSync(path.join(root, file), 'utf8')).template.content
+  const compiled = compiler.compile(source)
+  assert.deepEqual(compiled.errors, [])
+  const leaf = { functional: true, render: (h, context) => h('div', context.children) }
+  return { ...options,
+    components: { ...options.components, ...Object.fromEntries([...new Set(source.match(/v-[a-z-]+/g))].map(tag => [tag, leaf])) },
+    render: vm.compileFunction(compiled.render, []),
+    staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])),
+  }
+}
+async function mountCheckout(f, { site = false } = {}) {
+  const mountedPayments = []
+  const stripe = { elements: () => ({ create: () => ({ mount: element => { assert.ok(element); mountedPayments.push(element) } }) }) }
+  f.store.state.users.user.order_source = site ? 'web' : 'pos'
+  const options = compiledComponent('pages/cart.vue', { '@stripe/stripe-js': { loadStripe: () => Promise.resolve(stripe) } })
+  options.components.Loading = { functional: true, render: h => h('div') }
+  const checkout = compiledComponent('components/delivery/DeliveryCheckout.vue')
+  checkout.components.DeliveryAddressInput = compiledComponent('components/delivery/DeliveryAddressInput.vue')
+  const page = new Vue({ ...options, store: f.store,
+    components: { ...options.components, DeliveryCheckout: checkout },
+    beforeCreate() { this.$router = { push() {} } },
+  })
+  page.$mount(document.createElement('div'))
+  await drainVue()
+  return { page, mountedPayments }
+}
+
+test('I1 mounted confirmed delivery keeps proofs/signature through pending child teardown and Stripe response without cancel', async () => {
+  const response = deferred()
+  const sent = deferred()
+  const f = fixture(call => {
+    if (call.path.endsWith('/stripe/payment-intents/qr-table')) { sent.resolve(); return response.promise }
+    return null
+  })
+  await f.store.dispatch('cart/setTocart', copy(cart))
+  const { page, mountedPayments } = await mountCheckout(f, { site: true })
+  let preparation
+  try {
+    page.fulfillmentType = 'delivery'
+    page.isValue = true
+    await drainVue()
+    const checkout = page.$refs.deliveryCheckout
+    const address = checkout.$refs.addressInput
+    assert.ok(address && address._isMounted)
+    Object.assign(address.draft, postal, { instructions: 'Original door' })
+    await Vue.nextTick()
+    await address.resolve()
+    await drainVue()
+    checkout.confirmQuote()
+    await drainVue()
+    assert.equal(page.deliveryConfirmed, true)
+    const originalSignature = page.currentStripeCheckoutSignature
+    const originalProof = copy(page.deliveryResolution)
+    const originalQuote = copy(page.deliveryQuote)
+    preparation = page.prepareStripePaymentElement()
+    await sent.promise
+    await drainVue()
+    assert.equal(page.deliveryAttemptLocked, true)
+    assert.equal(address._isDestroyed, true, 'Real v-if teardown must exercise the unchanged resolved(null) hook')
+    assert.deepEqual(copy(page.deliveryResolution), originalProof)
+    assert.deepEqual(copy(page.deliveryQuote), originalQuote)
+    assert.equal(page.currentStripeCheckoutSignature, originalSignature)
+    response.resolve({ data: { orderId: 91, clientSecret: 'local-double-secret', publishableKey: 'local-double-key', paymentIntentId: 'pi_local_double' } })
+    await preparation
+    await drainVue()
+    assert.equal(f.store.state.cart.clientOrderStatus, 'stripe_prepared')
+    assert.equal(page.currentStripeCheckoutSignature, originalSignature)
+    assert.equal(page.stripeCheckoutSignature, originalSignature)
+    assert.equal(page.stripePaymentReady, true)
+    assert.equal(mountedPayments.length, 1)
+    assert.equal(f.calls.filter(call => call.path.endsWith('/cancel')).length, 0)
+  } finally {
+    response.resolve({ lost: true })
+    if (preparation) await preparation
+    page.$destroy()
+  }
+})
+
+test('I2 reload with persisted pending exactly replays original Stripe endpoint/key/body/proofs/secret and blocks live remount clicks', async () => {
+  const interrupted = deferred()
+  const sent = deferred()
+  const live = fixture(call => { sent.resolve(); return interrupted.promise })
+  const originalRequest = live.store.dispatch('cart/checkoutOrder', { customer: 'Guest', servicePointId: 70, total: 28.99,
+    payment: 'Stripe', stripe: true, dataCart: cart, fulfillmentType: 'delivery',
+    deliveryQuoteToken: 'quote-original', addressResolutionToken: 'proof-original',
+    deliveryDetails: { complement: 'Flat 2', instructions: 'Private original' }, deliveryAddressSnapshot: postal })
+  await sent.promise
+  const persisted = copy(live.store.state.cart)
+  const wire = copy(live.calls[0])
+  assert.equal(persisted.clientOrderStatus, 'pending')
+  const remount = await mountCheckout(live)
+  const replayResponse = deferred()
+  const reloaded = fixture(() => replayResponse.promise)
+  reloaded.store.replaceState({ ...reloaded.store.state, cart: copy(persisted) })
+  const restored = await mountCheckout(reloaded)
+  try {
+    await remount.page.retryDeliveryAttempt()
+    assert.equal(live.store.state.cart.clientOrderStatus, 'pending', 'Ordinary remount cannot normalize a live request')
+    assert.equal(live.calls.length, 1)
+    assert.equal(restored.page.deliveryAttemptLocked, true)
+    const recovery = restored.page.retryDeliveryAttempt()
+    await drainVue()
+    assert.equal(reloaded.calls.length, 1, 'Reload has no live promise: explicit recovery must send the original request')
+    assert.equal((await reloaded.store.dispatch('cart/retryCheckout')).error.code, 'CHECKOUT_ATTEMPT_UNRESOLVED')
+    replayResponse.resolve({ data: { orderId: 91, clientSecret: 'local-double-secret', publishableKey: 'local-double-key' } })
+    await recovery
+    assert.equal(reloaded.calls.length, 1, 'Reload has no live promise: explicit recovery must send the original request')
+    assert.equal(reloaded.calls[0].path, wire.path)
+    assert.deepEqual(reloaded.calls[0].body, wire.body)
+    assert.equal(reloaded.calls[0].credentials, false)
+    assert.deepEqual(copy(reloaded.store.state.cart.clientOrderPayload), persisted.clientOrderPayload)
+    assert.equal(reloaded.store.state.cart.clientOrderToken, persisted.clientOrderToken)
+    assert.equal(reloaded.store.state.cart.clientOrderStatus, 'stripe_prepared')
+    assert.equal(restored.page.stripePaymentReady, true)
+  } finally {
+    replayResponse.resolve({ lost: true })
+    interrupted.resolve({ lost: true })
+    await originalRequest
+    remount.page.$destroy()
+    restored.page.$destroy()
+  }
+})
+
+test('I3 mounted POS profile/address plus unrelated personal session and lost reply retries as original guest with cookies omitted', async () => {
+  let lost = true
+  const profile = { id: '51', name: 'Restaurant contact', contactPhone: '0700000000' }
+  const address = { id: '9007199254740995', label: 'Contact address', addressSnapshot: { ...postal } }
+  const f = fixture(call => {
+    if (call.path.endsWith('/customers/51/addresses')) return { data: [address] }
+    if (call.path.endsWith('/orders/checkout')) return lost ? { lost: true } : { data: { orderId: 91, tracking_url: '/local-tracking-double' } }
+    return null
+  }, { fetchBoundary: true })
+  f.store.commit('customer/RESET', 7)
+  f.store.commit('customer/SESSION', personal)
+  await f.store.dispatch('cart/setTocart', copy(cart))
+  const { page } = await mountCheckout(f)
+  const before = JSON.stringify({ storage, users: f.store.state.users, shop: f.store.state.shop })
+  try {
+    page.fulfillmentType = 'delivery'
+    page.isValue = true
+    await drainVue()
+    const checkout = page.$refs.deliveryCheckout
+    f.store.commit('delivery/PROFILES', [profile])
+    await checkout.selectProfile(profile.id)
+    await checkout.selectAddress(address.id)
+    await drainVue()
+    checkout.confirmQuote()
+    await drainVue()
+    assert.equal(page.formuser.customer, profile.name)
+    assert.equal(page.deliveryConfirmed, true)
+    await page.paymentBtn()
+    assert.equal(f.store.state.cart.clientOrderStatus, 'uncertain')
+    const original = copy(f.store.state.cart.clientOrderPayload)
+    assert.equal(original.customerContextId, undefined, 'Selected POS contact is never a verified personal owner')
+    const first = f.calls.find(call => call.path.endsWith('/orders/checkout'))
+    assert.ok(first)
+    lost = false
+    await page.retryDeliveryAttempt()
+    const checkouts = f.calls.filter(call => call.path.endsWith('/orders/checkout'))
+    assert.equal(checkouts.length, 2)
+    assert.deepEqual(checkouts[1].body, first.body)
+    assert(checkouts.every(call => call.credentials === false && call.fetchCredentials === 'omit' && !call.headers['X-CSRF-Token']))
+    assert.equal(page.checkoutFinalized, true)
+    assert.equal(JSON.stringify({ storage, users: f.store.state.users, shop: f.store.state.shop }), before)
+  } finally { page.$destroy() }
+})
+
+test('I3 personal retry requires the original verified owner/shop and current CSRF, never a selected contact', async () => {
+  const f = fixture(() => ({ lost: true }))
+  f.store.commit('customer/RESET', 7)
+  f.store.commit('customer/SESSION', personal)
+  await f.store.dispatch('cart/checkoutOrder', { customer: 'Personal', total: 25, payment: 'cash', dataCart: cart, customerSession: personal,
+    fulfillmentType: 'delivery', deliveryQuoteToken: 'original-quote', addressResolutionToken: 'original-proof' })
+  const original = copy(f.calls[0].body)
+  assert.equal(f.store.state.cart.clientOrderPayload.customerContextShopId, 7)
+  assert.equal(original.customerContextShopId, undefined)
+  assert.equal(f.store.state.cart.clientOrderPayload.csrfToken, undefined)
+  for (const session of [null, { ...personal, customerId: '51' }, { ...personal, shopId: 8 }, { ...personal, csrfToken: '' }, { ...personal, subject: 'staff' }]) {
+    f.store.commit('customer/SESSION', session)
+    const blocked = await f.store.dispatch('cart/retryCheckout')
+    assert.equal(blocked.error.code, 'CHECKOUT_ATTEMPT_UNRESOLVED')
+    assert.equal(f.calls.length, 1)
+  }
+  f.store.state.users.user.shopid = 8
+  f.store.commit('customer/RESET', 8)
+  f.store.commit('customer/SESSION', { ...personal, shopId: 8 })
+  assert.equal((await f.store.dispatch('cart/retryCheckout')).error.code, 'CHECKOUT_ATTEMPT_UNRESOLVED')
+  assert.equal(f.calls.length, 1, 'Even an identical account ID in another current shop cannot replace the original tenant')
+  f.store.state.users.user.shopid = 7
+  f.store.commit('customer/RESET', 7)
+  f.store.commit('customer/SESSION', { ...personal, csrfToken: 'b'.repeat(64) })
+  await f.store.dispatch('cart/retryCheckout')
+  assert.equal(f.calls.length, 2)
+  assert.deepEqual(f.calls[1].body, original)
+  assert.equal(f.calls[1].credentials, true)
+  assert.equal(f.calls[1].headers['X-CSRF-Token'], 'b'.repeat(64))
+})
+
+test('I2 restored pending counter-paid delivery keeps its original endpoint and payment choice', async () => {
+  const f = fixture(() => ({ lost: true }))
+  await f.store.dispatch('cart/checkoutOrder', { customer: 'Guest', total: 29, payment: 'counter_pay_before:Especes', dataCart: cart,
+    fulfillmentType: 'delivery', deliveryQuoteToken: 'counter-quote', addressResolutionToken: 'counter-proof' })
+  const persisted = copy(f.store.state.cart)
+  persisted.clientOrderStatus = 'pending'
+  const restored = fixture(() => ({ data: { orderId: 91 } }))
+  restored.store.replaceState({ ...restored.store.state, cart: persisted })
+  const result = await restored.store.dispatch('cart/retryCheckout')
+  assert.equal(result.ok, true)
+  assert.equal(restored.calls.length, 1)
+  assert.equal(restored.calls[0].path, '/baseurl/api/v1/orders/checkout')
+  assert.deepEqual(restored.calls[0].body, f.calls[0].body)
+  assert.equal(restored.calls[0].body.payment, 'counter_pay_before:Especes')
+})
+
+test('I3 a personal session appearing after a site guest lost reply cannot change replay credentials or bound signature', async () => {
+  const f = fixture(() => ({ lost: true }), { fetchBoundary: true })
+  await f.store.dispatch('cart/checkoutOrder', { customer: 'Guest', total: 25, payment: 'Stripe', stripe: true, dataCart: cart,
+    fulfillmentType: 'delivery', deliveryQuoteToken: 'guest-quote', addressResolutionToken: 'guest-proof' })
+  const { page } = await mountCheckout(f, { site: true })
+  try {
+    const signature = page.currentStripeCheckoutSignature
+    f.store.commit('customer/RESET', 7)
+    f.store.commit('customer/SESSION', personal)
+    await drainVue()
+    assert.equal(page.currentStripeCheckoutSignature, signature)
+    await page.retryDeliveryAttempt()
+    assert.equal(f.calls.length, 2)
+    assert.deepEqual(f.calls[1].body, f.calls[0].body)
+    assert.equal(f.calls[1].fetchCredentials, 'omit')
+    assert.equal(f.calls[1].headers['X-CSRF-Token'], undefined)
+  } finally { page.$destroy() }
+})
 
 test('server availability is a safe projection and stale shop replies cannot restore delivery', async () => {
   let finish

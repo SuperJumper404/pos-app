@@ -591,6 +591,7 @@ export default {
     deliveryDiscount() { return this.$store.state.delivery && this.$store.state.delivery.discount || { type: 'none', value: 0 } },
     deliverySession() {
       const customer = this.$store.state.customer
+      if (this.deliveryAttemptLocked && !this.$store.get('cart/clientOrderPayload').customerContextId) return null
       return this.isSiteCheckout && customer && customer.shopId === this.checkoutShopId ? customer.session : null
     },
     deliveryPaymentOptions() { return [

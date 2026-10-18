@@ -85,14 +85,14 @@ export default {
     discount: { deep: true, handler() { this.refreshQuote() } },
     shopId() { this.openShop() },
     value(value) { if (value === 'delivery') this.refreshQuote(); else this.invalidate() },
-    session() { this.selectedAddressId = null; this.resolution = null; this.invalidate(); this.loadBook() },
+    session() { if (this.locked) return; this.selectedAddressId = null; this.resolution = null; this.invalidate(); this.loadBook() },
     ready(value) { this.$emit('ready', value) },
   },
   mounted() { this.openShop() },
   beforeDestroy() { this.sequence++; clearTimeout(this.expiryTimer) },
   methods: {
     money(cents) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100) },
-    invalidate() { this.sequence++; this.confirmedBasis = null; this.currentQuote = null; this.loading = false; clearTimeout(this.expiryTimer); this.$emit('quote', null); this.$emit('ready', false) },
+    invalidate() { if (this.locked) return; this.sequence++; this.confirmedBasis = null; this.currentQuote = null; this.loading = false; clearTimeout(this.expiryTimer); this.$emit('quote', null); this.$emit('ready', false) },
     selectMode(mode) { if (!this.locked && (!this.site || mode !== 'dine_in') && (mode !== 'delivery' || this.available)) this.$emit('input', mode) },
     async openShop() {
       if (this.locked) return
@@ -141,10 +141,12 @@ export default {
     },
     resolveStored() { return this.$refs.addressInput && this.$refs.addressInput.resolve() },
     resolveAddress(body) { return this.$store.dispatch('delivery/resolveAddress', { ...body, personal: this.site, ...(body.addressId && !this.session ? { customerId: this.profileId } : {}) }) },
-    onResolved(resolution) { this.resolution = resolution; this.$emit('address', resolution); return this.refreshQuote() },
+    // The shared input emits resolved(null) on teardown when the attempt locks.
+    onResolved(resolution) { if (this.locked) return null; this.resolution = resolution; this.$emit('address', resolution); return this.refreshQuote() },
     async refreshQuote() {
+      if (this.locked) return null
       this.invalidate()
-      if (this.value !== 'delivery' || this.locked || !this.available || !this.resolution || !this.cart.length) return null
+      if (this.value !== 'delivery' || !this.available || !this.resolution || !this.cart.length) return null
       const sequence = this.sequence
       const basis = this.basis
       this.error = ''

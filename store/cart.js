@@ -34,6 +34,8 @@ const writeStoredOrdersSent = (ordersSent) => {
 }
 
 const CHECKOUT_ATTEMPT_UNRESOLVED = 'CHECKOUT_ATTEMPT_UNRESOLVED'
+// A remount shares this live guard; persisted/reloaded attempts have no surviving request.
+const liveDeliveryCheckouts = new WeakSet()
 const SAFE_PREWRITE_ERROR_CODES = new Set([
   'CHECKOUT_REQUEST_INVALID',
   'INSUFFICIENT_STOCK',
@@ -115,11 +117,12 @@ const buildCheckoutAttemptPayload = (params, publicPayload) => ({
     street: params.deliveryAddressSnapshot.street, postalCode: params.deliveryAddressSnapshot.postalCode,
     city: params.deliveryAddressSnapshot.city, country: params.deliveryAddressSnapshot.country,
   } } : {}),
-  ...(params.customerSession ? { customerContextId: params.customerSession.customerId } : {}),
+  ...(params.customerSession ? { customerContextId: params.customerSession.customerId,
+    customerContextShopId: params.customerSession.shopId } : {}),
 })
 
 const publicAttemptPayload = (payload) => {
-  const { dataCart, stripe, customerContextId, deliveryAddressSnapshot, ...body } = payload
+  const { dataCart, stripe, customerContextId, customerContextShopId, deliveryAddressSnapshot, ...body } = payload
   return JSON.parse(JSON.stringify(body))
 }
 
@@ -226,7 +229,9 @@ export const actions = {
       ? state.clientOrderSignature : buildCheckoutIntentSignature(params)
     const previousAttemptStatus = state.clientOrderStatus || 'idle'
     const previousOrderId = state.clientOrderOrderId
-    if (params.fulfillmentType === 'delivery' && ['pending'].includes(previousAttemptStatus)) return unresolvedCheckoutResult(state)
+    const deliveryAttempt = params.fulfillmentType === 'delivery' || state.clientOrderPayload?.fulfillment_type === 'delivery'
+    if (deliveryAttempt && (liveDeliveryCheckouts.has(state) ||
+      (previousAttemptStatus === 'pending' && params.retryOriginal !== true))) return unresolvedCheckoutResult(state)
     if (params.customerSession && params.customerSession.shopId !== rootState.users?.user?.shopid) return unresolvedCheckoutResult(state)
     const isFirstAttempt =
       previousAttemptStatus === 'idle' &&
@@ -272,6 +277,7 @@ export const actions = {
     dispatch('set/clientOrderSignature', signature)
     if (!preserveDeliveryAttempt && params.retryOriginal !== true) dispatch(
       'set/clientOrderPayload', buildCheckoutAttemptPayload(params, payload))
+    if (payload.fulfillment_type === 'delivery') liveDeliveryCheckouts.add(state)
     dispatch('set/clientOrderAuthRedirect', false)
     dispatch('set/clientOrderStatus', 'pending')
 
@@ -335,14 +341,22 @@ export const actions = {
       dispatch('set/clientOrderStatus', status)
       dispatch('set/message', checkoutError.message)
       return { ok: false, data: null, error: checkoutError }
+    } finally {
+      liveDeliveryCheckouts.delete(state)
     }
   },
   retryCheckout({ state, rootState, dispatch }) {
     const payload = state.clientOrderPayload
-    if (!payload || !state.clientOrderToken || state.clientOrderStatus === 'pending') return unresolvedCheckoutResult(state)
+    if (!payload || !state.clientOrderToken || liveDeliveryCheckouts.has(state) ||
+      (state.clientOrderStatus === 'pending' && payload.fulfillment_type !== 'delivery')) return unresolvedCheckoutResult(state)
     const customer = rootState.customer
-    const session = customer && customer.session && customer.shopId === rootState.users.user.shopid ? customer.session : null
-    if ((payload.customerContextId || null) !== (session && session.customerId || null)) return unresolvedCheckoutResult(state)
+    let session = null
+    if (payload.customerContextId) {
+      const shopId = rootState.users.user.shopid
+      session = customer && customer.shopId === shopId ? customer.session : null
+      if (!session || session.subject !== 'customer' || session.shopId !== shopId || payload.customerContextShopId !== shopId ||
+        session.customerId !== payload.customerContextId || !session.csrfToken) return unresolvedCheckoutResult(state)
+    }
     return dispatch('checkoutOrder', { retryOriginal: true, stripe: payload.stripe === true, customerSession: session })
   },
   checkoutCounterPayBefore({ dispatch }, params = {}) {
