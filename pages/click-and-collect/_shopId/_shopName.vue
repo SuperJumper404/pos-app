@@ -49,6 +49,7 @@
           <h1 id="restaurant-name" class="restaurant-title">
             {{ shopInfo.shop_name || 'Restaurant' }}
           </h1>
+          <v-btn text class="text-none" :to="{ path: '/compte', query: { shopId: $route.params.shopId } }"><v-icon left>mdi-account-outline</v-icon>Mon compte</v-btn>
 
           <div class="restaurant-contact" aria-label="Coordonnees du restaurant">
             <a

@@ -9,6 +9,7 @@ const shouldAutoPrepareStripeCheckout = ({
   isKitchenClosed,
   stripePaymentReady,
   stripePreparing,
+  deliveryReady = true,
 }) =>
   Boolean(
     isQrClient &&
@@ -18,6 +19,7 @@ const shouldAutoPrepareStripeCheckout = ({
       !isKitchenClosed &&
       !stripePaymentReady &&
       !stripePreparing
+      && deliveryReady
   )
 
 const buildStripeCheckoutSignature = ({
@@ -26,12 +28,16 @@ const buildStripeCheckoutSignature = ({
   selectedTable,
   total,
   dataCart,
+  fulfillmentType,
+  deliveryQuoteToken,
+  addressResolutionToken,
 }) =>
   JSON.stringify({
     customer,
     phone,
     selectedTable,
     total,
+    ...(fulfillmentType === 'delivery' ? { fulfillmentType, deliveryQuoteToken, addressResolutionToken } : {}),
     items: (Array.isArray(dataCart) ? dataCart : []).map((item) => ({
       id: item.id,
       price: item.price,

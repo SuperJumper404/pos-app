@@ -8,6 +8,11 @@
     >
       {{ checkoutErrorMessage }}
     </v-alert>
+    <v-alert v-if="checkoutFinalized && isDelivery" type="success" text>
+      Commande transmise au restaurant.
+      <a v-if="deliveryTrackingUrl" :href="deliveryTrackingUrl">Suivre la livraison</a>
+      <v-btn v-if="deliveryTrackingUrl" icon title="Copier le lien de suivi" aria-label="Copier le lien de suivi" @click="copyDeliveryTracking"><v-icon>mdi-content-copy</v-icon></v-btn>
+    </v-alert>
     <v-row class="mt-8">
       <v-col md="8" sm="12" cols="12">
         <v-card outlined height="100%" class="pa-2 overflow-y-auto">
@@ -68,6 +73,7 @@
                     </div>
                     <v-btn
                       v-if="(itm.customization_steps || []).length > 0"
+                      :disabled="deliveryAttemptLocked"
                       text
                       x-small
                       color="primary"
@@ -90,6 +96,7 @@
                     small
                     color="warning"
                     aria-label="Retirer une unité"
+                    :disabled="deliveryAttemptLocked"
                     @click="changeQuantity(itemIndex, -1)"
                   >
                     <v-icon>mdi-minus</v-icon>
@@ -109,6 +116,7 @@
                     small
                     color="success"
                     aria-label="Ajouter une unité"
+                    :disabled="deliveryAttemptLocked"
                     @click="changeQuantity(itemIndex, 1)"
                   >
                     <v-icon>mdi-plus</v-icon>
@@ -151,6 +159,27 @@
           <Loading />
         </v-card>
         <v-card v-else outlined class="pa-2 overflow-x-hidden overflow-y-auto">
+          <DeliveryCheckout
+            v-if="deliveryContext && dataCart && !isOrderEditActive"
+            ref="deliveryCheckout"
+            v-model="fulfillmentType"
+            :shop-id="checkoutShopId"
+            :cart="dataCart || []"
+            :discount="deliveryDiscount"
+            :site="isSiteCheckout"
+            :disabled="loadingBtn || stripePreparing"
+            :locked="deliveryAttemptLocked"
+            @quote="acceptDeliveryQuote"
+            @address="deliveryResolution = $event"
+            @ready="deliveryConfirmed = $event"
+            @customer="selectDeliveryCustomer"
+          />
+          <v-alert v-if="deliveryAttemptLocked" type="info" text>
+            Cette tentative reste liee a son adresse et a son total initial.
+            <p v-if="pendingDeliveryAddress">{{ pendingDeliveryAddress }}</p>
+            <v-btn text :disabled="loadingBtn" :loading="loadingBtn" @click="retryDeliveryAttempt"><v-icon left>mdi-refresh</v-icon>Resoudre la tentative</v-btn>
+            <v-btn v-if="$store.get('cart/clientOrderPayload').customerContextId" text :to="{ path: '/compte', query: { shopId: checkoutShopId } }"><v-icon left>mdi-account-outline</v-icon>Compte de cette commande</v-btn>
+          </v-alert>
           <v-card-actions v-if="!dataCart && !isOrderEditActive">
             <v-btn
               color="primary"
@@ -182,6 +211,7 @@
             <template v-if="!isOrderEditActive">
               <v-text-field
                 v-model="formuser.customer"
+                :disabled="deliveryAttemptLocked"
                 type="text"
                 prepend-inner-icon="mdi-account-outline"
                 label="Nom du client"
@@ -191,6 +221,7 @@
               ></v-text-field>
               <v-text-field
                 v-model="formuser.phone"
+                :disabled="deliveryAttemptLocked"
                 type="tel"
                 prepend-inner-icon="mdi-phone"
                 label="Numéro de téléphone"
@@ -203,6 +234,7 @@
                 required
               ></v-text-field>
               <v-checkbox
+                v-if="!deliveryContext"
                 v-model="formuser.isTakeaway"
                 label="À emporter"
                 color="primary"
@@ -217,12 +249,18 @@
             ></v-select> -->
               <v-textarea
                 v-model="formuser.notes"
+                :disabled="deliveryAttemptLocked"
                 label="Note à la commande"
                 :rows="2"
                 filled
                 prepend-inner-icon="mdi-comment"
                 placeholder="Ajouter une note à la commande"
               ></v-textarea>
+              <v-select v-if="isDelivery && isSiteCheckout" v-model="deliveryPayment" :items="deliveryPaymentOptions" label="Paiement" outlined :disabled="deliveryAttemptLocked || loadingBtn" />
+              <template v-if="isDelivery && !isSiteCheckout">
+                <v-select v-model="deliverySettlement" :items="[{ text: 'Paiement a la livraison', value: 'on_delivery' }, { text: 'Encaisser a la caisse', value: 'counter' }]" label="Reglement" outlined :disabled="deliveryAttemptLocked || loadingBtn" />
+                <v-select v-if="deliverySettlement === 'counter'" v-model="formuser.payment" :items="counterPaymentMethods" item-text="text" item-value="value" label="Moyen de paiement" outlined :disabled="deliveryAttemptLocked || loadingBtn" />
+              </template>
             </template>
             <v-checkbox
               v-if="isOrderEditActive"
@@ -424,9 +462,10 @@ import Loading from '@/components/loading'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
+import { buildCheckoutIntentSignature as buildCheckoutPayloadSignature, buildCounterPayBeforePayment, getCounterPayBeforeMethod } from '@/helpers/counterCheckout'
+import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import {
   applyServerQuoteToCart,
-  buildCheckoutPayloadSignature,
   findCartTargetForCheckoutError,
   groupCustomizationSelections,
   replaceConfiguredCartLine,
@@ -442,9 +481,11 @@ export default {
     Loading,
     ProductCustomizationWizard,
     CustomizationSummary,
+    DeliveryCheckout: () => import('@/components/delivery/DeliveryCheckout.vue'),
   },
   mixins: [price],
   async beforeRouteLeave(to, from, next) {
+    if (this.deliveryAttemptLocked && to.path === '/compte') { next(); return }
     if (this.$store.get('cart/clientOrderAuthRedirect')) {
       this.resetStripePaymentElement()
       next()
@@ -489,6 +530,13 @@ export default {
   data: () => ({
     ppn: 0,
     total: 0,
+    fulfillmentType: localStorage.getItem('order_source') === 'web' ? 'takeaway' : 'dine_in',
+    deliveryQuote: null,
+    deliveryResolution: null,
+    deliveryConfirmed: false,
+    deliveryPayment: 'online',
+    deliverySettlement: 'on_delivery',
+    deliveryTrackingUrl: null,
     isValue: false,
     loadingBtn: false,
     loadPage: false,
@@ -536,6 +584,29 @@ export default {
     items: ['Carte Bleu ', 'Espèce', 'Ticket Restaurant'],
   }),
   computed: {
+    checkoutShopId() { return Number(this.$store.state.users && this.$store.state.users.user.shopid || localStorage.getItem('shopid')) },
+    isSiteCheckout() { return (this.$store.state.users && this.$store.state.users.user.order_source || localStorage.getItem('order_source')) === 'web' },
+    deliveryContext() { return this.isSiteCheckout || [0, 1, 4, 5].includes(this.access) },
+    isDelivery() { return this.fulfillmentType === 'delivery' },
+    deliveryDiscount() { return this.$store.state.delivery && this.$store.state.delivery.discount || { type: 'none', value: 0 } },
+    deliverySession() {
+      const customer = this.$store.state.customer
+      return this.isSiteCheckout && customer && customer.shopId === this.checkoutShopId ? customer.session : null
+    },
+    deliveryPaymentOptions() { return [
+      ...(isStripePaymentRequired(this.qrPaymentMode) ? [{ text: 'Payer en ligne', value: 'online' }] : []),
+      { text: 'Payer a la livraison', value: 'on_delivery' },
+    ] },
+    counterPaymentMethods() { return getPaymentMethodOptions(this.$store.get('shop/shop_payment_methods')) },
+    deliveryAttemptLocked() {
+      return this.$store.get('cart/clientOrderPayload')?.fulfillment_type === 'delivery' &&
+        ['pending', 'uncertain', 'stripe_prepared'].includes(this.$store.get('cart/clientOrderStatus'))
+    },
+    pendingDeliveryAddress() {
+      const address = this.$store.get('cart/clientOrderPayload')?.deliveryAddressSnapshot
+      return address ? [address.street, address.postalCode, address.city].filter(Boolean).join(', ') : ''
+    },
+    deliveryCanPay() { return !this.isDelivery || (!this.deliveryAttemptLocked && this.deliveryConfirmed && Boolean(this.deliveryQuote)) },
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
@@ -569,6 +640,7 @@ export default {
       return this.isQrClient && isCounterPaymentAllowed(this.qrPaymentMode)
     },
     isStripeCheckout() {
+      if (this.isDelivery && this.isSiteCheckout) return this.deliveryPayment === 'online' && isStripePaymentRequired(this.qrPaymentMode)
       return (
         this.isQrClient &&
         isStripePaymentRequired(this.qrPaymentMode) &&
@@ -615,7 +687,7 @@ export default {
       if (this.isOrderEditActive) {
         return this.loadingBtn || this.hasReconfigurationRequired
       }
-      return !this.isValue || this.loadingBtn || !this.checkoutPayloadCanStart
+      return !this.isValue || this.loadingBtn || !this.checkoutPayloadCanStart || !this.deliveryCanPay
     },
     stripeConfirmationDisabled() {
       if (this.isOrderEditActive) {
@@ -625,6 +697,7 @@ export default {
       }
       return (
         !this.isValue ||
+        (!this.deliveryAttemptLocked && !this.deliveryCanPay) ||
         this.loadingBtn ||
         !this.checkoutPayloadMatchesBoundAttempt
       )
@@ -671,6 +744,7 @@ export default {
       )
     },
     checkoutPayloadCanStart() {
+      if (this.isDelivery && ['prewrite_rejected', 'reprice_required'].includes(this.$store.get('cart/clientOrderStatus'))) return this.deliveryCanPay
       const boundSignature = this.$store.get('cart/clientOrderSignature')
       return !boundSignature || this.checkoutPayloadMatchesBoundAttempt
     },
@@ -686,7 +760,7 @@ export default {
       },
     },
     totalCart(value) {
-      this.total = value
+      if (!this.isDelivery) this.total = value
       this.handleStripeCheckoutChange()
     },
     selectedTable() {
@@ -713,6 +787,14 @@ export default {
     'formuser.isTakeaway'() {
       this.handleStripeCheckoutChange()
     },
+    fulfillmentType(value) {
+      if (this.restoringCheckoutPayload) return
+      this.formuser.isTakeaway = value !== 'dine_in'
+      this.deliveryConfirmed = false
+      if (value !== 'delivery') this.total = this.totalCart
+      this.handleStripeCheckoutChange()
+    },
+    deliveryPayment() { this.handleStripeCheckoutChange() },
     qrPaymentMode() {
       this.handleStripeCheckoutChange()
     },
@@ -745,6 +827,13 @@ export default {
       this.formuser.isTakeaway = false
     }
     const restoredCheckout = await this.restoreCheckoutFromStore()
+    if (!restoredCheckout && this.$store.state.delivery?.posDraft) {
+      const draft = this.$store.state.delivery.posDraft
+      Object.assign(this.formuser, { customer: draft.customer, phone: draft.phone, notes: draft.remark, isTakeaway: draft.isTakeaway })
+      this.selectedTable = draft.servicePointId
+      this.fulfillmentType = draft.isTakeaway ? 'takeaway' : 'dine_in'
+      this.$store.commit('delivery/POS_DRAFT', null)
+    }
     if (!restoredCheckout) this.total = this.totalCart
     await Promise.all([
       this.$store.dispatch('shop/getCurrentShopInfo'),
@@ -757,6 +846,47 @@ export default {
     this.clearStripeAutoPrepareTimeout()
   },
   methods: {
+    async copyDeliveryTracking() {
+      if (!this.deliveryTrackingUrl) return
+      try { await navigator.clipboard.writeText(new URL(this.deliveryTrackingUrl, window.location.origin).href) }
+      catch (_) { this.checkoutErrorMessage = 'Le lien ne peut pas etre copie. Ouvrez le suivi pour le partager.' }
+    },
+    selectDeliveryCustomer(profile) {
+      if (this.deliveryAttemptLocked || !profile) return
+      this.formuser.customer = profile.name
+      this.formuser.phone = profile.contactPhone || ''
+    },
+    acceptDeliveryQuote(quote) {
+      this.deliveryConfirmed = false
+      this.deliveryQuote = quote
+      if (quote) this.total = quote.grandTotalCents / 100
+    },
+    guardDeliveryPayment() {
+      if (!this.isDelivery) return true
+      if (this.deliveryAttemptLocked) return false
+      return this.deliveryCanPay && Boolean(this.$refs.deliveryCheckout && this.$refs.deliveryCheckout.ready)
+    },
+    async retryDeliveryAttempt() {
+      this.loadingBtn = true
+      try {
+        const payload = this.$store.get('cart/clientOrderPayload')
+        const result = await this.$store.dispatch('cart/retryCheckout')
+        if (!result.ok) { this.handleCheckoutError(result.error, payload && payload.stripe ? 'stripe' : 'order', payload && payload.payment); return }
+        if (payload && payload.stripe && !result.data.checkout_resolved) {
+          await this.mountEditedPayment(result.data)
+          this.stripeCheckoutSignature = this.$store.get('cart/clientOrderSignature')
+        } else this.finishDeliveryCheckout(result.data)
+      } finally { this.loadingBtn = false }
+    },
+    finishDeliveryCheckout(data) {
+      this.checkoutFinalized = true
+      this.deliveryTrackingUrl = data && data.tracking_url || null
+      this.$store.dispatch('cart/setTotal', 0)
+      this.$store.dispatch('cart/setIndex', 0)
+      this.$store.dispatch('cart/setTocart', null)
+      this.$store.dispatch('delivery/resetForShop', this.checkoutShopId)
+      if (!this.deliveryTrackingUrl) this.$router.push(this.isQrClient ? '/ordersStatuses' : '/caisse/menu')
+    },
     customizationGroups(item) {
       const value = item || {}
       return groupCustomizationSelections(
@@ -788,6 +918,7 @@ export default {
       }
     },
     async changeQuantity(lineIndex, delta) {
+      if (this.deliveryAttemptLocked) return
       const cart = Array.isArray(this.dataCart) ? this.dataCart : []
       const line = cart[lineIndex]
       if (!line) return
@@ -809,6 +940,7 @@ export default {
       this.syncCartState(nextCart)
     },
     editCartLine(lineIndex, productStepId = null, message = '') {
+      if (this.deliveryAttemptLocked) return
       const line = Array.isArray(this.dataCart)
         ? this.dataCart[lineIndex]
         : null
@@ -864,9 +996,21 @@ export default {
       if (!payload || typeof payload !== 'object') return
 
       this.restoringCheckoutPayload = true
+      if (payload.fulfillment_type === 'delivery') {
+        this.$store.dispatch('delivery/setDiscount', { type: payload.discount_type || 'none', value: payload.discount_value || 0 })
+        this.fulfillmentType = 'delivery'
+        this.deliveryPayment = payload.stripe ? 'online' : 'on_delivery'
+        this.deliveryResolution = { addressResolutionToken: payload.address_resolution_token, addressSnapshot: payload.deliveryAddressSnapshot, ...payload.delivery_address_details }
+        this.deliveryQuote = { quoteToken: payload.delivery_quote_token, grandTotalCents: Math.round(payload.expected_total * 100) }
+      }
       this.formuser.customer = payload.customer || ''
       this.formuser.phone = payload.phone || ''
       this.formuser.payment = payload.payment || this.formuser.payment
+      if (payload.fulfillment_type === 'delivery') {
+        const counterMethod = getCounterPayBeforeMethod(payload.payment)
+        this.deliverySettlement = counterMethod ? 'counter' : 'on_delivery'
+        if (counterMethod) this.formuser.payment = counterMethod
+      }
       this.formuser.notes = payload.remark || ''
       this.formuser.isTakeaway = [true, 1, '1'].includes(payload.is_takeaway)
       if (payload.service_point_id != null) {
@@ -884,7 +1028,7 @@ export default {
         )
         this.total = restoredTotal
         this.$store.dispatch('cart/setTocart', restoredCart)
-        this.$store.dispatch('cart/setTotal', restoredTotal)
+        this.$store.dispatch('cart/setTotal', payload.fulfillment_type === 'delivery' ? this.roundPrice(restoredCart.reduce((sum, line) => sum + Number(line.subtotal || 0), 0)) : restoredTotal)
         this.$store.dispatch('cart/setIndex', restoredIndex)
       }
 
@@ -961,6 +1105,10 @@ export default {
     },
     async resetCheckoutAttempt() {
       this.clearStripeAutoPrepareTimeout()
+      if (this.deliveryAttemptLocked) {
+        this.checkoutErrorMessage = 'Resolvez la tentative de livraison avant de modifier la commande.'
+        return false
+      }
 
       if (this.isOrderEditActive) {
         this.resetStripePaymentElement()
@@ -1019,6 +1167,13 @@ export default {
     handleCheckoutError(error, flow, paymentMethod) {
       if (!error) return
       this.checkoutErrorMessage = error.message || 'Commande impossible.'
+      if (error.code === 'DELIVERY_QUOTE_CHANGED') {
+        this.deliveryConfirmed = false
+        this.resetStripePaymentElement()
+        if (error.server_quote) this.$refs.deliveryCheckout?.acceptServerQuote(error.server_quote)
+        else this.$refs.deliveryCheckout?.refreshQuote()
+        return
+      }
 
       if (error.code === 'ORDER_REPRICE_REQUIRED' && error.server_quote) {
         this.pendingRepriceFlow = flow
@@ -1077,6 +1232,7 @@ export default {
       this.stripeAutoPrepareTimeout = null
     },
     shouldPrepareStripeCheckout() {
+      if (this.isDelivery) return false
       if (this.isOrderEditActive) return false
       if (this.repriceDialog || this.customizationDialog) return false
       return shouldAutoPrepareStripeCheckout({
@@ -1111,6 +1267,7 @@ export default {
     },
     async handleStripeCheckoutChange() {
       if (this.isOrderEditActive) return
+      if (this.isDelivery || this.deliveryAttemptLocked) { this.clearStripeAutoPrepareTimeout(); return }
       if (
         this.restoringCheckoutPayload ||
         this.checkoutFinalized ||
@@ -1290,6 +1447,7 @@ export default {
       }
     },
     async paymentBtn() {
+      if (!this.guardDeliveryPayment()) return
       if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.kitchenClosedSnackbar = true
         return
@@ -1321,6 +1479,10 @@ export default {
       await this.submitOrderWithoutStripe(this.formuser.payment)
     },
     async orderWithoutPayment() {
+      if (this.isDelivery) {
+        if (this.guardDeliveryPayment()) await this.submitOrderWithoutStripe('Paiement a la livraison')
+        return
+      }
       if (!this.stripeOrderId) {
         if (!this.checkoutPayloadCanStart) {
           this.guardCheckoutConfirmation()
@@ -1360,6 +1522,7 @@ export default {
           this.buildOrderPayload(paymentMethod, false, repriceConfirmation)
         )
         if (result.ok) {
+          if (this.isDelivery) { this.finishDeliveryCheckout(result.data); return }
           this.checkoutFinalized = true
           this.$store.set('stateDialog', false)
           this.$store.dispatch('cart/setTotal', 0)
@@ -1379,18 +1542,30 @@ export default {
       repriceConfirmation = false
     ) {
       return {
+        ...(this.deliveryContext ? { fulfillmentType: this.fulfillmentType } : {}),
+        ...(this.isSiteCheckout ? { customerSession: this.deliverySession } : {}),
+        ...(this.isDelivery ? {
+          deliveryQuoteToken: this.deliveryQuote && this.deliveryQuote.quoteToken,
+          addressResolutionToken: this.deliveryResolution && this.deliveryResolution.addressResolutionToken,
+          deliveryDetails: { complement: this.deliveryResolution && this.deliveryResolution.complement || '', instructions: this.deliveryResolution && this.deliveryResolution.instructions || '' },
+          deliveryAddressSnapshot: this.deliveryResolution && this.deliveryResolution.addressSnapshot,
+          discountType: this.deliveryDiscount.type,
+          discountValue: this.deliveryDiscount.value,
+        } : {}),
         customer: this.formuser.customer,
         servicePointId: this.selectedTable,
         total: this.roundPrice(this.total),
-        payment: paymentMethod,
+        payment: this.isDelivery && !stripe
+          ? !this.isSiteCheckout && this.deliverySettlement === 'counter' ? buildCounterPayBeforePayment(paymentMethod) : 'Paiement a la livraison'
+          : paymentMethod,
         remark: this.formuser.notes,
         phone: this.formuser.phone,
-        isTakeaway: this.isOrderEditActive
+        isTakeaway: this.isDelivery ? true : this.isOrderEditActive
           ? this.orderEditTakeaway
           : this.formuser.isTakeaway,
         dataCart: this.dataCart,
         stripe,
-        repriceConfirmation,
+        repriceConfirmation: repriceConfirmation || (this.isDelivery && this.$store.get('cart/clientOrderStatus') === 'reprice_required' && this.deliveryConfirmed),
       }
     },
     async mountEditedPayment(payment) {
@@ -1417,7 +1592,7 @@ export default {
       if (this.stripePreparationPromise) {
         return this.stripePreparationPromise
       }
-      if (!force && !this.shouldPrepareStripeCheckout()) return
+      if (this.isDelivery ? !this.guardDeliveryPayment() : !force && !this.shouldPrepareStripeCheckout()) return
 
       this.clearStripeAutoPrepareTimeout()
       this.stripePreparing = true
@@ -1435,6 +1610,8 @@ export default {
           return false
         }
         const payment = checkoutResult.data
+        if (this.isDelivery && payment && payment.checkout_resolved) { this.finishDeliveryCheckout(payment); return false }
+        if (this.isDelivery) this.deliveryTrackingUrl = payment && payment.tracking_url || null
         const cancelReturnedPayment = async () => {
           const canceled = await this.cancelPreparedStripeAttempt(
             payment.orderId
@@ -1541,6 +1718,7 @@ export default {
       this.$store.dispatch('cart/setIndex', 0)
       this.$store.dispatch('cart/setTocart', null)
       this.$store.dispatch('cart/completeCheckout')
+      if (this.isDelivery && this.deliveryTrackingUrl) return
       this.$router.push('/ordersStatuses')
     },
     cancelCart() {
