@@ -1,5 +1,5 @@
 const moment = require('moment')
-const { normalizeVatBreakdown } = require('./vat')
+const { normalizeVatBreakdown, normalizeDeliveryCharge, deliveryChargeFor } = require('./vat')
 const { formatPrice, parsePrice, roundPrice } = require('./price-functions')
 const { groupCustomizationSelections } = require('./customizations')
 const { cardTicketLines } = require('./cardTicket')
@@ -82,6 +82,7 @@ const receiptCustomizationLines = (item = {}) =>
 const optionalText = (value) => String(value == null ? '' : value).trim()
 
 const getSaleMode = (order = {}) => {
+  if (order.fulfillment_type === 'delivery' || order.delivery_id != null) return 'Livraison'
   if (order.sale_mode || order.saleMode) return order.sale_mode || order.saleMode
   if (order.order_source === 'web' || order.source === 'click_collect') {
     return 'Click & Collect'
@@ -130,16 +131,18 @@ const buildCashierReceiptPayload = ({
   fallbackTable = 'Comptoir',
   fallbackRemark = '',
   ticketKind = 'caisse',
+  deliveryCharge,
 } = {}) => {
   const normalizedDetails = Array.isArray(details) ? details : []
+  const charge = deliveryCharge === undefined ? deliveryChargeFor(order) : normalizeDeliveryCharge(deliveryCharge)
   const orderId = order.id || order.orderId
   const totalAmount = roundPrice(
-    order.subtotal == null ? sumDetails(normalizedDetails) : order.subtotal
+    order.financials?.grand_total ?? (order.subtotal == null ? sumDetails(normalizedDetails) + (charge ? charge.feeCents / 100 : 0) : order.subtotal)
   )
   const subtotalBeforeDiscount = roundPrice(
     order.subtotal_before_discount == null
       ? totalAmount
-      : order.subtotal_before_discount
+      : parsePrice(order.subtotal_before_discount) + (charge ? charge.feeCents / 100 : 0)
   )
   const discountAmount = roundPrice(
     order.discount_amount == null
@@ -172,14 +175,16 @@ const buildCashierReceiptPayload = ({
     paymentMethod,
     remark: order.remark || fallbackRemark || '',
     details: normalizedDetails,
+    deliveryCharge: charge,
+    paymentStatus: order.payment_status || '',
     shopInfo,
     totalAmount,
     subtotalBeforeDiscount,
     discountType: order.discount_type || 'none',
     discountValue: roundPrice(order.discount_value || 0),
     discountAmount,
-    isTvaActive: isEnabled(shopInfo.activate_tva),
-    vatBreakdown: normalizeVatBreakdown(normalizedDetails),
+    isTvaActive: Boolean(charge) || isEnabled(shopInfo.activate_tva),
+    vatBreakdown: normalizeVatBreakdown(normalizedDetails, charge),
     itemCount: normalizedDetails.reduce(
       (sum, item) => sum + Math.max(0, Number(item.qty) || 0),
       0
@@ -215,13 +220,14 @@ const buildGroupedCashierReceiptPayload = ({
   const normalizedOrders = (Array.isArray(orders) ? orders : []).filter(Boolean)
   const orderGroups = normalizedOrders.map((order) => {
     const details = getReceiptDetails(order).slice()
+    const deliveryCharge = deliveryChargeFor(order)
     const totalAmount = roundPrice(
       order.subtotal == null ? sumDetails(details) : order.subtotal
     )
     const subtotalBeforeDiscount = roundPrice(
       order.subtotal_before_discount == null
         ? totalAmount
-        : order.subtotal_before_discount
+        : parsePrice(order.subtotal_before_discount) + (deliveryCharge ? deliveryCharge.feeCents / 100 : 0)
     )
     const discountAmount = roundPrice(
       order.discount_amount == null
@@ -239,8 +245,15 @@ const buildGroupedCashierReceiptPayload = ({
       subtotalBeforeDiscount,
       discountAmount,
       details,
+      deliveryId: order.delivery_id == null ? null : String(order.delivery_id),
+      deliveryCharge,
+      paymentStatus: order.payment_status || '',
     }
   })
+  const deliveryCharges = [...new Map(orderGroups.filter(group => group.deliveryCharge)
+    .map(group => [group.deliveryId || `order:${group.orderId}`, {
+      deliveryId: group.deliveryId, orderNumber: group.orderNumber, charge: group.deliveryCharge,
+    }])).values()]
   const orderIds = orderGroups
     .map((group) => Number(group.orderId))
     .filter((id) => Number.isSafeInteger(id) && id > 0)
@@ -291,7 +304,16 @@ const buildGroupedCashierReceiptPayload = ({
     orderIds,
     orderGroups,
     orderCount: orderGroups.length,
+    deliveryCharges,
+    isTvaActive: deliveryCharges.length > 0 || isEnabled(shopInfo.activate_tva),
+    vatBreakdown: normalizeVatBreakdown(details, deliveryCharges.map(entry => entry.charge)),
+    ...(deliveryCharges.length ? { saleMode: 'Livraison / groupe' } : {}),
   }
+}
+
+const receiptDeliveryLines = (payload = {}) => {
+  const charges = payload.deliveryCharges || (payload.deliveryCharge ? [{ charge: payload.deliveryCharge }] : [])
+  return charges.map(entry => `Livraison : ${formatTicketNumber(entry.charge.feeCents / 100)} EUR${entry.orderNumber ? ` (#${entry.orderNumber})` : ''}`)
 }
 
 const appendOptionalLine = (lines, label, value) => {
@@ -317,6 +339,9 @@ const receiptOrderLines = (payload) => {
   appendOptionalLine(lines, 'Caisse', payload.cashRegisterNumber)
   appendOptionalLine(lines, 'Mode', payload.saleMode)
   appendOptionalLine(lines, 'Articles', payload.itemCount)
+  if (payload.paymentStatus === 'refunded') lines.push('Remboursement confirme', 'Vente initiale conservee')
+  ;(payload.orderGroups || []).filter(group => group.paymentStatus === 'refunded')
+    .forEach(group => lines.push(`Remboursement confirme - commande #${group.orderNumber}`))
   return lines
 }
 
@@ -431,6 +456,7 @@ const buildCashierEscPos = (payload) => {
       })
     })
   })
+  receiptDeliveryLines(payload).forEach(lineText => push(alignLeft(), esc(`${lineText}\n`)))
   push(line())
 
   if (payload.discountAmount > 0) {
@@ -592,6 +618,7 @@ const buildCashierCloudXml = (payload) => {
     `<text>${xmlEscape(formatReceiptProductHeader(payload.isTvaActive))}\n</text>` +
     '<text>--------------------------------</text><feed line="1"/>' +
     productXml +
+    receiptDeliveryLines(payload).map(line => `<text align="left">${xmlEscape(line)}</text><feed line="1"/>`).join('') +
     '<text>--------------------------------</text><feed line="1"/>' +
     discountXml +
     vatXml +
@@ -703,7 +730,7 @@ const buildCashierTicketData = (payload = {}) => {
     },
     {
       id: 'order_meta',
-      lines: receiptOrderLines(payload).map((line) => renderText(line)),
+      lines: [...receiptOrderLines(payload), ...receiptDeliveryLines(payload)].map((line) => renderText(line)),
     },
     {
       id: 'items',
@@ -867,6 +894,9 @@ const buildCashierTicketData = (payload = {}) => {
       sellerName: payload.sellerName,
       cashRegisterNumber: payload.cashRegisterNumber,
       itemCount: payload.itemCount,
+      ...(payload.deliveryCharge ? { deliveryCharge: payload.deliveryCharge } : {}),
+      ...(payload.deliveryCharges?.length ? { deliveryCharges: payload.deliveryCharges } : {}),
+      paymentStatus: payload.paymentStatus,
       remark: payload.remark,
       items,
       totals: {
@@ -955,6 +985,7 @@ module.exports = {
   formatReceiptProductLine,
   receiptHeaderLines,
   receiptOrderLines,
+  receiptDeliveryLines,
   buildEscPosQrCode,
   sendCashierReceipt,
   splitByWords,

@@ -185,6 +185,16 @@
         </v-col>
       </v-row>
 
+      <section v-if="closureCashRows(currentClosure).length" class="mt-5" aria-label="Mouvements physiques">
+        <h2 class="text-subtitle-1 mb-2">Origine des ventes et mouvements physiques</h2>
+        <v-simple-table dense>
+          <tbody>
+            <tr v-for="row in closureCashRows(currentClosure)" :key="row.key">
+              <td>{{ row.label }}</td><td class="text-right">{{ formatCurrency(row.cents / 100) }}</td>
+            </tr>
+          </tbody>
+        </v-simple-table>
+      </section>
       <v-card outlined class="reports-panel reports-history mt-5">
         <div class="reports-panel__header">
           <div>
@@ -300,6 +310,13 @@
             </div>
           </div>
 
+          <v-simple-table v-if="closureCashRows(selectedClosureDetail).length" dense class="mt-4">
+            <tbody>
+              <tr v-for="row in closureCashRows(selectedClosureDetail)" :key="row.key">
+                <td>{{ row.label }}</td><td class="text-right">{{ formatCurrency(row.cents / 100) }}</td>
+              </tr>
+            </tbody>
+          </v-simple-table>
           <v-row class="mt-4" dense>
             <v-col cols="12" md="6">
               <div class="reports-detail-section">
@@ -374,6 +391,7 @@
 import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import { normalizePaymentSummary } from '@/helpers/paymentMethods'
+import { cashClosureCanClose, cashClosureRows } from '@/store/cashClosures'
 
 export default {
   mixins: [formatdate, price],
@@ -421,7 +439,7 @@ export default {
       return this.$store.get('cashClosures/detail') || {}
     },
     canCloseClosure() {
-      return Number(this.currentClosure.orders_count || 0) > 0
+      return cashClosureCanClose(this.currentClosure)
     },
     paymentRows() {
       return normalizePaymentSummary(this.currentClosure.payments_summary || [])
@@ -482,6 +500,7 @@ export default {
     this.refreshReports()
   },
   methods: {
+    closureCashRows: cashClosureRows,
     refreshReports() {
       this.loadPage = true
       return Promise.all([

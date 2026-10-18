@@ -22,6 +22,10 @@
 <script>
 export default {
   props: {
+    fulfillmentType: {
+      type: String,
+      default: '',
+    },
     value: {
       type: [Boolean, Number, String],
       default: false,
@@ -48,15 +52,17 @@ export default {
       return [true, 1, '1'].includes(this.value)
     },
     visible() {
-      return this.isTakeaway || this.showDineIn
+      return this.fulfillmentType === 'delivery' || this.isTakeaway || this.showDineIn
     },
     label() {
+      if (this.fulfillmentType === 'delivery') return 'Livraison'
       return this.isTakeaway ? 'À emporter' : 'Sur place'
     },
     color() {
       return this.isTakeaway ? 'warning' : 'primary'
     },
     icon() {
+      if (this.fulfillmentType === 'delivery') return 'mdi-truck-delivery'
       return this.isTakeaway ? 'mdi-basket' : 'mdi-silverware-fork-knife'
     },
     normalizedIconSize() {

@@ -112,7 +112,7 @@
         <v-card-actions class="cashregister-payout-actions">
           <v-btn
             v-if="requiresPaymentMethod"
-            :disabled="paymentControlsLocked"
+            :disabled="paymentControlsLocked || hasDeliveryOrders"
             outlined
             color="warning"
             class="cashregister-payout-action text-none"
@@ -120,6 +120,14 @@
           >
             <v-icon left small>mdi-percent</v-icon>
             Remise
+          </v-btn>
+          <v-btn
+            v-if="deliveryEditOrder"
+            text
+            :disabled="paymentControlsLocked"
+            :to="`/orders/detail/${deliveryEditOrder.id}?deliveryEdit=1`"
+          >
+            <v-icon left small>mdi-pencil</v-icon>Modifier la livraison
           </v-btn>
           <v-spacer></v-spacer>
 
@@ -421,6 +429,14 @@ export default {
     paymentSummary() {
       return getCashRegisterPaymentSummary(this.selectedOrders)
     },
+    hasDeliveryOrders() {
+      return this.selectedOrders.some(order => order.fulfillment_type === 'delivery' || order.delivery_id != null)
+    },
+    deliveryEditOrder() {
+      return this.selectedOrders.find(order => order.delivery_id != null &&
+        order.payment_status === 'unpaid' && !order.payment_provider &&
+        ['unassigned', 'assigned'].includes(order.delivery_status))
+    },
     receiptOrderNumbers() {
       if (!this.terminalReceiptOrders.length) return this.displayOrderNumbers
       return this.terminalReceiptOrders
@@ -463,7 +479,7 @@ export default {
       })
     },
     effectiveDiscount() {
-      if (this.discountType === null) {
+      if (this.discountType === null || this.hasDeliveryOrders) {
         return calculateDiscount({
           subtotal: this.paymentSummary.dueAmount,
           type: 'none',
@@ -682,7 +698,7 @@ export default {
         const saved = this.readTerminalAttempt(true)
         const attempt = saved || cashRegisterTerminalPayload({
           orderIds: this.retryActive ? this.retryDueOrderIds : this.paymentSummary.dueOrderIds,
-          discountType: this.discountType === null ? null : this.effectiveDiscountType,
+          discountType: this.hasDeliveryOrders || this.discountType === null ? null : this.effectiveDiscountType,
           discountValue: this.effectiveDiscountValue,
         })
         if (!attempt.paymentId && !matchesCashRegisterTerminalAttempt(attempt, this.paymentSummary.dueOrderIds)) {
@@ -793,7 +809,16 @@ export default {
       return true
     },
     setTerminalReceiptOrders(orders, payment) {
-      this.terminalReceiptOrders = terminalReceiptSnapshot(orders, payment)
+      this.terminalReceiptOrders = terminalReceiptSnapshot(orders, payment).map(settled => {
+        const original = orders.find(order => order.id === settled.id)
+        if (original.delivery_id == null) return settled
+        if (Math.round(Number(original.subtotal) * 100) !== Math.round(Number(settled.subtotal) * 100)) {
+          throw new TypeError('Le montant regle differe du devis livraison accepte.')
+        }
+        return { ...settled, subtotal_before_discount: original.subtotal_before_discount,
+          discount_type: original.discount_type, discount_value: original.discount_value,
+          discount_amount: original.discount_amount }
+      })
       this.terminalSettlements = { ...this.terminalSettlements,
         ...Object.fromEntries(this.terminalReceiptOrders.map((order) => [order.id, order])) }
       if (this.retryActive) this.retryDueOrderIds = this.retryDueOrderIds.filter((id) => !payment.orderIds.includes(id))
@@ -890,6 +915,7 @@ export default {
       return 'mdi-credit-card-outline'
     },
     openDiscountDialog() {
+      if (this.hasDeliveryOrders) return
       if (!this.requiresPaymentMethod || this.paymentControlsLocked) return
       this.discountDraftType =
         !this.discountType || this.discountType === 'none'
@@ -900,6 +926,7 @@ export default {
       this.discountDialog = true
     },
     applyDiscount() {
+      if (this.hasDeliveryOrders) return
       const preview = this.discountPreview
       if (!preview.value || !preview.amount) {
         this.clearDiscount()
@@ -916,6 +943,7 @@ export default {
       this.discountDialog = false
     },
     orderDiscountPayload(orderId) {
+      if (this.hasDeliveryOrders) return {}
       if (this.terminalSettlements[orderId]) return {}
       if (this.discountType === null) return {}
       if (this.effectiveDiscountType === 'none') {
@@ -971,7 +999,7 @@ export default {
         } catch (error) {
           details = []
         }
-        ordersWithDetails.push(this.terminalSettlements[order.id]
+        ordersWithDetails.push(this.terminalSettlements[order.id] && order.delivery_id == null
           ? terminalReceiptWithDetails(order, details)
           : { ...order, receiptDetails: details.slice() })
       }

@@ -112,6 +112,9 @@
           <div class="order-reference">
             <div class="order-reference__number">
               #{{ item.ordernumber }}
+              <v-chip v-if="item.fulfillment_type === 'delivery'" small color="warning" dark title="Livraison">
+                <v-icon x-small left>mdi-truck-delivery</v-icon>Livraison
+              </v-chip>
               <v-chip
                 v-if="isTakeawayOrder(item)"
                 small
@@ -622,6 +625,7 @@ export default {
       this.$delete(this.printingOrderIds, order.id)
     },
     isTakeawayOrder(item) {
+      if (item && item.fulfillment_type === 'delivery') return false
       return [true, 1, '1'].includes(item && item.is_takeaway)
     },
     async toggleKitchenClosed(value) {
@@ -875,7 +879,6 @@ export default {
       )
     },
     generateEscPos(order, shopInfo, orderInfo) {
-      console.log('Generating ESC/POS for order:', order, 'shopInfo:', shopInfo)
       // ---------------------------------------
       // FONCTIONS INTERNES UTILITAIRES
       // ---------------------------------------
@@ -997,7 +1000,6 @@ export default {
       push(alignRight(), esc('Paiement : ' + orderInfo.paymentMethod + '\n'))
       push(line())
 
-      console.log('Adding remark to receipt:', orderInfo.remark)
       if (orderInfo.remark.length > 0) {
         push(alignCenter(), doubleOn(), boldOn(), esc('----------\n'))
         push(alignLeft(), esc('NOTE: ' + orderInfo.remark + '\n'))
@@ -1042,7 +1044,6 @@ export default {
     },
 
     printReceiptCloud(order, shopInfo, orderInfo) {
-      console.log('Printing receipt via cloud for order:', order)
       const req =
         '<?xml version="1.0" encoding="utf-8" ?>' +
         '<PrintRequestInfo>' +

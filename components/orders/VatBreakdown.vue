@@ -35,10 +35,14 @@ export default {
       type: Array,
       default: () => [],
     },
+    deliveryCharge: {
+      type: Object,
+      default: null,
+    },
   },
   computed: {
     items() {
-      return normalizeVatBreakdown(this.details)
+      return normalizeVatBreakdown(this.details, this.deliveryCharge)
     },
   },
   methods: {

@@ -4,6 +4,27 @@ const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('token')}`,
 })
 
+export const cashClosureCanClose = (closure = {}) => Number(closure.orders_count || 0) > 0 ||
+  ['remittances_count', 'adjustments_count', 'refunds_count'].some(key => Number(closure.courier_cash?.[key] || 0) > 0)
+
+export const cashClosureRows = (closure = {}) => {
+  const snapshot = closure.courier_cash
+  if (!snapshot) return []
+  const labels = {
+    register_cash_sales_cents: 'Ventes especes - origine caisse',
+    courier_cash_sales_cents: 'Ventes especes - origine livreur',
+    collected_cents: 'Encaissements livreurs de la periode',
+    received_cents: 'Remises physiques recues en caisse',
+    outstanding_cents: 'Especes restant chez les livreurs',
+    manual_refunded_cents: 'Remboursements manuels confirmes',
+    cash_refunded_by_register_cents: 'Restitutions especes du tiroir (sorties)',
+    cash_refunded_by_courier_cents: 'Restitutions especes par les livreurs',
+    external_card_refunded_cents: 'Remboursements TPE independant declares',
+  }
+  return Object.entries(labels).filter(([key]) => Object.prototype.hasOwnProperty.call(snapshot, key))
+    .map(([key, label]) => ({ key, label, cents: snapshot[key] }))
+}
+
 export const state = () => ({
   current: null,
   history: [],

@@ -5,10 +5,31 @@ const toNumber = (value) => {
 
 const roundMoney = (value) => Math.round((value + Number.EPSILON) * 100) / 100
 
-const normalizeVatBreakdown = (details) => {
-  const groups = new Map()
+const normalizeDeliveryCharge = (charge) => {
+  if (charge == null) return null
+  const { feeCents, totalExclTaxCents, taxCents, vatRate } = charge
+  if (![feeCents, totalExclTaxCents, taxCents].every(value => Number.isSafeInteger(value) && value >= 0) ||
+    totalExclTaxCents + taxCents !== feeCents || typeof vatRate !== 'number' || !Number.isFinite(vatRate) || vatRate < 0) {
+    throw new TypeError('Invalid delivery fiscal snapshot')
+  }
+  return { feeCents, totalExclTaxCents, taxCents, vatRate,
+    fiscalPolicy: { mode: 'configured_rate', vatRate } }
+}
 
-  ;(Array.isArray(details) ? details : []).forEach((detail) => {
+const deliveryChargeFor = (order = {}) => normalizeDeliveryCharge(
+  order.financials?.delivery_charge || order.delivery_charge
+)
+
+const normalizeVatBreakdown = (details, deliveryCharge) => {
+  const groups = new Map()
+  const charges = (Array.isArray(deliveryCharge) ? deliveryCharge : [deliveryCharge])
+    .filter(Boolean).map(normalizeDeliveryCharge).filter(charge => charge.feeCents > 0)
+  const rows = [...(Array.isArray(details) ? details : []), ...charges.map(charge => ({
+    vatRate: charge.vatRate, totalHt: charge.totalExclTaxCents / 100,
+    totalVat: charge.taxCents / 100, totalTtc: charge.feeCents / 100,
+  }))]
+
+  rows.forEach((detail) => {
     const vatRate = toNumber(
       detail.vat_rate !== undefined ? detail.vat_rate : detail.vatRate
     )
@@ -43,5 +64,7 @@ const normalizeVatBreakdown = (details) => {
 }
 
 module.exports = {
+  deliveryChargeFor,
+  normalizeDeliveryCharge,
   normalizeVatBreakdown,
 }

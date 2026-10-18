@@ -70,6 +70,7 @@
               <span class="order-detail-header__label">Service</span>
               <TakeawayChip
                 :value="orderSummary.is_takeaway"
+                :fulfillment-type="orderSummary.fulfillment_type"
                 show-dine-in
                 show-icon
                 :icon-size="18"
@@ -161,10 +162,14 @@
       </v-card>
 
       <VatBreakdown
-        v-if="isTvaActive"
+        v-if="isTvaActive || deliveryCharge"
         :details="detailOrder"
+        :delivery-charge="deliveryCharge"
         class="mt-3"
       />
+      <div v-if="deliveryCharge" class="text-body-2 my-3">
+        Livraison : {{ formatCurrency(deliveryCharge.feeCents / 100) }}
+      </div>
 
       <v-card v-if="orderSummary" outlined class="order-detail-attribution mt-3">
         <v-card-text class="order-detail-attribution__grid">
@@ -367,7 +372,7 @@
             <v-btn
               color="warning"
               class="order-payment-tile text-none font-weight-bold"
-              :disabled="paymentLoading"
+              :disabled="paymentLoading || isDeliveryOrder"
               depressed
               @click="openOrderDiscountDialog"
             >
@@ -385,6 +390,37 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="deliveryEditDialog" :persistent="deliveryEditBusy || Boolean(deliveryEditAttempt)" max-width="640">
+      <v-card>
+        <v-card-title>Modifier la livraison</v-card-title>
+        <v-card-text>
+          <v-alert v-if="deliveryEditError" type="error" text>{{ deliveryEditError }}</v-alert>
+          <template v-if="deliveryEdit">
+            <v-select v-model="deliveryEditDiscountType" :items="[{ text: 'Aucune remise', value: 'none' }, { text: 'Pourcentage', value: 'percent' }, { text: 'Montant', value: 'amount' }]" label="Remise produits" outlined :disabled="deliveryEditBusy || Boolean(deliveryEditAttempt)" />
+            <v-text-field v-if="deliveryEditDiscountType !== 'none'" v-model.number="deliveryEditDiscountValue" label="Valeur" type="number" min="0" step="0.01" outlined :disabled="deliveryEditBusy || Boolean(deliveryEditAttempt)" />
+            <DeliveryCheckout
+              ref="deliveryEditor"
+              value="delivery"
+              :shop-id="Number(orderSummary.shopid)"
+              :cart="deliveryEditCart"
+              :discount="deliveryEditDiscount"
+              :disabled="deliveryEditBusy || Boolean(deliveryEditAttempt)"
+              :locked="Boolean(deliveryEditAttempt)"
+              @address="acceptDeliveryEditAddress"
+              @quote="deliveryEditQuote = $event; deliveryEditReady = false"
+              @ready="deliveryEditConfirmed"
+            />
+          </template>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn text :disabled="deliveryEditBusy || Boolean(deliveryEditAttempt)" @click="deliveryEditDialog = false">Annuler</v-btn>
+          <v-spacer />
+          <v-btn color="primary" :loading="deliveryEditBusy" :disabled="!deliveryEditAttempt && !deliveryEditReady" @click="confirmDeliveryEdit">
+            <v-icon left>mdi-check</v-icon>{{ deliveryEditAttempt ? 'Reprendre' : 'Enregistrer' }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-dialog v-model="orderDiscountDialog" max-width="520">
       <v-card>
         <v-card-title>Remise globale</v-card-title>
@@ -524,6 +560,8 @@
 import OrderEditModal from '@/components/orders/OrderEditModal'
 import TakeawayChip from '@/components/orders/TakeawayChip'
 import VatBreakdown from '@/components/orders/VatBreakdown'
+import DeliveryCheckout from '@/components/delivery/DeliveryCheckout.vue'
+import { deliveryChargeFor } from '@/helpers/vat'
 import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { calculateDiscount } from '@/helpers/discount'
@@ -555,9 +593,16 @@ export default {
     OrderEditModal,
     TakeawayChip,
     VatBreakdown,
+    DeliveryCheckout,
     CustomizationSummary,
   },
   mixins: [price],
+  beforeRouteLeave(to, from, next) {
+    next(this.deliveryEditBusy || this.deliveryEditAttempt ? false : undefined)
+  },
+  beforeRouteUpdate(to, from, next) {
+    next(this.deliveryEditBusy || this.deliveryEditAttempt ? false : undefined)
+  },
   layout() {
     return parseInt(localStorage.getItem('access')) === 0
       ? 'default'
@@ -574,6 +619,17 @@ export default {
       actionRequestId: 0,
       startLoading: false,
       orderEditDialog: false,
+      deliveryEditDialog: false,
+      deliveryEditBusy: false,
+      deliveryEdit: null,
+      deliveryEditQuote: null,
+      deliveryEditResolution: null,
+      deliveryEditReady: false,
+      deliveryEditBasis: '',
+      deliveryEditAttempt: null,
+      deliveryEditError: '',
+      deliveryEditDiscountType: 'none',
+      deliveryEditDiscountValue: 0,
       replaceCartDialog: false,
       pendingStart: null,
       paymentDialog: false,
@@ -622,7 +678,26 @@ export default {
       return !this.isQrClientOrderDetail
     },
     canOpenOrderEditModal() {
+      if (this.isDeliveryOrder) return this.canEditDelivery
       return canUseOrderEditModal(this.userAccess, this.orderSummary || {})
+    },
+    isDeliveryOrder() {
+      return this.orderSummary && (this.orderSummary.fulfillment_type === 'delivery' || this.orderSummary.delivery_id != null)
+    },
+    deliveryCharge() {
+      return deliveryChargeFor(this.orderSummary || {})
+    },
+    canEditDelivery() {
+      const order = this.orderSummary || {}
+      return Boolean(this.isDeliveryOrder && [0, 1].includes(this.userAccess) && order.payment_status === 'unpaid' &&
+        !order.payment_provider && [1, 2, 3].includes(Number(order.status)) && ['unassigned', 'assigned'].includes(order.delivery_status))
+    },
+    deliveryEditCart() {
+      return (this.deliveryEdit?.items || []).map(item => ({ product_id: item.product_id, quantity: item.quantity,
+        selected_product_step_choice_ids: item.selections.map(selection => selection.product_customization_step_choice_id) }))
+    },
+    deliveryEditDiscount() {
+      return { type: this.deliveryEditDiscountType, value: this.deliveryEditDiscountType === 'none' ? 0 : Number(this.deliveryEditDiscountValue) }
     },
     canStartComplementaryOrder() {
       return (
@@ -796,7 +871,7 @@ export default {
     },
     subtotalBeforeDiscount() {
       const subtotal = this.orderSummary && this.orderSummary.subtotal_before_discount
-      return this.roundPrice(subtotal != null ? subtotal : this.orderTotal)
+      return this.roundPrice(subtotal != null ? Number(subtotal) + (this.deliveryCharge ? this.deliveryCharge.feeCents / 100 : 0) : this.orderTotal)
     },
     discountAmount() {
       const savedAmount = this.orderSummary && this.orderSummary.discount_amount
@@ -827,7 +902,7 @@ export default {
       })
     },
     effectiveDiscount() {
-      if (!this.orderDiscountType) {
+      if (!this.orderDiscountType || this.isDeliveryOrder) {
         return calculateDiscount({
           subtotal: this.orderDiscountBaseTotal,
           type: 'none',
@@ -844,12 +919,14 @@ export default {
       return this.effectiveDiscount.amount > 0 ? this.effectiveDiscount.type : 'none'
     },
     archiveDiscountType() {
+      if (this.isDeliveryOrder) return null
       return this.orderDiscountType === null ? null : this.effectiveDiscountType
     },
     effectiveDiscountValue() {
       return this.effectiveDiscount.amount > 0 ? this.effectiveDiscount.value : 0
     },
     archiveDiscountValue() {
+      if (this.isDeliveryOrder) return null
       return this.orderDiscountType === null ? null : this.effectiveDiscountValue
     },
     effectiveDiscountAmount() {
@@ -919,12 +996,91 @@ export default {
         }
         this.loadedOrderId = requestedId
       } finally {
-        if (requestId === this.detailRequestId) this.loadPage = false
+        if (requestId === this.detailRequestId) {
+          this.loadPage = false
+          if (this.$route.query?.deliveryEdit === '1' && this.canEditDelivery) await this.openDeliveryEdit()
+        }
       }
     },
     requestOrderEdit() {
+      if (this.isDeliveryOrder) return this.openDeliveryEdit()
       if (!this.canOpenOrderEditModal) return
       this.requestOrderStart('edit')
+    },
+    acceptDeliveryEditAddress(resolution) {
+      this.deliveryEditReady = false
+      if (resolution && (resolution.complement || resolution.instructions)) {
+        this.deliveryEditResolution = null
+        this.deliveryEditError = 'La modification des complements et consignes ne peut pas etre enregistree dans ce parcours.'
+        return
+      }
+      this.deliveryEditResolution = resolution
+      this.deliveryEditError = ''
+    },
+    deliveryEditConfirmed(ready) {
+      this.deliveryEditReady = ready
+      this.deliveryEditBasis = ready ? JSON.stringify({ quote: this.deliveryEditQuote, resolution: this.deliveryEditResolution, discount: this.deliveryEditDiscount }) : ''
+    },
+    async openDeliveryEdit() {
+      if (!this.canEditDelivery || this.deliveryEditBusy) return
+      if (this.deliveryEditAttempt) { this.deliveryEditDialog = true; return }
+      const orderId = this.orderSummary.id
+      this.deliveryEditDialog = true
+      this.deliveryEditBusy = true
+      this.deliveryEditError = ''
+      this.deliveryEdit = null
+      this.deliveryEditReady = false
+      this.deliveryEditQuote = null
+      this.deliveryEditResolution = null
+      try {
+        const response = await this.$axios.get(`/baseurl/api/v1/orders/${orderId}/edit`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        })
+        if (this.orderSummary?.id !== orderId) return
+        this.deliveryEdit = response.data.data
+        this.deliveryEditDiscountType = this.deliveryEdit.order.discount_type || 'none'
+        this.deliveryEditDiscountValue = Number(this.deliveryEdit.order.discount_value || 0)
+      } catch (_) {
+        this.deliveryEditError = 'Cette livraison ne peut plus etre modifiee. Rechargez la commande.'
+      } finally { this.deliveryEditBusy = false }
+    },
+    async confirmDeliveryEdit() {
+      if (this.deliveryEditBusy || !this.deliveryEdit) return
+      if (!this.deliveryEditAttempt) {
+        if (!this.canEditDelivery || !this.deliveryEditReady || !this.deliveryEditQuote || !this.deliveryEditResolution ||
+          Date.parse(this.deliveryEditQuote.expiresAt) <= Date.now() || this.deliveryEditBasis !== JSON.stringify({
+            quote: this.deliveryEditQuote, resolution: this.deliveryEditResolution, discount: this.deliveryEditDiscount,
+          })) return
+        const key = Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('')
+        this.deliveryEditAttempt = {
+          content_revision: this.deliveryEdit.content_revision,
+          expected_total: this.deliveryEditQuote.grandTotalCents / 100,
+          items: this.deliveryEditCart,
+          delivery_quote_token: this.deliveryEditQuote.quoteToken,
+          address_resolution_token: this.deliveryEditResolution.addressResolutionToken,
+          delivery_expected_version: this.deliveryEdit.order.delivery_version,
+          delivery_idempotency_key: key,
+          discount_type: this.deliveryEditDiscount.type,
+          discount_value: this.deliveryEditDiscount.value,
+        }
+      }
+      this.deliveryEditBusy = true
+      try {
+        await this.$axios.patch(`/baseurl/api/v1/orders/${this.deliveryEdit.order.id}/items`, this.deliveryEditAttempt, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        })
+        this.deliveryEditAttempt = null
+        this.deliveryEditDialog = false
+        await this.loadOrderDetail(this.id)
+      } catch (error) {
+        if (error.response && error.response.status >= 400 && error.response.status < 500) {
+          this.deliveryEditAttempt = null
+          this.deliveryEditReady = false
+          this.deliveryEditError = 'La commande ou les frais ont change. Rechargez puis confirmez un nouveau devis.'
+        } else {
+          this.deliveryEditError = 'Reponse indisponible. Reprenez pour verifier cette modification.'
+        }
+      } finally { this.deliveryEditBusy = false }
     },
     requestComplementaryOrder() {
       if (!this.canStartComplementaryOrder) return
@@ -1116,6 +1272,7 @@ export default {
       this.paymentDialog = true
     },
     openOrderDiscountDialog() {
+      if (this.isDeliveryOrder) return
       if (!this.canCollectOrder || this.paymentLoading) return
       this.orderDiscountDraftType =
         this.orderDiscountType && this.orderDiscountType !== 'none'
@@ -1129,6 +1286,7 @@ export default {
       this.orderDiscountDialog = true
     },
     applyOrderDiscount() {
+      if (this.isDeliveryOrder) return
       const preview = this.orderDiscountPreview
       if (!preview.value || !preview.amount) {
         this.clearOrderDiscount()

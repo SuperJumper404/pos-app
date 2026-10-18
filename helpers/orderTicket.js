@@ -38,6 +38,7 @@ const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 const optionalText = (value) => String(value == null ? '' : value).trim()
 
 const getSaleMode = (order = {}) =>
+  order.fulfillment_type === 'delivery' || order.delivery_id != null ? 'Livraison' :
   order.sale_mode || order.saleMode ||
   (isEnabled(order.is_takeaway) ? 'À emporter' : 'Sur place')
 

@@ -66,7 +66,7 @@
       >
         <template #[`item.ordernumber`]="{ item }">
           <div>#{{ item.ordernumber }}</div>
-          <TakeawayChip :value="item.is_takeaway" />
+          <TakeawayChip :value="item.is_takeaway" :fulfillment-type="item.fulfillment_type" />
         </template>
         <template #expanded-item="{ item }">
           <td colspan="12">
@@ -195,10 +195,14 @@
               </v-card-text>
             </v-card>
             <VatBreakdown
-              v-if="isTvaActive"
+              v-if="isTvaActive || item.delivery_charge"
               :details="getArchivedOrderDetailsByOrderId(item.id)"
+              :delivery-charge="item.delivery_charge"
               class="mt-3 mb-3"
             />
+            <div v-if="item.delivery_charge" class="text-body-2 my-2">
+              Livraison : {{ formatCurrency(item.delivery_charge.feeCents / 100) }}
+            </div>
           </td>
         </template>
         <template #[`item.created`]="{ item }">
@@ -353,17 +357,14 @@ export default {
   mounted() {
     this.loadPage = true
     const archivedOrdersIds = this.dataArchivedOrders.map((x) => x.id)
-    console.log('id', archivedOrdersIds)
 
     for (const id of archivedOrdersIds) {
       this.$store.dispatch('history/getDetailArchivedOrder', id).then(() => {
         const detail = this.$store.get('history/detailArchivedOrder')
-        console.log('DeTAILLL', detail)
         this.dataAllDetailsArchivedOrders.push(detail)
       })
     }
 
-    console.log('result multi orders', this.result)
     this.$store.dispatch('history/getAllArchivedOrders').finally(() => {
       this.loadPage = false
     })
@@ -387,16 +388,11 @@ export default {
     getArchivedOrderDetailsByOrderId(id) {
       const result = this.dataAllDetailsArchivedOrders
         .flat()
-        .filter((x) => x.orderid === id)
-      console.log(id, ' archived Detail orders', result)
+        .filter((x) => Number(x.orderid || x.orderId) === Number(id))
       return result
     },
     showInvoice(id) {
-      const detailedArchive = this.$store
-        .dispatch('history/getDetailArchivedOrder', id)
-        .finally(() => {
-          console.log('Archived Order', detailedArchive)
-        })
+      this.$store.dispatch('history/getDetailArchivedOrder', id)
 
       // this.$store.dispatch('history/getReceiptTokenByOrder', id).finally(() => {
       //   console.log('Archived Token')

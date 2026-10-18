@@ -1054,15 +1054,54 @@ test('destroy during paid-order context reset cannot open a receipt afterward', 
   assert.strictEqual(h.timers.size, 0)
 })
 
+test('delivery and mixed selections disable inline discounts and preserve accepted settlement total', () => {
+  const h = make({ orders: [order(1, { fulfillment_type: 'delivery', delivery_id: '9007199254740993', delivery_status: 'assigned', status: 1 }), order(2)] })
+  h.instance.ordersToArchive = [1, 2]
+  h.instance.ordersLoaded = true
+  h.instance.discountType = 'percent'
+  h.instance.discountValue = 50
+  assert.strictEqual(h.instance.hasDeliveryOrders, true)
+  assert.strictEqual(h.instance.discountAmount, 0)
+  assert.strictEqual(h.instance.effectiveDueAmount, 24)
+  h.instance.openDiscountDialog()
+  assert.strictEqual(h.instance.discountDialog, false)
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(h.instance.orderDiscountPayload(1))), {})
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(h.instance.orderDiscountPayload(2))), {})
+  assert.strictEqual(h.instance.deliveryEditOrder.id, 1)
+  h.state.orders[0].payment_status = 'paid'
+  assert.strictEqual(h.instance.deliveryEditOrder, undefined)
+  h.state.orders[0].payment_status = 'unpaid'
+  h.state.orders[0].delivery_status = 'in_transit'
+  assert.strictEqual(h.instance.deliveryEditOrder, undefined)
+})
+
+test('delivery Terminal receipt preserves product VAT and fee snapshot without scaling fee into products', async () => {
+  const charge = { feeCents: 400, totalExclTaxCents: 333, taxCents: 67, vatRate: 20, fiscalPolicy: { mode: 'configured_rate', vatRate: 20 } }
+  const source = order(1, { subtotal: 24, subtotal_before_discount: 20, discount_amount: 0,
+    delivery_id: '9007199254740993', fulfillment_type: 'delivery', delivery_charge: charge,
+    financials: { grand_total: 24, delivery_charge: charge } })
+  const h = make({ orders: [source], details: [{ name: 'Menu', qty: 1, total: 20, vat_rate: 10, total_ht: 18.18, total_vat: 1.82 }] })
+  h.instance.setTerminalReceiptOrders([source], payment('succeeded', { amountCents: 2400 }))
+  const rows = await h.instance.buildReceiptOrdersWithDetails(h.instance.terminalReceiptOrders)
+  assert.strictEqual(rows[0].receiptDetails[0].total, 20)
+  assert.strictEqual(rows[0].receiptDetails[0].total_vat, 1.82)
+  assert.strictEqual(rows[0].subtotal_before_discount, 20)
+  const payload = h.load(path.join(root, 'helpers/cashierReceipt.js')).buildCashierReceiptPayload({ order: rows[0], details: rows[0].receiptDetails })
+  assert.strictEqual(payload.totalAmount, 24)
+  assert.strictEqual(payload.vatBreakdown[1].totalVat, 0.67)
+  assert.strictEqual(payload.subtotalBeforeDiscount, 24)
+})
+
 const run = async () => {
   let failed = 0
-  for (const { name, run } of tests) {
+  const selected = tests.filter(test => !process.env.TASK15_PAYOUT_FILTER || test.name.includes(process.env.TASK15_PAYOUT_FILTER))
+  for (const { name, run } of selected) {
     try { await run(); console.log(`PASS ${name}`) } catch (error) {
       failed++
       console.error(`FAIL ${name}: ${error.message}`)
     }
   }
-  console.log(`${tests.length - failed}/${tests.length} Terminal payout tests passed`)
+  console.log(`${selected.length - failed}/${selected.length} Terminal payout tests passed`)
   if (failed) process.exitCode = 1
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

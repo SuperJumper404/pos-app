@@ -187,13 +187,13 @@ import price from '@/helpers/price'
 import moment from 'moment'
 import { jsPDF as JSPDF } from 'jspdf'
 import QRCode from 'qrcode-js-package/qrcode.js'
-import { normalizeVatBreakdown } from '@/helpers/vat'
 import {
   buildCashierReceiptPayload,
   formatReceiptProductHeader,
   formatReceiptProductLine,
   receiptHeaderLines,
   receiptOrderLines,
+  receiptDeliveryLines,
 } from '@/helpers/cashierReceipt'
 import {
   buildCardTicketPayload,
@@ -271,11 +271,7 @@ export default {
       )
     },
     subtotalBeforeDiscount() {
-      return this.roundPrice(
-        this.dataArchivedOrder && this.dataArchivedOrder.subtotal_before_discount != null
-          ? this.dataArchivedOrder.subtotal_before_discount
-          : this.totalAmount
-      )
+      return this.receiptPayload.subtotalBeforeDiscount
     },
     discountAmount() {
       return this.roundPrice(
@@ -285,10 +281,10 @@ export default {
       )
     },
     isTvaActive() {
-      return [true, 1, '1', 'true'].includes(this.shopInfo.activate_tva)
+      return this.receiptPayload.isTvaActive
     },
     vatBreakdown() {
-      return normalizeVatBreakdown(this.detailArchivedOrder)
+      return this.receiptPayload.vatBreakdown
     },
     receiptPayload() {
       return buildCashierReceiptPayload({
@@ -747,8 +743,10 @@ export default {
         if (!text) return
         doc.setFont('courier', style)
         doc.setFontSize(fontSize)
-        y += gap
-        doc.text(text, x, y, { align })
+        doc.splitTextToSize(text, doc.internal.pageSize.getWidth() - left - 2).forEach(line => {
+          y += gap
+          doc.text(line, x, y, { align })
+        })
       }
       const drawLine = () => {
         this.drawDashLine(doc, (y += 3), 52, '-', 8, 58)
@@ -783,6 +781,7 @@ export default {
           gap: 3,
         })
       })
+      receiptDeliveryLines(payload).forEach(lineText => write(lineText, { fontSize: 7.5 }))
       drawLine()
 
       if (payload.discountAmount > 0) {
