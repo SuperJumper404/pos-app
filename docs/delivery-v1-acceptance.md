@@ -1,12 +1,106 @@
 # Delivery V1 Local Acceptance
 
-Author implementation and required local command gates are complete; controller Task17 and final broad paired-branch reviews remain pending. Corrected whole frontend/backend npm commands, registered SQL, lint, isolated build and configured Node20 whole-application boot each returned native exit0. Initial failures remain recorded below. This records software preparation on disposable fixtures, not authorization or proof of live activation, supplier receipt, deployment or production data readiness.
+Task17's local gates and independent task review passed. The subsequent broad paired-branch review found two Important integration defects: register-origin manual full refunds and restaurant closure before courier assignment. The bounded author fixes and their current evidence are recorded first below; main's one scoped re-review remains pending. Earlier Task17 results are preserved as BEFORE-fix evidence. This records software preparation on disposable fixtures, not authorization or proof of live activation, supplier receipt, deployment or production data readiness.
 
-## Tested Sources
+## Final Integration Fixes
+
+Fix bases: F9fc355799e1124cc257a9e647f0933aadf04389c and
+B8dbc562efb69a291a09b515b3d1ce17eb1253279, in the paired isolated worktrees only.
+Backend final commit is b2e3ede2636a5de19005ff1966a11211f4dab5a7 (14scoped files,
+tree7fb87c6ac20bf3ad96efb9a05a8eb4d2538ec0b9, identical tested production source).
+Final compatible HEADs and native command/source bindings are recorded in
+final-fixes-report.md. Production source stayed fixed through final gates.
+The SQL test gained its eighth clock witness after backend unit launch; that
+file is not loaded by npm test. The final SQL/runtime manifests bind the full
+eight-group revision. Later acceptance/decision edits are documentation only.
+
+The new registered delivery-final-fixes.integration.test.js exercises actual
+checkout SQL, cashier collection/archive HTTP routes, manual refund HTTP,
+dispatch, public tracking and financial/closure producers. Its eight groups cover:
+
+1. Actual initial POS counter_pay_before cash creates immutable register proof
+   on the commercial transaction; full2400-cent return includes400-cent accepted
+   delivery fee. Exact replay, changed body/key, current role and cross-shop
+   refusal preserve stock/logistics/courier journals.
+2. Later cashier cash collection and collection at archive create original-order
+   payment proof. A later refund-only Z has zero sales/VAT,2400-cent drawer
+   outflow and zero courier debt; prior stored sale/VAT/closure remains frozen.
+3. Cash, independent card, cheque and restaurant vouchers preserve explicit
+   method identity for initial and later settlement. Noncash returns are matching
+   restaurant declarations, providerVerified=false, no drawer/courier movement.
+   Unknown methods and unverifiable old paid flags cannot create proof.
+4. Restaurant issue then cancellation/failure closes accepted unpaid/prepaid
+   unassigned missions without courier availability or fictitious assignment.
+   Version, current authority and exact replay remain enforced; commercial/stock/
+   cash state does not change implicitly. Public tracking shows intervention.
+5. Real producer concurrency, committed-response loss, late SQL rollback and
+   source uniqueness prevent duplicate settlement/full return. Cross-origin
+   source/key reuse is refused, with no forged courier collection or debt.
+6. Returned-to-unassigned closure works after suspension. Explicit retry requires
+   an available courier. Valid admin corrections retain null-courier context and
+   the earliest closure privacy ceiling; missing history and expired tracking
+   refuse. Existing finances and stock remain unchanged.
+7. An actual refund waits on the shop SQL barrier and only then samples UTC6
+   posting time; its stored timestamp matches the returned microsecond value.
+8. Additive register migration down/up preserves populated existing courier
+   collections/refunds/impacts and creates no unverifiable register backfill.
+
+Initial four SQL groups were RED on the original producer/transition defects;
+the two original compiled Vue/Vuex regressions were RED on fictitious holder
+refresh and illegal unassigned choices. Corrected focused groups and final
+eight-group SQL pass on Node22 and cached18. Node18 uses only the existing
+actual-installed Nano ID import-cache bridge in SQL tests; production18 boot is
+not established. Configured Node20 smoke is unbridged and separate.
+
+Current final command evidence, relative to the retained scratch directory:
+
+| Gate | Final-Fix Result / Raw Log |
+| --- | --- |
+| Whole backend npm66 | native0, final-fixes-backend-npm.log |
+| Whole registered SQL18 | native0, final-fixes-backend-sql.log; all18files in ONE unfiltered invocation |
+| Existing affected archive / dispatch files | native0, final-fixes-archive-b.log / final-fixes-dispatch-b.log |
+| Existing affected courier-refund file | native0, final-fixes-refunds-b.log; all16groups including migration/queued clock |
+| Configured actual Docker app | native0, final-fixes-runtime.log; Node20.20.2/MySQL8.0.33,164allowlisted files/no mounts |
+| Whole frontend npm3pretests+88main files | native0, final-fixes-frontend-npm.log; includes40operator tests |
+| Whole frontend lint | native0,0errors/143warnings, final-fixes-frontend-lint.log |
+| Approved scratch build / --dotenv false | native0, final-fixes-frontend-build.log; original live .nuxt/PID6024 preserved |
+| Focused Node18 SQL8 / operator40 | native0, final-fixes-node18-sql.log / final-fixes-node18-operator.log |
+
+All SQL commands independently set ENV_FILE=NUL, the explicit disposable
+loopback33319 URL, fake JWT/public-image configuration and clear Task4/5/7/
+7refund/15report selectors. Source JSONs bind HEAD/working blobs; the supplemental
+final-fixes-backend-final-source.json binds all14staged backend paths, raw SHA256
+and index tree7fb87c6ac20bf3ad96efb9a05a8eb4d2538ec0b9. The first helper version
+omitted staged paths from SQL/runtime launch manifests; this supplemental capture
+records unchanged source rather than rerunning gates to regenerate evidence.
+
+Retained failed iterations: final-fixes-red-b.log (missing counter fixture),
+final-fixes-red-b-fixture.log (actual four-group RED), final-fixes-red-f.log
+(actual two-regression RED), final-fixes-green-b-1.log (missing seeded charge
+snapshot for operational list), final-fixes-green-f-1.log (test operator identity
+not initialized), final-fixes-expanded-b-1.log (injected refund endpoint expected
+500 instead of established503). No failure was silently retried or reclassified
+as a successful whole command. Later expanded tests strengthen coverage beyond
+the original RED fixture revision; initial REDs do not claim the final test body.
+
+No new browser/detector/polish or physical-device round was run for the small
+dialog change. Actual compiled templates/Vuex tests and scratch build validate
+the changed controls; earlier screenshots/PDFs remain earlier-source evidence.
+Task17 M1/M2, inherited audit47 and final review DeclinedToJudge1-15 remain
+preserved limitations. All58 current controller rulings are retained verbatim in
+delivery-v1-decisions.md. Main artifact subtree and original raw evidence remain
+untouched; no raw archive cleanup, source approval or live readiness is claimed.
+
+All final-fix gate sessions are complete and collected, including the sole full
+SQL session41691. No command was rerun to repair source-binding metadata. Main's
+single scoped re-review remains pending; these author results do not self-approve
+the paired changes or authorize any merge, migration, deployment or activation.
+
+## Task17 Before-Fix Sources
 
 Review bases: frontend `9d8efd9b5662ff8eb6f60035bf20df14f4fe83d5`; backend `b63e38ea385ede2f85be2dd6774c552abe36b732`. Exact tested executable pair: frontend `b795fca1931f6bbe90b82eaf58c620f68c29f995` / backend `8dbc562efb69a291a09b515b3d1ce17eb1253279`. Frontend includes controller UI wave `98bfb39db922184df3e1aa43ecdad496c2975f32` plus the approved minimal compatibility correction and focused package alias. Backend contains the seven-file Task17 manifest. Commands launched before those source commits with recorded working blobs (frontend HEAD98bfb39/backend HEADb63e38ea); the commits bind identical tested contents, not an invented command-launch HEAD. This subsequent acceptance/decisions commit changes documentation only; the final documentation HEAD is recorded in task-17-report.md without changing the tested executable pair. Controller owns the evidence subtree and reviews; worker owns these two records/package and the explicitly granted source/test hunks. Full native logs and working-content identities remain in the author report and planned retained raw archive.
 
-## Actual HTTP And SQL Journeys
+## Task17 HTTP And SQL Journeys
 
 The new registered backend journey test executes actual Express routing declarations, authentication/current-account middleware, controllers, business services, transactions and disposable MySQL8.0.33. Installed provider SDKs/production transports execute against HTTP boundary doubles. No business/payment/authorization service is replaced with a success stub.
 
@@ -18,7 +112,7 @@ R5 crosses the repeated Europe/Paris02:30 hour using distinct UTC00:30/01:30 ins
 
 The Task2 deferred signer issue is addressed by a lazy operation-boundary preflight: missing/short signer configuration now refuses before any geocoder call. RED observed one supplier call; GREEN observed zero. Loading legacy/disabled routers without the secret remains valid.
 
-## Commands And Limits
+## Task17 Commands And Limits
 
 Set ENV_FILE=NUL and the explicit local disposable DELIVERY_TEST_DATABASE_URL independently before every SQL command. The harness creates/drops only random smarteat_delivery_test_<nonce> schemas, never the supplied catalog or application database. Full final native exits are propagated and embedded in retained logs. Do not substitute historical prefix/suffix evidence for a successful complete command.
 

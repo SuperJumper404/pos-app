@@ -129,6 +129,54 @@ function deferred() {
   return { promise, resolve: complete }
 }
 
+test('final fixes register refund never queries fictitious courier balance and renders origin truthfully', async () => {
+  const f = fixture(cashier, call => call.path.endsWith('/refund-eligibility')
+    ? { data: { eligible: true, paymentOrigin: 'register', method: 'cash', amountCents: 2400, returnSources: ['register'] } }
+    : call.path.endsWith('/refund') ? { data: { refundId: '101', paymentOrigin: 'register', method: 'cash', amountCents: 2400, returnSource: 'register' } } : null)
+  const component = mountedComponent(f, 'DeliveryDispatch')
+  await component.openRefund(mission())
+  component.reason = 'Full physical return'; component.refundConfirmed = true
+  await component.confirmRefund()
+  await Vue.nextTick()
+  assert.equal(component.refundResult.paymentOrigin, 'register')
+  assert.equal(f.calls.some(call => call.path.endsWith('/cash-balance')), false)
+  assert.equal(component.$el.textContent.includes('detention du livreur initial inchangee'), false)
+  assert.equal(component.$el.textContent.includes('Solde du detenteur initial indisponible'), false)
+  assert.match(component.$el.textContent, /Encaissement initial en caisse/)
+  component.$destroy()
+})
+
+test('final fixes unassigned issue dialog offers only server legal resolutions and no physical transfer', async () => {
+  const item = { ...mission(), deliveryStatus: 'issue', courierId: null, allowedActions: ['resolveIssue'], allowedResolutions: ['resume', 'retry', 'fail', 'cancel'] }
+  const f = fixture(cashier, call => call.path === '/deliveries' ? { data: [item] } : null)
+  await f.dispatch('operatorLoad', { resource: 'missions' })
+  const component = mountedComponent(f, 'DeliveryDispatch')
+  component.openAction(item, 'resolveIssue')
+  assert.deepEqual(component.resolutions.map(row => row.value), ['resume', 'retry', 'fail', 'cancel'])
+  component.reason = 'Cannot fulfill'; component.resolutionAction = 'cancel'
+  assert.equal(component.actionValid, true)
+  await component.confirmAction()
+  const body = f.calls.find(call => call.path.endsWith('/resolve-issue')).body
+  assert.equal(body.action, 'cancel')
+  assert.equal(body.courierId, undefined)
+  assert.equal(body.physicalTransferConfirmed, false)
+  component.$destroy()
+})
+
+test('final fixes cheque and voucher returns retain noncash declaration and explicit source labels', async () => {
+  for (const method of ['cheque', 'meal_voucher']) {
+    const f = fixture(cashier, call => call.path.endsWith('/refund-eligibility')
+      ? { data: { eligible: true, paymentOrigin: 'register', method, amountCents: 2400, returnSources: [method] } } : null)
+    const component = mountedComponent(f, 'DeliveryDispatch')
+    await component.openRefund(mission())
+    assert.equal(component.returnSource, method)
+    assert.match(component.refundDeclaration, /Aucun mouvement d'especes/)
+    assert.equal(component.refundSources.length, 1)
+    assert.match(component.refundSources[0].text, /Restitution/)
+    component.$destroy()
+  }
+})
+
 test('operator role gate denies courier and forged primary flags; one Delivery entry and hidden internal modules', () => {
   const roles = load('helpers/staffRoles.js')
   assert.equal(roles.canAccessModule(6, 'delivery', ['delivery'], true), false)

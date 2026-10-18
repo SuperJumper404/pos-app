@@ -214,7 +214,10 @@ export const actions = {
     const refresh = async () => {
       const reads = []
       if (deliveryId) reads.push({ resource: 'detail', deliveryId })
-      if (operation === 'refund') reads.push({ resource: 'eligibility', deliveryId, confirmationId: input.eligibilityReadId }, { resource: 'balance', courierId: pending.originalCourierId })
+      if (operation === 'refund') {
+        reads.push({ resource: 'eligibility', deliveryId, confirmationId: input.eligibilityReadId })
+        if (pending.originalCourierId != null) reads.push({ resource: 'balance', courierId: pending.originalCourierId })
+      }
       if (['remit', 'adjust'].includes(operation)) reads.push({ resource: 'balance', courierId })
       let loaded = true
       for (const read of reads) {

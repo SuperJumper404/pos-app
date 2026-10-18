@@ -326,3 +326,62 @@ Append any new deferred findings from Tasks13-17 before the single final broad r
 - Local-only image smarteat-delivery-pdf-qa:20261018/pdftoppm25.12.0 produced Task15 independently approved raster evidence. Minimal-image Courier font issue was fixed only in artifact-local font configuration; no new app renderer/dependency.
 
 Before deleting any plan scratch artifacts, retain the final decisions, ALL Rulings with costs and actual acceptance evidence in the tracked final record. Do not link the user to files that the cleanup will remove.
+
+## Final Integration Rulings
+
+The following six later rulings supplement the original52 above. They preserve
+scope, costs and unexecuted limits; none is independent correctness approval.
+Source: controller progress.md, current lines332/335/337-340.
+
+Source line 332:
+
+- Ruling: scope binary Git attributes ONLY under docs/delivery-v1-evidence/2026-10-18 for PDF/zip artifacts - valid jsPDF ASCII cross-reference lines carry significant whitespace, initial artifact git diff --check flagged them as text and autocrlf warnings threaten future checkout integrity - if wrong, only artifact rendering/diff behavior needs adjustment, no application attributes change. Actualcurrentworking/committedPDFbytesalreadyequal accepted SHA256s, no observed corruption. Artifactcommit79e6203 occurred despite whitespacecheck1 (not claimedclean); followupscopedattributes/check will distinguish validbinary evidence from source whitespace. Rawzip/manifest stillplanned afterreviews.
+
+Source line 335:
+
+- Ruling: defer Task17 reviewer M1 inherited diagnostics and M2 final runtime probe timeout hardening to final whole-review triage rather than reopening the source-task gate - current whole smoke passed and no application defect is established, both are nonblocking tooling/maintenance observations - if wrong, a stalled final API probe can postpone test cleanup until external termination and CI noise can obscure later failures; final broad reviewer must see both, no success is inferred for a future hung run.
+
+Source line 337:
+
+- Ruling: extend final fix scope to immutable register-origin manual settlement/full refund proof and accepted-unassigned restaurant logistics closure - these are already-offered ordinary V1 flows missed by courier-only source and assigned-only issue contracts, confirmed against real counter consumers and current service/FKs - if wrong, one additive financial-origin schema/producer/projection path and narrow unassigned transition/terminal-context extension need revision. Never forge courier collection/debt, infer old immutable payment proof, auto-refund/restock or broaden beyond two findings. Prefer additive register proof/refund model preserving courier FKs; exact current-authority replay, accepted fee, physical posting clock and old snapshots mandatory. final-fixes-brief prepared before dispatch.
+
+Source line 338:
+
+- Ruling: accept final reviewer DeclinedToJudge1-15 as explicit unexecuted/excluded/unsupported-exhaustiveness limits, NOT successful evidence - real channels/money/hardware/device/TLS/history/legacy inventory/aggregate topology/load/a11y/broad inherited security/legal-fiscal settings and excluded partial/GPS/SMS features cannot be established by authorized local scope; merge/deploy and post-review archive remain separate - if wrong, commissioning or a separately authorized domain/security/device/load audit is needed before that claim. No known application defect is excused by these exclusions; I1/I2 must be fixed. Each entry preserved verbatim in final-review.md/raw archive, no silentdrop.
+
+Source line 339:
+
+- Ruling: accept final fixer additive delivery_register_payments/refunds source model, retaining old courier refund/impact FKs and explicit cash/external_card/cheque/meal_voucher counter semantics - real currently-offered counter methods need truthful full return without fictitious courier; two immutable tables avoid changing populated courier identities/FKs and no unverifiable backfill - if wrong, the additive schema/trigger exclusivity and new source adapter require revision; no legal/fiscal appropriateness or provider/physical return is asserted by this software contract. Shared shop barrier/current authorization/replay/UTC/closure invariants remain independently reviewable, rationale is not proof.
+
+Source line 340:
+
+- Ruling: grant final fixer B/src/controllers/c_orders.js ONLY current req.id handoffs into collectDeliveryOrderPayment.operatorId and existing archiveOrder fifth argument - authoritative current register operator proof cannot reach existing real producers otherwise; controller inspected actual exact two hunks - if wrong, two callsites/optional producer signature plus focused actual-router tests need revision, not broad legacy controller changes. Worker proposed in its commentary BEFORE editing but main saw proposal after implementation; this is explicit retrospective scope adjudication, not invented prior approval. Brief amended andworker informed before commit/re-review.
+
+## Register Origin And Unassigned Closure
+
+The final bounded fix uses additive immutable delivery_register_payments and
+delivery_register_refunds tables. Existing courier refund/impact tables and FKs
+are retained. Register proof is created on the same transaction/connection as
+initial POS counter_pay_before or later cashier collection/archive settlement,
+using current staff identity, original commercial payment and accepted full fee.
+No old paid flag is backfilled into purported evidence. New schema and application
+must be commissioned together; an old paid delivery without actual proof remains
+ineligible for this manual return path.
+
+Cash returns from a register-origin payment are register outflows in the posting
+UTC period. Independent card, cheque and restaurant voucher returns are explicit
+matching restaurant declarations with no cash/courier debt movement or provider
+verification. Unknown manual methods are refused rather than relabeled. Actual
+provider/Terminal refund paths and legacy non-delivery behavior retain their
+existing contracts. Partial/mixed returns are not introduced. The existing
+manual_refunded_cents closure total includes all these declarations; its cash and
+external-card fields retain their specific meanings.
+
+Restaurant operators may report an accepted unassigned issue and resolve it by
+resume, explicit retry with an available courier, failure or cancellation. A
+courier cannot claim an unassigned mission. No assignment is invented to close
+the logistics, and closure never implicitly refunds, restocks or adjusts debt.
+The operator resolution choices come from the server's journal-derived origin.
+Explicit admin correction accepts proven unassigned/null-courier history and
+retains the earliest immutable closure ceiling for private tracking; missing
+history is refused. This contract remains subject to main's scoped re-review.

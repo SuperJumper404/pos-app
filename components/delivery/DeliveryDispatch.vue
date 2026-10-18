@@ -38,7 +38,7 @@
         <v-select v-if="operation === 'resolveIssue'" v-model="resolutionAction" :items="resolutions" label="Resolution" outlined dense :disabled="locked" />
         <v-select v-if="operation === 'assign' || (operation === 'resolveIssue' && resolutionAction === 'retry')" v-model="courierId" :items="availableCouriers" item-text="username" item-value="id" label="Livreur disponible" outlined dense :disabled="locked" />
         <v-textarea v-if="operation !== 'assign'" v-model="reason" label="Motif" outlined rows="3" maxlength="2000" :disabled="locked" />
-        <v-checkbox v-if="operation === 'resolveIssue' && ['return', 'retry'].includes(resolutionAction)" v-model="physicalTransferConfirmed" label="Transfert physique ou retour au restaurant confirme" :disabled="locked" />
+        <v-checkbox v-if="operation === 'resolveIssue' && currentDelivery.courierId != null && ['return', 'retry'].includes(resolutionAction)" v-model="physicalTransferConfirmed" label="Transfert physique ou retour au restaurant confirme" :disabled="locked" />
         <v-alert v-if="operation === 'correctTerminal'" type="warning" text>Reouverture en probleme avec le contexte conserve dans le journal. Paiement, stock et especes restent a traiter separement.</v-alert>
       </v-card-text><v-card-actions class="flex-wrap"><v-spacer /><v-btn text :disabled="locked" @click="actionOpen = false">Fermer</v-btn><v-btn color="primary" :loading="sending" :disabled="!actionValid || sending || (pending && pending.status === 'conflict' && !pending.reloaded)" @click="confirmAction(Boolean(pending && pending.status === 'conflict'))">{{ pending && pending.status === 'unresolved' ? 'Reprendre la tentative' : pending && pending.status === 'conflict' ? 'Confirmer le nouvel etat' : 'Confirmer' }}</v-btn></v-card-actions></v-card>
     </v-dialog>
@@ -49,9 +49,10 @@
         <v-alert v-if="refundReadFailed && !refundLoading" type="warning" text>Lecture de l'eligibilite indisponible. Aucune nouvelle restitution ne peut etre confirmee.</v-alert>
         <template v-if="refundEligibility && refundEligibility.eligible">
           <p>Montant complet, frais inclus : <strong>{{ money(refundEligibility.amountCents) }}</strong></p>
-          <p v-if="refundEligibility.method === 'cash'">Detenteur initial : {{ courierName(refundEligibility.originalCourierId) }}.</p>
+          <p v-if="refundEligibility.paymentOrigin === 'register'">Encaissement initial en caisse.</p>
+          <p v-else-if="refundEligibility.method === 'cash'">Detenteur initial : {{ courierName(refundEligibility.originalCourierId) }}.</p>
           <v-select v-model="returnSource" :items="refundSources" label="Restitution effectuee par" outlined dense :disabled="refundLocked" />
-          <p v-if="returnSource === 'register'">Une restitution par la caisse laisse la detention d'especes du livreur initial inchangee.</p>
+          <p v-if="returnSource === 'register' && refundEligibility.paymentOrigin !== 'register'">Une restitution par la caisse laisse la detention d'especes du livreur initial inchangee.</p>
           <p v-if="returnSource === 'courier'">La restitution reduit uniquement les especes encore detenues par le livreur initial.</p>
           <v-textarea v-model="reason" label="Motif du remboursement" rows="3" outlined maxlength="2000" :disabled="refundLocked" />
           <v-checkbox v-model="refundConfirmed" :label="refundDeclaration" :disabled="refundLocked" />
@@ -59,7 +60,8 @@
         <v-alert v-else-if="!refundLoading && !refundReadFailed && !refundResult" type="warning" text>Le paiement actuel n'est pas eligible au remboursement manuel complet.</v-alert>
         <v-alert v-if="refundPending" type="warning" text>{{ refundPending.status === 'conflict' ? 'Paiement et solde relus. Verifiez la source puis confirmez a nouveau.' : 'Resultat inconnu. Reprenez la meme tentative avant toute autre restitution.' }}</v-alert>
         <v-alert v-if="refundResult" type="success" text>Restitution enregistree : {{ money(refundResult.amountCents) }}. Declaration restaurant.</v-alert>
-        <template v-if="refundResult && refundResult.method === 'cash'">
+        <p v-if="refundResult && refundResult.paymentOrigin === 'register'">Encaissement initial en caisse. Restitution enregistree par le restaurant.</p>
+        <template v-if="refundResult && refundResult.method === 'cash' && refundResult.paymentOrigin !== 'register'">
           <p v-if="refundResult.returnSource === 'register'">Restitution par la caisse : detention du livreur initial inchangee.</p>
           <p v-else>Restitution par le livreur initial enregistree.</p>
           <p v-if="refundResult.originalHolderBalance" role="status">Solde restant du detenteur initial {{ courierName(refundResult.originalCourierId) }} : <strong>{{ money(refundResult.originalHolderBalance.remainingDueCents) }}</strong></p>
@@ -83,7 +85,7 @@ export default {
       { text: 'Attribuees / en cours', value: 'ongoing' }, { text: 'Problemes', value: 'issue' }, { text: 'Terminees recentes', value: 'closed' }],
     headers: [{ text: 'Commande', value: 'orderReference' }, { text: 'Preparation', value: 'preparationStatus' }, { text: 'Paiement', value: 'paymentStatus' },
       { text: 'Livraison', value: 'deliveryStatus' }, { text: 'Livreur', value: 'courierId' }, { text: 'Actions', value: 'actions', sortable: false }],
-    resolutions: [{ text: 'Reprendre', value: 'resume' }, { text: 'Nouvelle tentative', value: 'retry' }, { text: 'Retour restaurant', value: 'return' },
+    resolutionOptions: [{ text: 'Reprendre', value: 'resume' }, { text: 'Nouvelle tentative', value: 'retry' }, { text: 'Retour restaurant', value: 'return' },
       { text: 'Clore en echec', value: 'fail' }, { text: 'Annuler la livraison', value: 'cancel' }, { text: 'Livree avec impaye', value: 'confirm_unpaid_delivery' }] }),
   computed: {
     identity() { return operatorIdentity(this.$store.state) },
@@ -108,7 +110,10 @@ export default {
     pending() { return this.selected && this.operator.pending[`${this.operation}:${this.selected.id}`] },
     locked() { return Boolean(this.pending && ['sending', 'unresolved'].includes(this.pending.status)) },
     sending() { return Boolean(this.pending && this.pending.status === 'sending') },
-    actionValid() { return this.locked || (this.operation === 'assign' ? Number.isSafeInteger(this.courierId) : this.reason.trim().length > 0) },
+    resolutions() { return this.resolutionOptions.filter(row => (this.currentDelivery.allowedResolutions || []).includes(row.value)) },
+    actionValid() { return this.locked || (this.operation === 'assign' ? Number.isSafeInteger(this.courierId) : this.reason.trim().length > 0 &&
+      (this.operation !== 'resolveIssue' || this.resolutions.some(row => row.value === this.resolutionAction) &&
+        (this.resolutionAction !== 'retry' || Number.isSafeInteger(this.courierId)))) },
     refundEligibility() {
       const check = this.selected && this.operator.eligibilityChecks[this.selected.id]
       return this.operator.identity === this.identity && check && check.status === 'ready' && check.confirmationId === this.refundReadId ? this.operator.eligibility[this.selected.id] : null
@@ -117,10 +122,12 @@ export default {
     refundLocked() { return Boolean(this.refundPending && ['sending', 'unresolved'].includes(this.refundPending.status)) },
     refundSending() { return Boolean(this.refundPending && this.refundPending.status === 'sending') },
     refundValid() { return this.refundLocked || Boolean(this.refundOpen && !this.refundLoading && !this.refundReadFailed && this.refundEligibility && this.refundEligibility.eligible && this.returnSource && this.reason.trim() && this.refundConfirmed) },
-    refundSources() { return (this.refundEligibility && this.refundEligibility.returnSources || []).map(value => ({ value, text: { register: 'Caisse du restaurant', courier: 'Livreur detenteur initial', external_card: 'TPE independant' }[value] })) },
+    refundSources() { return (this.refundEligibility && this.refundEligibility.returnSources || []).map(value => ({ value, text: { register: 'Caisse du restaurant', courier: 'Livreur detenteur initial', external_card: 'TPE independant', cheque: 'Restitution du cheque', meal_voucher: 'Restitution des titres restaurant' }[value] })) },
     refundDeclaration() { return this.refundEligibility && this.refundEligibility.method === 'external_card'
       ? 'Je declare le remboursement complet effectue sur le TPE independant. Aucune verification Stripe.'
-      : 'Je confirme que la totalite des especes a ete restituee au client par la source selectionnee.' },
+      : this.refundEligibility && ['cheque', 'meal_voucher'].includes(this.refundEligibility.method)
+        ? 'Je confirme la restitution complete au client du cheque ou des titres restaurant. Aucun mouvement d\'especes.'
+        : 'Je confirme que la totalite des especes a ete restituee au client par la source selectionnee.' },
   },
   watch: { identity() { this.resetPrivateState() } },
   beforeDestroy() { this.resetPrivateState() },
