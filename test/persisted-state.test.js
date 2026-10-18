@@ -72,6 +72,9 @@ const persisted = {
   users: { user: { id: 4, token: 'saved-session' } },
   cart: { totalCart: 12 },
   stripeTerminal: terminalState,
+  customer: { session: { csrfToken: 'private' }, addresses: [{ instructions: 'private' }] },
+  delivery: { quote: { addressSnapshot: { instructions: 'private' } } },
+  courier: { missions: [{ addressSnapshot: { instructions: 'private' } }] },
 }
 const expectedPersisted = {
   authenticated: true,
@@ -81,6 +84,9 @@ const expectedPersisted = {
 assert.deepStrictEqual(sanitizePersistedState(persisted), expectedPersisted)
 assert.deepStrictEqual(parsePersistedState(serializePersistedState(persisted, now), now), expectedPersisted)
 assert.deepStrictEqual(parsePersistedState(JSON.stringify(persisted), now), expectedPersisted)
+assert.deepStrictEqual(parsePersistedState(JSON.stringify({
+  expiresAt: now + PERSISTED_STATE_TTL, state: persisted,
+}), now), expectedPersisted)
 
 const pluginSource = fs.readFileSync(
   path.join(__dirname, '../plugins/persistedState.client.js'), 'utf8'

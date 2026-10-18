@@ -114,6 +114,7 @@ export default {
     { src: '~/plugins/session.client.js', ssr: false },
     { src: '~/plugins/shopTheme.client.js', ssr: false },
     { src: '~/plugins/axios.js' },
+    { src: '~/plugins/customerApi.client.js', ssr: false },
   ],
   components: true,
   buildModules: ['@nuxtjs/eslint-module', '@nuxtjs/vuetify'],
