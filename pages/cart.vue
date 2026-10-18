@@ -10,8 +10,9 @@
     </v-alert>
     <v-alert v-if="checkoutFinalized && isDelivery" type="success" text>
       Commande transmise au restaurant.
-      <a v-if="deliveryTrackingUrl" :href="deliveryTrackingUrl">Suivre la livraison</a>
+      <a v-if="deliveryTrackingUrl" :href="deliveryTrackingUrl" rel="noreferrer">Suivre la livraison</a>
       <v-btn v-if="deliveryTrackingUrl" icon title="Copier le lien de suivi" aria-label="Copier le lien de suivi" @click="copyDeliveryTracking"><v-icon>mdi-content-copy</v-icon></v-btn>
+      <v-btn v-if="!deliveryTrackingUrl && deliveryTrackingRecovery" text :loading="deliveryTrackingBusy" @click="renewDeliveryTracking"><v-icon left>mdi-link-variant</v-icon>Renouveler le lien de suivi</v-btn>
     </v-alert>
     <v-row class="mt-8">
       <v-col md="8" sm="12" cols="12">
@@ -537,6 +538,8 @@ export default {
     deliveryPayment: 'online',
     deliverySettlement: 'on_delivery',
     deliveryTrackingUrl: null,
+    deliveryTrackingRecovery: false,
+    deliveryTrackingBusy: false,
     isValue: false,
     loadingBtn: false,
     loadPage: false,
@@ -847,6 +850,16 @@ export default {
     this.clearStripeAutoPrepareTimeout()
   },
   methods: {
+    async renewDeliveryTracking() {
+      if (this.deliveryTrackingBusy) return
+      this.deliveryTrackingBusy = true
+      try {
+        const result = await this.$store.dispatch('cart/rotateDeliveryTracking')
+        this.deliveryTrackingUrl = result.trackingUrl
+        this.checkoutErrorMessage = result.trackingUrl ? '' : 'Ce renouvellement a deja ete traite. Demandez un nouveau lien.'
+      } catch (_) { this.checkoutErrorMessage = 'Suivi indisponible. Reprenez le renouvellement pour verifier son resultat.' }
+      finally { this.deliveryTrackingBusy = false }
+    },
     async copyDeliveryTracking() {
       if (!this.deliveryTrackingUrl) return
       try { await navigator.clipboard.writeText(new URL(this.deliveryTrackingUrl, window.location.origin).href) }
@@ -879,14 +892,15 @@ export default {
         } else this.finishDeliveryCheckout(result.data)
       } finally { this.loadingBtn = false }
     },
-    finishDeliveryCheckout(data) {
+    async finishDeliveryCheckout(data) {
       this.checkoutFinalized = true
       this.deliveryTrackingUrl = data && data.tracking_url || null
+      this.deliveryTrackingRecovery = await this.$store.dispatch('cart/hasDeliveryTrackingConfirmation')
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)
       this.$store.dispatch('cart/setTocart', null)
       this.$store.dispatch('delivery/resetForShop', this.checkoutShopId)
-      if (!this.deliveryTrackingUrl) this.$router.push(this.isQrClient ? '/ordersStatuses' : '/caisse/menu')
+      if (!this.deliveryTrackingUrl && !this.deliveryTrackingRecovery) this.$router.push(this.isQrClient ? '/ordersStatuses' : '/caisse/menu')
     },
     customizationGroups(item) {
       const value = item || {}

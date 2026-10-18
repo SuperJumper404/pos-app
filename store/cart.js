@@ -1,5 +1,6 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 import { v4 as uuidv4 } from 'uuid'
+import { buildTrackingApi } from '@/helpers/deliveryTracking.js'
 const {
   appendOrderSentEntry,
   filterTodayOrderEntries,
@@ -36,6 +37,7 @@ const writeStoredOrdersSent = (ordersSent) => {
 const CHECKOUT_ATTEMPT_UNRESOLVED = 'CHECKOUT_ATTEMPT_UNRESOLVED'
 // A remount shares this live guard; persisted/reloaded attempts have no surviving request.
 const liveDeliveryCheckouts = new WeakSet()
+const deliveryConfirmations = new WeakMap()
 const SAFE_PREWRITE_ERROR_CODES = new Set([
   'CHECKOUT_REQUEST_INVALID',
   'INSUFFICIENT_STOCK',
@@ -208,6 +210,22 @@ export const mutations = {
 
 export const plugins = [EasyAccess()]
 export const actions = {
+  hasDeliveryTrackingConfirmation({ state, rootState }) {
+    const context = deliveryConfirmations.get(state)
+    return Boolean(context && context.shopId === rootState.users?.user?.shopid)
+  },
+  async rotateDeliveryTracking({ state, rootState }) {
+    const context = deliveryConfirmations.get(state)
+    if (!context || context.shopId !== rootState.users?.user?.shopid || context.busy) throw new Error('Confirmation privee indisponible.')
+    context.busy = true
+    if (!context.key) context.key = uuidv4()
+    try {
+      const result = await buildTrackingApi({ baseURL: process.env.privateURL }).rotate({ deliveryId: context.deliveryId,
+        idempotencyKey: context.key, privateCheckoutContext: context.privateCheckoutContext })
+      context.key = null
+      return result
+    } finally { context.busy = false }
+  },
   setTotal({ dispatch }, params) {
     dispatch('set/totalCart', params)
   },
@@ -290,6 +308,10 @@ export const actions = {
         },
       })
       const data = response && response.data ? response.data.data : null
+      if (payload.fulfillment_type === 'delivery' && data?.delivery?.id) {
+        deliveryConfirmations.set(state, { shopId: rootState.users?.user?.shopid, deliveryId: data.delivery.id,
+          privateCheckoutContext: { clientOrderToken: payload.client_order_token, confirmationSecret: payload.delivery_confirmation_secret }, busy: false, key: null })
+      }
       if (data && data.orderId) commit('ADD_ORDER_SENT', data.orderId)
       dispatch('set/message', response?.data?.message || '')
       if (stripe) {

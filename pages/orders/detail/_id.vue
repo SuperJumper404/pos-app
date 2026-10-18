@@ -170,6 +170,12 @@
       <div v-if="deliveryCharge" class="text-body-2 my-3">
         Livraison : {{ formatCurrency(deliveryCharge.feeCents / 100) }}
       </div>
+      <section v-if="canRenewDeliveryTracking" class="my-4">
+        <v-btn outlined :loading="trackingBusy" @click="renewTracking"><v-icon left>mdi-link-variant</v-icon>Renouveler le lien de suivi</v-btn>
+        <a v-if="trackingUrl" :href="trackingUrl" rel="noreferrer" class="ml-3">Suivre la livraison</a>
+        <v-btn v-if="trackingUrl" icon title="Copier le lien de suivi" aria-label="Copier le lien de suivi" @click="copyTracking"><v-icon>mdi-content-copy</v-icon></v-btn>
+        <v-alert v-if="trackingError" text type="error" role="alert" class="mt-3">{{ trackingError }}</v-alert>
+      </section>
 
       <v-card v-if="orderSummary" outlined class="order-detail-attribution mt-3">
         <v-card-text class="order-detail-attribution__grid">
@@ -562,6 +568,7 @@ import TakeawayChip from '@/components/orders/TakeawayChip'
 import VatBreakdown from '@/components/orders/VatBreakdown'
 import DeliveryCheckout from '@/components/delivery/DeliveryCheckout.vue'
 import { deliveryChargeFor } from '@/helpers/vat'
+import { buildTrackingApi } from '@/helpers/deliveryTracking.js'
 import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { calculateDiscount } from '@/helpers/discount'
@@ -620,6 +627,10 @@ export default {
       startLoading: false,
       orderEditDialog: false,
       deliveryEditDialog: false,
+      trackingBusy: false,
+      trackingUrl: null,
+      trackingKey: null,
+      trackingError: '',
       deliveryEditBusy: false,
       deliveryEdit: null,
       deliveryEditQuote: null,
@@ -650,6 +661,16 @@ export default {
   },
 
   computed: {
+    trackingScope() {
+      const user = this.$store.state.users?.user || {}
+      return JSON.stringify([user.shopid, user.id, user.access, user.session_subject, this.orderSummary?.delivery_id])
+    },
+    canRenewDeliveryTracking() {
+      const { canOperateDelivery } = require('@/helpers/staffRoles')
+      const user = this.$store.state.users?.user
+      return Boolean(this.$store.state.authenticated !== false && this.isDeliveryOrder && canOperateDelivery(user) &&
+        String(user.shopid) === String(this.orderSummary.shopid))
+    },
     staticURL() {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
@@ -956,6 +977,7 @@ export default {
     },
   },
   watch: {
+    trackingScope() { this.trackingUrl = null; this.trackingKey = null; this.trackingError = ''; this.trackingBusy = false },
     '$route.params.id'(id) {
       this.loadOrderDetail(id)
     },
@@ -964,10 +986,36 @@ export default {
     this.loadOrderDetail(this.id)
   },
   methods: {
+    async renewTracking() {
+      if (!this.canRenewDeliveryTracking || this.trackingBusy) return
+      this.trackingBusy = true
+      this.trackingError = ''
+      if (!this.trackingKey) this.trackingKey = require('uuid').v4()
+      const requestId = this.detailRequestId
+      const scope = this.trackingScope
+      try {
+        const result = await buildTrackingApi({ baseURL: process.env.privateURL }).rotate({ deliveryId: String(this.orderSummary.delivery_id),
+          idempotencyKey: this.trackingKey, bearer: localStorage.getItem('token') })
+        if (this._isDestroyed || requestId !== this.detailRequestId || scope !== this.trackingScope || !this.canRenewDeliveryTracking) return
+        this.trackingKey = null
+        this.trackingUrl = result.trackingUrl
+        if (!this.trackingUrl) this.trackingError = 'Ce renouvellement a deja ete traite. Demandez un nouveau lien.'
+      } catch (_) {
+        if (requestId === this.detailRequestId && scope === this.trackingScope) this.trackingError = 'Suivi indisponible. Reprenez le renouvellement pour verifier son resultat.'
+      } finally { if (requestId === this.detailRequestId && scope === this.trackingScope) this.trackingBusy = false }
+    },
+    async copyTracking() {
+      try { await navigator.clipboard.writeText(new URL(this.trackingUrl, window.location.origin).href) }
+      catch (_) { this.trackingError = 'Le lien ne peut pas etre copie. Ouvrez le suivi pour le partager.' }
+    },
     async loadOrderDetail(id) {
       const requestedId = String(id)
       const requestId = this.detailRequestId + 1
       this.detailRequestId = requestId
+      this.trackingUrl = null
+      this.trackingKey = null
+      this.trackingError = ''
+      this.trackingBusy = false
       this.actionRequestId += 1
       this.startLoading = false
       this.$store.dispatch('orderEdit/invalidateBegin')
