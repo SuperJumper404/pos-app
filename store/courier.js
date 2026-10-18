@@ -256,14 +256,22 @@ export const actions = {
       const row = safeMission(result.delivery || result, actor)
       if (!row || row.id !== deliveryId) throw new Error('Resultat a verifier.')
       const previous = state.missions.find(item => item.id === deliveryId)
-      // Confirmed closure outranks a pre-commit active read, but never revives a removed mission.
-      const publicationSequence = closed(row) && previous && !closed(previous) && row.version > previous.version ? state.missionSequence : sequence
-      const fresh = missionFresh(state, deliveryId, publicationSequence)
-      commit('MISSION', { deliveryId, row, sequence: publicationSequence })
+      // A newer confirmed server version can supersede an active pre-commit read, never a removal/closure.
+      const active = previous && !closed(previous)
+      const publicationSequence = active && row.version > previous.version ? state.missionSequence : sequence
+      const fresh = missionFresh(state, deliveryId, publicationSequence) && (!previous || row.version > previous.version)
+      if (fresh) commit('MISSION', { deliveryId, row, sequence: publicationSequence })
       if (operation === 'collectPayment') saveRecovery(actor, deliveryId, pending.body, true)
       commit('PENDING', { deliveryId, pending: null })
+      let outcome = fresh ? result : null
+      if (!fresh && active) {
+        const read = await dispatch('read', { resource: 'detail', deliveryId })
+        if (!current()) return null
+        const reconciled = read && state.missions.find(item => item.id === deliveryId)
+        if (reconciled) outcome = result.delivery ? { ...result, delivery: reconciled } : reconciled
+      }
       if (operation === 'collectPayment' || operation === 'deliver') await dispatch('loadCashBalance')
-      return fresh ? result : null
+      return outcome
     } catch (error) {
       if (!current()) return null
       const status = statusOf(error)

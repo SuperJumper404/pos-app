@@ -694,3 +694,112 @@ test('round1 I1 empty authoritative list fences an in-flight detail not previous
   assert.equal(f.store.state.courier.missions.length, 0)
   assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
 })
+
+for (const scenario of [
+  { operation: 'pickup', version: 3, recovering: false },
+  { operation: 'pickup', version: 3, recovering: true },
+  { operation: 'collectPayment', version: 3, recovering: false },
+  { operation: 'collectPayment', version: 3, recovering: true },
+]) test(`round2 N-I1 confirmed ${scenario.operation} version${scenario.version} ${scenario.recovering ? 'replay' : 'new'} survives a precommit active detail`, async t => {
+  const started = deferred(); const release = deferred()
+  const suffix = scenario.operation === 'pickup' ? '/pickup' : '/collect-payment'
+  let firstLost = scenario.recovering
+  const applied = () => mission(undefined, { version: scenario.version, deliveryStatus: 'in_transit', paymentStatus: 'paid',
+    remainingDueCents: 0, allowedActions: ['deliver', 'reportIssue'] })
+  const f = await fixture(t, async (call, rows) => {
+    if (!call.path.endsWith(suffix)) return
+    if (firstLost) {
+      firstLost = false
+      if (scenario.operation === 'collectPayment') rows[0] = applied()
+      return { lost: true }
+    }
+    started.resolve(); await release.promise
+    rows[0] = applied()
+    return { data: scenario.operation === 'pickup' ? copy(rows[0]) : { collectionId: '81', delivery: copy(rows[0]), idempotentReplay: scenario.recovering } }
+  })
+  f.rows[0] = mission(undefined, scenario.operation === 'pickup'
+    ? { paymentStatus: 'paid', remainingDueCents: 0 }
+    : { deliveryStatus: 'in_transit', allowedActions: ['collectPayment', 'reportIssue'] })
+  await f.dispatch('loadMissions')
+  const untouched = copy(f.store.state.courier.missions[1])
+  f.store.commit('courier/ORDER', [f.rows[1].id, f.rows[0].id])
+  if (scenario.recovering) {
+    await f.dispatch(scenario.operation, { deliveryId: mission().id, method: 'cash' })
+    await f.dispatch('loadMissions')
+  }
+  const command = f.dispatch(scenario.operation, { deliveryId: mission().id, method: 'cash' }); await started.promise
+  await f.dispatch('read', { resource: 'detail', deliveryId: mission().id })
+  const detailCount = f.calls.filter(call => call.path === `/courier/deliveries/${mission().id}`).length
+  release.resolve(); const result = await command
+  const row = f.store.state.courier.missions.find(row => row.id === mission().id)
+  assert.equal(row.deliveryStatus, 'in_transit'); assert.equal(row.version, scenario.version)
+  assert.equal(row.paymentStatus, 'paid'); assert.equal(row.remainingDueCents, 0)
+  assert.ok(row.allowedActions.includes('deliver')); assert.ok(result, 'confirmed nonterminal outcome must not disappear')
+  assert.deepEqual(copy(f.store.state.courier.missions[1]), untouched)
+  assert.deepEqual(copy(f.store.state.courier.order), [f.rows[1].id, f.rows[0].id])
+  assert.equal(f.store.state.courier.pending[mission().id], undefined)
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+  const posts = f.calls.filter(call => call.method === 'POST')
+  assert.equal(posts.length, scenario.recovering ? 2 : 1)
+  if (scenario.recovering) assert.deepEqual(posts[1].body, posts[0].body)
+  if (scenario.operation === 'collectPayment' && scenario.recovering) {
+    assert.equal(f.calls.filter(call => call.path === `/courier/deliveries/${mission().id}`).length, detailCount + 1)
+    assert.equal(posts[1].body.expectedVersion, 2)
+    assert.equal(result.idempotentReplay, true)
+  }
+  if (scenario.operation === 'collectPayment') assert.deepEqual(JSON.parse(f.storage.getItem('smarteat.courier.collections.v1')), [])
+})
+
+for (const source of ['detail', 'list']) test(`round2 N-I1 lower-version confirmation rereads authority after a newer active ${source}`, async t => {
+  const started = deferred(); const release = deferred()
+  const reconcileStarted = deferred(); const reconcileRelease = deferred()
+  let confirmed = false
+  const f = await fixture(t, async (call, rows) => {
+    if (call.path.endsWith('/pickup')) {
+      started.resolve(); await release.promise; confirmed = true
+      return { data: mission(undefined, { version: 3, deliveryStatus: 'in_transit' }) }
+    }
+    if (confirmed && call.path === `/courier/deliveries/${mission().id}`) {
+      reconcileStarted.resolve(); await reconcileRelease.promise; return { data: copy(rows[0]) }
+    }
+  })
+  await f.dispatch('loadMissions')
+  const command = f.dispatch('pickup', { deliveryId: mission().id }); await started.promise
+  f.rows[0] = mission(undefined, { version: 5, deliveryStatus: 'issue', allowedActions: [] })
+  if (source === 'detail') await f.dispatch('read', { resource: 'detail', deliveryId: mission().id })
+  else await f.dispatch('loadMissions')
+  release.resolve()
+  // Wait for either the reconciliation request or the old implementation's discarded result.
+  const boundary = await Promise.race([reconcileStarted.promise.then(() => 'read'), command.then(() => 'done')])
+  try {
+    assert.equal(boundary, 'read', 'confirmed stale projection needs an own-detail reconciliation')
+    const row = f.store.state.courier.missions.find(row => row.id === mission().id)
+    assert.equal(row.version, 5); assert.equal(row.deliveryStatus, 'issue')
+  } finally { reconcileRelease.resolve(); await command }
+  assert.equal(f.store.state.courier.missions.find(row => row.id === mission().id).version, 5)
+  assert.equal(f.calls.filter(call => call.method === 'POST').length, 1)
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+})
+
+for (const authority of ['removed', 'terminal']) test(`round2 N-I1 higher-version nonterminal reply cannot replace ${authority} authority`, async t => {
+  const started = deferred(); const release = deferred()
+  let read = false
+  const f = await fixture(t, async call => {
+    if (call.path.endsWith('/pickup')) {
+      started.resolve(); await release.promise; return { data: mission(undefined, { version: 7, deliveryStatus: 'in_transit' }) }
+    }
+    if (read && call.path === `/courier/deliveries/${mission().id}`) return authority === 'removed'
+      ? { status: 404 } : { data: mission(undefined, { version: 6, deliveryStatus: 'delivered', allowedActions: [] }) }
+  })
+  await f.dispatch('loadMissions')
+  const command = f.dispatch('pickup', { deliveryId: mission().id }); await started.promise
+  read = true; await f.dispatch('read', { resource: 'detail', deliveryId: mission().id })
+  const reads = f.calls.filter(call => call.method === 'GET').length
+  release.resolve(); await command
+  const row = f.store.state.courier.missions.find(row => row.id === mission().id)
+  if (authority === 'removed') assert.equal(row, undefined)
+  else { assert.equal(row.deliveryStatus, 'delivered'); assert.equal(row.version, 6); assert.equal(row.addressSnapshot, undefined) }
+  assert.equal(f.calls.filter(call => call.method === 'GET').length, reads)
+  assert.equal(f.calls.filter(call => call.method === 'POST').length, 1)
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+})
