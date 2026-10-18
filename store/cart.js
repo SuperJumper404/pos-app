@@ -42,6 +42,17 @@ const deliveryTrackingResults = new WeakMap()
 const trackingIdentity = (root, state) => [root.cart || state, root.users?.user?.shopid,
   root.users?.user?.id, root.users?.user?.session_subject, root.authenticated]
 const sameIdentity = (left, right) => left.every((value, index) => value === right[index])
+const trackingCustomerIdentity = root => {
+  const customer = root.customer
+  const session = customer?.session
+  return [customer, customer?.epoch, customer?.shopId, session?.subject, session?.shopId, session?.customerId,
+    Boolean(session && typeof session.customerId === 'string' && /^[1-9]\d{0,19}$/.test(session.customerId) &&
+      /^[a-f0-9]{64}$/i.test(session.csrfToken) && Date.parse(session.expiresAt) > Date.now())]
+}
+const trackingCustomerCurrent = (root, authority) => !authority ||
+  (sameIdentity(authority.identity, trackingCustomerIdentity(root)) && authority.identity[2] === authority.shopId &&
+    authority.identity[3] === 'customer' && authority.identity[4] === authority.shopId &&
+    authority.identity[5] === authority.customerId && authority.identity[6] === true)
 const trackingRecord = (store, state, rootState, commit) => {
   let record = deliveryConfirmations.get(state)
   if (record) return record
@@ -58,13 +69,18 @@ const trackingRecord = (store, state, rootState, commit) => {
       root.cart?.clientOrderToken, root.cart?.clientOrderPayload, root.cart?.clientOrderSignature], (next, previous) => {
       if (!sameIdentity(next.slice(0, 5), previous.slice(0, 5)) ||
         next.some((value, index) => index >= 5 && value !== previous[index] && (value != null || record.pending))) record.advance()
-      if (next[0] !== state) record.stop()
+      if (next[0] !== state) { record.stop(); record.stopCustomer() }
+    }, { sync: true })
+    // SESSION refresh keeps authority; owner/epoch/clear transitions do not, even away and back.
+    record.stopCustomer = store.watch(trackingCustomerIdentity, (next, previous) => {
+      if (record.customerAuthority && !sameIdentity(next, previous)) record.advance()
     }, { sync: true })
   }
   return record
 }
 const trackingFrameCurrent = (store, rootState, state, record, frame) =>
-  record.generation === frame.generation && sameIdentity(frame.identity, trackingIdentity(store.state || rootState, state))
+  record.generation === frame.generation && sameIdentity(frame.identity, trackingIdentity(store.state || rootState, state)) &&
+  trackingCustomerCurrent(store.state || rootState, frame.customerAuthority)
 const trackingConfirmation = (store, rootState, state, record) => {
   const context = record.confirmation
   return context && trackingFrameCurrent(store, rootState, state, record, context) ? context : null
@@ -254,7 +270,8 @@ export const actions = {
     if (!result || result.record !== record ||
       !trackingFrameCurrent(this, rootState, state, record, result)) return null
     const context = trackingConfirmation(this, rootState, state, record)
-    return { generation: record.generation, shopId: rootState.users?.user?.shopid, confirmationId: context?.id || null }
+    return { generation: record.generation, shopId: rootState.users?.user?.shopid, confirmationId: context?.id || null,
+      isCurrent: () => trackingFrameCurrent(this, rootState, state, record, result) }
   },
   async rotateDeliveryTracking({ state, rootState, commit }, expectedId) {
     const record = trackingRecord(this, state, rootState, commit)
@@ -347,9 +364,13 @@ export const actions = {
     if (payload.fulfillment_type === 'delivery') liveDeliveryCheckouts.add(state)
     dispatch('set/clientOrderAuthRedirect', false)
     dispatch('set/clientOrderStatus', 'pending')
+    const customerAuthority = tracking && state.clientOrderPayload?.customerContextId ? {
+      identity: trackingCustomerIdentity(rootState), customerId: state.clientOrderPayload.customerContextId,
+      shopId: state.clientOrderPayload.customerContextShopId,
+    } : null
     const trackingFrame = tracking && { generation: tracking.generation, identity: trackingIdentity(rootState, state),
-      token: payload.client_order_token, payload: state.clientOrderPayload }
-    if (tracking) tracking.pending = trackingFrame
+      token: payload.client_order_token, payload: state.clientOrderPayload, customerAuthority }
+    if (tracking) { tracking.pending = trackingFrame; tracking.customerAuthority = customerAuthority }
     const currentTracking = () => tracking && trackingFrameCurrent(this, rootState, state, tracking, trackingFrame) &&
       state.clientOrderToken === trackingFrame.token && state.clientOrderPayload === trackingFrame.payload
 
@@ -369,10 +390,12 @@ export const actions = {
           if (data.delivery?.id) {
             tracking.advance()
             tracking.confirmation = { id: uuidv4(), generation: tracking.generation, identity: trackingFrame.identity,
+              customerAuthority: trackingFrame.customerAuthority,
               deliveryId: data.delivery.id, privateCheckoutContext: { clientOrderToken: trackingFrame.token,
                 confirmationSecret: payload.delivery_confirmation_secret }, busy: false, key: null }
           }
-          deliveryTrackingResults.set(data, { record: tracking, generation: tracking.generation, identity: trackingFrame.identity })
+          deliveryTrackingResults.set(data, { record: tracking, generation: tracking.generation, identity: trackingFrame.identity,
+            customerAuthority: trackingFrame.customerAuthority })
         } else {
           const { tracking_url: ignoredTrackingUrl, ...financialData } = data
           data = financialData
@@ -402,7 +425,8 @@ export const actions = {
         commit('ADD_ORDER_SENT', checkoutError.orderId)
         clearCheckoutAttempt(dispatch)
         const data = { orderId: checkoutError.orderId, checkout_resolved: true, payment_status: checkoutError.payment_status }
-        if (trackingCurrent) deliveryTrackingResults.set(data, { record: tracking, generation: tracking.generation, identity: trackingFrame.identity })
+        if (trackingCurrent) deliveryTrackingResults.set(data, { record: tracking, generation: tracking.generation, identity: trackingFrame.identity,
+          customerAuthority: trackingFrame.customerAuthority })
         return { ok: true, data, error: null }
       }
       if (stripe && payload.fulfillment_type !== 'delivery' && isAlreadyProcessedStripeReplay(checkoutError)) {

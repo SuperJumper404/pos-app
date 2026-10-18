@@ -67,7 +67,7 @@ function trackingFixture() {
   const Vuex = require('vuex'); Vue.use(Vuex)
   if (!global.crypto) global.crypto = require('crypto').webcrypto
   global.localStorage = { getItem: key => ({ shopid: '7', access: '1', token: 'fixture-bearer' }[key] || null), setItem() {} }
-  const cart = load('store/cart.js'); const delivery = load('store/delivery.js')
+  const cart = load('store/cart.js'); const delivery = load('store/delivery.js'); const customer = load('store/customer.js')
   const calls = []
   const fetch = (url, options) => {
     const pending = deferred()
@@ -80,21 +80,209 @@ function trackingFixture() {
     cart: { ...cart, namespaced: true, state: cart.state() },
     delivery: { ...delivery, state: delivery.state() },
     users: { namespaced: true, state: { user: { shopid: 7, id: null, session_subject: 'service_point', order_source: 'pos' } } },
-    customer: { namespaced: true, state: { shopId: 7, session: null } },
+    customer: { ...customer, state: customer.state() },
     shop: { namespaced: true, state: {}, actions: { getCurrentShopInfo() {} } },
     orderEdit: { namespaced: true, state: { active: false } },
     servicePoints: { namespaced: true, state: { items: [] }, actions: { getAll() {} } },
     notifications: { namespaced: true, actions: { success() {} } },
   }, plugins: [require('vuex-easy-access').default()] })
+  store.commit('customer/RESET', 7)
+  const customerCalls = []
+  store.$customerApi = { request(input) { customerCalls.push(input); return Promise.resolve({ loggedOut: true }) } }
   store.$deliveryApi = delivery.buildDeliveryApi({ baseURL: 'http://fixture.invalid', fetch })
-  const checkout = async (id = 31) => {
-    const result = store.dispatch('cart/checkoutOrder', deliveryParams())
+  const checkout = async (id = 31, params = {}) => {
+    const result = store.dispatch('cart/checkoutOrder', { ...deliveryParams(), ...params })
     await drain()
     calls[calls.length - 1].resolve(checkoutData(id))
     return (await result).data
   }
-  return { store, calls, checkout }
+  return { store, calls, checkout, customerCalls }
 }
+
+const personalSession = (customerId = '101', csrfToken = 'c'.repeat(64)) => ({ subject: 'customer', shopId: 7,
+  customerId, csrfToken, expiresAt: '2099-01-01T00:00:00Z' })
+const authenticate = f => f.store.commit('customer/AUTHENTICATED', personalSession())
+const verifiedParams = f => ({ ...deliveryParams(), customerSession: f.store.state.customer.session })
+const replacePersonal = {
+  owner: f => f.store.commit('customer/SESSION', personalSession('202')),
+  clear: f => f.store.commit('customer/SESSION', null),
+  logout: f => f.store.dispatch('customer/logout'),
+  awayBack(f) { f.store.commit('customer/SESSION', personalSession('202')); f.store.commit('customer/SESSION', personalSession()) },
+  resetBack(f) { f.store.commit('customer/PRIVATE_RESET'); f.store.commit('customer/SESSION', personalSession()) },
+  authenticate: f => f.store.commit('customer/AUTHENTICATED', personalSession()),
+  state: f => f.store.replaceState({ ...f.store.state, customer: { ...f.store.state.customer } }),
+}
+
+test('I1 verified checkout discards proof/link on real customer owner, clear, logout, epoch and away-back replacement', async () => {
+  for (const [name, replace] of Object.entries(replacePersonal)) {
+    const f = trackingFixture(); authenticate(f)
+    const page = await mountTrackingCart(f)
+    const pending = f.store.dispatch('cart/checkoutOrder', verifiedParams(f))
+    await drain()
+    const call = f.calls[0]
+    assert.equal(call.options.credentials, 'include')
+    await replace(f)
+    call.resolve(checkoutData(31))
+    const result = await pending
+    assert.equal(result.ok, true, name)
+    assert.equal(result.data.orderId, 31)
+    assert.equal(Boolean(result.data.tracking_url), false, name)
+    assert.equal(await f.store.dispatch('cart/hasDeliveryTrackingConfirmation'), false, name)
+    assert.equal(await f.store.dispatch('cart/deliveryTrackingContext', result.data), null, name)
+    await page.finishDeliveryCheckout(result.data)
+    assert.equal(page.deliveryTrackingUrl === null, true, name)
+    assert.equal(page.deliveryTrackingRecovery, false, name)
+    if (name === 'logout') assert.equal(f.customerCalls[0].path, '/customer-auth/logout')
+    page.$destroy()
+  }
+})
+
+test('I1 verified rotation checks personal authority before and after HTTP, including same-tick away-back', async () => {
+  for (const [name, replace] of Object.entries(replacePersonal)) {
+    const f = trackingFixture(); authenticate(f)
+    const data = await f.checkout(31, { customerSession: f.store.state.customer.session })
+    const context = await f.store.dispatch('cart/deliveryTrackingContext', data)
+    const pending = f.store.dispatch('cart/rotateDeliveryTracking', context.confirmationId)
+    await drain()
+    const call = f.calls[f.calls.length - 1]
+    await replace(f)
+    call.resolve({ trackingUrl: '/livraison/suivi#' + token })
+    const result = await pending
+    assert.equal(result.discarded, true, name)
+    assert.equal(Boolean(result.trackingUrl), false, name)
+    assert.equal(await f.store.dispatch('cart/hasDeliveryTrackingConfirmation'), false, name)
+    const count = f.calls.length
+    await assert.rejects(f.store.dispatch('cart/rotateDeliveryTracking', context.confirmationId), /Confirmation privee indisponible/)
+    assert.equal(f.calls.length, count)
+    f.store.commit('customer/SESSION', personalSession())
+    assert.equal(await f.store.dispatch('cart/hasDeliveryTrackingConfirmation'), false, 'Restoring A cannot revive an invalidated proof')
+  }
+})
+
+test('I1 compiled cart discards verified renewal success/error and publication after logout or owner replacement', async () => {
+  for (const name of ['owner', 'logout', 'awayBack']) {
+    for (const failure of [false, true]) {
+      const f = trackingFixture(); authenticate(f)
+      const page = await mountTrackingCart(f)
+      const data = await f.checkout(31, { customerSession: f.store.state.customer.session })
+      await page.finishDeliveryCheckout(data)
+      assert.equal(Boolean(page.deliveryTrackingUrl), true)
+      page.deliveryTrackingUrl = null
+      const pending = page.renewDeliveryTracking()
+      await drain()
+      const call = f.calls[f.calls.length - 1]
+      await replacePersonal[name](f)
+      if (failure) call.reject(new Error('Lost old personal result'))
+      else call.resolve({ trackingUrl: '/livraison/suivi#' + token })
+      await pending
+      assert.equal(page.deliveryTrackingUrl === null, true, name)
+      assert.equal(page.deliveryTrackingRecovery, false, name)
+      assert.equal(page.deliveryTrackingBusy, false, name)
+      assert.equal(page.deliveryTrackingError, '', name)
+      assert.equal(page.checkoutErrorMessage, '', name)
+      await page.finishDeliveryCheckout(data)
+      assert.equal(page.deliveryTrackingUrl === null, true, name)
+      page.$destroy()
+    }
+  }
+})
+
+test('I1 verified same-account SESSION refresh preserves genuine checkout, publication, rotation and exact retry credentials', async () => {
+  const f = trackingFixture(); authenticate(f)
+  const page = await mountTrackingCart(f)
+  const epoch = f.store.state.customer.epoch
+  const pending = f.store.dispatch('cart/checkoutOrder', verifiedParams(f))
+  await drain()
+  f.store.commit('customer/SESSION', personalSession('101', 'd'.repeat(64)))
+  assert.equal(f.store.state.customer.epoch, epoch)
+  f.calls[0].reject(new Error('Lost verified checkout result'))
+  assert.equal((await pending).ok, false)
+  f.store.commit('customer/SESSION', personalSession('202'))
+  assert.equal((await f.store.dispatch('cart/retryCheckout')).ok, false)
+  assert.equal(f.calls.length, 1, 'Owner B cannot replay owner A checkout')
+  f.store.commit('customer/SESSION', personalSession('101', 'e'.repeat(64)))
+  const retry = f.store.dispatch('cart/retryCheckout')
+  await drain()
+  assert.equal(f.calls[1].options.body === f.calls[0].options.body, true)
+  assert.equal(f.calls[1].options.credentials, 'include')
+  assert.equal(f.calls[1].options.headers['X-CSRF-Token'] === 'e'.repeat(64), true)
+  f.store.commit('customer/SESSION', personalSession('101', 'f'.repeat(64)))
+  f.calls[1].resolve(checkoutData(31))
+  const result = await retry
+  await page.finishDeliveryCheckout(result.data)
+  assert.equal(Boolean(page.deliveryTrackingUrl), true)
+  assert.equal(await f.store.dispatch('cart/hasDeliveryTrackingConfirmation'), true)
+  assert.equal(JSON.stringify(f.store.state.cart).includes('f'.repeat(64)), false)
+  page.deliveryTrackingUrl = null
+  const rotation = page.renewDeliveryTracking()
+  await drain()
+  f.store.commit('customer/SESSION', personalSession('101', 'a'.repeat(64)))
+  f.calls[2].resolve({ trackingUrl: '/livraison/suivi#' + token })
+  await rotation
+  assert.equal(Boolean(page.deliveryTrackingUrl), true)
+  assert.equal(page.deliveryTrackingBusy, false)
+  assert.equal(f.calls[2].options.credentials, 'omit')
+  assert.equal(f.calls[2].options.headers['X-CSRF-Token'], undefined)
+  page.$destroy()
+})
+
+test('I1 original verified intent cannot be relabelled by later retry params for owner B', async () => {
+  const f = trackingFixture(); authenticate(f)
+  const pending = f.store.dispatch('cart/checkoutOrder', verifiedParams(f))
+  await drain(); f.calls[0].reject(new Error('Lost original response')); await pending
+  f.store.commit('customer/SESSION', personalSession('202'))
+  const replay = f.store.dispatch('cart/checkoutOrder', { retryOriginal: true, customerSession: f.store.state.customer.session })
+  await drain()
+  assert.equal(f.calls[1].options.body === f.calls[0].options.body, true)
+  f.calls[1].resolve(checkoutData(31))
+  const result = await replay
+  assert.equal(result.ok, true, 'Existing financial result is not rewritten by tracking privacy')
+  assert.equal(Boolean(result.data.tracking_url), false)
+  assert.equal(await f.store.dispatch('cart/hasDeliveryTrackingConfirmation'), false)
+})
+
+test('I1 original guest stays guest through later personal login and exact checkout replay', async () => {
+  const f = trackingFixture()
+  const pending = f.store.dispatch('cart/checkoutOrder', deliveryParams())
+  await drain(); f.calls[0].reject(new Error('Lost guest response')); await pending
+  authenticate(f)
+  const replay = f.store.dispatch('cart/retryCheckout')
+  await drain()
+  assert.equal(f.calls[1].options.body === f.calls[0].options.body, true)
+  assert.equal(f.calls[1].options.credentials, 'omit')
+  assert.equal(f.calls[1].options.headers['X-CSRF-Token'], undefined)
+  f.store.commit('customer/SESSION', personalSession('202'))
+  f.calls[1].resolve(checkoutData(31))
+  const result = await replay
+  const page = await mountTrackingCart(f)
+  await page.finishDeliveryCheckout(result.data)
+  assert.equal(Boolean(page.deliveryTrackingUrl), true)
+  await f.store.dispatch('customer/logout')
+  assert.equal(await f.store.dispatch('cart/hasDeliveryTrackingConfirmation'), true, 'Guest proof is not personal-account proof')
+  page.deliveryTrackingUrl = null
+  const rotation = page.renewDeliveryTracking()
+  await drain()
+  f.calls[2].resolve({ trackingUrl: '/livraison/suivi#' + token })
+  await rotation
+  assert.equal(Boolean(page.deliveryTrackingUrl), true)
+  page.$destroy()
+})
+
+test('I1 verified publication rechecks current session authority after its await, without needing a reactive mutation', async () => {
+  const f = trackingFixture(); authenticate(f)
+  const page = await mountTrackingCart(f)
+  const expires = Date.now() + 60000
+  f.store.commit('customer/SESSION', { ...personalSession(), expiresAt: new Date(expires).toISOString() })
+  const data = await f.checkout(31, { customerSession: f.store.state.customer.session })
+  const now = Date.now
+  try {
+    const publication = page.publishDeliveryTracking(data)
+    Date.now = () => expires + 1
+    assert.equal(await publication, false)
+    assert.equal(page.deliveryTrackingUrl === null, true)
+    assert.equal(await f.store.dispatch('cart/hasDeliveryTrackingConfirmation'), false)
+  } finally { Date.now = now; page.$destroy() }
+})
 async function mountTrackingCart(f) {
   const leaf = { functional: true, render: (h, context) => h('div', context.children) }
   const imports = Object.fromEntries(['@/components/loading', '@/components/products/ProductCustomizationWizard',

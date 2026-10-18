@@ -884,7 +884,7 @@ export default {
       const scope = this.deliveryTrackingScope
       const confirmation = this.deliveryTrackingConfirmation
       const context = await this.$store.dispatch('cart/deliveryTrackingContext', data)
-      if (!context || publication !== this.deliveryTrackingPublication || !this.deliveryTrackingCurrent(request, scope, confirmation) ||
+      if (!context || !context.isCurrent() || publication !== this.deliveryTrackingPublication || !this.deliveryTrackingCurrent(request, scope, confirmation) ||
         context.shopId !== this.checkoutShopId || context.generation !== scope[1]) return false
       this.deliveryTrackingRequest++
       this.deliveryTrackingConfirmation = context.confirmationId
