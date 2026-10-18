@@ -97,3 +97,9 @@ retention-check.json records the archive verification; sha256.json binds all
 retained evidence files. No node_modules, build output, real env files or git
 metadata is included. Direct final reports are retained beside this README.
 No merge/push/deploy or real OTP receipt is part of this completion.
+
+Closeout exception: tool policy rejected recursive plan-scratch deletion and
+background preview restart. No bypass was attempted. Scratch is still present;
+the controller-owned Nuxt was stopped for log retention and8097 is not running.
+Original servers/worktrees are preserved. Archive verification refers to its
+timestamped frozen originals; this later runtime outcome is recorded here.

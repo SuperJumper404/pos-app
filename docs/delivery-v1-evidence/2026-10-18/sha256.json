@@ -49,8 +49,8 @@
                   },
                   {
                       "path":  "README.md",
-                      "bytes":  6033,
-                      "sha256":  "68693D9B29836E09B14E7474DBF6110414F0AFCFA7E96D2F18125966264C4088"
+                      "bytes":  6422,
+                      "sha256":  "6551DC314FD2ABDED094A08BAF1D06874B496DA8B74CFCEB3BB7A14C09CC76F5"
                   },
                   {
                       "path":  "retention-check.json",

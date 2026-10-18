@@ -12,6 +12,13 @@ See the retained [scoped verdict](delivery-v1-evidence/2026-10-18/final-fixes-re
 M1/M2 and all real-world commissioning limits remain explicit; both actual OTP
 receipts/verification are NOT EXECUTED. No merge, push or deployment occurred.
 
+Closeout runtime: the controller-owned Nuxt PID6024 was stopped to freeze its
+logs for retention. The tool policy then refused both recursive scratch cleanup
+and background preview restart. Neither was bypassed: plan scratch remains,
+port8097 is stopped, original servers/checkouts are untouched. This does not
+invalidate the earlier recorded tests/build/browser evidence. No running preview
+or completed scratch deletion is claimed.
+
 ## Final Integration Fixes
 
 Fix bases: F9fc355799e1124cc257a9e647f0933aadf04389c and
