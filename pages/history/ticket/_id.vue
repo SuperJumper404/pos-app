@@ -25,7 +25,7 @@
           </span>
           <div>
             <div class="history-ticket-header__meta">
-              <TakeawayChip :value="dataArchivedOrder.is_takeaway" />
+              <TakeawayChip :value="dataArchivedOrder.is_takeaway" :fulfillment-type="dataArchivedOrder.fulfillment_type" />
               <span>{{ currentDate }}</span>
             </div>
             <h1>Ticket #{{ receiptPayload.orderNumber }}</h1>

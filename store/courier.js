@@ -5,7 +5,7 @@ const { isTokenExpired } = require('../helpers/sessionAuth')
 
 export const namespaced = true
 export const state = () => ({ identity: null, epoch: 0, missions: [], available: null, balance: null,
-  pending: {}, reads: {}, busy: {}, error: null, recoveryError: null, order: [], missionSequence: 0, missionFreshness: {} })
+  pending: {}, reads: {}, readErrors: {}, busy: {}, error: null, recoveryError: null, order: [], missionSequence: 0, missionFreshness: {} })
 const initialState = state
 const user = root => root.users && root.users.user
 export const courierIdentity = root => JSON.stringify([root.authenticated !== false, user(root) && [
@@ -70,7 +70,14 @@ const canCommand = (row, operation) => row && !closed(row) && row.deliveryStatus
 
 export const mutations = {
   RESET(state, identity) { Object.assign(state, { ...initialState(), identity, epoch: state.epoch + 1 }) },
-  ERROR(state, error) { state.error = error },
+  ERROR(state, error) { state.error = error || Object.values(state.readErrors)[0] || null },
+  READ_ERROR(state, { key, error }) {
+    const wasReadError = Object.values(state.readErrors).includes(state.error)
+    const errors = { ...state.readErrors }
+    if (error) errors[key] = error; else delete errors[key]
+    state.readErrors = errors
+    if (!state.error || wasReadError) state.error = Object.values(errors)[0] || null
+  },
   RECOVERY_ERROR(state, error) { state.recoveryError = error },
   PENDING(state, { deliveryId, pending }) {
     const entries = { ...state.pending }
@@ -142,6 +149,7 @@ export const actions = {
       if (resource === 'missions') {
         if (!Array.isArray(result)) throw new Error('Missions indisponibles.')
         commit('MISSIONS', { rows: result.map(row => safeMission(row, user(rootState))).filter(Boolean), sequence })
+        commit('READ_ERROR', { key, error: null })
         return state.missions
       } else if (resource === 'detail') {
         if (!missionFresh(state, deliveryId, sequence)) return null
@@ -155,17 +163,21 @@ export const actions = {
         if (String(result.courierId) !== String(user(rootState).id) || String(result.shopId) !== String(user(rootState).shopid)) throw new Error('Solde indisponible.')
         commit('BALANCE', result)
       }
+      commit('READ_ERROR', { key, error: null })
       return result
     } catch (error) {
       if (current() && state.reads[key] === token) {
-        if (terminalDenial(error)) commit('RESET', null)
+        if (terminalDenial(error)) {
+          commit('RESET', null)
+          commit('ERROR', 'Lecture impossible. Actualisez avant de continuer.')
+        }
         else {
           if (resource === 'missions') commit('MISSIONS', { rows: [], sequence })
           if (resource === 'detail') commit('MISSION', { deliveryId, row: null, sequence })
           if (resource === 'availability') commit('AVAILABLE', null)
           if (resource === 'balance') commit('BALANCE', null)
+          commit('READ_ERROR', { key, error: 'Lecture impossible. Actualisez avant de continuer.' })
         }
-        commit('ERROR', 'Lecture impossible. Actualisez avant de continuer.')
       }
       return null
     } finally {

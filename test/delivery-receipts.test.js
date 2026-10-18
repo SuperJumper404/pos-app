@@ -63,6 +63,39 @@ const instance = (page, values = {}) => {
 
 const tests = []
 const test = (name, run) => tests.push({ name, run })
+
+function renderPageFragment(file, matches, values, components = {}) {
+  const template = compiler.parseComponent(fs.readFileSync(path.join(root, file), 'utf8')).template.content.trim()
+  const ast = compiler.compile(template, { outputSourceRange: true }).ast
+  const find = node => matches(node) ? node : (node.children || []).map(find).find(Boolean) ||
+    (node.ifConditions || []).filter(condition => condition.block !== node).map(condition => find(condition.block)).find(Boolean)
+  const node = find(ast)
+  assert.ok(node, 'page fragment missing')
+  const compiled = compiler.compile(template.slice(node.start, node.end))
+  assert.deepStrictEqual(compiled.errors, [])
+  return renderer.renderToString(new Vue({ components, data: () => values,
+    render: vm.compileFunction(compiled.render, []), staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])) }))
+}
+
+test('history delivery header does not mislabel a delivery as takeaway', async () => {
+  const file = 'components/orders/TakeawayChip.vue'
+  const chip = load(file).default
+  const compiled = compiler.compile(compiler.parseComponent(fs.readFileSync(path.join(root, file), 'utf8')).template.content)
+  const html = await renderPageFragment('pages/history/ticket/_id.vue', node => node.tag === 'TakeawayChip',
+    { dataArchivedOrder: { ...order, is_takeaway: 1 } }, { TakeawayChip: { ...chip,
+      render: vm.compileFunction(compiled.render, []), staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])) } })
+  assert.match(html, /Livraison/)
+  assert.doesNotMatch(html, /emporter/)
+})
+
+test('delivery detail shows fee-inclusive total even without a product discount', async () => {
+  const html = await renderPageFragment('pages/orders/detail/_id.vue', node => node.attrsMap &&
+    node.attrsMap.class === 'order-detail-discount mt-3', { discountAmount: 0, deliveryCharge: charge,
+    subtotalBeforeDiscount: 24, orderTotal: 24, discountLabel: 'Remise', formatCurrency: value => `${value.toFixed(2)} EUR` })
+  assert.match(html, /Total/)
+  assert.match(html, /24\.00 EUR/)
+  assert.doesNotMatch(html, /-0\.00/)
+})
 test('literal immutable server charge, VAT and three cashier renderers', () => {
   const payload = build()
   assert.equal(payload.totalAmount, 24)

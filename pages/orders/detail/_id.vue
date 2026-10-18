@@ -141,7 +141,7 @@
       </v-card>
 
       <v-card
-        v-if="discountAmount > 0"
+        v-if="discountAmount > 0 || deliveryCharge"
         outlined
         class="order-detail-discount mt-3"
       >
@@ -150,7 +150,7 @@
             <span>Sous-total</span>
             <strong>{{ formatCurrency(subtotalBeforeDiscount) }}</strong>
           </div>
-          <div class="order-detail-discount__row order-detail-discount__row--discount">
+          <div v-if="discountAmount > 0" class="order-detail-discount__row order-detail-discount__row--discount">
             <span>{{ discountLabel }}</span>
             <strong>-{{ formatCurrency(discountAmount) }}</strong>
           </div>

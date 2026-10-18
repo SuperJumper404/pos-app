@@ -174,6 +174,52 @@ test('mount reads current availability and balance without any availability writ
   assert.equal(f.calls.some(call => call.method === 'PATCH'), false)
 })
 
+test('successful refresh clears only its resource read failure, not another failed resource', async t => {
+  const failed = new Set(['/courier/deliveries', '/courier/cash-balance'])
+  const f = await fixture(t, call => failed.has(call.path) ? { status: 503 } : null)
+  await f.dispatch('loadMissions')
+  await f.dispatch('loadCashBalance')
+  assert.match(f.store.state.courier.error, /Lecture impossible/)
+  failed.delete('/courier/deliveries')
+  await f.dispatch('loadMissions')
+  assert.match(f.store.state.courier.error, /Lecture impossible/)
+  failed.clear()
+  await f.dispatch('loadCashBalance')
+  assert.equal(f.store.state.courier.error, null)
+  assert.equal(f.store.state.courier.missions.length, 2)
+})
+
+test('read recovery preserves an unresolved command error through later successful reads', async t => {
+  let failRead = true
+  const f = await fixture(t, call => call.method === 'POST' ? { status: 503 }
+    : failRead && call.path === '/courier/deliveries' ? { status: 503 } : null)
+  await f.dispatch('loadMissions')
+  failRead = false
+  await f.dispatch('read', { resource: 'detail', deliveryId: '9007199254740993' })
+  await f.dispatch('pickup', { deliveryId: '9007199254740993' })
+  assert.match(f.store.state.courier.error, /Resultat non confirme/)
+  await f.dispatch('loadMissions')
+  await f.dispatch('loadCashBalance')
+  assert.match(f.store.state.courier.error, /Resultat non confirme/)
+})
+
+test('an obsolete failed read cannot restore a banner after the newer refresh succeeds', async t => {
+  const slow = deferred()
+  let readCount = 0
+  const f = await fixture(t, call => {
+    if (call.path !== '/courier/deliveries') return null
+    if (++readCount === 1) return slow.promise
+    return null
+  })
+  const oldRead = f.dispatch('loadMissions')
+  while (!f.calls.length) await new Promise(resolve => setImmediate(resolve))
+  await f.dispatch('loadMissions')
+  slow.resolve({ status: 503 })
+  await oldRead
+  assert.equal(f.store.state.courier.error, null)
+  assert.equal(f.store.state.courier.missions.length, 2)
+})
+
 test('two missions are picked up and finished independently through actual HTTP', async t => {
   const f = await fixture(t, (call, rows) => {
     if (call.method !== 'POST') return
