@@ -38,7 +38,7 @@ export default {
   head() { return { title: 'Suivi de livraison', meta: [{ hid: 'referrer', name: 'referrer', content: 'no-referrer' }, { hid: 'robots', name: 'robots', content: 'noindex, nofollow' }] } },
   computed: {
     stage() {
-      return ({ received: { label: 'Commande recue', icon: 'mdi-check-circle-outline' }, preparing: { label: 'En preparation', icon: 'mdi-chef-hat' }, ready: { label: 'Commande prete', icon: 'mdi-package-variant-closed' },
+      return ({ received: { label: 'Commande recue', icon: 'mdi-check-circle-outline' }, preparing: { label: 'En préparation', icon: 'mdi-chef-hat' }, ready: { label: 'Commande prete', icon: 'mdi-package-variant-closed' },
         in_delivery: { label: 'En livraison', icon: 'mdi-truck-delivery-outline' }, delivered: { label: 'Livree', icon: 'mdi-check-circle-outline' }, restaurant_intervention: { label: 'Intervention du restaurant', icon: 'mdi-phone-outline' } })[this.view.stage] || { label: 'Suivi indisponible', icon: 'mdi-information-outline' }
     },
     phone() { return this.view && String(this.view.restaurant.phone || '').replace(/[^+\d]/g, '') },

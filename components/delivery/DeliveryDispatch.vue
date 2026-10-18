@@ -5,7 +5,7 @@
     </div>
     <v-row dense>
       <v-col cols="12" sm="5"><v-select v-model="filter" :items="filters" label="Etat livraison" outlined dense hide-details /></v-col>
-      <v-col cols="12" sm="7"><v-text-field v-model="search" prepend-inner-icon="mdi-magnify" label="Reference, adresse ou livreur" outlined dense hide-details clearable /></v-col>
+      <v-col cols="12" sm="7"><v-text-field v-model="search" class="se-search-field" prepend-inner-icon="mdi-magnify" label="Reference, adresse ou livreur" outlined dense hide-details clearable /></v-col>
     </v-row>
     <p v-if="filter === 'closed'" class="text-caption mt-3">{{ historyLabel }}</p>
     <v-data-table :headers="headers" :items="filteredMissions" :loading="busy" :items-per-page="20" item-key="id" dense class="mt-4" no-data-text="Aucune livraison dans cette vue.">
@@ -129,7 +129,7 @@ export default {
     currentIdentity(identity) { return !this._isDestroyed && identity === this.identity },
     money(cents) { return ((cents || 0) / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) },
     courierName(id) { const row = [...this.operator.couriers, ...this.operator.holders].find(row => row.id === id); return row ? row.username : id ? `Livreur #${id}` : 'Non attribuee' },
-    preparationLabel(value) { return { 0: 'Recue', 1: 'Recue', 2: 'En preparation', 3: 'Prete' }[value] || String(value) },
+    preparationLabel(value) { return { 0: 'Recue', 1: 'Recue', 2: 'En préparation', 3: 'Prete' }[value] || String(value) },
     paymentLabel(value) { return { paid: 'Payee', unpaid: 'Impayee', refunded: 'Remboursee', requires_payment: 'Paiement en attente', pending: 'Paiement en attente' }[value] || value },
     statusLabel(value) { return { unassigned: 'A attribuer', assigned: 'Attribuee', in_transit: 'En livraison', issue: 'Probleme', delivered: 'Livree', failed: 'Echec', canceled: 'Annulee' }[value] || value },
     actionLabel(value) { return { assign: 'Attribuer / reattribuer', reportIssue: 'Signaler un probleme', resolveIssue: 'Resoudre le probleme', correctTerminal: 'Corriger une erreur terminale', refund: 'Remboursement manuel complet' }[value] || '' },
