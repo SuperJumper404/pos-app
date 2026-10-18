@@ -8,6 +8,9 @@
     >
       {{ checkoutErrorMessage }}
     </v-alert>
+    <v-alert v-if="deliveryTrackingError" type="error" dismissible @input="deliveryTrackingError = ''">
+      {{ deliveryTrackingError }}
+    </v-alert>
     <v-alert v-if="checkoutFinalized && isDelivery" type="success" text>
       Commande transmise au restaurant.
       <a v-if="deliveryTrackingUrl" :href="deliveryTrackingUrl" rel="noreferrer">Suivre la livraison</a>
@@ -540,6 +543,10 @@ export default {
     deliveryTrackingUrl: null,
     deliveryTrackingRecovery: false,
     deliveryTrackingBusy: false,
+    deliveryTrackingError: '',
+    deliveryTrackingConfirmation: null,
+    deliveryTrackingRequest: 0,
+    deliveryTrackingPublication: 0,
     isValue: false,
     loadingBtn: false,
     loadPage: false,
@@ -588,6 +595,8 @@ export default {
   }),
   computed: {
     checkoutShopId() { return Number(this.$store.state.users && this.$store.state.users.user.shopid || localStorage.getItem('shopid')) },
+    deliveryTrackingScope() { return [this.$store.state.cart, this.$store.state.cart?.deliveryTrackingGeneration,
+      this.checkoutShopId, this.fulfillmentType] },
     isSiteCheckout() { return (this.$store.state.users && this.$store.state.users.user.order_source || localStorage.getItem('order_source')) === 'web' },
     deliveryContext() { return this.isSiteCheckout || [0, 1, 4, 5].includes(this.access) },
     isDelivery() { return this.fulfillmentType === 'delivery' },
@@ -754,6 +763,10 @@ export default {
     },
   },
   watch: {
+    deliveryTrackingScope: {
+      sync: true,
+      handler() { this.invalidateDeliveryTracking() },
+    },
     isValue() {
       this.handleStripeCheckoutChange()
     },
@@ -847,23 +860,65 @@ export default {
     this.scheduleStripeAutoPrepare()
   },
   beforeDestroy() {
+    this.invalidateDeliveryTracking()
     this.clearStripeAutoPrepareTimeout()
   },
   methods: {
+    invalidateDeliveryTracking() {
+      this.deliveryTrackingRequest++
+      this.deliveryTrackingPublication++
+      this.deliveryTrackingUrl = null
+      this.deliveryTrackingConfirmation = null
+      this.deliveryTrackingRecovery = false
+      this.deliveryTrackingBusy = false
+      this.deliveryTrackingError = ''
+    },
+    deliveryTrackingCurrent(request, scope, confirmation) {
+      return !this._isDestroyed && !this._isBeingDestroyed && request === this.deliveryTrackingRequest &&
+        scope.every((value, index) => value === this.deliveryTrackingScope[index]) &&
+        confirmation === this.deliveryTrackingConfirmation
+    },
+    async publishDeliveryTracking(data) {
+      const publication = ++this.deliveryTrackingPublication
+      const request = this.deliveryTrackingRequest
+      const scope = this.deliveryTrackingScope
+      const confirmation = this.deliveryTrackingConfirmation
+      const context = await this.$store.dispatch('cart/deliveryTrackingContext', data)
+      if (!context || publication !== this.deliveryTrackingPublication || !this.deliveryTrackingCurrent(request, scope, confirmation) ||
+        context.shopId !== this.checkoutShopId || context.generation !== scope[1]) return false
+      this.deliveryTrackingRequest++
+      this.deliveryTrackingConfirmation = context.confirmationId
+      this.deliveryTrackingRecovery = Boolean(context.confirmationId)
+      this.deliveryTrackingUrl = data && data.tracking_url || null
+      this.deliveryTrackingError = ''
+      this.deliveryTrackingBusy = false
+      return true
+    },
     async renewDeliveryTracking() {
-      if (this.deliveryTrackingBusy) return
+      if (this.deliveryTrackingBusy || !this.deliveryTrackingConfirmation || this._isDestroyed || this._isBeingDestroyed) return
+      const request = ++this.deliveryTrackingRequest
+      const scope = this.deliveryTrackingScope
+      const confirmation = this.deliveryTrackingConfirmation
+      const current = () => this.deliveryTrackingCurrent(request, scope, confirmation)
       this.deliveryTrackingBusy = true
       try {
-        const result = await this.$store.dispatch('cart/rotateDeliveryTracking')
+        const result = await this.$store.dispatch('cart/rotateDeliveryTracking', confirmation)
+        if (!current() || result.discarded) return
         this.deliveryTrackingUrl = result.trackingUrl
-        this.checkoutErrorMessage = result.trackingUrl ? '' : 'Ce renouvellement a deja ete traite. Demandez un nouveau lien.'
-      } catch (_) { this.checkoutErrorMessage = 'Suivi indisponible. Reprenez le renouvellement pour verifier son resultat.' }
-      finally { this.deliveryTrackingBusy = false }
+        this.deliveryTrackingError = result.trackingUrl ? '' : 'Ce renouvellement a deja ete traite. Demandez un nouveau lien.'
+      } catch (_) {
+        if (current()) this.deliveryTrackingError = 'Suivi indisponible. Reprenez le renouvellement pour verifier son resultat.'
+      } finally { if (current()) this.deliveryTrackingBusy = false }
     },
     async copyDeliveryTracking() {
       if (!this.deliveryTrackingUrl) return
+      const request = this.deliveryTrackingRequest
+      const scope = this.deliveryTrackingScope
+      const confirmation = this.deliveryTrackingConfirmation
       try { await navigator.clipboard.writeText(new URL(this.deliveryTrackingUrl, window.location.origin).href) }
-      catch (_) { this.checkoutErrorMessage = 'Le lien ne peut pas etre copie. Ouvrez le suivi pour le partager.' }
+      catch (_) {
+        if (this.deliveryTrackingCurrent(request, scope, confirmation)) this.deliveryTrackingError = 'Le lien ne peut pas etre copie. Ouvrez le suivi pour le partager.'
+      }
     },
     selectDeliveryCustomer(profile) {
       if (this.deliveryAttemptLocked || !profile) return
@@ -894,13 +949,12 @@ export default {
     },
     async finishDeliveryCheckout(data) {
       this.checkoutFinalized = true
-      this.deliveryTrackingUrl = data && data.tracking_url || null
-      this.deliveryTrackingRecovery = await this.$store.dispatch('cart/hasDeliveryTrackingConfirmation')
+      const currentTracking = await this.publishDeliveryTracking(data)
       this.$store.dispatch('cart/setTotal', 0)
       this.$store.dispatch('cart/setIndex', 0)
       this.$store.dispatch('cart/setTocart', null)
       this.$store.dispatch('delivery/resetForShop', this.checkoutShopId)
-      if (!this.deliveryTrackingUrl && !this.deliveryTrackingRecovery) this.$router.push(this.isQrClient ? '/ordersStatuses' : '/caisse/menu')
+      if (currentTracking && !this.deliveryTrackingUrl && !this.deliveryTrackingRecovery) this.$router.push(this.isQrClient ? '/ordersStatuses' : '/caisse/menu')
     },
     customizationGroups(item) {
       const value = item || {}
@@ -1626,7 +1680,7 @@ export default {
         }
         const payment = checkoutResult.data
         if (this.isDelivery && payment && payment.checkout_resolved) { this.finishDeliveryCheckout(payment); return false }
-        if (this.isDelivery) this.deliveryTrackingUrl = payment && payment.tracking_url || null
+        if (this.isDelivery) await this.publishDeliveryTracking(payment)
         const cancelReturnedPayment = async () => {
           const canceled = await this.cancelPreparedStripeAttempt(
             payment.orderId

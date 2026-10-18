@@ -38,6 +38,37 @@ const CHECKOUT_ATTEMPT_UNRESOLVED = 'CHECKOUT_ATTEMPT_UNRESOLVED'
 // A remount shares this live guard; persisted/reloaded attempts have no surviving request.
 const liveDeliveryCheckouts = new WeakSet()
 const deliveryConfirmations = new WeakMap()
+const deliveryTrackingResults = new WeakMap()
+const trackingIdentity = (root, state) => [root.cart || state, root.users?.user?.shopid,
+  root.users?.user?.id, root.users?.user?.session_subject, root.authenticated]
+const sameIdentity = (left, right) => left.every((value, index) => value === right[index])
+const trackingRecord = (store, state, rootState, commit) => {
+  let record = deliveryConfirmations.get(state)
+  if (record) return record
+  record = { generation: state.deliveryTrackingGeneration, confirmation: null, pending: null }
+  record.advance = () => {
+    record.confirmation = null
+    record.generation++
+    commit('DELIVERY_TRACKING_GENERATION', record.generation)
+  }
+  deliveryConfirmations.set(state, record)
+  if (typeof store.watch === 'function') {
+    // Synchronous invalidation also catches A -> B -> A within a single render tick.
+    record.stop = store.watch(root => [...trackingIdentity(root, state),
+      root.cart?.clientOrderToken, root.cart?.clientOrderPayload, root.cart?.clientOrderSignature], (next, previous) => {
+      if (!sameIdentity(next.slice(0, 5), previous.slice(0, 5)) ||
+        next.some((value, index) => index >= 5 && value !== previous[index] && (value != null || record.pending))) record.advance()
+      if (next[0] !== state) record.stop()
+    }, { sync: true })
+  }
+  return record
+}
+const trackingFrameCurrent = (store, rootState, state, record, frame) =>
+  record.generation === frame.generation && sameIdentity(frame.identity, trackingIdentity(store.state || rootState, state))
+const trackingConfirmation = (store, rootState, state, record) => {
+  const context = record.confirmation
+  return context && trackingFrameCurrent(store, rootState, state, record, context) ? context : null
+}
 const SAFE_PREWRITE_ERROR_CODES = new Set([
   'CHECKOUT_REQUEST_INVALID',
   'INSUFFICIENT_STOCK',
@@ -189,11 +220,15 @@ export const state = () => ({
   clientOrderOrderId: null,
   clientOrderAuthRedirect: false,
   clientOrderStatus: 'idle',
+  deliveryTrackingGeneration: 0,
 })
 
 removeOldOrders()
 export const mutations = {
   ...defaultMutations(state()),
+  DELIVERY_TRACKING_GENERATION(state, generation) {
+    state.deliveryTrackingGeneration = generation
+  },
   MARK_CHECKOUT_AUTH_REDIRECT(currentState, active) {
     currentState.clientOrderAuthRedirect = active === true
   },
@@ -210,20 +245,33 @@ export const mutations = {
 
 export const plugins = [EasyAccess()]
 export const actions = {
-  hasDeliveryTrackingConfirmation({ state, rootState }) {
-    const context = deliveryConfirmations.get(state)
-    return Boolean(context && context.shopId === rootState.users?.user?.shopid)
+  hasDeliveryTrackingConfirmation({ state, rootState, commit }) {
+    return Boolean(trackingConfirmation(this, rootState, state, trackingRecord(this, state, rootState, commit)))
   },
-  async rotateDeliveryTracking({ state, rootState }) {
-    const context = deliveryConfirmations.get(state)
-    if (!context || context.shopId !== rootState.users?.user?.shopid || context.busy) throw new Error('Confirmation privee indisponible.')
+  deliveryTrackingContext({ state, rootState, commit }, data) {
+    const record = trackingRecord(this, state, rootState, commit)
+    const result = data && deliveryTrackingResults.get(data)
+    if (!result || result.record !== record ||
+      !trackingFrameCurrent(this, rootState, state, record, result)) return null
+    const context = trackingConfirmation(this, rootState, state, record)
+    return { generation: record.generation, shopId: rootState.users?.user?.shopid, confirmationId: context?.id || null }
+  },
+  async rotateDeliveryTracking({ state, rootState, commit }, expectedId) {
+    const record = trackingRecord(this, state, rootState, commit)
+    const context = trackingConfirmation(this, rootState, state, record)
+    if (!context || (expectedId && context.id !== expectedId) || context.busy) throw new Error('Confirmation privee indisponible.')
+    const current = () => trackingConfirmation(this, rootState, state, record) === context
     context.busy = true
     if (!context.key) context.key = uuidv4()
     try {
       const result = await buildTrackingApi({ baseURL: process.env.privateURL }).rotate({ deliveryId: context.deliveryId,
         idempotencyKey: context.key, privateCheckoutContext: context.privateCheckoutContext })
+      if (!current()) return { discarded: true }
       context.key = null
       return result
+    } catch (error) {
+      if (!current()) return { discarded: true }
+      throw error
     } finally { context.busy = false }
   },
   setTotal({ dispatch }, params) {
@@ -248,6 +296,7 @@ export const actions = {
     const previousAttemptStatus = state.clientOrderStatus || 'idle'
     const previousOrderId = state.clientOrderOrderId
     const deliveryAttempt = params.fulfillmentType === 'delivery' || state.clientOrderPayload?.fulfillment_type === 'delivery'
+    const tracking = deliveryAttempt ? trackingRecord(this, state, rootState, commit) : null
     if (deliveryAttempt && (liveDeliveryCheckouts.has(state) ||
       (previousAttemptStatus === 'pending' && params.retryOriginal !== true))) return unresolvedCheckoutResult(state)
     if (params.customerSession && params.customerSession.shopId !== rootState.users?.user?.shopid) return unresolvedCheckoutResult(state)
@@ -298,6 +347,11 @@ export const actions = {
     if (payload.fulfillment_type === 'delivery') liveDeliveryCheckouts.add(state)
     dispatch('set/clientOrderAuthRedirect', false)
     dispatch('set/clientOrderStatus', 'pending')
+    const trackingFrame = tracking && { generation: tracking.generation, identity: trackingIdentity(rootState, state),
+      token: payload.client_order_token, payload: state.clientOrderPayload }
+    if (tracking) tracking.pending = trackingFrame
+    const currentTracking = () => tracking && trackingFrameCurrent(this, rootState, state, tracking, trackingFrame) &&
+      state.clientOrderToken === trackingFrame.token && state.clientOrderPayload === trackingFrame.payload
 
     try {
       const response = payload.fulfillment_type === 'delivery' || params.customerSession
@@ -307,10 +361,22 @@ export const actions = {
           Authorization: `Bearer ${readAuthToken()}`,
         },
       })
-      const data = response && response.data ? response.data.data : null
-      if (payload.fulfillment_type === 'delivery' && data?.delivery?.id) {
-        deliveryConfirmations.set(state, { shopId: rootState.users?.user?.shopid, deliveryId: data.delivery.id,
-          privateCheckoutContext: { clientOrderToken: payload.client_order_token, confirmationSecret: payload.delivery_confirmation_secret }, busy: false, key: null })
+      let data = response && response.data ? response.data.data : null
+      const trackingCurrent = currentTracking()
+      if (tracking) tracking.pending = null
+      if (tracking && data) {
+        if (trackingCurrent) {
+          if (data.delivery?.id) {
+            tracking.advance()
+            tracking.confirmation = { id: uuidv4(), generation: tracking.generation, identity: trackingFrame.identity,
+              deliveryId: data.delivery.id, privateCheckoutContext: { clientOrderToken: trackingFrame.token,
+                confirmationSecret: payload.delivery_confirmation_secret }, busy: false, key: null }
+          }
+          deliveryTrackingResults.set(data, { record: tracking, generation: tracking.generation, identity: trackingFrame.identity })
+        } else {
+          const { tracking_url: ignoredTrackingUrl, ...financialData } = data
+          data = financialData
+        }
       }
       if (data && data.orderId) commit('ADD_ORDER_SENT', data.orderId)
       dispatch('set/message', response?.data?.message || '')
@@ -327,13 +393,17 @@ export const actions = {
       }
       return { ok: true, data, error: null }
     } catch (error) {
+      const trackingCurrent = currentTracking()
+      if (tracking) tracking.pending = null
       const checkoutError = buildCheckoutError(error)
       if (!checkoutError.code && typeof error?.response?.data?.error === 'string') checkoutError.code = error.response.data.error
       if (payload.fulfillment_type === 'delivery' && checkoutError.checkout_resolved === true && checkoutError.orderId &&
         ['paid', 'refunded'].includes(checkoutError.payment_status)) {
         commit('ADD_ORDER_SENT', checkoutError.orderId)
         clearCheckoutAttempt(dispatch)
-        return { ok: true, data: { orderId: checkoutError.orderId, checkout_resolved: true, payment_status: checkoutError.payment_status }, error: null }
+        const data = { orderId: checkoutError.orderId, checkout_resolved: true, payment_status: checkoutError.payment_status }
+        if (trackingCurrent) deliveryTrackingResults.set(data, { record: tracking, generation: tracking.generation, identity: trackingFrame.identity })
+        return { ok: true, data, error: null }
       }
       if (stripe && payload.fulfillment_type !== 'delivery' && isAlreadyProcessedStripeReplay(checkoutError)) {
         commit('ADD_ORDER_SENT', checkoutError.orderId)
