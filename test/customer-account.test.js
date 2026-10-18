@@ -143,7 +143,7 @@ function make(options = {}) {
     load('plugins/persistedState.client.js').default({ store })
   } finally { global.window = previousWindow }
   const dispatch = (name, payload) => store.dispatch(`customer/${name}`, payload)
-  const snapshot = () => JSON.stringify({ ...Object.fromEntries(Object.keys(staff).map(key => [key, store.state[key]])), storage: { ...storage, vuex: JSON.parse(storage.vuex).state }, theme })
+  const snapshot = () => JSON.stringify({ ...Object.fromEntries(Object.keys(staff).map(key => [key, store.state[key]])), storage, theme })
   const component = (file, propsData = {}, clocks) => new Vue({ ...load(file, clocks).default, store, propsData })
   return { store, dispatch, calls, api, snapshot, component, storage, get state() { return store.state.customer } }
 }
@@ -263,14 +263,16 @@ test('current customer 401 clears only customer state, late reads cannot restore
   assert.equal(f.snapshot(), before)
 })
 
-test('actual general persistence retains staff values but rewrites TTL: bounded controller-owned filter need', async () => {
+test('actual general persistence preserves raw staff storage bytes and expiry during customer activity', async () => {
   const f = make()
   const raw = f.storage.vuex
+  const expiresAt = JSON.parse(raw).expiresAt
   const before = f.snapshot()
   await f.dispatch('loadSession', { shopId: 7 })
   await f.dispatch('loadAddresses')
   assert.equal(f.snapshot(), before)
-  assert.notEqual(f.storage.vuex, raw)
+  assert.equal(f.storage.vuex, raw)
+  assert.equal(JSON.parse(f.storage.vuex).expiresAt, expiresAt)
   assert.ok(!Object.hasOwn(JSON.parse(f.storage.vuex).state, 'customer'))
 })
 

@@ -2,6 +2,9 @@ const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
+const Vue = require('vue')
+const Vuex = require('vuex')
+const createPersistedState = require('vuex-persistedstate')
 const {
   PERSISTED_STATE_TTL,
   parsePersistedState,
@@ -113,5 +116,84 @@ pluginOptions.setState('vuex', persisted, storage)
 assert.deepStrictEqual(JSON.parse(storage.saved).state, expectedPersisted)
 storage.saved = JSON.stringify({ expiresAt: Date.now() + PERSISTED_STATE_TTL, state: persisted })
 assert.deepStrictEqual(pluginOptions.getState('vuex', storage), expectedPersisted)
+
+Vue.use(Vuex)
+
+const originalWindow = global.window
+const originalNow = Date.now
+let clock = now
+const values = new Map([
+  ['vuex', JSON.stringify({ expiresAt: now + PERSISTED_STATE_TTL, state: expectedPersisted })],
+])
+const writes = []
+const realStorage = {
+  getItem: key => values.get(key) || null,
+  setItem(key, value) { values.set(key, value); if (key === 'vuex') writes.push(value) },
+  removeItem: key => values.delete(key),
+}
+const moduleWithMutation = (initial = {}) => ({
+  namespaced: true,
+  state: { ...initial, count: 0 },
+  mutations: { CHANGE(state) { state.count++ } },
+})
+try {
+  Date.now = () => clock
+  global.window = { localStorage: realStorage }
+  const liveStore = new Vuex.Store({
+    state: { authenticated: true, rootCount: 0 },
+    mutations: {
+      ROOT_CHANGE(state) { state.rootCount++ },
+      customer(state) { state.rootCount++ },
+      delivery(state) { state.rootCount++ },
+      courier(state) { state.rootCount++ },
+    },
+    modules: {
+      customer: moduleWithMutation({ addresses: [{ instructions: 'private customer address' }] }),
+      delivery: moduleWithMutation({ quote: { instructions: 'private delivery address' } }),
+      courier: moduleWithMutation({ missions: [{ instructions: 'private mission' }] }),
+      users: moduleWithMutation(expectedPersisted.users),
+      staff: moduleWithMutation(),
+      cart: moduleWithMutation({ ...expectedPersisted.cart, clientOrderToken: 'pending-recovery-fixture' }),
+      customerSupport: moduleWithMutation(),
+      deliverySettings: moduleWithMutation(),
+      courierCash: moduleWithMutation(),
+      nested: { namespaced: true, modules: { customer: moduleWithMutation() } },
+    },
+  })
+  pluginFactory(createPersistedState, require)({ store: liveStore })
+
+  const originalBytes = values.get('vuex')
+  const originalExpiry = JSON.parse(originalBytes).expiresAt
+  for (const namespace of ['customer', 'delivery', 'courier']) {
+    clock += 12345
+    liveStore.commit(`${namespace}/CHANGE`)
+    assert.strictEqual(liveStore.state[namespace].count, 1)
+    assert.strictEqual(values.get('vuex'), originalBytes, `${namespace} must preserve exact stored bytes`)
+    assert.strictEqual(JSON.parse(values.get('vuex')).expiresAt, originalExpiry)
+    assert.strictEqual(writes.length, 0, 'Excluded mutations must not write storage')
+  }
+
+  const retainedMutations = [
+    'users/CHANGE', 'staff/CHANGE', 'cart/CHANGE', 'ROOT_CHANGE',
+    'customer', 'delivery', 'courier', 'customerSupport/CHANGE',
+    'deliverySettings/CHANGE', 'courierCash/CHANGE', 'nested/customer/CHANGE',
+  ]
+  retainedMutations.forEach((type, index) => {
+    clock += 12345
+    liveStore.commit(type)
+    assert.strictEqual(writes.length, index + 1, `${type} must still persist`)
+    const persisted = JSON.parse(values.get('vuex'))
+    assert.strictEqual(persisted.expiresAt, clock + PERSISTED_STATE_TTL)
+    assert.deepStrictEqual(persisted.state, JSON.parse(JSON.stringify(sanitizePersistedState(liveStore.state))))
+    assert.strictEqual(persisted.state.cart.clientOrderToken, 'pending-recovery-fixture')
+    assert.strictEqual(persisted.state.users.user.token, 'saved-session')
+    for (const namespace of ['customer', 'delivery', 'courier']) {
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(persisted.state, namespace), false)
+    }
+  })
+} finally {
+  Date.now = originalNow
+  global.window = originalWindow
+}
 
 console.log('persistedState tests passed')
