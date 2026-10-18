@@ -79,8 +79,21 @@ raster-rendered and inspected at Task15; those PDF/PNG files are retained here.
 Some old full-page dialog captures place a fixed header partway down the image
 after input auto-scroll; do not treat that screenshot artifact as app geometry.
 
-After the final reviews, the controller will create `raw-evidence.zip` with
-the plan ledger, task/review reports, raw command logs and browser reports/
-screenshots before plan-scratch cleanup. `sha256.json` will bind those retained
-artifacts. Both are still planned at this pre-review snapshot. No node_modules,
-build output, real env files or git metadata belongs in that archive.
+## Final Review And Retention
+
+All17 task gates and the broad review/one fix dispatch/one scoped re-review
+are complete. Final I1/I2 are ADDRESSED, no new blocking finding. Final tested
+code is Ff0d57990e5c7e7afe1f3edf50f17db0ffabe0820 and
+Bb2e3ede2636a5de19005ff1966a11211f4dab5a7; fullF3+88/B66/SQL18/runtime20/
+lint/build native0 evidence is in final-fixes-report.md. Original images remain
+BEFORE-fix visuals, not new screenshots of the register/unassigned controls;
+actual compiled Vue/Vuex tests and final build cover those small changed views.
+
+The verified raw-evidence.zip retains1253 files: plan ledger, all task/review
+reports, raw command logs, browser reports/screenshots and actual PDF artifacts.
+Every entry was SHA256-compared to its original before scratch cleanup, zero
+mismatches; all59 Rulings/reasons/costs are also preserved in tracked decisions.
+retention-check.json records the archive verification; sha256.json binds all
+retained evidence files. No node_modules, build output, real env files or git
+metadata is included. Direct final reports are retained beside this README.
+No merge/push/deploy or real OTP receipt is part of this completion.

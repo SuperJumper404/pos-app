@@ -1,6 +1,18 @@
 # Delivery V1 Decisions And Evidence Limits
 
-This tracked record preserves ALL 52 ledger Ruling lines at this author snapshot, with their original reasons and costs. Source: `.superpowers/sdd/2026-10-16-delivery-management/progress.md`; line numbers are provenance, not links that require scratch retention. Refresh immediately before the final author commit and after any later controller review rulings. No original decision is silently removed when a later fix supersedes its initial disposition.
+This tracked record preserves ALL 59 ledger Ruling lines, with their original reasons and costs (original52, six final-integration rulings and final maintenance disposition). Source: progress.md retained inside the raw evidence archive; line numbers are provenance, not live scratch links. No original decision is silently removed when a later fix supersedes its initial disposition.
+
+## Final Disposition
+
+All17 source gates, the broad review, one bounded fix dispatch and one scoped
+re-review are complete. Final findings I1/I2 are ADDRESSED; no new blocking
+finding remains. Tested code pair Ff0d57990e5c7e7afe1f3edf50f17db0ffabe0820 /
+Bb2e3ede2636a5de19005ff1966a11211f4dab5a7 has complete F3+88/B66/SQL18/runtime20/
+lint/build native0 evidence. Later closeout files are documentation/evidence only.
+Current source-binding limitations, old failed/composite gates and all physical/
+live/external exclusions remain unchanged. Below Task17 source/checklist sections
+are historical snapshots, NOT pending current software gates. See acceptance
+and the retained broad/scoped review reports for the complete final verdict.
 
 ## Current Dispositions
 
@@ -24,7 +36,7 @@ This tracked record preserves ALL 52 ledger Ruling lines at this author snapshot
 | Headless native embedded PDF iframe | Blank, visual preview NOT validated. Existing actual generated Task15 PDFs/raster PNGs were independently rendered/viewed/hashchecked and retained; no browser PDF integration fix or physical print claim. |
 | Live commissioning and historical data | Both real OTP receipts, provider finance/printing, historic DATETIME/activation-link audits, shared budgets/limiter, actual TLS/origin/proxy/cookie topology and deployment remain external prerequisites. No live readiness claim. |
 
-## Current Local Gate And Source Binding
+## Task17 Before-Fix Gate And Source Binding
 
 Tested executable pair: F `b795fca1931f6bbe90b82eaf58c620f68c29f995` / B `8dbc562efb69a291a09b515b3d1ce17eb1253279`; controller UI wave98bfb39 is included. B whole npm66 files/registered SQL17 files/configured Node20.20.2 whole-app boot on MySQL8.0.33 each native0. F whole npm3 pretests+88 files/lint/isolated build each native0. Initial/composite histories below are not retroactively upgraded. Source commits bind the same working blobs used at command launch; a later two-Markdown documentation commit changes no executable/package bytes. Full exact commands, raw log names and source limitations are in [acceptance](delivery-v1-acceptance.md) and task-17-report.md. All worker sessions are collected.
 
@@ -384,4 +396,9 @@ the logistics, and closure never implicitly refunds, restocks or adjusts debt.
 The operator resolution choices come from the server's journal-derived origin.
 Explicit admin correction accepts proven unassigned/null-courier history and
 retains the earliest immutable closure ceiling for private tracking; missing
-history is refused. This contract remains subject to main's scoped re-review.
+history is refused. The independent scoped re-review confirms both fixes
+ADDRESSED, with no new breakage. No live/provider/deployment authority follows.
+
+## Final Maintenance Ruling (Verbatim)
+
+- Ruling: retain final M1 diagnostic/lint/build noise, inherited untriaged audit47 and M2 unbounded final runtime probes as explicit deferred maintenance after scoped software approval - no newly introduced blocking defect was established by full/scoped reviews and current whole commands passed; broad dependency/tooling modernization is outside two-findings fix - if wrong, CI noise or a stalled future smoke can delay diagnosis/cleanup, and inherited security exploitability requires a separately authorized audit before stronger security/live claims. No maintenance issue is represented as fixed/harmless, no OTP/provider/physical/deployment validation is inferred. All DeclinedToJudge1-15 remain individually preserved in final-review.md and earlier acceptance ruling.

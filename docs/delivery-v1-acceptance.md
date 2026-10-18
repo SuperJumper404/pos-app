@@ -1,6 +1,16 @@
 # Delivery V1 Local Acceptance
 
-Task17's local gates and independent task review passed. The subsequent broad paired-branch review found two Important integration defects: register-origin manual full refunds and restaurant closure before courier assignment. The bounded author fixes and their current evidence are recorded first below; main's one scoped re-review remains pending. Earlier Task17 results are preserved as BEFORE-fix evidence. This records software preparation on disposable fixtures, not authorization or proof of live activation, supplier receipt, deployment or production data readiness.
+Local software implementation and independent reviews are complete. The broad review's two Important integration defects (register-origin full refunds and closure before courier assignment) are both ADDRESSED by the single fix dispatch and scoped re-review, with no new Critical/Important/Minor finding. Earlier Task17 results remain BEFORE-fix evidence. This is software preparation on disposable fixtures, not authorization or proof of live activation, supplier receipt, deployment or production data readiness.
+
+Final tested executable pair: frontend `f0d57990e5c7e7afe1f3edf50f17db0ffabe0820`
+and backend `b2e3ede2636a5de19005ff1966a11211f4dab5a7`. Later frontend closeout
+changes only documentation/evidence. Current complete gates are F3pretests+88main,
+B66unit/18SQL, actual Docker Node20 runtime, lint0errors143warnings and build0.
+See the retained [scoped verdict](delivery-v1-evidence/2026-10-18/final-fixes-rereview.md),
+[broad review](delivery-v1-evidence/2026-10-18/final-review.md) and
+[fix evidence](delivery-v1-evidence/2026-10-18/final-fixes-report.md).
+M1/M2 and all real-world commissioning limits remain explicit; both actual OTP
+receipts/verification are NOT EXECUTED. No merge, push or deployment occurred.
 
 ## Final Integration Fixes
 
@@ -87,14 +97,14 @@ No new browser/detector/polish or physical-device round was run for the small
 dialog change. Actual compiled templates/Vuex tests and scratch build validate
 the changed controls; earlier screenshots/PDFs remain earlier-source evidence.
 Task17 M1/M2, inherited audit47 and final review DeclinedToJudge1-15 remain
-preserved limitations. All58 current controller rulings are retained verbatim in
-delivery-v1-decisions.md. Main artifact subtree and original raw evidence remain
-untouched; no raw archive cleanup, source approval or live readiness is claimed.
+preserved limitations. All59 controller rulings are retained verbatim in
+delivery-v1-decisions.md. Original raw evidence has been archived and byte-checked
+before temporary scratch cleanup. Live readiness is not claimed.
 
 All final-fix gate sessions are complete and collected, including the sole full
-SQL session41691. No command was rerun to repair source-binding metadata. Main's
-single scoped re-review remains pending; these author results do not self-approve
-the paired changes or authorize any merge, migration, deployment or activation.
+SQL session41691. No command was rerun to repair source-binding metadata. The
+independent scoped re-review confirms I1/I2 ADDRESSED with no new breakage;
+this does not authorize merge, migration, deployment or activation.
 
 ## Task17 Before-Fix Sources
 
@@ -197,7 +207,7 @@ Thirteen retained representative screenshots (not a claim every complex boundary
 
 The native embedded PDF iframe is BLANK in headless Chrome; its visual preview is NOT validated. Task15 produced actual fictional PDFs with the existing receipt generator; both final raster PNGs were visually inspected and independently bound to hashes. Accepted stable artifacts are [paid PDF](delivery-v1-evidence/2026-10-18/pdf/delivery-paid.pdf), [paid raster](delivery-v1-evidence/2026-10-18/pdf/delivery-paid-1.png), [refunded PDF](delivery-v1-evidence/2026-10-18/pdf/delivery-refunded.pdf) and [refunded raster](delivery-v1-evidence/2026-10-18/pdf/delivery-refunded-1.png). This is actual standalone PDF visual evidence, not a passed native embedded preview, renderer-version/text-only assertion or physical printing. No extra browser PDF integration fix was introduced.
 
-Controller owns the evidence subtree and will prepare raw-evidence.zip and sha256.json AFTER independent/final reviews to retain the newest ledger/reports/logs/screenshots. They are planned retention artifacts, not yet-present or completed checks at this author stage. Existing scratch/raw evidence is not deleted. [Decisions and evidence limits](delivery-v1-decisions.md) retain ALL current ledger Rulings/reasons/costs and historical qualifications.
+Post-review retention is complete: [raw-evidence.zip](delivery-v1-evidence/2026-10-18/raw-evidence.zip) contains1253 files, all SHA256-compared to originals with zero mismatches before temporary scratch cleanup. [Retention check](delivery-v1-evidence/2026-10-18/retention-check.json) and [artifact hashes](delivery-v1-evidence/2026-10-18/sha256.json) preserve integrity evidence. [Decisions and evidence limits](delivery-v1-decisions.md) retain all59 Rulings/reasons/costs and historical qualifications. The archive contains raw log paths cited above; no real env, dependencies, build output or git metadata was retained.
 
 ## Commissioning Prerequisites
 

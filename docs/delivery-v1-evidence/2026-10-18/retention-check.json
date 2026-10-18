@@ -1,0 +1,10 @@
+{
+    "verifiedAt":  "2026-10-18T11:54:58.3367202Z",
+    "expectedFiles":  1253,
+    "verifiedFiles":  1253,
+    "allBytesMatch":  true,
+    "excluded":  "node_modules, build output, real env files, git metadata",
+    "archiveBytes":  10606532,
+    "archiveSha256":  "2C0690CB5F1B8F5C47E875C816353FBB14CA5B32A81208558B82C543401D8C41",
+    "rulingsRetained":  59
+}

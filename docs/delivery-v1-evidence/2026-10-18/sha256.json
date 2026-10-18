@@ -1,0 +1,136 @@
+{
+    "algorithm":  "SHA256",
+    "excludesSelf":  true,
+    "files":  [
+                  {
+                      "path":  ".gitattributes",
+                      "bytes":  40,
+                      "sha256":  "9E206FA63EE7FC83E149018EEA83EBC6687C5C5A87D15BD84248B351F150C1A2"
+                  },
+                  {
+                      "path":  "final-fixes-report.md",
+                      "bytes":  9442,
+                      "sha256":  "C15A58121DB30BA14E40F8168CB3A53861A4A929764D1840A7B345C2CC06AFB4"
+                  },
+                  {
+                      "path":  "final-fixes-rereview.md",
+                      "bytes":  13734,
+                      "sha256":  "B5728D2FF32CB126DFA7CCCF310C61FCD4D90D977CA8C9E7BD70AD665DFA5DCC"
+                  },
+                  {
+                      "path":  "final-review.md",
+                      "bytes":  20312,
+                      "sha256":  "0806B77951034EC1040DBE1FD6A7DDEDEB303B8B307B7EE605AA2CF270043DDB"
+                  },
+                  {
+                      "path":  "pdf/delivery-paid.pdf",
+                      "bytes":  5535,
+                      "sha256":  "89125DE8B8854A8B272EC7C6AC755DF72A2D29FC84E087683FF57C3ACE993C04"
+                  },
+                  {
+                      "path":  "pdf/delivery-paid-1.png",
+                      "bytes":  35276,
+                      "sha256":  "A9F4DCE692EC9A95E8B2DEE7ADA410E342B8223625744AB8CB44DA819B1DE27D"
+                  },
+                  {
+                      "path":  "pdf/delivery-refunded.pdf",
+                      "bytes":  5761,
+                      "sha256":  "CA3169BF966BE517B81E02317AEEDB302D4825BBD9E0211ABC0030F3E2AF3870"
+                  },
+                  {
+                      "path":  "pdf/delivery-refunded-1.png",
+                      "bytes":  38064,
+                      "sha256":  "FCE44AC9F76DBE8F639AE364727CF6A717EAFB509CCAF7F20D758F87C454E88B"
+                  },
+                  {
+                      "path":  "raw-evidence.zip",
+                      "bytes":  10606532,
+                      "sha256":  "2C0690CB5F1B8F5C47E875C816353FBB14CA5B32A81208558B82C543401D8C41"
+                  },
+                  {
+                      "path":  "README.md",
+                      "bytes":  6033,
+                      "sha256":  "68693D9B29836E09B14E7474DBF6110414F0AFCFA7E96D2F18125966264C4088"
+                  },
+                  {
+                      "path":  "retention-check.json",
+                      "bytes":  363,
+                      "sha256":  "78FAB95172E8D3DC6CD24BAD043248625EC71984000786572A47ED914FDD6D25"
+                  },
+                  {
+                      "path":  "screenshots/account-login-desktop.png",
+                      "bytes":  34759,
+                      "sha256":  "6F45E870A0FCE4E622A7969B715D7FB2EB6925F7B61AF44F58F922A03F91A671"
+                  },
+                  {
+                      "path":  "screenshots/addresses-mobile.png",
+                      "bytes":  100991,
+                      "sha256":  "2182EC480A845066DD5F6D8E2B5F7A9C1E4DE67018C192A3E0876CB62402F91C"
+                  },
+                  {
+                      "path":  "screenshots/courier-landscape.png",
+                      "bytes":  169602,
+                      "sha256":  "203013DDA3E5439A18D731C4B2229C4D7DCF860DF4C24D1C41E1457D3E9192EE"
+                  },
+                  {
+                      "path":  "screenshots/courier-network-recovered-mobile.png",
+                      "bytes":  162933,
+                      "sha256":  "F0E21936CB367470BF7D7BEEDC697907E23C451040948E4C7024DB45D2E86DB1"
+                  },
+                  {
+                      "path":  "screenshots/dispatch-desktop.png",
+                      "bytes":  67437,
+                      "sha256":  "D5F1F05ABE501CEFF3334FC4CECA0FC28362569203077AA4299452BDC2797380"
+                  },
+                  {
+                      "path":  "screenshots/history-delivery-receipt-mobile.png",
+                      "bytes":  91891,
+                      "sha256":  "3FAB513C2AAAE58AE46FE7247950C45BFC6FDF89E77C33DFB485C687FD64713E"
+                  },
+                  {
+                      "path":  "screenshots/order-delivery-vat-mobile-scrolled.png",
+                      "bytes":  43603,
+                      "sha256":  "E19506F4DDD82681DE556030B1F097D561FFCB7C7717B712BFA624129C8998B5"
+                  },
+                  {
+                      "path":  "screenshots/pos-delivery-quote-mobile.png",
+                      "bytes":  72904,
+                      "sha256":  "C1EEE89C556AF21612ABD164E9997D61804D424E7804DF5D392C775117CF6C39"
+                  },
+                  {
+                      "path":  "screenshots/refund-dialog-mobile.png",
+                      "bytes":  83523,
+                      "sha256":  "71A5AB13034F75E673DD7B1D6319C466D31CC4FF77C1A9FED67CB02008461296"
+                  },
+                  {
+                      "path":  "screenshots/reports-remittance-only-mobile.png",
+                      "bytes":  135918,
+                      "sha256":  "D6B0D59391CCC0AA7C1CA844DD73C1EF4CE51111AC18EEEA1246C8B35D51C6BE"
+                  },
+                  {
+                      "path":  "screenshots/settings-narrow-arrow-navigation.png",
+                      "bytes":  52646,
+                      "sha256":  "DEC1FCDA0BD297CF7F5ABDE87E32FE6E04B044B431D0AED8D8EC14D77537EF53"
+                  },
+                  {
+                      "path":  "screenshots/terminal-correction-mobile.png",
+                      "bytes":  41696,
+                      "sha256":  "FE88091FA76C5890096C182288506400E3F40B3E6A509B015221995A5DB01257"
+                  },
+                  {
+                      "path":  "screenshots/tracking-active-mobile.png",
+                      "bytes":  36754,
+                      "sha256":  "0DED657FE2635D86E93BC4E0499BAEA57CA4333EB59E5A14D16E974FAA56754D"
+                  },
+                  {
+                      "path":  "task-17-review.md",
+                      "bytes":  10750,
+                      "sha256":  "546052F6F1819094D6B9DAE52D20652249FE6BFC76D64AF96296991F8FC82266"
+                  },
+                  {
+                      "path":  "ui-detector.json",
+                      "bytes":  99110,
+                      "sha256":  "0D59B625E11E598CD16CE1A7EDB0847687FB758434553D0227BB5883F51D4126"
+                  }
+              ]
+}
