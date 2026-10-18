@@ -16,8 +16,12 @@ const sessionAuth =
     ? require('../helpers/sessionAuth')
     : { isQrSession: () => false, isTokenExpired: () => false }
 const { isQrSession, isTokenExpired } = sessionAuth
+const courierAccess = typeof require === 'function' ? require('../helpers/staffRoles') : {
+  isCourierUser: () => false, isCourierRoute: () => false, isPublicDeliveryTracking: () => false,
+}
 
 export default async function ({ store, redirect, route, router }) {
+  if (courierAccess.isPublicDeliveryTracking(route)) return
   const storedToken =
     typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
   const storedQrToken =
@@ -63,6 +67,10 @@ export default async function ({ store, redirect, route, router }) {
         ? '/session-expired'
         : '/login'
     )
+  }
+
+  if (courierAccess.isCourierUser(currentUser) && !courierAccess.isCourierRoute(route) && !courierAccess.isPublicDeliveryTracking(route)) {
+    return redirect('/livreur')
   }
 
   if (isKioskRoute(route) && !canAccessKiosk(currentUser)) {

@@ -222,7 +222,7 @@ const {
 const { isKioskRoute } = require('@/helpers/kioskAccess')
 export default {
   mixins: [listdashboard],
-  middleware: 'delivery',
+  middleware: ['courier', 'delivery'],
   data() {
     return {
       clipped: false,

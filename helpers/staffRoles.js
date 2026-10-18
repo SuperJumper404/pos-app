@@ -160,6 +160,11 @@ const canOperateDelivery = user => Boolean(user && user.id && user.shopid && use
   user.session_subject !== 'service_point' && user.session_subject !== 'customer' && Number(user.status) !== 0 &&
   canAccessModule(user.access, 'delivery', user.module_permissions))
 
+const isCourierUser = user => Boolean(user && user.id && user.shopid && user.access != null &&
+  user.session_subject === 'staff' && Number(user.status) !== 0 && Number(user.access) === ACCESS.COURIER)
+const isCourierRoute = route => /^\/livreur(?:\/|$)/i.test(String(route && route.path || ''))
+const isPublicDeliveryTracking = route => /^\/livraison\/suivi(?:\/|$)/i.test(String(route && route.path || ''))
+
 module.exports = {
   ACCESS,
   ROLE_OPTIONS,
@@ -174,4 +179,7 @@ module.exports = {
   isTableQrAccess,
   canOperateDelivery,
   isDeliveryAdmin,
+  isCourierUser,
+  isCourierRoute,
+  isPublicDeliveryTracking,
 }
