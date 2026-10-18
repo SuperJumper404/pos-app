@@ -5,7 +5,7 @@ const { isTokenExpired } = require('../helpers/sessionAuth')
 
 export const namespaced = true
 export const state = () => ({ identity: null, epoch: 0, missions: [], available: null, balance: null,
-  pending: {}, reads: {}, busy: {}, error: null, recoveryError: null, order: [] })
+  pending: {}, reads: {}, busy: {}, error: null, recoveryError: null, order: [], missionSequence: 0, missionFreshness: {} })
 const initialState = state
 const user = root => root.users && root.users.user
 export const courierIdentity = root => JSON.stringify([root.authenticated !== false, user(root) && [
@@ -15,6 +15,12 @@ const authorized = root => root.authenticated !== false && isCourierUser(user(ro
   !isTokenExpired(user(root).token || (typeof localStorage !== 'undefined' && localStorage.getItem('token')))
 const validId = id => typeof id === 'string' && /^[1-9]\d{0,19}$/.test(id)
 const closed = row => ['delivered', 'failed', 'canceled'].includes(row.deliveryStatus)
+const missionFresh = (state, id, sequence) => (state.missionFreshness[id] || 0) <= sequence
+const protectMissions = (state, ids) => {
+  if (!ids.length) return
+  state.missionSequence++
+  state.missionFreshness = { ...state.missionFreshness, ...Object.fromEntries(ids.map(id => [id, state.missionSequence])) }
+}
 const safeMission = (row, actor) => {
   if (!row || !validId(row.id) || String(row.shopId) !== String(actor.shopid) || String(row.courierId) !== String(actor.id)) return null
   const result = { ...row }
@@ -73,11 +79,29 @@ export const mutations = {
   },
   BUSY(state, { key, value }) { state.busy = { ...state.busy, [key]: value } },
   READ(state, { key, token }) { state.reads = { ...state.reads, [key]: token } },
-  INVALIDATE_READS(state) { state.reads = {} },
-  MISSIONS(state, rows) { state.missions = rows; state.order = state.order.filter(id => rows.some(row => row.id === id)) },
-  MISSION(state, { deliveryId, row }) {
+  PROTECT_MISSION(state, deliveryId) { protectMissions(state, [deliveryId]) },
+  TRACK_MISSION(state, deliveryId) {
+    if (!Object.hasOwn(state.missionFreshness, deliveryId)) state.missionFreshness = { ...state.missionFreshness, [deliveryId]: state.missionSequence }
+  },
+  MISSIONS(state, { rows, sequence }) {
+    const current = new Map(state.missions.map(row => [row.id, row]))
+    const incoming = new Map(rows.map(row => [row.id, row]))
+    const fresh = id => missionFresh(state, id, sequence)
+    const next = rows.map(row => fresh(row.id) ? row : current.get(row.id)).filter(Boolean)
+    state.missions.forEach((row, index) => {
+      if (!fresh(row.id) && !next.some(item => item.id === row.id)) next.splice(Math.min(index, next.length), 0, row)
+    })
+    // List omissions/closures fence older details; a concurrent detail fences only its own list row.
+    protectMissions(state, [...new Set([...current.keys(), ...Object.keys(state.missionFreshness), ...incoming.keys()])]
+      .filter(id => fresh(id) && (!incoming.has(id) || closed(incoming.get(id)))))
+    state.missions = next
+    state.order = state.order.filter(id => next.some(row => row.id === id))
+  },
+  MISSION(state, { deliveryId, row, sequence = state.missionSequence }) {
+    if (!missionFresh(state, deliveryId, sequence)) return
     state.missions = !row ? state.missions.filter(item => item.id !== deliveryId)
       : state.missions.some(item => item.id === deliveryId) ? state.missions.map(item => item.id === deliveryId ? row : item) : [...state.missions, row]
+    protectMissions(state, [deliveryId])
   },
   AVAILABLE(state, available) { state.available = available },
   BALANCE(state, balance) { state.balance = balance },
@@ -109,16 +133,20 @@ export const actions = {
     const current = () => state.identity === identity && state.epoch === epoch && authorized(rootState) && courierIdentity(rootState) === identity
     const paths = { missions: '/courier/deliveries', availability: '/courier/availability', balance: '/courier/cash-balance', detail: `/courier/deliveries/${deliveryId}` }
     if (!paths[resource] || (resource === 'detail' && !validId(deliveryId))) return null
+    if (resource === 'detail') commit('TRACK_MISSION', deliveryId)
+    const sequence = state.missionSequence
     commit('READ', { key, token }); commit('BUSY', { key, value: true })
     try {
       const result = unwrap(await api(this).request({ path: paths[resource] }))
       if (!current() || state.reads[key] !== token) return null
       if (resource === 'missions') {
         if (!Array.isArray(result)) throw new Error('Missions indisponibles.')
-        commit('MISSIONS', result.map(row => safeMission(row, user(rootState))).filter(Boolean))
+        commit('MISSIONS', { rows: result.map(row => safeMission(row, user(rootState))).filter(Boolean), sequence })
+        return state.missions
       } else if (resource === 'detail') {
+        if (!missionFresh(state, deliveryId, sequence)) return null
         const row = safeMission(result, user(rootState))
-        commit('MISSION', { deliveryId, row })
+        commit('MISSION', { deliveryId, row, sequence })
         if (!row) return null
       } else if (resource === 'availability') {
         if (String(result.courierId) !== String(user(rootState).id) || typeof result.available !== 'boolean') throw new Error('Disponibilite indisponible.')
@@ -132,8 +160,8 @@ export const actions = {
       if (current() && state.reads[key] === token) {
         if (terminalDenial(error)) commit('RESET', null)
         else {
-          if (resource === 'missions') commit('MISSIONS', [])
-          if (resource === 'detail') commit('MISSION', { deliveryId, row: null })
+          if (resource === 'missions') commit('MISSIONS', { rows: [], sequence })
+          if (resource === 'detail') commit('MISSION', { deliveryId, row: null, sequence })
           if (resource === 'availability') commit('AVAILABLE', null)
           if (resource === 'balance') commit('BALANCE', null)
         }
@@ -201,7 +229,8 @@ export const actions = {
     if (operation === 'collectPayment' && (state.recoveryError || (!pending && !['cash', 'external_card'].includes(input.method)))) return null
     const identity = state.identity; const epoch = state.epoch; const actor = { ...user(rootState) }
     const current = () => state.identity === identity && state.epoch === epoch && courierIdentity(rootState) === identity && authorized(rootState)
-    commit('BUSY', { key: deliveryId, value: true }); commit('INVALIDATE_READS'); commit('ERROR', null)
+    commit('BUSY', { key: deliveryId, value: true }); commit('PROTECT_MISSION', deliveryId); commit('ERROR', null)
+    let sequence = state.missionSequence
     try {
       // A fresh authority read precedes both new money and explicit same-key recovery.
       if (operation === 'collectPayment' && !await dispatch('read', { resource: 'detail', deliveryId })) return null
@@ -221,16 +250,20 @@ export const actions = {
         pending = { operation, body, status: 'sending' }
       }
       commit('PENDING', { deliveryId, pending: { ...pending, status: 'sending' } })
+      sequence = state.missionSequence
       const result = unwrap(await api(this).request({ method: 'post', path: `/courier/deliveries/${deliveryId}/${paths[operation]}`, body: pending.body }))
       if (!current()) return null
-      commit('INVALIDATE_READS')
       const row = safeMission(result.delivery || result, actor)
       if (!row || row.id !== deliveryId) throw new Error('Resultat a verifier.')
-      commit('MISSION', { deliveryId, row })
+      const previous = state.missions.find(item => item.id === deliveryId)
+      // Confirmed closure outranks a pre-commit active read, but never revives a removed mission.
+      const publicationSequence = closed(row) && previous && !closed(previous) && row.version > previous.version ? state.missionSequence : sequence
+      const fresh = missionFresh(state, deliveryId, publicationSequence)
+      commit('MISSION', { deliveryId, row, sequence: publicationSequence })
       if (operation === 'collectPayment') saveRecovery(actor, deliveryId, pending.body, true)
       commit('PENDING', { deliveryId, pending: null })
       if (operation === 'collectPayment' || operation === 'deliver') await dispatch('loadCashBalance')
-      return result
+      return fresh ? result : null
     } catch (error) {
       if (!current()) return null
       const status = statusOf(error)
@@ -242,7 +275,7 @@ export const actions = {
         }
         commit('PENDING', { deliveryId, pending: uncertain ? { ...pending, status: 'unresolved' } : null })
       }
-      commit('MISSION', { deliveryId, row: null })
+      commit('MISSION', { deliveryId, row: null, sequence: status === 404 ? state.missionSequence : sequence })
       if (terminalDenial(error)) commit('RESET', null)
       else if (!uncertain) await dispatch('read', { resource: 'detail', deliveryId })
       commit('ERROR', uncertain ? 'Resultat non confirme. Verifiez avant de poursuivre.' : 'Mission modifiee ou action refusee. Relisez son etat puis confirmez a nouveau.')

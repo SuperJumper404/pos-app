@@ -515,3 +515,182 @@ test('manual order skips completed missions so one arrow moves one visible missi
   await f.dispatch('reorder', { deliveryId: '9007199254740993', direction: 1 })
   assert.deepEqual(copy(f.store.state.courier.order), ['9007199254740995', '9007199254740993'])
 })
+
+for (const recovering of [false, true]) test(`round1 I1 detail404 blocks an old list started during collection preflight (${recovering ? 'unresolved replay' : 'new collection'})`, async t => {
+  const detailStarted = deferred(); const detailRelease = deferred()
+  const listStarted = deferred(); const listRelease = deferred()
+  let overlap = false
+  const f = await fixture(t, async (call, rows) => {
+    if (call.path.endsWith('/collect-payment')) return { lost: true }
+    if (!overlap) return
+    if (call.path === `/courier/deliveries/${mission().id}`) {
+      detailStarted.resolve(); await detailRelease.promise; return { status: 404 }
+    }
+    if (call.path === '/courier/deliveries') {
+      const snapshot = copy(rows)
+      snapshot[1].version = 8
+      listStarted.resolve(); await listRelease.promise; return { data: snapshot }
+    }
+  })
+  f.rows[0] = mission(undefined, { deliveryStatus: 'in_transit', allowedActions: ['collectPayment'] })
+  await f.dispatch('loadMissions')
+  if (recovering) {
+    await f.dispatch('collectPayment', { deliveryId: mission().id, method: 'cash' })
+    await f.dispatch('loadMissions')
+  }
+  f.store.commit('courier/ORDER', [f.rows[1].id, f.rows[0].id])
+  const saved = f.storage.getItem('smarteat.courier.collections.v1')
+  const postCount = f.calls.filter(call => call.method === 'POST').length
+  overlap = true
+  const collect = f.dispatch('collectPayment', { deliveryId: mission().id, method: 'external_card' })
+  await detailStarted.promise
+  const list = f.dispatch('loadMissions'); await listStarted.promise
+  detailRelease.resolve(); await collect
+  assert.equal(f.store.state.courier.missions.some(row => row.id === mission().id), false)
+  assert.equal(f.calls.filter(call => call.method === 'POST').length, postCount)
+  listRelease.resolve(); await list
+  assert.equal(f.store.state.courier.missions.some(row => row.id === mission().id), false, 'old list resurrected reassigned mission')
+  assert.equal(JSON.stringify(f.store.state.courier.missions).includes('Private fixture intercom'), true, 'other mission remains independent')
+  assert.equal(f.store.state.courier.missions.find(row => row.id === f.rows[1].id).version, 8)
+  assert.deepEqual(copy(f.store.state.courier.order), [f.rows[1].id])
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+  assert.equal(f.storage.getItem('smarteat.courier.collections.v1'), saved)
+  if (recovering) {
+    const entries = JSON.parse(saved)
+    assert.deepEqual(Object.keys(entries[0]).sort(), ['courierId', 'deliveryId', 'expectedVersion', 'idempotencyKey', 'method', 'shopId'])
+    assert.equal(f.store.state.courier.pending[mission().id].body.idempotencyKey, entries[0].idempotencyKey)
+    assert.equal(f.store.state.courier.pending[mission().id].body.method, 'cash')
+  }
+  overlap = false
+  f.rows[0] = mission(undefined, { version: 9, addressSnapshot: { street: 'New authoritative fixture' } })
+  await f.dispatch('loadMissions')
+  assert.equal(f.store.state.courier.missions.find(row => row.id === mission().id).version, 9)
+  assert.equal(f.store.state.courier.missions.find(row => row.id === mission().id).addressSnapshot.street, 'New authoritative fixture')
+  assert.equal(f.calls.filter(call => call.method === 'POST').length, postCount)
+})
+
+test('round1 I1 newer terminal detail defeats older list and detail without blocking a fresh authoritative reopen', async t => {
+  const listStarted = deferred(); const listRelease = deferred()
+  const detailStarted = deferred(); const detailRelease = deferred()
+  let overlap = false; let detailCount = 0
+  const f = await fixture(t, async (call, rows) => {
+    if (!overlap) return
+    if (call.path === '/courier/deliveries') {
+      const snapshot = copy(rows); listStarted.resolve(); await listRelease.promise; return { data: snapshot }
+    }
+    if (call.path === `/courier/deliveries/${mission().id}`) {
+      if (++detailCount === 1) {
+        const snapshot = copy(rows[0]); detailStarted.resolve(); await detailRelease.promise; return { data: snapshot }
+      }
+      return { data: mission(undefined, { version: 7, deliveryStatus: 'delivered', allowedActions: [] }) }
+    }
+  })
+  await f.dispatch('loadMissions'); overlap = true
+  const list = f.dispatch('loadMissions'); await listStarted.promise
+  const oldDetail = f.dispatch('read', { resource: 'detail', deliveryId: mission().id }); await detailStarted.promise
+  await f.dispatch('read', { resource: 'detail', deliveryId: mission().id })
+  listRelease.resolve(); detailRelease.resolve(); await list; await oldDetail
+  const row = f.store.state.courier.missions.find(row => row.id === mission().id)
+  assert.equal(row.deliveryStatus, 'delivered'); assert.equal(row.version, 7)
+  assert.equal(row.addressSnapshot, undefined); assert.equal(row.contactSnapshot, undefined); assert.equal(row.items, undefined)
+  assert.equal(f.store.state.courier.missions.length, 2)
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+  overlap = false; f.rows[0] = mission(undefined, { version: 8, deliveryStatus: 'issue', allowedActions: [] })
+  await f.dispatch('read', { resource: 'detail', deliveryId: mission().id })
+  assert.equal(f.store.state.courier.missions.find(row => row.id === mission().id).version, 8)
+})
+
+for (const removed of [false, true]) test(`round1 I1 newer list ${removed ? 'removal' : 'closure'} defeats an older detail`, async t => {
+  const started = deferred(); const release = deferred()
+  const f = await fixture(t, async (call, rows) => {
+    if (call.path === `/courier/deliveries/${mission().id}`) {
+      const snapshot = copy(rows[0]); started.resolve(); await release.promise; return { data: snapshot }
+    }
+  })
+  await f.dispatch('loadMissions')
+  const oldDetail = f.dispatch('read', { resource: 'detail', deliveryId: mission().id }); await started.promise
+  if (removed) f.rows.shift()
+  else f.rows[0] = mission(undefined, { version: 7, deliveryStatus: 'delivered', allowedActions: [] })
+  await f.dispatch('loadMissions')
+  release.resolve(); await oldDetail
+  const row = f.store.state.courier.missions.find(row => row.id === mission().id)
+  if (removed) assert.equal(row, undefined)
+  else { assert.equal(row.deliveryStatus, 'delivered'); assert.equal(row.addressSnapshot, undefined); assert.equal(row.contactSnapshot, undefined) }
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+})
+
+test('round1 I1 older command success cannot restore private data over a newer terminal detail', async t => {
+  const started = deferred(); const release = deferred()
+  const f = await fixture(t, async call => {
+    if (call.path.endsWith('/pickup')) {
+      started.resolve(); await release.promise
+      return { data: mission(undefined, { version: 3, deliveryStatus: 'in_transit', allowedActions: ['collectPayment'] }) }
+    }
+    if (call.path === `/courier/deliveries/${mission().id}`) return { data: mission(undefined, { version: 5, deliveryStatus: 'delivered', allowedActions: [] }) }
+  })
+  await f.dispatch('loadMissions')
+  const pickup = f.dispatch('pickup', { deliveryId: mission().id }); await started.promise
+  await f.dispatch('read', { resource: 'detail', deliveryId: mission().id })
+  release.resolve(); await pickup
+  const row = f.store.state.courier.missions.find(row => row.id === mission().id)
+  assert.equal(row.deliveryStatus, 'delivered'); assert.equal(row.version, 5)
+  assert.equal(row.addressSnapshot, undefined); assert.equal(row.contactSnapshot, undefined)
+  assert.equal(f.store.state.courier.pending[mission().id], undefined)
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+  assert.equal(f.calls.filter(call => call.method === 'POST').length, 1)
+})
+
+for (const denied of [false, true]) test(`round1 I1 command ${denied ? '404' : 'newer closure'} fences a concurrent older active detail and list`, async t => {
+  const commandStarted = deferred(); const commandRelease = deferred()
+  const listStarted = deferred(); const listRelease = deferred()
+  const denialReadStarted = deferred(); const denialReadRelease = deferred()
+  let overlap = false; let detailCount = 0
+  const f = await fixture(t, async (call, rows) => {
+    if (call.path.endsWith('/deliver')) {
+      commandStarted.resolve(); await commandRelease.promise
+      return denied ? { status: 404 } : { data: mission(undefined, { version: 3, deliveryStatus: 'delivered', allowedActions: [] }) }
+    }
+    if (denied && call.path === `/courier/deliveries/${mission().id}` && ++detailCount > 1) {
+      denialReadStarted.resolve(); await denialReadRelease.promise; return { status: 404 }
+    }
+    if (overlap && call.path === '/courier/deliveries') {
+      const snapshot = copy(rows); listStarted.resolve(); await listRelease.promise; return { data: snapshot }
+    }
+  })
+  f.rows[0] = mission(undefined, { deliveryStatus: 'in_transit', paymentStatus: 'paid', remainingDueCents: 0, allowedActions: ['deliver'] })
+  await f.dispatch('loadMissions')
+  const command = f.dispatch('deliver', { deliveryId: mission().id }); await commandStarted.promise
+  await f.dispatch('read', { resource: 'detail', deliveryId: mission().id })
+  overlap = true
+  const list = f.dispatch('loadMissions'); await listStarted.promise
+  commandRelease.resolve()
+  try {
+    if (denied) {
+      await denialReadStarted.promise
+      assert.equal(f.store.state.courier.missions.some(row => row.id === mission().id), false, 'command404 must clear before its follow-up read')
+    } else await command
+    listRelease.resolve(); await list
+    if (denied) assert.equal(f.store.state.courier.missions.some(row => row.id === mission().id), false)
+  } finally {
+    listRelease.resolve(); denialReadRelease.resolve(); await command; await list
+  }
+  const row = f.store.state.courier.missions.find(row => row.id === mission().id)
+  if (denied) assert.equal(row, undefined)
+  else { assert.equal(row.deliveryStatus, 'delivered'); assert.equal(row.version, 3); assert.equal(row.addressSnapshot, undefined) }
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+  assert.equal(f.calls.filter(call => call.method === 'POST').length, 1)
+})
+
+test('round1 I1 empty authoritative list fences an in-flight detail not previously in missions', async t => {
+  const started = deferred(); const release = deferred()
+  const f = await fixture(t, async call => {
+    if (call.path === '/courier/deliveries') return { data: [] }
+    if (call.path === `/courier/deliveries/${mission().id}`) {
+      started.resolve(); await release.promise; return { data: mission() }
+    }
+  })
+  const detail = f.dispatch('read', { resource: 'detail', deliveryId: mission().id }); await started.promise
+  await f.dispatch('loadMissions'); release.resolve(); await detail
+  assert.equal(f.store.state.courier.missions.length, 0)
+  assert.equal(Object.values(f.store.state.courier.busy).some(Boolean), false)
+})
