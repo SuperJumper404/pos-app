@@ -387,6 +387,93 @@ test('Google actual checkout state persists only recovery digests and retries th
   assert.match(sent.delivery_quote_token, /^sha256:[a-f0-9]{64}$/)
 })
 
+test('Google staff actor changes cancel old address reads and clear checkout private context without changing the frozen cart', async () => {
+  const late = deferred()
+  const f = fixture(() => late.promise)
+  await f.dispatch('resetForShop', 7)
+  const originalUser = { id: 10, shopid: 7, access: 1, status: 1, session_subject: 'staff' }
+  f.store.state.users.user = originalUser
+  const checkout = f.component({ value: 'delivery' })
+  try {
+    checkout.profileId = '61'
+    checkout.resolution = proof('private')
+    checkout.currentQuote = quote()
+    f.store.commit('delivery/PROFILES', [{ id: '61', name: 'Private customer' }])
+    f.store.commit('delivery/ADDRESSES', [{ id: '51', addressSnapshot: { provider: 'google_places', placeId: 'fixture' } }])
+    const frozen = { client_order_token: 'pending', fulfillment_type: 'delivery' }
+    f.store.state.cart.clientOrderPayload = frozen
+    const before = checkout.bookContext
+    const display = f.dispatch('displayAddress', { addressId: '51', customerId: '61', personal: false })
+    const resolution = f.dispatch('resolveAddress', { selectionToken: 'private-selection', personal: false })
+    await drainVue()
+    f.store.state.users.user = { id: 11, shopid: 7, access: 6, status: 1, session_subject: 'staff' }
+    f.store.state.users.user = originalUser
+    await Vue.nextTick()
+    late.resolve({ data: { ...proof('private'), addressSnapshot: { ...postal, provider: 'google_places', instructions: 'Private door' } } })
+    assert.equal(await display, null)
+    assert.equal(await resolution, null)
+    assert.notEqual(checkout.bookContext, before)
+    assert.equal(checkout.resolution, null)
+    assert.equal(checkout.currentQuote, null)
+    assert.equal(checkout.profileId, null)
+    assert.deepEqual(copy(f.store.state.delivery.addresses), [])
+    assert.deepEqual(copy(f.store.state.delivery.profiles), [])
+    assert.equal(f.store.state.cart.clientOrderPayload, frozen)
+  } finally { late.resolve({ data: proof('private') }); checkout.$destroy() }
+})
+
+test('Google actual Vuetify preserves saved addresses on initialization', async () => {
+  if (!process.env.GOOGLE_SAVED_VUETIFY_CHILD) {
+    const env = { ...process.env, GOOGLE_SAVED_VUETIFY_CHILD: '1' }
+    delete env.NODE_TEST_CONTEXT
+    try {
+      require('child_process').execFileSync(process.execPath, ['--test', '--test-name-pattern=Google actual Vuetify preserves', __filename], { env, timeout: 20000 })
+    } catch (error) { throw new Error(String(error.stdout || error.message)) }
+    return
+  }
+  const Vuetify = require('vuetify')
+  document.documentElement = { clientWidth: 1440, clientHeight: 900 }
+  Vue.use(Vuetify)
+  for (const addressSnapshot of [{ provider: 'google_places', placeId: 'saved-place' }, { ...postal, latitude: 48.8, longitude: 2.3 }]) {
+    const root = new Vue({ vuetify: new Vuetify({ theme: { disable: true } }) })
+    const requests = []
+    const input = new Vue({ ...load('components/delivery/DeliveryAddressInput.vue').default, parent: root, propsData: {
+      value: { id: '51', label: 'Adresse 1', addressSnapshot }, suggester: () => Promise.resolve({ suggestions: [] }),
+      resolver: body => { requests.push(body); return Promise.resolve(proof('saved')) },
+    } })
+    const Autocomplete = Vue.options.components.VAutocomplete
+    // Isolate Vuetify's real creation lifecycle; the child process owns unmounted dependency teardown.
+    const autocomplete = new Autocomplete({ parent: input, propsData: {
+      value: input.googleChoice || input.storedChoice, searchInput: input.query, items: input.storedChoice ? [input.storedChoice] : input.suggestions,
+      itemText: 'label', itemValue: 'placeId', returnObject: true, noFilter: true,
+    }, _parentListeners: { 'update:search-input': value => { input.query = value } } })
+    autocomplete.$refs.menu = { getTiles() {}, listIndex: -1 }
+    const stop = input.$watch(() => ({ value: input.googleChoice || input.storedChoice, searchInput: input.query,
+      items: input.storedChoice ? [input.storedChoice] : input.suggestions }), props => {
+      const silent = Vue.config.silent
+      Vue.config.silent = true
+      Object.assign(autocomplete.$props, props)
+      Vue.config.silent = silent
+    })
+    try {
+      await drainVue()
+      assert.equal(input.postalEdited, false, 'Widget initialization is not a user edit')
+      assert.equal(input.unchangedPostal, true)
+      assert.ok(autocomplete.internalSearch, 'The unchanged saved address stays visible')
+      assert.ok(await input.resolve())
+      await drainVue()
+      assert.ok(input.resolution, 'Vuetify normalization must not invalidate the accepted saved address')
+      assert.equal(input.postalEdited, false)
+      assert.equal(input.storedChoice.label, [postal.street, postal.postalCode, postal.city].join(', '))
+      assert.deepEqual(requests, [{ addressId: '51' }])
+      await input.chooseSuggestion(null)
+      assert.equal(input.unchangedPostal, false, 'Explicitly clearing must not revive the saved destination')
+      assert.equal(await input.resolve(), null)
+      assert.equal(requests.length, 1)
+    } finally { stop(); input.$destroy(); root.$destroy() }
+  }
+})
+
 test('I1 mounted confirmed delivery keeps proofs/signature through pending child teardown and Stripe response without cancel', async () => {
   const response = deferred()
   const sent = deferred()

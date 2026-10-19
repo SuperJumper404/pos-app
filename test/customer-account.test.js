@@ -737,6 +737,27 @@ test('addressbook SFC saves private edits using fresh stored proof, confirms del
   input.$destroy(); book.$destroy()
 })
 
+test('Google saved private edits need no new postal proof or provider call', async () => {
+  const f = make({ reply: call => call.path.endsWith('/address-resolutions') ? { status: 503, error: 'DELIVERY_GEOCODING_UNAVAILABLE' } : null })
+  await f.dispatch('loadSession', { shopId: 7 })
+  await f.dispatch('loadAddresses')
+  f.state.addresses[0].addressSnapshot = { provider: 'google_places', placeId: 'saved-place', instructions: 'Old private detail' }
+  const book = f.component('components/customer/CustomerAddressBook.vue')
+  book.editAddress(f.state.addresses[0])
+  const input = f.component('components/delivery/DeliveryAddressInput.vue', { value: book.selected, resolver: book.resolveAddress }, timers())
+  book.$refs.addressInput = input
+  try {
+    input.draft.instructions = 'New private detail'
+    await Vue.nextTick()
+    await book.save()
+    assert.equal(book.editing, false)
+    assert.equal(f.calls.some(call => call.path.endsWith('/address-resolutions')), false)
+    const patch = f.calls.find(call => call.method === 'patch')
+    assert.equal(patch.body.instructions, 'New private detail')
+    assert.equal(Object.hasOwn(patch.body, 'addressResolutionToken'), false)
+  } finally { input.$destroy(); book.$destroy() }
+})
+
 test('link SFC emits identity-linked only after HTTP success; conflict retains its verified book', async () => {
   let conflict = true
   const f = make({ reply: call => conflict && call.path.endsWith('/link/verify')

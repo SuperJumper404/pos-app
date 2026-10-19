@@ -51,6 +51,7 @@
 import DeliveryAddressInput from '@/components/delivery/DeliveryAddressInput.vue'
 import CustomerCodeLogin from '@/components/customer/CustomerCodeLogin.vue'
 import CustomerAddressSummary from '@/components/customer/CustomerAddressSummary.vue'
+import { operatorIdentity } from '@/store/delivery'
 const { buildAddressDisplayQueue } = require('@/helpers/deliveryAddressDisplay')
 
 export default {
@@ -66,7 +67,7 @@ export default {
   },
   data: () => ({ resolution: null, currentQuote: null, confirmedBasis: null, sequence: 0, loading: false,
     error: '', loginOpen: false, selectedAddressId: null, profileId: null, customerQuery: '', searching: false,
-    newCustomer: { name: '', contactPhone: '' }, saving: false, expiryTimer: null }),
+    newCustomer: { name: '', contactPhone: '' }, saving: false, expiryTimer: null, actorEpoch: 0 }),
   computed: {
     delivery() { return this.$store.state.delivery },
     available() { return this.delivery.shopId === this.shopId && this.delivery.enabled },
@@ -79,8 +80,8 @@ export default {
     addresses() { return this.session ? this.account.addresses : this.profileId ? this.delivery.addresses : [] },
     addressOptions() { return [{ id: null, label: 'Nouvelle adresse' }, ...this.addresses] },
     selectedAddress() { return this.addresses.find(address => address.id === this.selectedAddressId) || null },
-    bookContext() { return `${this.shopId}:${this.session ? this.account.epoch : this.profileId || 'guest'}` },
-    addressContext() { return `${this.shopId}:${this.session ? this.account.epoch : this.profileId || 'guest'}:${this.selectedAddressId || 'new'}` },
+    bookContext() { return `${this.shopId}:${this.session ? this.account.epoch : this.profileId || 'guest'}:${this.actorEpoch}` },
+    addressContext() { return `${this.bookContext}:${this.selectedAddressId || 'new'}` },
     basis() { return JSON.stringify({ shop: this.shopId, cart: this.cart, discount: this.discount, resolution: this.resolution, account: this.session && this.session.customerId }) },
     ready() { return Boolean(!this.locked && this.available && !this.loading && this.currentQuote &&
       this.confirmedBasis === this.basis && Date.parse(this.currentQuote.expiresAt) > Date.now()) },
@@ -95,11 +96,22 @@ export default {
     ready(value) { this.$emit('ready', value) },
   },
   mounted() { this.openShop() },
-  created() { this.addressDisplayQueue = buildAddressDisplayQueue(addressId => this.$store.dispatch('delivery/displayAddress', {
-    addressId, personal: this.site, ...(!this.session ? { customerId: this.profileId } : {}),
-  })) },
-  beforeDestroy() { this.addressDisplayQueue.clear(); this.sequence++; clearTimeout(this.expiryTimer) },
+  created() {
+    this.addressDisplayQueue = buildAddressDisplayQueue(addressId => this.$store.dispatch('delivery/displayAddress', {
+      addressId, personal: this.site, ...(!this.session ? { customerId: this.profileId } : {}),
+    }))
+    this.stopActorWatch = this.$store.watch(root => [root.users && root.users.user, operatorIdentity(root), root.users?.user?.token],
+      (next, previous) => { if (next.some((value, index) => value !== previous[index]) && !(this.site && this.session)) this.clearActorContext() }, { sync: true })
+  },
+  beforeDestroy() { this.stopActorWatch(); this.addressDisplayQueue.clear(); this.sequence++; clearTimeout(this.expiryTimer) },
   methods: {
+    clearActorContext() {
+      this.actorEpoch++; this.sequence++; clearTimeout(this.expiryTimer); this.addressDisplayQueue.clear()
+      this.profileId = null; this.selectedAddressId = null; this.resolution = null; this.currentQuote = null; this.confirmedBasis = null
+      this.customerQuery = ''; this.newCustomer = { name: '', contactPhone: '' }; this.error = ''; this.loading = false
+      this.$store.commit('delivery/CLEAR_ADDRESS_CONTEXT')
+      if (!this.locked) { this.$emit('address', null); this.$emit('quote', null); this.$emit('ready', false) }
+    },
     money(cents) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100) },
     invalidate() { if (this.locked) return; this.sequence++; this.confirmedBasis = null; this.currentQuote = null; this.loading = false; clearTimeout(this.expiryTimer); this.$emit('quote', null); this.$emit('ready', false) },
     selectMode(mode) { if (!this.locked && (!this.site || mode !== 'dine_in') && (mode !== 'delivery' || this.available)) this.$emit('input', mode) },

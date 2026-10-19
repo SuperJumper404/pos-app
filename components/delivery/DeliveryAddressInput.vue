@@ -1,7 +1,7 @@
 <template>
   <div class="delivery-address-input">
     <v-autocomplete
-      :value="googleChoice" :search-input.sync="query" :items="suggestions" item-text="label" item-value="placeId"
+      :value="googleChoice || storedChoice" :search-input.sync="query" :items="storedChoice ? [storedChoice] : suggestions" item-text="label" item-value="placeId"
       return-object no-filter clearable outlined label="Adresse" autocomplete="off" maxlength="255"
       :disabled="disabled" :loading="searching || resolving" :menu-props="{ maxHeight: 320, contentClass: 'delivery-address-menu' }"
       :no-data-text="searching ? 'Recherche en cours...' : searched ? 'Aucune adresse trouvee' : 'Adresse'"
@@ -50,11 +50,16 @@ export default {
     const snapshot = this.value && this.value.addressSnapshot
     return { draft: { ...empty(), ...postal(snapshot || {}), country: (snapshot && snapshot.country) || 'FR',
       complement: (snapshot && snapshot.complement) || '', instructions: (snapshot && snapshot.instructions) || '' },
-    query: snapshot ? [snapshot.street, snapshot.postalCode, snapshot.city].filter(Boolean).join(', ') : '',
+    query: snapshot ? [snapshot.street, snapshot.postalCode, snapshot.city].filter(Boolean).join(', ') || this.value.label || 'Adresse' : '',
     googleChoice: null, suggestions: [], searching: false, searched: false, sessionToken: null, syncing: false, postalEdited: false, expiryTimer: null,
     resolution: null, candidates: [], selectedCandidate: null, error: '', resolving: false, sequence: 0, timer: null }
   },
   computed: {
+    storedChoice() {
+      if (!this.value || this.postalEdited || this.googleChoice) return null
+      const row = this.draft
+      return { placeId: `stored:${this.value.id}`, label: [row.street, row.postalCode, row.city].filter(Boolean).join(', ') || this.value.label || 'Adresse' }
+    },
     complete() { return Boolean(this.draft.street.trim() && /^\d{5}$/.test(this.draft.postalCode) && this.draft.city.trim() && this.draft.country === 'FR') },
     unchangedPostal() { return !this.postalEdited && this.value && (this.value.addressSnapshot.provider === 'google_places' || JSON.stringify(postal(this.draft)) === JSON.stringify(postal(this.value.addressSnapshot))) },
     postalKey() { return JSON.stringify(postal(this.draft)) },
@@ -71,7 +76,13 @@ export default {
       if (this.resolution && (this.googleChoice || this.unchangedPostal) && this.postalKey === JSON.stringify(postal(this.resolution.addressSnapshot))) { this.applyPrivate(); return }
       this.schedule()
     } },
-    query() { if (!this.syncing && (!this.googleChoice || this.query !== this.googleChoice.label)) { this.postalEdited = true; this.scheduleSearch() } },
+    query() {
+      if (!this.syncing && (!this.googleChoice || this.query !== this.googleChoice.label)) {
+        const stored = this.storedChoice
+        if (stored && (this.query == null || this.query === stored.label)) return
+        this.postalEdited = true; this.scheduleSearch(Boolean(stored))
+      }
+    },
     disabled(value) { if (value) { clearTimeout(this.timer); this.sequence++; this.syncing = false; this.searching = false; this.resolving = false; this.suggestions = [] } },
     contextKey() {
       this.invalidate(); this.sessionToken = null; this.postalEdited = true; this.syncing = true
@@ -83,7 +94,7 @@ export default {
       this.postalEdited = false
       this.draft = { ...empty(), ...(this.value && this.value.addressSnapshot) }
       this.syncing = true
-      this.query = this.value ? [this.draft.street, this.draft.postalCode, this.draft.city].filter(Boolean).join(', ') : ''
+      this.query = this.value ? [this.draft.street, this.draft.postalCode, this.draft.city].filter(Boolean).join(', ') || this.value.label || 'Adresse' : ''
       this.$nextTick(() => { this.syncing = false })
     },
   },
@@ -110,8 +121,8 @@ export default {
       this.$emit('resolved', this.resolution)
       return this.resolution
     },
-    scheduleSearch() {
-      const previousChoice = this.googleChoice
+    scheduleSearch(storedSelection = false) {
+      const previousChoice = this.googleChoice || storedSelection
       const query = this.query
       this.invalidate()
       if (previousChoice) {
@@ -143,6 +154,7 @@ export default {
       finally { if (current()) this.searching = false }
     },
     async chooseSuggestion(choice) {
+      if (!choice && this.value) this.postalEdited = true
       this.invalidate()
       this.sessionToken = null
       if (!choice || typeof choice.selectionToken !== 'string' || this.disabled) return null

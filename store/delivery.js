@@ -74,6 +74,17 @@ const actorIdentity = user => JSON.stringify([user && user.shopid, user && user.
   user && user.status, user && user.session_subject, user && user.module_permissions])
 const operatorUser = rootState => rootState.users && rootState.users.user
 export const operatorIdentity = rootState => JSON.stringify([rootState.authenticated !== false, actorIdentity(operatorUser(rootState))])
+const addressScope = (store, state, rootState) => {
+  const { epoch, shopId } = state
+  const user = operatorUser(rootState)
+  const identity = operatorIdentity(rootState)
+  const token = bearer()
+  let changed = false
+  const stop = typeof store.watch === 'function' ? store.watch(root => [operatorUser(root), operatorIdentity(root), operatorUser(root)?.token],
+    (next, previous) => { if (next.some((value, index) => value !== previous[index])) changed = true }, { sync: true }) : () => {}
+  return { stop, current: () => !changed && epoch === state.epoch && shopId === state.shopId &&
+    user === operatorUser(rootState) && identity === operatorIdentity(rootState) && token === bearer() }
+}
 const assertOperator = (rootState, admin = false) => {
   const user = operatorUser(rootState)
   if (rootState.authenticated === false || !(admin ? isDeliveryAdmin(user) : canOperateDelivery(user))) throw new Error('Acces livraison refuse.')
@@ -91,6 +102,10 @@ export const mutations = {
   DISCOUNT(state, discount) { state.discount = { type: discount.type, value: discount.value } },
   PROFILES(state, profiles) { state.profiles = profiles },
   ADDRESSES(state, addresses) { state.addresses = addresses },
+  CLEAR_ADDRESS_CONTEXT(state) {
+    state.epoch++; state.quoteSequence++; state.currentQuote = null; state.error = null
+    state.profiles = []; state.addresses = []; state.posDraft = null
+  },
   POS_DRAFT(state, draft) { state.posDraft = draft },
   OPERATOR_RESET(state, identity) { state.operator = { ...operatorState(), identity, sequence: state.operator.sequence + 1 } },
   OPERATOR_ERROR(state, error) { state.operator.error = error },
@@ -313,22 +328,27 @@ export const actions = {
       throw asError(failure)
     }
   },
-  async displayAddress({ dispatch }, payload) {
-    const result = await dispatch('resolveAddress', payload)
-    if (!result) return null
-    return { addressSnapshot: Object.fromEntries(['provider', 'placeId', 'street', 'postalCode', 'city', 'country', 'complement', 'instructions'].filter(key => typeof result.addressSnapshot[key] === 'string').map(key => [key, result.addressSnapshot[key]])), displayStatus: 'ready' }
+  async displayAddress({ dispatch, state, rootState }, payload) {
+    const scope = addressScope(this, state, rootState)
+    try {
+      const result = await dispatch('resolveAddress', payload)
+      if (!scope.current() || !result) return null
+      return { addressSnapshot: Object.fromEntries(['provider', 'placeId', 'street', 'postalCode', 'city', 'country', 'complement', 'instructions'].filter(key => typeof result.addressSnapshot[key] === 'string').map(key => [key, result.addressSnapshot[key]])), displayStatus: 'ready' }
+    } finally { scope.stop() }
   },
   async resolveAddress({ state, rootState, dispatch }, payload) {
     const customer = rootState.customer
     if (payload.personal !== false && !payload.customerId && customer && customer.shopId === state.shopId && customer.session) {
       return dispatch('customer/resolveAddress', payload, { root: true })
     }
-    if (payload.addressId) {
-      if (!validId(payload.customerId) || !validId(payload.addressId)) throw new Error('Selectionnez une adresse de cette fiche client.')
-      return unwrap(await api(this).request({ method: 'post', path: `/delivery/customers/${payload.customerId}/addresses/${payload.addressId}/resolve`, body: {} }))
-    }
-    try { return unwrap(await api(this).request({ method: 'post', path: '/delivery/address-resolutions', body: postalBody(payload) })) }
-    catch (failure) { throw asError(failure) }
+    if (payload.addressId && (!validId(payload.customerId) || !validId(payload.addressId))) throw new Error('Selectionnez une adresse de cette fiche client.')
+    const scope = addressScope(this, state, rootState)
+    try {
+      const result = unwrap(await api(this).request(payload.addressId ? { method: 'post', path: `/delivery/customers/${payload.customerId}/addresses/${payload.addressId}/resolve`, body: {} }
+        : { method: 'post', path: '/delivery/address-resolutions', body: postalBody(payload) }))
+      return scope.current() ? result : null
+    } catch (failure) { if (!scope.current()) return null; throw asError(failure) }
+    finally { scope.stop() }
   },
   async quote({ state, commit }, { cart, resolution, discount = { type: 'none', value: 0 } }) {
     commit('QUOTE_START')

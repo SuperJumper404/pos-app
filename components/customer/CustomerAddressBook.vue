@@ -75,7 +75,9 @@ export default {
       this.validationError = ''
       const epoch = this.account.epoch
       try {
-        const result = await this.$refs.addressInput.resolve()
+        const input = this.$refs.addressInput
+        const privateOnly = this.selected && this.selected.addressSnapshot.provider === 'google_places' && input.unchangedPostal
+        const result = privateOnly ? { complement: input.draft.complement, instructions: input.draft.instructions } : await input.resolve()
         if (!result || epoch !== this.account.epoch) { this.validationError = 'Verifiez et validez votre adresse.'; return }
         const saved = await this.$store.dispatch('customer/saveAddress', {
           ...(this.selected ? { id: this.selected.id } : {}),
