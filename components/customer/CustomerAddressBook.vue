@@ -11,7 +11,7 @@
       <li v-for="address in account.addresses" :key="address.id" class="customer-address-row">
         <div class="customer-address-content">
           <div class="customer-actions"><h3>{{ address.label }}</h3><span v-if="address.isDefault" class="customer-default"><v-icon small>mdi-star</v-icon> Par defaut</span></div>
-          <p class="customer-wrap">{{ address.addressSnapshot.street }}<br>{{ address.addressSnapshot.postalCode }} {{ address.addressSnapshot.city }}</p>
+          <CustomerAddressSummary :value="address" :loader="displayAddress" :context-key="account.epoch" />
           <p v-if="address.addressSnapshot.complement" class="customer-wrap">{{ address.addressSnapshot.complement }}</p>
           <p v-if="address.addressSnapshot.instructions" class="customer-wrap customer-muted">{{ address.addressSnapshot.instructions }}</p>
         </div>
@@ -32,7 +32,7 @@
       <h3>{{ selected ? selected.label : 'Nouvelle adresse' }}</h3>
       <delivery-address-input
         :key="`${account.epoch}-${selected ? selected.id : 'new'}`" ref="addressInput"
-        :value="selected" :resolver="resolveAddress" :context-key="account.epoch"
+        :value="selected" :resolver="resolveAddress" :suggester="suggestAddresses" :context-key="account.epoch"
         :disabled="account.busy" @resolved="resolved = $event"
       />
       <v-checkbox v-model="defaultAddress" label="Adresse par defaut" :disabled="account.busy || working" />
@@ -47,14 +47,20 @@
 
 <script>
 import DeliveryAddressInput from '@/components/delivery/DeliveryAddressInput.vue'
+import CustomerAddressSummary from '@/components/customer/CustomerAddressSummary.vue'
+const { buildAddressDisplayQueue } = require('@/helpers/deliveryAddressDisplay')
 
 export default {
-  components: { DeliveryAddressInput },
+  components: { DeliveryAddressInput, CustomerAddressSummary },
   data() { return { editing: false, selected: null, resolved: null, defaultAddress: false, working: false, confirmDelete: null, validationError: '', selectionError: '' } },
   computed: { account() { return this.$store.state.customer } },
-  watch: { 'account.epoch'() { this.cancelEdit(); this.confirmDelete = null } },
+  watch: { 'account.epoch'() { this.addressDisplayQueue.clear(); this.cancelEdit(); this.confirmDelete = null } },
+  created() { this.addressDisplayQueue = buildAddressDisplayQueue(addressId => this.$store.dispatch('customer/displayAddress', { addressId })) },
+  beforeDestroy() { this.addressDisplayQueue.clear() },
   methods: {
     resolveAddress(payload) { return this.$store.dispatch('customer/resolveAddress', payload) },
+    suggestAddresses(payload) { return this.$store.dispatch('customer/suggestAddresses', payload) },
+    displayAddress(address) { return this.addressDisplayQueue.load(address.id) },
     editAddress(address) {
       this.selected = address
       this.defaultAddress = Boolean(address && address.isDefault)

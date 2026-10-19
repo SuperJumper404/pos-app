@@ -70,7 +70,8 @@ function compiled(file) {
   const options = load(file).default
   return { ...options, components: { ...options.components, ...Object.fromEntries([...new Set(source.match(/v-[a-z-]+/g) || [])].map(tag => [tag, leaf])),
     CourierMission: file.endsWith('CourierMission.vue') ? undefined : compiledChild('CourierMission', source),
-    CourierPayment: file.endsWith('CourierPayment.vue') ? undefined : compiledChild('CourierPayment', source) },
+    CourierPayment: file.endsWith('CourierPayment.vue') ? undefined : compiledChild('CourierPayment', source),
+    CustomerAddressSummary: source.includes('<CustomerAddressSummary') ? compiled('components/customer/CustomerAddressSummary.vue') : undefined },
   render: vm.compileFunction(result.render, []), staticRenderFns: result.staticRenderFns.map(code => vm.compileFunction(code, [])) }
 }
 function compiledChild(name, source) { return source.includes(`<${name}`) ? compiled(`components/delivery/${name}.vue`) : undefined }
@@ -344,6 +345,25 @@ test('compiled payment hides paid collect, labels external card manual and disab
   const unpaid = f.mount('components/delivery/CourierPayment.vue', { mission: mission(undefined, { deliveryStatus: 'in_transit', allowedActions: ['collectPayment'] }) }).component
   assert.equal(unpaid.$el.textContent.includes('manuelle'), true)
   assert.ok(action(unpaid, 'collect'))
+})
+
+test('Google courier destination loads authorized detail and never exposes a closed mission address', async t => {
+  const f = await fixture(t)
+  await f.dispatch('initialize')
+  const google = mission(undefined, { addressSnapshot: { provider: 'google_places', placeId: 'fixture-google-place' } })
+  const component = f.mount('components/delivery/CourierMission.vue', { mission: google }).component
+  const summary = component.$children.find(child => child.$options.props && child.$options.props.loader)
+  assert.ok(summary)
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Address summary did not finish its HTTP read')), 5000)
+    summary.$watch('status', value => { if (['ready', 'unavailable', 'invalid'].includes(value)) { clearTimeout(timeout); resolve() } }, { immediate: true })
+  })
+  await drain()
+  assert.ok(f.calls.some(call => call.path === `/courier/deliveries/${google.id}`))
+  assert.ok(component.$el.textContent.includes('1 Test Street'))
+  component.$props.mission = { ...google, deliveryStatus: 'delivered', allowedActions: [] }
+  await drain()
+  assert.equal(component.$el.textContent.includes('1 Test Street'), false)
 })
 
 test('compiled mission builds fixed encoded phone/maps URLs and has no cancel/refund action', async t => {

@@ -128,7 +128,8 @@ const visibleSearchFieldFiles = listVueFiles('pages')
   .concat(listVueFiles('components'))
   .filter((filePath) => {
     const source = read(filePath)
-    return /<v-text-field[\s\S]*?(?:searchFilter|v-model="search"|Rechercher|Recherche|mdi-card-search)/i.test(source)
+    const template = require('vue-template-compiler').parseComponent(source).template
+    return template && /<v-text-field\b[^>]*(?:searchFilter|v-model="search"|Rechercher|Recherche|mdi-card-search)[^>]*>/i.test(template.content)
   })
 
 assert.deepStrictEqual(

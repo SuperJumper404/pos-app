@@ -166,6 +166,148 @@ async function mountCheckout(f, { site = false } = {}) {
   return { page, mountedPayments }
 }
 
+test('Google selection resolves once and SAVE reuses the fresh proof; private details do not call Google', async () => {
+  let calls = 0
+  const options = load('components/delivery/DeliveryAddressInput.vue').default
+  const input = new Vue({ ...options, propsData: { suggester: () => Promise.resolve({ suggestions: [] }),
+    resolver: body => { calls++; assert.deepEqual(body, { selectionToken: 'selection-fixture' }); return Promise.resolve({ ...proof('google'), expiresAt: new Date(Date.now() + 900000).toISOString() }) } } })
+  try {
+    await input.chooseSuggestion({ placeId: 'fixture-place', label: '60 rue Test, Paris', selectionToken: 'selection-fixture' })
+    assert.equal(input.suggestions.some(item => item.placeId === input.googleChoice.placeId), true, 'Vuetify must retain the selected item to display its address')
+    await input.resolve()
+    input.draft.instructions = 'Portail B'
+    await Vue.nextTick()
+    assert.equal(calls, 1)
+    assert.equal(input.resolution.addressSnapshot.instructions, 'Portail B')
+    input.query = '61 rue Test'
+    await Vue.nextTick()
+    assert.equal(input.resolution, null)
+  } finally { input.$destroy() }
+})
+
+test('Google search waits 300ms, skips short input and rejects stale context replies', async () => {
+  let timer
+  let delay
+  const late = deferred()
+  const calls = []
+  const options = load('components/delivery/DeliveryAddressInput.vue', {
+    setTimeout: (fn, ms) => { timer = fn; delay = ms; return 1 }, clearTimeout() {},
+  }).default
+  const input = new Vue({ ...options, propsData: { contextKey: 'shop7', resolver: () => Promise.resolve(proof('one')),
+    suggester: body => { calls.push(body); return late.promise } } })
+  try {
+    input.query = 'ab'
+    await Vue.nextTick()
+    assert.equal(calls.length, 0)
+    input.query = '60 rue Francois 1er'
+    await Vue.nextTick()
+    assert.equal(delay, 300)
+    const pending = timer()
+    input.contextKey = 'shop8'
+    await Vue.nextTick()
+    late.resolve({ suggestions: [{ placeId: 'old-shop', label: 'Old', selectionToken: 'old' }] })
+    await pending
+    assert.equal(calls.length, 1)
+    assert.match(calls[0].sessionToken, /^[a-f0-9-]{36}$/i)
+    assert.deepEqual(copy(input.suggestions), [])
+    assert.equal(input.resolution, null)
+  } finally { input.$destroy() }
+})
+
+test('Google delivery store sends only search/session or signed selection, never browser GPS', async () => {
+  const f = fixture(call => ({ data: call.path.endsWith('address-suggestions') ? { suggestions: [] } : proof('google') }))
+  await f.dispatch('suggestAddresses', { input: '60 rue Test', sessionToken: 'session', latitude: 1, personal: false })
+  await f.dispatch('resolveAddress', { selectionToken: 'signed-selection', longitude: 2, personal: false })
+  assert.deepEqual(f.calls[0].body, { input: '60 rue Test', sessionToken: 'session' })
+  assert.deepEqual(f.calls[1].body, { selectionToken: 'signed-selection' })
+})
+
+test('Google address display queue deduplicates visible rows and limits provider work to two requests', async () => {
+  const { buildAddressDisplayQueue } = require('../helpers/deliveryAddressDisplay')
+  const waits = [deferred(), deferred(), deferred()]
+  const started = []
+  const queue = buildAddressDisplayQueue(id => { started.push(id); return waits[started.length - 1].promise })
+  const a = queue.load('a')
+  const duplicate = queue.load('a')
+  const b = queue.load('b')
+  const c = queue.load('c')
+  assert.equal(a, duplicate)
+  assert.deepEqual(started, ['a', 'b'])
+  waits[0].resolve({ ready: true })
+  await a
+  await Promise.resolve()
+  assert.deepEqual(started, ['a', 'b', 'c'])
+  queue.clear()
+  waits[1].resolve({ ready: true })
+  waits[2].resolve({ ready: true })
+  assert.equal(await b, null)
+  assert.equal(await c, null)
+})
+
+test('Google book summary ignores an old account reply and shows provider failure separately', async () => {
+  const late = deferred()
+  const input = new Vue({ ...load('components/customer/CustomerAddressSummary.vue').default,
+    propsData: { value: { id: '51', label: 'Adresse 1', addressSnapshot: { provider: 'google_places', placeId: 'fixture' } },
+      contextKey: 'account-1', loader: () => late.promise } })
+  try {
+    const pending = input.load()
+    input.contextKey = 'account-2'
+    await Vue.nextTick()
+    late.resolve({ displayStatus: 'ready', addressSnapshot: { street: 'Private old account' } })
+    await pending
+    assert.equal(input.addressText.includes('Private'), false)
+  } finally { input.$destroy() }
+})
+
+test('Google editing a saved address cannot silently resolve its previous destination', async () => {
+  let calls = 0
+  const input = new Vue({ ...load('components/delivery/DeliveryAddressInput.vue').default, propsData: {
+    value: { id: '51', addressSnapshot: { ...postal, provider: 'google_places', placeId: 'old-place' } },
+    suggester: () => Promise.resolve({ suggestions: [] }), resolver: () => { calls++; return Promise.resolve(proof('old')) },
+  } })
+  try {
+    input.query = 'A different new address'
+    await Vue.nextTick()
+    assert.equal(await input.resolve(), null)
+    assert.equal(calls, 0)
+  } finally { input.$destroy() }
+})
+
+test('Google saved address keeps its fresh proof when only private details change', async () => {
+  let calls = 0
+  const input = new Vue({ ...load('components/delivery/DeliveryAddressInput.vue').default, propsData: {
+    value: { id: '51', addressSnapshot: { provider: 'google_places', placeId: 'saved-place' } },
+    suggester: () => Promise.resolve({ suggestions: [] }),
+    resolver: () => { calls++; return Promise.resolve({ ...proof('saved'), expiresAt: new Date(Date.now() + 900000).toISOString() }) },
+  } })
+  try {
+    await input.resolve()
+    input.draft.instructions = 'Portail B'
+    await Vue.nextTick()
+    assert.ok(input.resolution, 'Private fields must preserve the confirmed destination')
+    await input.resolve()
+    assert.equal(calls, 1)
+    assert.equal(input.resolution.addressSnapshot.instructions, 'Portail B')
+  } finally { input.$destroy() }
+})
+
+test('Google typing after selection preserves the new text when Vuetify clears its old model', async () => {
+  const input = new Vue({ ...load('components/delivery/DeliveryAddressInput.vue').default, propsData: {
+    suggester: () => Promise.resolve({ suggestions: [] }), resolver: () => Promise.resolve(proof('google')),
+  } })
+  try {
+    await input.chooseSuggestion({ placeId: 'fixture', label: '60 rue Test', selectionToken: 'selection' })
+    input.query = '61 rue Test'
+    await Vue.nextTick()
+    input.query = null
+    await new Promise(resolve => setTimeout(resolve, 10))
+    await drainVue()
+    assert.equal(input.query, '61 rue Test')
+    assert.equal(input.resolution, null)
+    assert.equal(input.googleChoice, null)
+  } finally { input.$destroy() }
+})
+
 test('I1 mounted confirmed delivery keeps proofs/signature through pending child teardown and Stripe response without cancel', async () => {
   const response = deferred()
   const sent = deferred()

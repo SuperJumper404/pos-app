@@ -26,8 +26,10 @@
             </v-expansion-panel-content></v-expansion-panel>
           </v-expansion-panels>
         </template>
-        <v-select :value="selectedAddressId" :items="addressOptions" item-text="label" item-value="id" label="Adresse de livraison" outlined :disabled="disabled" @change="selectAddress" />
-        <DeliveryAddressInput :key="addressContext" ref="addressInput" :value="selectedAddress" :context-key="addressContext" :resolver="resolveAddress" :disabled="disabled || !available" @resolved="onResolved" />
+        <v-select :value="selectedAddressId" :items="addressOptions" item-text="label" item-value="id" label="Adresse de livraison" outlined :disabled="disabled" @change="selectAddress">
+          <template #item="{ item }"><div><strong>{{ item.label }}</strong><CustomerAddressSummary v-if="item.id" :value="item" :loader="displayAddress" :context-key="bookContext" /></div></template>
+        </v-select>
+        <DeliveryAddressInput :key="addressContext" ref="addressInput" :value="selectedAddress" :context-key="addressContext" :resolver="resolveAddress" :suggester="suggestAddresses" :disabled="disabled || !available" @resolved="onResolved" />
         <v-btn v-if="selectedAddress && !resolution" text :disabled="disabled || !available || loading" @click="resolveStored"><v-icon left>mdi-map-marker-check-outline</v-icon>Valider cette adresse</v-btn>
         <v-btn v-if="site && session && resolution && !selectedAddressId" text :disabled="disabled || saving" @click="saveAddress"><v-icon left>mdi-content-save-outline</v-icon>Ajouter au carnet</v-btn>
       </template>
@@ -48,9 +50,11 @@
 <script>
 import DeliveryAddressInput from '@/components/delivery/DeliveryAddressInput.vue'
 import CustomerCodeLogin from '@/components/customer/CustomerCodeLogin.vue'
+import CustomerAddressSummary from '@/components/customer/CustomerAddressSummary.vue'
+const { buildAddressDisplayQueue } = require('@/helpers/deliveryAddressDisplay')
 
 export default {
-  components: { DeliveryAddressInput, CustomerCodeLogin },
+  components: { DeliveryAddressInput, CustomerCodeLogin, CustomerAddressSummary },
   props: {
     shopId: { type: Number, required: true },
     cart: { type: Array, default: () => [] },
@@ -75,12 +79,14 @@ export default {
     addresses() { return this.session ? this.account.addresses : this.profileId ? this.delivery.addresses : [] },
     addressOptions() { return [{ id: null, label: 'Nouvelle adresse' }, ...this.addresses] },
     selectedAddress() { return this.addresses.find(address => address.id === this.selectedAddressId) || null },
+    bookContext() { return `${this.shopId}:${this.session ? this.account.epoch : this.profileId || 'guest'}` },
     addressContext() { return `${this.shopId}:${this.session ? this.account.epoch : this.profileId || 'guest'}:${this.selectedAddressId || 'new'}` },
     basis() { return JSON.stringify({ shop: this.shopId, cart: this.cart, discount: this.discount, resolution: this.resolution, account: this.session && this.session.customerId }) },
     ready() { return Boolean(!this.locked && this.available && !this.loading && this.currentQuote &&
       this.confirmedBasis === this.basis && Date.parse(this.currentQuote.expiresAt) > Date.now()) },
   },
   watch: {
+    bookContext() { this.addressDisplayQueue.clear() },
     cart: { deep: true, handler() { this.refreshQuote() } },
     discount: { deep: true, handler() { this.refreshQuote() } },
     shopId() { this.openShop() },
@@ -89,7 +95,10 @@ export default {
     ready(value) { this.$emit('ready', value) },
   },
   mounted() { this.openShop() },
-  beforeDestroy() { this.sequence++; clearTimeout(this.expiryTimer) },
+  created() { this.addressDisplayQueue = buildAddressDisplayQueue(addressId => this.$store.dispatch('delivery/displayAddress', {
+    addressId, personal: this.site, ...(!this.session ? { customerId: this.profileId } : {}),
+  })) },
+  beforeDestroy() { this.addressDisplayQueue.clear(); this.sequence++; clearTimeout(this.expiryTimer) },
   methods: {
     money(cents) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100) },
     invalidate() { if (this.locked) return; this.sequence++; this.confirmedBasis = null; this.currentQuote = null; this.loading = false; clearTimeout(this.expiryTimer); this.$emit('quote', null); this.$emit('ready', false) },
@@ -140,6 +149,8 @@ export default {
       if (id) await this.resolveStored()
     },
     resolveStored() { return this.$refs.addressInput && this.$refs.addressInput.resolve() },
+    suggestAddresses(body) { return this.$store.dispatch('delivery/suggestAddresses', { ...body, personal: this.site }) },
+    displayAddress(address) { return this.addressDisplayQueue.load(address.id) },
     resolveAddress(body) { return this.$store.dispatch('delivery/resolveAddress', { ...body, personal: this.site, ...(body.addressId && !this.session ? { customerId: this.profileId } : {}) }) },
     // The shared input emits resolved(null) on teardown when the attempt locks.
     onResolved(resolution) { if (this.locked) return null; this.resolution = resolution; this.$emit('address', resolution); return this.refreshQuote() },

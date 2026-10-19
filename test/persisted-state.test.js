@@ -87,6 +87,21 @@ const expectedPersisted = {
 assert.deepStrictEqual(sanitizePersistedState(persisted), expectedPersisted)
 assert.deepStrictEqual(parsePersistedState(serializePersistedState(persisted, now), now), expectedPersisted)
 assert.deepStrictEqual(parsePersistedState(JSON.stringify(persisted), now), expectedPersisted)
+
+const googleProof = Buffer.from(JSON.stringify({ kind: 'address', addressSnapshot: {
+  provider: 'google_places', placeId: 'fixture-place', latitude: 48.868, longitude: 2.306,
+} })).toString('base64url') + '.fixture-signature'
+const googleCart = { ...persisted.cart, clientOrderToken: 'same-attempt', clientOrderStatus: 'uncertain',
+  clientOrderPayload: { fulfillment_type: 'delivery', address_resolution_token: googleProof, delivery_quote_token: googleProof },
+  clientOrderSignature: JSON.stringify({ addressResolutionToken: googleProof, deliveryQuoteToken: googleProof }),
+}
+const googleBytes = serializePersistedState({ ...persisted, cart: googleCart }, now)
+assert.equal(googleBytes.includes(googleProof), false, 'Google GPS proofs must not survive browser persistence')
+const restoredGoogle = parsePersistedState(googleBytes, now).cart
+assert.equal(restoredGoogle.clientOrderToken, 'same-attempt')
+assert.equal(restoredGoogle.clientOrderStatus, 'uncertain')
+assert.match(restoredGoogle.clientOrderPayload.address_resolution_token, /^sha256:[a-f0-9]{64}$/)
+assert.equal(googleCart.clientOrderPayload.address_resolution_token, googleProof, 'Live retries retain their original proofs')
 assert.deepStrictEqual(parsePersistedState(JSON.stringify({
   expiresAt: now + PERSISTED_STATE_TTL, state: persisted,
 }), now), expectedPersisted)

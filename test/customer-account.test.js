@@ -82,7 +82,8 @@ const timers = () => {
   }
 }
 function load(relative, globals = {}) {
-  const filename = path.join(root, relative)
+  let filename = path.join(root, relative)
+  if (!fs.existsSync(filename)) filename += fs.existsSync(`${filename}.js`) ? '.js' : '.vue'
   let source = fs.readFileSync(filename, 'utf8')
   if (relative.endsWith('.vue')) {
     const sfc = compiler.parseComponent(source)
@@ -349,7 +350,7 @@ test('I2 candidate authority is invalidated by postal/context changes and destru
       await Vue.nextTick()
       const before = f.calls.length
       await input.resolve()
-      if (change === 'destroy') assert.equal(f.calls.length, before)
+      if (change === 'destroy' || change === 'context') { assert.equal(f.calls.length, before); assert.equal(input.resolution, null) }
       else assert.ok(!Object.hasOwn(f.calls[before].body, 'candidateId'))
     } finally { input.$destroy() }
   }

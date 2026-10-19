@@ -2,7 +2,7 @@
 
 Date : 2026-10-19
 
-Statut : choix fonctionnels et adaptation de conservation valides en conversation ; specification ecrite a relire avant le plan d'implementation. Ce document ne signifie pas que l'integration est deja implementee ou deployee.
+Statut : specification ecrite validee par l'utilisateur le 2026-10-19 apres le commit `7f892c5` ; plan d'implementation distinct a relire avant execution. Ce document ne signifie pas que l'integration est deja implementee ou deployee.
 
 Cette evolution complete la V1 de livraison existante dans `pos-app` et `express-pos`. Elle remplace la saisie postale et la recherche IGN des nouvelles adresses par Google Places, sans changer le moteur de commande.
 

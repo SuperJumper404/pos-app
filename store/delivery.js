@@ -14,7 +14,7 @@ const initialState = state
 const validShop = value => Number.isInteger(value) && value > 0
 const validId = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value)
 const bearer = () => typeof localStorage === 'undefined' ? '' : localStorage.getItem('token') || ''
-const postalBody = payload => ({ address: Object.fromEntries(['street', 'postalCode', 'city', 'country']
+const postalBody = payload => payload.selectionToken !== undefined ? { selectionToken: payload.selectionToken } : ({ address: Object.fromEntries(['street', 'postalCode', 'city', 'country']
   .map(key => [key, payload.address && payload.address[key]])), ...(payload.candidateId ? { candidate_id: payload.candidateId } : {}) })
 
 // A separate Axios instance keeps personal HTTP failures out of the staff logout interceptor.
@@ -47,6 +47,8 @@ const unwrap = response => response && response.data && response.data.data
 const asError = failure => {
   const dto = failure.response && failure.response.data
   const messages = {
+    DELIVERY_GEOCODING_UNAVAILABLE: 'La recherche d\'adresse est indisponible. Reessayez.',
+    DELIVERY_GEOCODING_RATE_LIMITED: 'La recherche d\'adresse est occupee. Patientez puis reessayez.',
     DELIVERY_DISABLED: 'La livraison est suspendue. Votre panier est conserve.',
     DELIVERY_OUT_OF_RANGE: 'Cette adresse est hors du rayon de livraison. Corrigez l\'adresse ou choisissez un autre mode.',
     DELIVERY_MINIMUM_NOT_MET: 'Le minimum de produits pour la livraison n\'est pas atteint. Votre panier est conserve.',
@@ -297,6 +299,24 @@ export const actions = {
       if (epoch === state.epoch) { commit('AVAILABILITY', false); commit('ERROR', asError(failure).message) }
       return null
     }
+  },
+  async suggestAddresses({ state, rootState, dispatch }, payload) {
+    const customer = rootState.customer
+    if (payload.personal !== false && !payload.customerId && customer && customer.shopId === state.shopId && customer.session) return dispatch('customer/suggestAddresses', payload, { root: true })
+    const { epoch, shopId } = state
+    const identity = operatorIdentity(rootState)
+    try {
+      const result = unwrap(await api(this).request({ method: 'post', path: '/delivery/address-suggestions', body: { input: payload.input, sessionToken: payload.sessionToken } }))
+      return epoch === state.epoch && shopId === state.shopId && identity === operatorIdentity(rootState) ? result : null
+    } catch (failure) {
+      if (epoch !== state.epoch || shopId !== state.shopId || identity !== operatorIdentity(rootState)) return null
+      throw asError(failure)
+    }
+  },
+  async displayAddress({ dispatch }, payload) {
+    const result = await dispatch('resolveAddress', payload)
+    if (!result) return null
+    return { addressSnapshot: Object.fromEntries(['provider', 'placeId', 'street', 'postalCode', 'city', 'country', 'complement', 'instructions'].filter(key => typeof result.addressSnapshot[key] === 'string').map(key => [key, result.addressSnapshot[key]])), displayStatus: 'ready' }
   },
   async resolveAddress({ state, rootState, dispatch }, payload) {
     const customer = rootState.customer

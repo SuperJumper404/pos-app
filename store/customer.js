@@ -193,9 +193,19 @@ export const actions = {
     if (result) await context.dispatch('loadAddresses')
     return result
   },
+  suggestAddresses(context, payload) {
+    if (!context.state.session) return null
+    return scoped(this.$customerApi, context, request => request('post', '/customer/address-suggestions', { input: payload.input, sessionToken: payload.sessionToken }), null,
+      { busy: false, propagate: true, reportError: false })
+  },
+  async displayAddress(context, payload) {
+    const result = await context.dispatch('resolveAddress', payload)
+    if (!result) return null
+    return { addressSnapshot: Object.fromEntries(['provider', 'placeId', 'street', 'postalCode', 'city', 'country', 'complement', 'instructions'].filter(key => typeof result.addressSnapshot[key] === 'string').map(key => [key, result.addressSnapshot[key]])), displayStatus: 'ready' }
+  },
   resolveAddress(context, payload) {
     if (!context.state.session) return null
-    const body = payload.addressId ? { addressId: payload.addressId } : {
+    const body = payload.addressId ? { addressId: payload.addressId } : payload.selectionToken !== undefined ? { selectionToken: payload.selectionToken } : {
       address: Object.fromEntries(['street', 'postalCode', 'city', 'country'].map(key => [key, payload.address[key]])),
       ...(payload.candidateId ? { candidateId: payload.candidateId } : {}),
     }

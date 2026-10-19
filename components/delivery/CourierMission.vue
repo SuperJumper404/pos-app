@@ -7,6 +7,9 @@
       <template v-if="!closed">
         <p v-if="mission.contactSnapshot" class="courier-recipient">{{ mission.contactSnapshot.name }}</p>
         <p v-if="address" class="courier-address">{{ address }}</p>
+        <CustomerAddressSummary v-else-if="mission.addressSnapshot && mission.addressSnapshot.provider === 'google_places'"
+                                :value="{ id: mission.id, label: 'Adresse de livraison', addressSnapshot: mission.addressSnapshot }" :loader="loadAddress" :context-key="$store.state.courier.identity || ''" />
+        <div v-if="address && mission.addressSnapshot && mission.addressSnapshot.provider === 'google_places'" class="courier-google-attribution"><img src="/google-maps-attribution.png" alt="Google Maps" height="18"></div>
         <dl v-if="mission.addressSnapshot" class="courier-access">
           <div v-for="field in accessFields" :key="field.key"><dt>{{ field.label }}</dt><dd>{{ mission.addressSnapshot[field.key] }}</dd></div>
         </dl>
@@ -39,8 +42,9 @@
 
 <script>
 import CourierPayment from '@/components/delivery/CourierPayment.vue'
+import CustomerAddressSummary from '@/components/customer/CustomerAddressSummary.vue'
 export default {
-  components: { CourierPayment },
+  components: { CourierPayment, CustomerAddressSummary },
   props: { mission: { type: Object, required: true } },
   data: () => ({ issueOpen: false, reason: '' }),
   computed: {
@@ -58,9 +62,19 @@ export default {
       const phone = raw.replace(/[\s().-]/g, '')
       return /^\+?\d{6,15}$/.test(phone) ? `tel:${encodeURIComponent(phone)}` : null
     },
-    mapsUrl() { return !this.closed && this.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(this.address)}` : null },
+    mapsUrl() {
+      if (this.closed) return null
+      const row = this.mission.addressSnapshot
+      if (row && row.provider === 'google_places' && row.placeId) return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(this.address || 'Livraison')}&destination_place_id=${encodeURIComponent(row.placeId)}`
+      return this.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(this.address)}` : null
+    },
   },
   methods: {
+    async loadAddress() {
+      if (this.closed) return null
+      const result = await this.$store.dispatch('courier/read', { resource: 'detail', deliveryId: this.mission.id })
+      return result && result.addressSnapshot ? { addressSnapshot: result.addressSnapshot, displayStatus: result.addressDisplayStatus || 'ready' } : null
+    },
     can(action) { return this.mission.deliveryStatus !== 'issue' && this.mission.acceptanceStatus === 'accepted' &&
       (this.mission.allowedActions || []).includes(action) && (action !== 'pickup' || Number(this.mission.preparationStatus) === 3) },
     command(action) { return this.$store.dispatch(`courier/${action}`, { deliveryId: this.mission.id }) },
@@ -74,6 +88,7 @@ export default {
 
 <style scoped>
 .courier-mission { min-width: 0; border-radius: 8px; }
+.courier-google-attribution { padding: 10px 10px 5px; }
 .courier-mission-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .courier-mission-heading h3 { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.4; min-width: 0; }
 .courier-mission p, .courier-access dd, .courier-items li { overflow-wrap: anywhere; }

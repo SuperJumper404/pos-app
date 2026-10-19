@@ -17,7 +17,9 @@
           </section>
           <section class="tracking-section" aria-label="Adresse de livraison">
             <h2>Adresse de livraison</h2>
-            <p>{{ view.addressSnapshot.street }}<br>{{ view.addressSnapshot.postalCode }} {{ view.addressSnapshot.city }}</p>
+            <p v-if="view.addressSnapshot.street">{{ view.addressSnapshot.street }}<br>{{ view.addressSnapshot.postalCode }} {{ view.addressSnapshot.city }}</p>
+            <p v-else>Adresse temporairement indisponible</p>
+            <div v-if="view.addressProvider === 'google_places' && view.addressSnapshot.street" class="py-2 px-3"><img src="/google-maps-attribution.png" alt="Google Maps" height="18"></div>
           </section>
           <section class="tracking-section" aria-label="Paiement">
             <h2>Paiement</h2>

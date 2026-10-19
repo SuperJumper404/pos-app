@@ -5,9 +5,10 @@
       <v-switch v-model="form.enabled" label="Accepter de nouvelles livraisons" :disabled="saving" />
       <v-alert v-if="!form.enabled" type="info" text>Les missions deja acceptees continuent pendant la suspension.</v-alert>
       <h2>Depart du restaurant</h2>
-      <p v-if="form.origin">Position validee : {{ form.origin.latitude }}, {{ form.origin.longitude }}</p>
+      <p v-if="form.origin && form.origin.provider === 'google_places'"><v-icon small color="success">mdi-map-marker-check-outline</v-icon> Adresse du restaurant validee</p>
+      <p v-else-if="form.origin">Position validee : {{ form.origin.latitude }}, {{ form.origin.longitude }}</p>
       <v-btn text :disabled="saving" @click="editingOrigin = !editingOrigin"><v-icon left>mdi-map-marker-edit-outline</v-icon>{{ editingOrigin ? 'Conserver la position precedente' : 'Valider une nouvelle adresse' }}</v-btn>
-      <DeliveryAddressInput v-if="editingOrigin" :resolver="resolveOrigin" :disabled="saving" :context-key="operator.identity" @resolved="onResolved" />
+      <DeliveryAddressInput v-if="editingOrigin" :resolver="resolveOrigin" :suggester="suggestAddresses" :disabled="saving" :context-key="operator.identity" @resolved="onResolved" />
       <h2 class="mt-6">Tarification</h2>
       <v-row dense class="mt-2">
         <v-col cols="12" sm="6"><v-text-field v-model.number="form.maxDistanceMeters" type="number" min="0" step="1" label="Rayon maximal (metres)" outlined dense :disabled="saving" /></v-col>
@@ -47,7 +48,7 @@ export default {
       if (!Number.isInteger(value.maxDistanceMeters) || value.maxDistanceMeters < 0 || value.maxDistanceMeters > 4294967295 || !validCents(value.minimumItemsCents)) return 'Renseignez un rayon entier et un minimum positif ou nul.'
       if (value.freeDeliveryEnabled && !validCents(value.freeDeliveryThresholdCents)) return 'Renseignez le seuil de gratuite.'
       const point = value.origin
-      if (point && (!Number.isFinite(point.latitude) || Math.abs(point.latitude) > 90 || !Number.isFinite(point.longitude) || Math.abs(point.longitude) > 180)) return 'Validez la position du restaurant.'
+      if (point && (point.provider === 'google_places' ? !point.placeId : !Number.isFinite(point.latitude) || Math.abs(point.latitude) > 90 || !Number.isFinite(point.longitude) || Math.abs(point.longitude) > 180)) return 'Validez la position du restaurant.'
       if (value.fiscalPolicy.mode !== 'configured_rate' || (value.fiscalPolicy.vatRate !== null && ![5.5, 10, 20].includes(value.fiscalPolicy.vatRate))) return 'Selectionnez la TVA des frais.'
       let previous = 0
       for (const band of value.bands) {
@@ -69,7 +70,9 @@ export default {
     euros(value) { return validCents(value) ? (value / 100).toFixed(2) : '' },
     cents(value) { const text = String(value).replace(',', '.'); if (!/^\d+(\.\d{1,2})?$/.test(text)) return null; const [whole, part = ''] = text.split('.'); const amount = Number(whole) * 100 + Number(part.padEnd(2, '0')); return validCents(amount) ? amount : null },
     resolveOrigin(payload) { return this.$store.dispatch('delivery/resolveAddress', { ...payload, personal: false }) },
-    onResolved(value) { this.originResolution = value; if (value) this.form.origin = { latitude: value.addressSnapshot.latitude, longitude: value.addressSnapshot.longitude } },
+    suggestAddresses(payload) { return this.$store.dispatch('delivery/suggestAddresses', { ...payload, personal: false }) },
+    onResolved(value) { this.originResolution = value; if (value) this.form.origin = value.addressSnapshot.provider === 'google_places'
+      ? { provider: 'google_places', placeId: value.addressSnapshot.placeId } : { latitude: value.addressSnapshot.latitude, longitude: value.addressSnapshot.longitude } },
     async save() {
       if (!isDeliveryAdmin(this.$store.state.users.user) || this.validationError || this.saving) return
       this.saving = true; this.saved = null

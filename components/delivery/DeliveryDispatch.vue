@@ -24,7 +24,9 @@
     <v-dialog v-model="detailsOpen" max-width="640" scrollable>
       <v-card v-if="selected"><v-card-title>{{ currentDelivery.orderReference }}</v-card-title><v-card-text>
         <p>{{ statusLabel(currentDelivery.deliveryStatus) }} / {{ paymentLabel(currentDelivery.paymentStatus) }}</p>
-        <address v-if="currentDelivery.addressSnapshot">{{ currentDelivery.addressSnapshot.street }}, {{ currentDelivery.addressSnapshot.postalCode }} {{ currentDelivery.addressSnapshot.city }}<br>{{ currentDelivery.addressSnapshot.complement }}<br>{{ currentDelivery.addressSnapshot.instructions }}</address>
+        <address v-if="currentDelivery.addressSnapshot && currentDelivery.addressSnapshot.street">{{ currentDelivery.addressSnapshot.street }}, {{ currentDelivery.addressSnapshot.postalCode }} {{ currentDelivery.addressSnapshot.city }}<br>{{ currentDelivery.addressSnapshot.complement }}<br>{{ currentDelivery.addressSnapshot.instructions }}</address>
+        <p v-else-if="currentDelivery.addressSnapshot">Adresse indisponible</p>
+        <div v-if="currentDelivery.addressSnapshot && currentDelivery.addressSnapshot.provider === 'google_places' && currentDelivery.addressSnapshot.street" class="py-2 px-3"><img src="/google-maps-attribution.png" alt="Google Maps" height="18"></div>
         <p v-if="currentDelivery.contactSnapshot">{{ currentDelivery.contactSnapshot.name }} {{ currentDelivery.contactSnapshot.phone }}</p>
         <v-simple-table dense><tbody><tr v-for="(item, index) in currentDelivery.items || []" :key="index"><td>{{ item.quantity }} x {{ item.name }}<div v-for="(choice, choiceIndex) in item.customizations || []" :key="choiceIndex" class="text-caption">{{ choice.step }} : {{ choice.choice }}</div></td></tr></tbody></v-simple-table>
         <p v-if="currentDelivery.financials" class="mt-4">Total : {{ money(Math.round(currentDelivery.financials.grand_total * 100)) }} / restant du : {{ money(currentDelivery.remainingDueCents) }}</p>

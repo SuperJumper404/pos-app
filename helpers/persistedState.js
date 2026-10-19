@@ -1,4 +1,23 @@
 const PERSISTED_STATE_TTL = 24 * 60 * 60 * 1000
+const { createHash } = require('crypto')
+const { Buffer } = require('buffer')
+const recoveryHash = value => `sha256:${createHash('sha256').update(value).digest('hex')}`
+const googleProof = token => {
+  try { return JSON.parse(Buffer.from(token.split('.')[0], 'base64').toString('utf8')).addressSnapshot?.provider === 'google_places' }
+  catch (_) { return false }
+}
+const persistCart = cart => {
+  if (!cart || !googleProof(cart.clientOrderPayload?.address_resolution_token)) return cart
+  const payload = { ...cart.clientOrderPayload }
+  for (const key of ['address_resolution_token', 'delivery_quote_token']) payload[key] = recoveryHash(payload[key])
+  let signature = cart.clientOrderSignature
+  try {
+    const parsed = JSON.parse(signature)
+    for (const key of ['addressResolutionToken', 'deliveryQuoteToken']) if (typeof parsed[key] === 'string') parsed[key] = recoveryHash(parsed[key])
+    signature = JSON.stringify(parsed)
+  } catch (_) { signature = null }
+  return { ...cart, clientOrderPayload: payload, clientOrderSignature: signature }
+}
 
 const sanitizePersistedState = (state) => {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return state
@@ -9,6 +28,7 @@ const sanitizePersistedState = (state) => {
   delete nextState.customer
   delete nextState.delivery
   delete nextState.courier
+  if (nextState.cart) nextState.cart = persistCart(nextState.cart)
   return nextState
 }
 
