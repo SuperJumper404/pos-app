@@ -102,6 +102,7 @@ assert.equal(restoredGoogle.clientOrderToken, 'same-attempt')
 assert.equal(restoredGoogle.clientOrderStatus, 'uncertain')
 assert.match(restoredGoogle.clientOrderPayload.address_resolution_token, /^sha256:[a-f0-9]{64}$/)
 assert.equal(googleCart.clientOrderPayload.address_resolution_token, googleProof, 'Live retries retain their original proofs')
+assert.equal(serializePersistedState({ cart: { clientOrderPayload: { delivery_quote_token: googleProof } } }, now).includes(googleProof), false)
 assert.deepStrictEqual(parsePersistedState(JSON.stringify({
   expiresAt: now + PERSISTED_STATE_TTL, state: persisted,
 }), now), expectedPersisted)

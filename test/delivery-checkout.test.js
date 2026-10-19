@@ -366,9 +366,12 @@ test('Google actual checkout state persists only recovery digests and retries th
   } })).toString('base64url') + '.fixture-signature'
   let lost = true
   const f = fixture(() => lost ? { lost: true } : { data: { orderId: 91 } })
+  const writes = []
+  f.store.subscribe((mutation, state) => writes.push(serializePersistedState(state)))
   const params = { customer: 'Guest', servicePointId: 70, total: 29, payment: 'cash', dataCart: cart,
     fulfillmentType: 'delivery', deliveryQuoteToken: addressToken, addressResolutionToken: addressToken }
   assert.equal((await f.store.dispatch('cart/checkoutOrder', params)).ok, false)
+  assert.equal(writes.every(bytes => !bytes.includes(addressToken)), true, 'No intermediate Vuex write may persist Google GPS proofs')
   const original = copy(f.calls[0].body)
   const bytes = serializePersistedState(f.store.state)
   assert.equal(bytes.includes(addressToken), false)
