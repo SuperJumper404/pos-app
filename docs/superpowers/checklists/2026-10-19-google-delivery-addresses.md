@@ -65,6 +65,7 @@ Local preview: `http://127.0.0.1:8098`, fixture API: `http://127.0.0.1:8099`.
 - Reviewer model is inherited under tool restrictions. Risk: capability cannot be explicitly selected, while context remains independent.
 - Live Google acceptance/private activation settings are not reviewed or tested. Risk: external account/key configuration can still block rollout; owner validation is required.
 - Test actual Vuetify creation and prop synchronization in an isolated child process with a memory-DOM boundary. Risk: not a full DOM test; actual Chrome stored-address selection and edits were separately checked.
+- Environment policy rejected removal of the verified, owned plan scratch directory. Retain it without attempting an alternative deletion path. Cost: ignored local test artifacts remain on disk; runnable preview is unaffected.
 
 ## Before Activation
 
