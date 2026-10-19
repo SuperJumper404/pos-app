@@ -66,6 +66,8 @@ export default {
   watch: {
     draft: { deep: true, handler() {
       if (this.syncing) return
+      const pending = this.pendingResolution
+      if (this.resolving && pending && pending.sequence === this.sequence && pending.contextKey === this.contextKey && pending.postalKey === this.postalKey) return
       if (this.resolution && (this.googleChoice || this.unchangedPostal) && this.postalKey === JSON.stringify(postal(this.resolution.addressSnapshot))) { this.applyPrivate(); return }
       this.schedule()
     } },
@@ -158,11 +160,22 @@ export default {
       if (this.complete && !this.disabled) this.timer = setTimeout(() => this.resolve(), 300)
     },
     chooseCandidate(candidate) { return this.resolve(candidate.providerId) },
-    async resolve(candidateId) {
+    resolve(candidateId) {
+      const pending = this.pendingResolution
+      if (pending && pending.sequence === this.sequence && pending.contextKey === this.contextKey &&
+        pending.postalKey === this.postalKey && pending.query === this.query && pending.candidateId === candidateId && !this.disabled) return pending.promise
+      const promise = this.performResolve(candidateId)
+      const record = { sequence: this.sequence, contextKey: this.contextKey, postalKey: this.postalKey, query: this.query, candidateId }
+      record.promise = promise.finally(() => { if (this.pendingResolution === record) this.pendingResolution = null })
+      this.pendingResolution = record
+      return record.promise
+    },
+    async performResolve(candidateId) {
       clearTimeout(this.timer)
       if (this.disabled || this._isDestroyed) return null
       const choice = this.googleChoice
       if ((choice || this.unchangedPostal) && this.resolution && Date.parse(this.resolution.expiresAt) > Date.now()) return this.applyPrivate()
+      if (choice && this.resolution) { this.invalidate(); this.error = 'Validez de nouveau cette adresse.'; return null }
       if ((!this.complete && !(this.value && this.value.id && this.unchangedPostal) && !choice) || this.disabled || this._isDestroyed) return null
       if (!choice && this.suggester && this.query && !this.unchangedPostal) return null
       const sequence = ++this.sequence

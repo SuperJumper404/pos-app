@@ -308,6 +308,82 @@ test('Google typing after selection preserves the new text when Vuetify clears i
   } finally { input.$destroy() }
 })
 
+test('Google concurrent SAVE joins selection Details instead of ending the same session twice', async () => {
+  let calls = 0
+  const late = deferred()
+  const input = new Vue({ ...load('components/delivery/DeliveryAddressInput.vue').default, propsData: {
+    suggester: () => Promise.resolve({ suggestions: [] }), resolver: () => { calls++; return late.promise },
+  } })
+  try {
+    const selected = input.chooseSuggestion({ placeId: 'fixture', label: '60 rue Test', selectionToken: 'selection' })
+    await drainVue()
+    const saved = input.resolve()
+    late.resolve({ ...proof('google'), expiresAt: new Date(Date.now() + 900000).toISOString() })
+    const first = await selected
+    const second = await saved
+    assert.equal(calls, 1)
+    assert.equal(first.addressResolutionToken, second.addressResolutionToken)
+  } finally { input.$destroy() }
+})
+
+test('Google expired proof never resubmits a terminated selection even before its timer fires', async () => {
+  let calls = 0
+  const originalNow = Date.now
+  const now = Date.now()
+  const input = new Vue({ ...load('components/delivery/DeliveryAddressInput.vue').default, propsData: {
+    suggester: () => Promise.resolve({ suggestions: [] }),
+    resolver: () => { calls++; return Promise.resolve({ ...proof('google'), expiresAt: new Date(now + 5000).toISOString() }) },
+  } })
+  try {
+    await input.chooseSuggestion({ placeId: 'fixture', label: '60 rue Test', selectionToken: 'selection' })
+    Date.now = () => now + 5000
+    assert.equal(await input.resolve(), null)
+    assert.equal(calls, 1)
+    assert.equal(input.resolution, null)
+    assert.equal(input.googleChoice, null)
+  } finally { Date.now = originalNow; input.$destroy() }
+})
+
+test('Google private edits while Details loads keep the same pending destination', async () => {
+  const late = deferred()
+  const input = new Vue({ ...load('components/delivery/DeliveryAddressInput.vue').default, propsData: {
+    suggester: () => Promise.resolve({ suggestions: [] }), resolver: () => late.promise,
+  } })
+  try {
+    const selected = input.chooseSuggestion({ placeId: 'fixture', label: '60 rue Test', selectionToken: 'selection' })
+    await drainVue()
+    input.draft.instructions = 'Portail B'
+    await Vue.nextTick()
+    late.resolve({ ...proof('google'), expiresAt: new Date(Date.now() + 900000).toISOString() })
+    assert.equal((await selected)?.addressSnapshot.instructions, 'Portail B')
+  } finally { input.$destroy() }
+})
+
+test('Google actual checkout state persists only recovery digests and retries the same accepted identity', async () => {
+  const { serializePersistedState, parsePersistedState } = require('../helpers/persistedState')
+  const addressToken = Buffer.from(JSON.stringify({ kind: 'address', addressSnapshot: {
+    provider: 'google_places', placeId: 'fixture', latitude: 48.868, longitude: 2.306,
+  } })).toString('base64url') + '.fixture-signature'
+  let lost = true
+  const f = fixture(() => lost ? { lost: true } : { data: { orderId: 91 } })
+  const params = { customer: 'Guest', servicePointId: 70, total: 29, payment: 'cash', dataCart: cart,
+    fulfillmentType: 'delivery', deliveryQuoteToken: addressToken, addressResolutionToken: addressToken }
+  assert.equal((await f.store.dispatch('cart/checkoutOrder', params)).ok, false)
+  const original = copy(f.calls[0].body)
+  const bytes = serializePersistedState(f.store.state)
+  assert.equal(bytes.includes(addressToken), false)
+  assert.equal(bytes.includes('48.868'), false)
+  const restored = parsePersistedState(bytes)
+  f.store.replaceState({ ...f.store.state, cart: restored.cart })
+  lost = false
+  assert.equal((await f.store.dispatch('cart/retryCheckout')).ok, true)
+  const sent = f.calls[f.calls.length - 1].body
+  assert.equal(sent.client_order_token, original.client_order_token)
+  assert.equal(sent.delivery_confirmation_secret, original.delivery_confirmation_secret)
+  assert.match(sent.address_resolution_token, /^sha256:[a-f0-9]{64}$/)
+  assert.match(sent.delivery_quote_token, /^sha256:[a-f0-9]{64}$/)
+})
+
 test('I1 mounted confirmed delivery keeps proofs/signature through pending child teardown and Stripe response without cancel', async () => {
   const response = deferred()
   const sent = deferred()
