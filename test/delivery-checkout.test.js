@@ -937,7 +937,7 @@ test('frozen-attempt mounting never clears proofs or requests quote/address', as
   } finally { checkout.$destroy() }
 })
 
-test('actual cashier service entry routes its existing cart to common checkout without customer/bootstrap actions', async () => {
+test('cashier menu keeps its original service dialog even when delivery is enabled', async () => {
   const f = fixture()
   const options = load('pages/caisse/menu.vue').default
   const cashier = new Vue({ ...options, store: f.store })
@@ -950,10 +950,20 @@ test('actual cashier service entry routes its existing cart to common checkout w
     cashier.expressPhone = '0700000000'
     cashier.expressDiscountType = 'amount'
     cashier.expressDiscountValue = 0.01
+    assert.equal(cashier.expressSelectedServiceLabel, 'Sur place')
     await cashier.openExpressServiceDialog()
-    assert.deepEqual(routes, ['/cart'])
-    assert.equal(f.store.state.delivery.discount.value, 0.01)
-    assert.equal(f.store.state.delivery.posDraft.customer, 'Customer at counter')
+    assert.equal(cashier.expressServiceDialog, true)
+    assert.deepEqual(routes, [])
+    assert.equal(f.store.state.delivery.discount.value, 0)
+    assert.equal(f.store.state.delivery.posDraft, null)
+    cashier.selectExpressService(true)
+    assert.equal(cashier.expressIsTakeaway, true)
+    assert.equal(cashier.expressServiceDialog, false)
+    cashier.openExpressServiceDialog()
+    assert.equal(cashier.expressServiceDialog, true)
+    cashier.selectExpressService(false)
+    assert.equal(cashier.expressSelectedServiceLabel, 'Sur place')
+    assert.equal(cashier.expressServiceDialog, false)
     assert.equal(f.calls.length, 0)
   } finally { cashier.$destroy() }
 })
