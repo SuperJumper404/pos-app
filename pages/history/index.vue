@@ -17,7 +17,7 @@
     </div>
 
     <v-card
-      v-if="loadPage"
+      v-if="loadPage && !historyEntries.length"
       outlined
       class="mt-5 overflow-y-auto"
       style="height: 350px"
@@ -46,30 +46,48 @@
         <v-text-field
           v-model="searchFilter"
           class="se-search-field"
-          placeholder="Rechercher une commande, table ou client"
+          placeholder="Rechercher une commande ou un paiement TPE"
+          aria-label="Rechercher dans l’historique"
           outlined
           dense
           hide-details
           prepend-inner-icon="mdi-magnify"
         ></v-text-field>
+        <v-btn icon class="ml-2 history-touch-button" :loading="loadPage" aria-label="Actualiser l’historique" @click="loadEntries"><v-icon>mdi-refresh</v-icon></v-btn>
       </v-app-bar>
       <v-data-table
         v-model="selectedOrders"
         :headers="headers"
-        :items="dataArchivedOrders"
-        :search="searchFilter"
+        :items="historyEntries"
+        :options.sync="tableOptions"
+        :server-items-length="historyTotal"
+        :loading="loadPage"
+        :footer-props="{ 'items-per-page-options': [10, 25, 50], 'items-per-page-text': 'Lignes par page' }"
+        :item-class="historyRowClass"
+        no-data-text="Aucune commande ni paiement dans l’historique"
         :expanded.sync="expanded"
-        item-key="id"
+        item-key="rowKey"
         show-expand
         single-expand
         :disable-sort="$vuetify.breakpoint.smAndDown"
       >
+        <template #[`item.data-table-expand`]="{ item, expand, isExpanded }">
+          <v-btn v-if="item.entryType === 'order'" icon class="history-touch-button" :aria-label="`Détails de la commande ${item.ordernumber}`" :aria-expanded="String(isExpanded)" @click="expandOrder(item, expand, isExpanded)"><v-icon>{{ isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon></v-btn>
+        </template>
         <template #[`item.ordernumber`]="{ item }">
-          <div>#{{ item.ordernumber }}</div>
-          <TakeawayChip :value="item.is_takeaway" :fulfillment-type="item.fulfillment_type" />
+          <template v-if="item.entryType === 'terminal_payment'">
+            <div class="history-terminal-label"><v-icon small color="primary">mdi-contactless-payment</v-icon><strong>Paiement TPE</strong></div>
+            <div class="text-caption">{{ item.ordernumber || `TPE #${item.id}` }} · {{ item.readerLabel || `Terminal #${item.terminalPayment.readerId}` }}</div>
+          </template>
+          <template v-else>
+            <div>#{{ item.ordernumber }}</div>
+            <TakeawayChip :value="item.is_takeaway" :fulfillment-type="item.fulfillment_type" />
+          </template>
         </template>
         <template #expanded-item="{ item }">
-          <td colspan="12">
+          <td v-if="item.entryType === 'order'" :colspan="headers.length + 1">
+            <v-progress-linear v-if="detailsLoadingIds.includes(item.id)" indeterminate color="primary" aria-label="Chargement des détails de commande" />
+            <v-alert v-if="detailsErrorIds.includes(item.id)" type="error" text dense>Les détails de cette commande sont indisponibles. <v-btn small text @click="loadOrderDetails(item)">Réessayer</v-btn></v-alert>
             <v-card
               v-for="(itm, i) in getArchivedOrderDetailsByOrderId(item.id)"
               :key="i"
@@ -205,26 +223,29 @@
             </div>
           </td>
         </template>
-        <template #[`item.created`]="{ item }">
+        <template #[`item.eventAt`]="{ item }">
           <div>
-            {{ orderTime(item.created) }}
+            {{ orderTime(item.eventAt) }}
           </div>
         </template>
+        <template #[`item.username`]="{ item }">{{ item.username || '—' }}</template>
+        <template #[`item.customer`]="{ item }">{{ item.customer || '—' }}</template>
         <template #[`item.subtotal`]="{ item }">
           <div>{{ formatCurrency(item.subtotal) }}</div>
         </template>
         <template #[`item.taken_by_name`]="{ item }">
-          {{ item.taken_by_name || 'Non attribuee' }}
+          {{ item.taken_by_name || (item.entryType === 'terminal_payment' ? '—' : 'Non attribuee') }}
         </template>
         <template #[`item.prepared_by_name`]="{ item }">
-          {{ item.prepared_by_name || 'Non attribuee' }}
+          {{ item.entryType === 'terminal_payment' ? '—' : item.prepared_by_name || 'Non attribuee' }}
         </template>
         <template #[`item.payment_status`]="{ item }">
-          <v-chip small dark :color="paymentStatusColor(item)">
+          <v-chip small :dark="item.entryType !== 'terminal_payment'" :color="paymentStatusColor(item)">
             {{ paymentStatusText(item) }}
           </v-chip>
         </template>
         <template #[`item.status`]="{ item }">
+          <span v-if="item.entryType === 'terminal_payment'">—</span>
           <v-chip v-if="item.status === 1" color="grey"> En attente </v-chip>
           <v-chip v-if="item.status === 2" color="success">
             En préparation
@@ -236,10 +257,19 @@
           <v-row class="d-flex flex-nowrap">
             <v-card-actions>
               <v-btn
+                v-if="item.entryType === 'terminal_payment'"
                 outlined
                 small
                 color="primary"
-                class="text-none"
+                class="text-none history-touch-button"
+                @click="openAttachments(item)"
+              >Commandes jointes ({{ item.terminalPayment.attachmentsCount }})<v-icon small right>mdi-paperclip</v-icon></v-btn>
+              <v-btn
+                v-else
+                outlined
+                small
+                color="primary"
+                class="text-none history-touch-button"
                 @click="showInvoice(item.id)"
                 >Ticket <v-icon small right>mdi-invoice-text</v-icon>
               </v-btn>
@@ -248,6 +278,7 @@
         </template>
       </v-data-table>
     </v-card>
+    <TerminalPaymentAttachments v-model="attachmentsDialog" :payment-id="attachmentsPaymentId" @changed="loadEntries" />
     <!-- <pre type="json">{{ dataOrders }}</pre> -->
     <!-- <v-btn @click="soundNotification()"
       >Sound <v-icon small right>mdi-close-circle</v-icon>
@@ -262,6 +293,7 @@
 <script>
 import TakeawayChip from '@/components/orders/TakeawayChip'
 import VatBreakdown from '@/components/orders/VatBreakdown'
+import TerminalPaymentAttachments from '@/components/history/TerminalPaymentAttachments.vue'
 import formatdate from '@/helpers/formatdate'
 import moment from 'moment'
 import price from '@/helpers/price'
@@ -270,8 +302,9 @@ const {
   getPaymentStatusText,
   getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
+const { attemptStorageKey, terminalStatusText, terminalStatusColor } = require('@/helpers/standaloneTerminal')
 export default {
-  components: { TakeawayChip, VatBreakdown },
+  components: { TakeawayChip, VatBreakdown, TerminalPaymentAttachments },
   mixins: [formatdate, price],
   middleware: 'auth',
   data() {
@@ -284,10 +317,20 @@ export default {
       lastUpdate: moment(new Date()),
       searchFilter: '',
       selectedOrders: [],
+      tableOptions: { page: 1, itemsPerPage: 10, sortBy: ['eventAt'], sortDesc: [true] },
+      historyReady: false,
+      historyVersion: 0,
+      searchTimer: null,
+      appliedSearch: '',
+      attachmentsDialog: false,
+      attachmentsPaymentId: null,
+      detailsLoadingIds: [],
+      detailsErrorIds: [],
+      detailsLoadedIds: [],
       headers: [
-        { text: 'Date', value: 'created', filterable: true },
+        { text: 'Date', value: 'eventAt', filterable: true },
         {
-          text: 'Numéro de commande',
+          text: 'Référence',
           value: 'ordernumber',
           filterable: true,
         },
@@ -299,7 +342,7 @@ export default {
         { text: 'Total', value: 'subtotal', filterable: true },
         { text: 'Paiement', value: 'payment_status', filterable: true },
         { text: 'Statut', value: 'status', filterable: true },
-        { text: 'Actions', value: 'actions' },
+        { text: 'Actions', value: 'actions', sortable: false },
       ],
       items: [
         {
@@ -330,8 +373,14 @@ export default {
     //   console.log('result multi orders', this.result)
     //   return this.result
     // },
-    dataArchivedOrders() {
-      return this.$store.get('history/dataArchivedOrders')
+    userScope() {
+      return attemptStorageKey(this.user)
+    },
+    historyEntries() {
+      return this.userScope && this.$store.get('history/entriesOwner') === this.userScope ? this.$store.get('history/entries') || [] : []
+    },
+    historyTotal() {
+      return this.userScope && this.$store.get('history/entriesOwner') === this.userScope ? this.$store.get('history/entriesTotal') || 0 : 0
     },
     detailArchivedOrder() {
       return this.$store.get('history/detailArchivedOrder')
@@ -354,23 +403,79 @@ export default {
       return this.$store.get('staticURL').replace(/\/+$/, '')
     },
   },
+  watch: {
+    tableOptions: { deep: true, handler() { this.queueEntries() } },
+    searchFilter() { this.tableOptions.page = 1; this.queueEntries() },
+    '$route.query.payment'() { this.searchFilter = ''; this.tableOptions.page = 1; this.queueEntries() },
+    userScope() {
+      this.historyVersion += 1
+      this.attachmentsDialog = false
+      this.expanded = []
+      this.dataAllDetailsArchivedOrders = []
+      this.detailsLoadingIds = []
+      this.detailsLoadedIds = []
+      this.detailsErrorIds = []
+      this.queueEntries()
+    },
+  },
   mounted() {
-    this.loadPage = true
-    const archivedOrdersIds = this.dataArchivedOrders.map((x) => x.id)
-
-    for (const id of archivedOrdersIds) {
-      this.$store.dispatch('history/getDetailArchivedOrder', id).then(() => {
-        const detail = this.$store.get('history/detailArchivedOrder')
-        this.dataAllDetailsArchivedOrders.push(detail)
-      })
-    }
-
-    this.$store.dispatch('history/getAllArchivedOrders').finally(() => {
-      this.loadPage = false
-    })
+    this.historyReady = true
+    this.loadEntries()
+  },
+  beforeDestroy() {
+    this.historyReady = false
+    this.historyVersion += 1
+    if (this.searchTimer) clearTimeout(this.searchTimer)
   },
 
   methods: {
+    queueEntries() {
+      if (!this.historyReady) return
+      if (this.searchTimer) clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => { this.searchTimer = null; this.loadEntries() }, this.searchFilter.trim() === this.appliedSearch ? 0 : 300)
+    },
+    async loadEntries() {
+      const generation = ++this.historyVersion
+      this.loadPage = true
+      this.errMsg = false
+      const result = await this.$store.dispatch('history/getEntries', {
+        search: this.searchFilter.trim(), page: this.tableOptions.page,
+        itemsPerPage: this.tableOptions.itemsPerPage,
+        sortBy: this.tableOptions.sortBy[0] || 'eventAt', sortDesc: this.tableOptions.sortDesc[0] !== false,
+      })
+      if (generation !== this.historyVersion) return
+      this.loadPage = false
+      this.errMsg = !result
+      if (!result) return
+      this.appliedSearch = this.searchFilter.trim()
+      this.expanded = this.expanded.filter(item => this.historyEntries.some(row => row.rowKey === item.rowKey && row.entryType === 'order'))
+      this.selectedOrders = this.selectedOrders.filter(item => item.entryType === 'order')
+    },
+    historyRowClass(item) {
+      return item.entryType === 'terminal_payment' && String(this.$route.query.payment) === String(item.id) ? 'history-payment-focus' : ''
+    },
+    openAttachments(item) {
+      if (item.entryType !== 'terminal_payment') return
+      this.attachmentsPaymentId = item.id
+      this.attachmentsDialog = true
+    },
+    expandOrder(item, expand, isExpanded) {
+      if (item.entryType !== 'order') return
+      expand(!isExpanded)
+      if (!isExpanded) this.loadOrderDetails(item)
+    },
+    async loadOrderDetails(item) {
+      if (item.entryType !== 'order' || this.detailsLoadingIds.includes(item.id) || this.detailsLoadedIds.includes(item.id)) return
+      const scope = this.userScope
+      this.detailsLoadingIds.push(item.id)
+      this.detailsErrorIds = this.detailsErrorIds.filter(id => id !== item.id)
+      const detail = await this.$store.dispatch('history/getEntryDetails', item.id)
+      if (scope !== this.userScope || this._isDestroyed) return
+      this.detailsLoadingIds = this.detailsLoadingIds.filter(id => id !== item.id)
+      if (!detail) { this.detailsErrorIds.push(item.id); return }
+      this.dataAllDetailsArchivedOrders.push(detail)
+      this.detailsLoadedIds.push(item.id)
+    },
     customizationGroups(item) {
       const value = item || {}
       const snapshots = [
@@ -406,15 +511,20 @@ export default {
       return moment(new Date(time)).format('DD/MM à HH:mm')
     },
     paymentStatusText(item) {
+      if (item.entryType === 'terminal_payment') return terminalStatusText(item.terminalPayment.status)
       return getPaymentStatusText(item)
     },
     paymentStatusColor(item) {
+      if (item.entryType === 'terminal_payment') return terminalStatusColor(item.terminalPayment.status)
       return getPaymentStatusColor(item)
     },
   },
 }
 </script>
 <style scoped>
+.history-touch-button { min-width: 44px !important; min-height: 44px !important; }
+.history-terminal-label { display: flex; align-items: center; gap: 6px; }
+::v-deep .history-payment-focus { background: var(--se-color-primary-soft); }
 .history-panel-card,
 .history-detail-card {
   box-shadow: none !important;

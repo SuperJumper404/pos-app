@@ -53,8 +53,10 @@ const loadStore = (file) => {
 
 const runIdentityRegression = async () => {
   const terminal = loadStore('store/stripeTerminal.js')
+  const standalone = loadStore('store/terminalPayments.js')
   const users = loadStore('store/users.js')
   const terminalState = terminal.state()
+  const standaloneState = standalone.state()
   const userState = users.state()
   const events = []
   const storageValues = new Map()
@@ -69,12 +71,14 @@ const runIdentityRegression = async () => {
     dispatch(type, value) { terminalState[type.slice(4)] = value },
   }
   const dirtyTerminal = () => {
+    standaloneState.activePayment = { id: 21, amountCents: 5000 }
     terminalState.readers = [{ id: 7 }]
     terminalState.currentReader = { id: 7 }
     terminalState.activePayment = { id: 13 }
     terminalState.error = { code: 'TERMINAL_PAYMENT_FAILED', message: 'Old user' }
   }
   const assertTerminalCleared = () => {
+    assert.strictEqual(standaloneState.activePayment, null)
     assert.deepStrictEqual(terminalState.readers, [])
     assert.strictEqual(terminalState.currentReader, null)
     assert.strictEqual(terminalState.activePayment, null)
@@ -84,6 +88,9 @@ const runIdentityRegression = async () => {
     events.push([type, value, options])
     if (type === 'stripeTerminal/resetSession') {
       return terminal.actions.resetSession(terminalContext)
+    }
+    if (type === 'terminalPayments/resetSession') {
+      return standalone.actions.resetSession({ state: standaloneState, dispatch(type, value) { standaloneState[type.slice(4)] = value } })
     }
     if (type === 'clearAuthenticatedUser') {
       return users.actions.clearAuthenticatedUser({ dispatch })

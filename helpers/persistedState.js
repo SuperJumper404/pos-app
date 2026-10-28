@@ -29,6 +29,13 @@ const sanitizePersistedState = (state) => {
   const nextState = { ...state }
   delete nextState.staticURL
   delete nextState.stripeTerminal
+  delete nextState.terminalPayments
+  if (nextState.history) {
+    nextState.history = { ...nextState.history }
+    delete nextState.history.entries
+    delete nextState.history.entriesTotal
+    delete nextState.history.entriesOwner
+  }
   delete nextState.customer
   delete nextState.loyalty
   delete nextState.delivery

@@ -75,6 +75,7 @@ const persisted = {
   users: { user: { id: 4, token: 'saved-session' } },
   cart: { totalCart: 12 },
   stripeTerminal: terminalState,
+  terminalPayments: { activePayment: { id: 21, amountCents: 5000 }, error: { message: 'Previous cashier' } },
   customer: { session: { csrfToken: 'private' }, addresses: [{ instructions: 'private' }] },
   delivery: { quote: { addressSnapshot: { instructions: 'private' } } },
   courier: { missions: [{ addressSnapshot: { instructions: 'private' } }] },

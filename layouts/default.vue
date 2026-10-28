@@ -157,6 +157,17 @@
           <v-icon>mdi-home</v-icon>
         </v-btn>
         <v-btn
+          v-if="showTerminalPayment"
+          class="toolbar-terminal-button"
+          icon
+          color="primary"
+          aria-label="Ouvrir le paiement TPE"
+          title="Paiement TPE"
+          @click="terminalDialog = true"
+        >
+          <v-icon>mdi-contactless-payment</v-icon>
+        </v-btn>
+        <v-btn
           v-if="!isStaffUser && canAccessModule(userAccess, 'orders')"
           icon
           class="top-bar-icon-button"
@@ -206,10 +217,17 @@
       <!-- </v-container> -->
     </v-main>
     <AppNotifications />
+    <StandaloneTerminalDialog
+      v-if="isStaffUser && !isKioskPage"
+      v-model="terminalDialog"
+      :reader="currentTerminalReader"
+      @recovery-change="terminalRecovery = $event"
+    />
   </v-app>
 </template>
 <script>
 import listdashboard from '@/helpers/listdashboard'
+import StandaloneTerminalDialog from '@/components/terminal/StandaloneTerminalDialog.vue'
 const {
   canAccessModule: canUseModule,
   getAccessibleNavigationItems,
@@ -220,7 +238,9 @@ const {
   formatPendingOrderBadge,
 } = require('@/helpers/orderNotifications')
 const { isKioskRoute } = require('@/helpers/kioskAccess')
+const { attemptStorageKey, readAttempt, canUseStandaloneTerminal } = require('@/helpers/standaloneTerminal')
 export default {
+  components: { StandaloneTerminalDialog },
   mixins: [listdashboard],
   middleware: ['courier', 'delivery'],
   data() {
@@ -236,9 +256,23 @@ export default {
       ordersPolling: null,
       ordersPollingInFlight: false,
       ordersPollingReady: false,
+      terminalDialog: false,
+      terminalRecovery: false,
     }
   },
   computed: {
+    terminalIdentity() {
+      return attemptStorageKey(this.idUser)
+    },
+    currentTerminalReader() {
+      return this.$store.get('stripeTerminal/currentReader') || null
+    },
+    showTerminalPayment() {
+      return canUseStandaloneTerminal({
+        user: this.idUser, reader: this.currentTerminalReader,
+        path: this.$route.path, hasRecovery: this.terminalRecovery,
+      })
+    },
     isKioskPage() {
       return isKioskRoute(this.$route)
     },
@@ -383,6 +417,14 @@ export default {
     },
   },
   watch: {
+    terminalIdentity() {
+      this.terminalDialog = false
+      this.terminalRecovery = false
+      if (this.ordersPollingReady) this.syncTerminalAccess()
+    },
+    '$route.path'() {
+      if (this.ordersPollingReady) this.syncTerminalAccess()
+    },
     userAccess() {
       this.syncOrdersPolling()
     },
@@ -390,11 +432,24 @@ export default {
   mounted() {
     this.ordersPollingReady = true
     this.syncOrdersPolling()
+    this.syncTerminalAccess()
+    if (typeof window !== 'undefined') window.addEventListener('focus', this.syncTerminalAccess)
   },
   beforeDestroy() {
     this.stopOrdersPolling()
+    if (typeof window !== 'undefined') window.removeEventListener('focus', this.syncTerminalAccess)
   },
   methods: {
+    async syncTerminalAccess() {
+      const permitted = canUseStandaloneTerminal({ user: this.idUser, path: this.$route.path, hasRecovery: true })
+      if (!permitted) {
+        this.terminalDialog = false
+        this.terminalRecovery = false
+        return
+      }
+      this.terminalRecovery = Boolean(readAttempt(typeof localStorage === 'undefined' ? null : localStorage, this.terminalIdentity))
+      try { await this.$store.dispatch('stripeTerminal/getCurrentReader') } catch (_) {}
+    },
     canAccessModule(access, moduleKey) {
       return canUseModule(
         access,
@@ -471,6 +526,17 @@ export default {
 }
 </script>
 <style scoped>
+.toolbar-terminal-button {
+  width: 44px !important;
+  height: 44px !important;
+  background: var(--se-color-primary-soft);
+}
+
+.toolbar-terminal-button:focus-visible {
+  outline: 2px solid var(--se-color-primary);
+  outline-offset: 2px;
+}
+
 .app-top-bar {
   background: rgba(255, 255, 255, 0.96) !important;
   border-bottom: 1px solid var(--se-color-border-soft) !important;

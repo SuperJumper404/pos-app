@@ -1,8 +1,8 @@
 # Paiements TPE autonomes avec commandes en pièces jointes
 
-Date : 28 octobre 2026. Statut : conception proposée, à valider avant implémentation.
+Date : 28 octobre 2026. Statut : conception validée par l'utilisateur, y compris la liste unique de l'historique.
 
-Relecture indépendante effectuée, y compris après la correction de l'historique demandée par l'utilisateur : une liste unique mêlant commandes et paiements TPE. Aucune question importante ne reste à résoudre pour préparer le plan. Les choix proposés ci-dessous restent soumis à la validation de l'utilisateur.
+Relecture indépendante effectuée, y compris après la correction de l'historique demandée par l'utilisateur : une liste unique mêlant commandes et paiements TPE. L'utilisateur a ensuite validé cette conception et le démarrage de l'implémentation.
 
 ## Besoin confirmé
 

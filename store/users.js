@@ -94,6 +94,7 @@ const persistAuthenticatedUser = async (dispatch, response) => {
   const user = Array.isArray(payload) ? payload[0] : payload
   const servicePointSession = user.session_subject === 'service_point'
   await dispatch('stripeTerminal/resetSession', null, { root: true })
+  await dispatch('terminalPayments/resetSession', null, { root: true })
   persistAuthStorage(user)
   dispatch('set/user.id', servicePointSession ? null : user.id)
   dispatch('set/user.access', user.access)
@@ -286,6 +287,7 @@ export const actions = {
     tableAccessRequest = null
     tableAccessRequestToken = null
     dispatch('stripeTerminal/resetSession', null, { root: true })
+    dispatch('terminalPayments/resetSession', null, { root: true })
     dispatch('set/user.id', null)
     dispatch('set/user.access', null)
     dispatch('set/user.token', null)

@@ -1,7 +1,16 @@
 import EasyAccess, { defaultMutations } from 'vuex-easy-access'
-const { sortArchivedOrdersByArchiveDate } = require('@/helpers/history')
+const { sortArchivedOrdersByArchiveDate, validHistoryPage } = require('@/helpers/history')
+const { attemptStorageKey } = require('@/helpers/standaloneTerminal')
+const entryRequests = new WeakMap()
+const historyIdentity = rootState => {
+  const user = rootState && rootState.users && rootState.users.user
+  return { key: attemptStorageKey(user), token: user && user.token }
+}
 export const state = () => ({
   dataArchivedOrders: [],
+  entries: [],
+  entriesTotal: 0,
+  entriesOwner: null,
   // dataArchivedOrdersByUserId: [],
   message: '',
   detailArchivedOrder: [],
@@ -13,6 +22,54 @@ export const state = () => ({
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
+  async getEntries({ state, rootState, dispatch }, input = {}) {
+    const owner = historyIdentity(rootState)
+    const generation = (entryRequests.get(state) || 0) + 1
+    entryRequests.set(state, generation)
+    const fresh = () => entryRequests.get(state) === generation && historyIdentity(rootState).key === owner.key &&
+      historyIdentity(rootState).token === owner.token
+    if (state.entriesOwner !== owner.key) {
+      dispatch('set/entries', [])
+      dispatch('set/entriesTotal', 0)
+      dispatch('set/entriesOwner', owner.key)
+    }
+    if (!owner.key) return false
+    const sortBy = ['eventAt', 'ordernumber', 'username', 'customer', 'taken_by_name', 'prepared_by_name', 'subtotal', 'payment_status', 'status'].includes(input.sortBy) ? input.sortBy : 'eventAt'
+    try {
+      const response = await this.$axios.get('/baseurl/api/v1/stripe/terminal/history', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+        skipGlobalErrorNotification: true,
+        params: {
+          search: typeof input.search === 'string' ? input.search.slice(0, 200) : '',
+          page: Number.isSafeInteger(input.page) && input.page > 0 ? input.page : 1,
+          itemsPerPage: [10, 25, 50].includes(input.itemsPerPage) ? input.itemsPerPage : 10,
+          sortBy, sortDesc: input.sortDesc !== false,
+        },
+      })
+      const envelope = response && response.data
+      if (!envelope || envelope.success !== true || !validHistoryPage(envelope.data)) throw new Error('Invalid history response')
+      if (!fresh()) return false
+      dispatch('set/entries', envelope.data.items)
+      dispatch('set/entriesTotal', envelope.data.total)
+      dispatch('set/message', '')
+      return envelope.data
+    } catch (_) {
+      if (fresh()) dispatch('set/message', 'Impossible de charger l’historique. Actualisez pour réessayer.')
+      return false
+    }
+  },
+  async getEntryDetails({ rootState }, id) {
+    const owner = historyIdentity(rootState)
+    if (!owner.key || !Number.isSafeInteger(id) || id <= 0) return false
+    try {
+      const response = await this.$axios.get(`/baseurl/api/v1/detailorder/archive/${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }, skipGlobalErrorNotification: true,
+      })
+      if (historyIdentity(rootState).key !== owner.key || historyIdentity(rootState).token !== owner.token ||
+        !response.data || !Array.isArray(response.data.data)) return false
+      return response.data.data
+    } catch (_) { return false }
+  },
   getAllArchivedOrders({ dispatch }) {
     return this.$axios
       .get(`/baseurl/api/v1/orders/archives`, {

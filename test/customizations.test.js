@@ -2474,6 +2474,7 @@ const runReviewRegressionTests = async () => {
   })
   assert.deepStrictEqual(userAuthDispatches, [
     ['stripeTerminal/resetSession', null],
+    ['terminalPayments/resetSession', null],
     ['set/user.id', null],
     ['set/user.access', null],
     ['set/user.token', null],
@@ -2558,7 +2559,7 @@ const runReviewRegressionTests = async () => {
       await userActions.clearAuthenticatedUser({
         dispatch(innerType, innerPayload) {
           events.push([innerType, innerPayload])
-          if (innerType === 'stripeTerminal/resetSession') return
+          if (['stripeTerminal/resetSession', 'terminalPayments/resetSession'].includes(innerType)) return
           const field = innerType.replace('set/user.', '')
           state.users.user[field] = innerPayload
         },
