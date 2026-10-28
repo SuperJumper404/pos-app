@@ -1543,11 +1543,13 @@ const menusOptions = loadComponentOptions(
   [
     'Loading',
     'ProductCustomizationWizard',
+    'DeliveryOrderDialog',
+    'cashierDelivery',
     'price',
     'mergeConfiguredCartLine',
     'replaceConfiguredCartLine',
   ],
-  [{}, {}, {}, mergeConfiguredCartLine, replaceConfiguredCartLine]
+  [{}, {}, {}, {}, {}, mergeConfiguredCartLine, replaceConfiguredCartLine]
 )
 
 const menuProduct = {

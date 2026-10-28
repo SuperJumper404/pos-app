@@ -479,7 +479,7 @@ export default {
   justify-content: center;
 }
 
-.module-card__icon {
+.module-card .module-card__icon {
   color: var(--se-color-primary);
   font-size: 26px;
 }

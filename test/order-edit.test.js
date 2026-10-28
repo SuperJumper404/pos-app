@@ -715,11 +715,13 @@ const runCartEditContracts = async () => {
       [
         'Loading',
         'ProductCustomizationWizard',
+        'DeliveryOrderDialog',
+        'cashierDelivery',
         'price',
         'mergeConfiguredCartLine',
         'replaceConfiguredCartLine',
       ],
-      [{}, {}, {}, () => [], () => []]
+      [{}, {}, {}, {}, {}, () => [], () => []]
     )
     assert.ok(
       menusOptions.props && menusOptions.props.embeddedOrderEdit,

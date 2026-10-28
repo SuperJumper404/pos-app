@@ -13,15 +13,18 @@
         </v-btn>
       </v-btn-toggle>
       <v-alert v-if="displayError" type="error" text role="alert">{{ displayError }}</v-alert>
+      <v-alert v-if="channel === 'sms' && account.channels.smsDevelopment" type="info" text>
+        Mode développement : aucun SMS envoyé. Utilisez le code de test configuré sur le serveur local.
+      </v-alert>
       <form v-if="availableChannels.length" novalidate @submit.prevent="challenge ? verify() : sendCode()">
         <template v-if="!challenge">
           <v-text-field
             ref="destination" v-model="destination" outlined
-            :label="channel === 'whatsapp' ? 'Numero WhatsApp' : 'Adresse e-mail'"
-            :type="channel === 'whatsapp' ? 'tel' : 'email'"
-            :autocomplete="channel === 'whatsapp' ? 'tel' : 'email'"
-            :placeholder="channel === 'whatsapp' ? '+33 6 12 34 56 78' : ''"
-            :disabled="submitting || account.busy" :maxlength="channel === 'whatsapp' ? 32 : 254"
+            :label="channel === 'email' ? 'Adresse e-mail' : channel === 'sms' ? 'Numéro de téléphone' : 'Numero WhatsApp'"
+            :type="channel === 'email' ? 'email' : 'tel'"
+            :autocomplete="channel === 'email' ? 'email' : 'tel'"
+            :placeholder="channel === 'email' ? '' : '+33 6 12 34 56 78'"
+            :disabled="submitting || account.busy" :maxlength="channel === 'email' ? 254 : 32"
           />
           <v-btn type="submit" color="primary" :disabled="!channel || account.busy" :loading="submitting">
             <v-icon left>mdi-send-outline</v-icon>Recevoir un code
@@ -64,6 +67,7 @@ export default {
     availableChannels() {
       if (!this.account.channelsLoaded) return []
       return [
+        { value: 'sms', label: 'SMS', icon: 'mdi-message-text-outline' },
         { value: 'email', label: 'E-mail', icon: 'mdi-email-outline' },
         { value: 'whatsapp', label: 'WhatsApp', icon: 'mdi-whatsapp' },
       ].filter(item => this.account.channels[item.value])
@@ -74,6 +78,7 @@ export default {
     expired() { return this.challenge && Date.parse(this.challenge.expiresAt) <= this.now },
     deliveryMessage() {
       if (!this.challenge) return ''
+      if (this.challenge.channel === 'sms' && this.account.channels.smsDevelopment) return 'Code de test local attendu. Aucun SMS envoyé.'
       if (this.challenge.status === 'failed') return 'Le code n\'a pas pu etre envoye.'
       if (this.challenge.status !== 'sent') return `Envoi incertain a ${this.challenge.destination}. Si vous recevez le code, vous pouvez le saisir.`
       return `Code envoye a ${this.challenge.destination}`
@@ -115,7 +120,7 @@ export default {
       this.validationError = ''
       const destination = this.destination.trim()
       if (this.channel === 'email' ? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destination) : !/^\+[\d\s()-]{7,30}$/.test(destination)) {
-        this.validationError = this.channel === 'email' ? 'Saisissez une adresse e-mail valide.' : 'Saisissez un numero WhatsApp avec son indicatif pays.'
+        this.validationError = this.channel === 'email' ? 'Saisissez une adresse e-mail valide.' : 'Saisissez un numéro de téléphone avec son indicatif pays.'
         return
       }
       this.submitting = true

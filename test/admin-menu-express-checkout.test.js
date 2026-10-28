@@ -239,7 +239,7 @@ assert.match(
 )
 assert.match(
   expressCartSource,
-  /express-cashout-button[\s\S]*?express-cashout-label[\s\S]*?Encaisser[\s\S]*?express-cashout-total[\s\S]*?formatCurrency\(total\)/,
+  /express-cashout-button[\s\S]*?express-cashout-label[\s\S]*?Encaisser[\s\S]*?express-cashout-total[\s\S]*?formatCurrency\(expressCheckoutTotal\)/,
   'express checkout total must live inside the cash-out button'
 )
 assert.doesNotMatch(
@@ -424,8 +424,8 @@ assert.match(
 )
 assert.match(
   menusSource,
-  /payment:\s*'Paiement au comptoir'[\s\S]*?stripe:\s*false/,
-  'express pay-later action must reuse the existing unpaid counter checkout flow'
+  /payment:\s*this\.expressIsDelivery\s*\?\s*'Paiement a la livraison'\s*:\s*'Paiement au comptoir'[\s\S]*?stripe:\s*false/,
+  'express pay-later keeps the unpaid counter flow and collects delivery orders at delivery'
 )
 assert.match(
   menusSource,
@@ -509,12 +509,12 @@ assert.doesNotMatch(
 )
 assert.match(
   menusSource,
-  /async printExpressReceipt\(result, paymentMethod\)[\s\S]*?orders\/getAllOrder[\s\S]*?orders\/getDetailOrder/,
+  /async printExpressReceipt\(result, paymentMethod, checkoutContext = null\)[\s\S]*?orders\/getAllOrder[\s\S]*?orders\/getDetailOrder/,
   'express receipt printing must reload the created order and its details'
 )
 assert.match(
   menusSource,
-  /confirmExpressReceipt\(wantsReceipt\)[\s\S]*?printExpressReceipt\(result, paymentMethod\)/,
+  /confirmExpressReceipt\(wantsReceipt\)[\s\S]*?printExpressReceipt\(result, paymentMethod, checkoutContext\)/,
   'express receipt choice must trigger printing after checkout succeeds'
 )
 assert.doesNotMatch(

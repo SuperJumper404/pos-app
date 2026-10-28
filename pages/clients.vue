@@ -1,5 +1,6 @@
 <template>
   <v-container fluid class="pa-5">
+    <v-btn v-if="Number($store.state.users.user.access) === 0" outlined color="primary" class="text-none mb-3" to="/fidelite"><v-icon left>mdi-card-account-details-outline</v-icon>Gérer la fidélité</v-btn>
     <v-alert v-model="errMsg" outlined text type="error">
       <v-row align="center" no-gutters>
         <v-col class="grow">

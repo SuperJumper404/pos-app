@@ -81,6 +81,7 @@
         </v-card-text>
       </v-card>
 
+      <LoyaltyPos v-if="orderSummary && [0, 1].includes(userAccess) && !['paid', 'refunded', 'canceled'].includes(orderSummary.payment_status)" :order-id="orderSummary.id" />
       <v-card outlined class="order-detail-list-card">
         <div class="order-detail-list">
           <v-card
@@ -567,6 +568,7 @@ import OrderEditModal from '@/components/orders/OrderEditModal'
 import TakeawayChip from '@/components/orders/TakeawayChip'
 import VatBreakdown from '@/components/orders/VatBreakdown'
 import DeliveryCheckout from '@/components/delivery/DeliveryCheckout.vue'
+import LoyaltyPos from '@/components/loyalty/LoyaltyPos.vue'
 import { deliveryChargeFor } from '@/helpers/vat'
 import { buildTrackingApi } from '@/helpers/deliveryTracking.js'
 import CustomizationSummary from '@/components/products/CustomizationSummary'
@@ -601,6 +603,7 @@ export default {
     TakeawayChip,
     VatBreakdown,
     DeliveryCheckout,
+    LoyaltyPos,
     CustomizationSummary,
   },
   mixins: [price],

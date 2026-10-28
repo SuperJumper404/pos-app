@@ -29,6 +29,29 @@
       <template #[`item.staff_login_id`]="{ item }">
         {{ item.staff_login_id || 'A creer' }}
       </template>
+      <template #[`item.pin`]="{ item }">
+        <div v-if="!isPrimaryAdmin(item)" class="staff-pin">
+          <span class="staff-pin__value">{{ pinUserId === item.id && revealedPin ? revealedPin : '****' }}</span>
+          <v-tooltip top>
+            <template #activator="{ on, attrs }">
+              <v-btn
+                icon
+                small
+                :loading="pinUserId === item.id && pinLoading"
+                :aria-label="pinUserId === item.id && revealedPin ? 'Masquer le PIN' : 'Afficher le PIN'"
+                v-bind="attrs"
+                v-on="on"
+                @click="togglePin(item)"
+              >
+                <v-icon small>{{ pinUserId === item.id && revealedPin ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+              </v-btn>
+            </template>
+            {{ pinUserId === item.id && revealedPin ? 'Masquer le PIN' : 'Afficher le PIN' }}
+          </v-tooltip>
+          <span v-if="pinUserId === item.id && pinMessage" role="status" class="text-caption">{{ pinMessage }}</span>
+        </div>
+        <span v-else>-</span>
+      </template>
       <template #[`item.actions`]="{ item }">
         <v-tooltip top>
           <template #activator="{ on, attrs }">
@@ -141,7 +164,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn text class="text-none" @click="closeCredentials">Fermer</v-btn>
+          <v-btn text class="text-none" @click="finishCredentials">Fermer</v-btn>
           <v-btn
             v-if="credentialUser && !(credentialResult && credentialResult.staff_pin)"
             color="primary"
@@ -179,6 +202,7 @@ const {
   PERSONAL_ROLE_OPTIONS: ROLE_OPTIONS,
   getRoleLabel,
   getRoleModuleDefaults,
+  isDeliveryAdmin,
 } = require('@/helpers/staffRoles')
 
 const emptyForm = () => ({
@@ -210,11 +234,18 @@ export default {
       credentialUser: null,
       credentialResult: null,
       showCredentialPin: false,
+      revealedPin: '',
+      pinUserId: null,
+      pinLoading: false,
+      pinMessage: '',
+      pinRequest: 0,
+      credentialScopeVersion: 0,
       removeTarget: null,
       handledCourierQuery: false,
       headers: [
         { text: 'Nom', value: 'username' },
         { text: 'ID caisse', value: 'staff_login_id' },
+        { text: 'PIN', value: 'pin', sortable: false },
         { text: 'Role', value: 'access' },
         { text: 'Statut', value: 'status' },
         { text: 'Actions', value: 'actions', sortable: false },
@@ -224,6 +255,10 @@ export default {
     }
   },
   computed: {
+    credentialActor() {
+      const user = this.$store.state.users && this.$store.state.users.user
+      return JSON.stringify(user && [user.id, user.shopid, user.access, user.status, user.session_subject, user.token])
+    },
     staff() {
       return this.$store.get('staff/data') || []
     },
@@ -234,10 +269,56 @@ export default {
       return this.isEditing && this.form.is_primary_admin
     },
   },
+  watch: {
+    credentialActor: {
+      sync: true,
+      handler() { this.clearRevealedPin(); this.closeCredentials() },
+    },
+    '$route.fullPath': {
+      sync: true,
+      handler() { this.clearRevealedPin(); this.closeCredentials() },
+    },
+    staff: {
+      sync: true,
+      handler() {
+        this.clearRevealedPin()
+        if (this.credentialUser || this.credentialResult) this.closeCredentials()
+      },
+    },
+  },
+  beforeDestroy() {
+    this.clearRevealedPin()
+    this.closeCredentials()
+  },
   mounted() {
     this.refresh()
   },
   methods: {
+    clearRevealedPin() {
+      this.pinRequest++
+      this.revealedPin = ''
+      this.pinUserId = null
+      this.pinLoading = false
+      this.pinMessage = ''
+    },
+    async togglePin(user) {
+      if (this.isPrimaryAdmin(user) || !isDeliveryAdmin(this.$store.state.users.user)) return
+      if (this.pinUserId === user.id && (this.revealedPin || this.pinLoading)) { this.clearRevealedPin(); return }
+      this.clearRevealedPin()
+      const request = this.pinRequest
+      this.pinUserId = user.id
+      this.pinLoading = true
+      try {
+        const result = await this.$store.dispatch('staff/readCredentials', { id: user.id })
+        if (request !== this.pinRequest) return
+        this.revealedPin = result && /^\d{4}$/.test(result.staff_pin) ? result.staff_pin : ''
+        this.pinMessage = result && result.needs_regeneration ? 'PIN a regenerer' : !result ? 'PIN indisponible' : ''
+      } catch (_) {
+        if (request === this.pinRequest) this.pinMessage = 'PIN indisponible'
+      } finally {
+        if (request === this.pinRequest) this.pinLoading = false
+      }
+    },
     roleLabel(access) {
       return getRoleLabel(access)
     },
@@ -297,6 +378,7 @@ export default {
     },
     async submit() {
       if (!this.$refs.form.validate()) return
+      const scope = this.credentialScopeVersion
       const isCreating = !this.isEditing
       this.submitting = true
       const data = this.isEditingPrimaryAdmin
@@ -312,9 +394,11 @@ export default {
         ? await this.$store.dispatch('staff/update', { id: this.form.id, data })
         : await this.$store.dispatch('staff/create', data)
       this.submitting = false
+      if (scope !== this.credentialScopeVersion) return
       if (!result) return
       this.closeForm()
       await this.refresh()
+      if (scope !== this.credentialScopeVersion) return
       if (isCreating && result.staff_login_id && result.staff_pin) {
         this.credentialUser = null
         this.credentialResult = result
@@ -323,28 +407,37 @@ export default {
       }
     },
     openCredentials(user) {
+      this.clearRevealedPin()
+      this.closeCredentials()
       this.credentialUser = user
       this.credentialResult = { staff_login_id: user.staff_login_id }
       this.showCredentialPin = false
       this.credentialsDialog = true
     },
     closeCredentials() {
+      this.credentialScopeVersion++
       this.credentialsDialog = false
       this.credentialUser = null
       this.credentialResult = null
       this.showCredentialPin = false
     },
+    finishCredentials() {
+      this.closeCredentials()
+      this.refresh()
+    },
     async saveCredentials() {
-      if (!this.credentialUser) return
+      if (!this.credentialUser || this.credentialLoading) return
+      const scope = this.credentialScopeVersion
+      this.clearRevealedPin()
       this.credentialLoading = true
       const result = await this.$store.dispatch('staff/provisionCredentials', {
         id: this.credentialUser.id,
       })
       this.credentialLoading = false
+      if (scope !== this.credentialScopeVersion) return
       if (!result) return
       this.credentialResult = result
       this.showCredentialPin = false
-      await this.refresh()
     },
     confirmRemove(user) {
       this.removeTarget = user
@@ -363,3 +456,8 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.staff-pin { display: flex; align-items: center; gap: 8px; min-height: 36px; flex-wrap: wrap; }
+.staff-pin__value { display: inline-block; min-width: 4ch; font-variant-numeric: tabular-nums; }
+</style>

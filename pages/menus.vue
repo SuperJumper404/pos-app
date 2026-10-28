@@ -615,6 +615,7 @@
                   >
                     <v-btn
                       class="cart-action-btn"
+                      :disabled="expressIsDelivery && expressDeliveryLocked"
                       outlined
                       color="warning"
                       small
@@ -642,6 +643,7 @@
                       color="success"
                       small
                       icon
+                      :disabled="expressIsDelivery && expressDeliveryLocked"
                       @click="plusBtn(itm, itemIndex)"
                     >
                       <v-icon>mdi-plus</v-icon>
@@ -678,6 +680,7 @@
               <div class="express-table-service-row">
                 <v-btn
                   class="express-table-button text-none justify-start"
+                  :disabled="expressIsDelivery && expressDeliveryLocked"
                   color="grey lighten-3"
                   depressed
                   @click="openExpressTableDialog"
@@ -693,7 +696,9 @@
                 >
                   <v-icon left>
                     {{
-                      expressIsTakeaway
+                      expressIsDelivery
+                        ? 'mdi-truck-delivery-outline'
+                        : expressIsTakeaway
                         ? 'mdi-shopping-outline'
                         : 'mdi-storefront-outline'
                     }}
@@ -704,6 +709,7 @@
               <div class="express-customer-fields">
                 <v-text-field
                   v-model="expressCustomer"
+                  :disabled="expressIsDelivery && expressDeliveryLocked"
                   dense
                   outlined
                   hide-details
@@ -713,6 +719,7 @@
                 />
                 <v-text-field
                   v-model="expressPhone"
+                  :disabled="expressIsDelivery && expressDeliveryLocked"
                   dense
                   outlined
                   hide-details
@@ -723,6 +730,7 @@
               </div>
               <v-textarea
                 v-model="expressRemark"
+                :disabled="expressIsDelivery && expressDeliveryLocked"
                 class="express-note-field"
                 dense
                 outlined
@@ -746,7 +754,7 @@
                     Encaisser
                   </span>
                   <span class="express-cashout-total">
-                    {{ formatCurrency(total) }}
+                    {{ formatCurrency(expressCheckoutTotal) }}
                   </span>
                 </v-btn>
               </div>
@@ -877,7 +885,7 @@
             >
               <span>Remise appliquée</span>
               <strong>
-                - {{ formatCurrency(total - expressCheckoutTotal) }}
+                - {{ formatCurrency(expressIsDelivery ? (expressDeliveryQuote && expressDeliveryQuote.itemsDiscountCents || 0) / 100 : total - expressCheckoutTotal) }}
               </strong>
             </div>
           </div>
@@ -904,7 +912,7 @@
               @click="submitExpressPayLater"
             >
               <v-icon class="mb-2">mdi-clock-outline</v-icon>
-              <span>Payer plus tard</span>
+              <span>{{ expressIsDelivery ? 'Payer a la livraison' : 'Payer plus tard' }}</span>
             </v-btn>
             <v-btn
               color="warning"
@@ -1086,45 +1094,59 @@
 
     <v-dialog v-model="expressServiceDialog" max-width="560">
       <v-card>
-        <v-card-title>Sur place ou à emporter</v-card-title>
+        <v-card-title>{{ canUseDeliveryService ? 'Mode de remise' : 'Sur place ou à emporter' }}</v-card-title>
         <v-card-text>
-          <div class="express-service-grid">
+          <div class="express-service-grid" :class="{ 'express-service-grid--delivery': canUseDeliveryService && !isOrderEditActive }">
             <v-btn
               class="express-service-tile text-none"
-              :class="{ 'express-service-tile--active': !expressIsTakeaway }"
-              :color="!expressIsTakeaway ? 'primary' : 'grey lighten-3'"
-              :dark="!expressIsTakeaway"
+              :class="{ 'express-service-tile--active': !expressIsTakeaway && !expressIsDelivery }"
+              :color="!expressIsTakeaway && !expressIsDelivery ? 'primary' : 'grey lighten-3'"
+              :dark="!expressIsTakeaway && !expressIsDelivery"
+              :disabled="canUseDeliveryService && expressDeliveryLocked"
               depressed
               @click="selectExpressService(false)"
             >
               <v-icon class="mb-2">mdi-storefront-outline</v-icon>
               <span>
                 Sur place
-                <small v-if="!expressIsTakeaway" class="express-choice-state">
+                <small v-if="!expressIsTakeaway && !expressIsDelivery" class="express-choice-state">
                   Choisi
                 </small>
               </span>
             </v-btn>
             <v-btn
               class="express-service-tile text-none"
-              :class="{ 'express-service-tile--active': expressIsTakeaway }"
-              :color="expressIsTakeaway ? 'primary' : 'grey lighten-3'"
-              :dark="expressIsTakeaway"
+              :class="{ 'express-service-tile--active': expressIsTakeaway && !expressIsDelivery }"
+              :color="expressIsTakeaway && !expressIsDelivery ? 'primary' : 'grey lighten-3'"
+              :dark="expressIsTakeaway && !expressIsDelivery"
+              :disabled="canUseDeliveryService && expressDeliveryLocked"
               depressed
               @click="selectExpressService(true)"
             >
               <v-icon class="mb-2">mdi-shopping-outline</v-icon>
               <span>
                 À emporter
-                <small v-if="expressIsTakeaway" class="express-choice-state">
+                <small v-if="expressIsTakeaway && !expressIsDelivery" class="express-choice-state">
                   Choisi
                 </small>
               </span>
+            </v-btn>
+            <v-btn v-if="canUseDeliveryService && !isOrderEditActive" class="express-service-tile text-none"
+              :class="{ 'express-service-tile--active': expressIsDelivery }" :color="expressIsDelivery ? 'primary' : 'grey lighten-3'"
+              :dark="expressIsDelivery" :disabled="expressDeliveryUnavailable || expressDeliveryLocked" depressed @click="openExpressDeliveryDialog">
+              <v-icon class="mb-2">mdi-truck-delivery-outline</v-icon>
+              <span>Livraison<small v-if="expressIsDelivery" class="express-choice-state">Choisi</small></span>
             </v-btn>
           </div>
         </v-card-text>
       </v-card>
     </v-dialog>
+
+    <DeliveryOrderDialog v-if="canUseDeliveryService && expressDeliveryMounted && !isOrderEditActive" :key="expressDeliveryEpoch" ref="expressDelivery"
+      v-model="expressDeliveryDialog" :shop-id="expressDeliveryShopId"
+      :customer.sync="expressCustomer" :phone.sync="expressPhone" :remark.sync="expressRemark"
+      :cart="expressDeliveryDialog || expressIsDelivery ? cartItem : []" :discount="expressDeliveryDiscount" :locked="expressDeliveryLocked"
+      @address="expressDeliveryResolution = $event" @quote="expressDeliveryQuote = $event" @ready="expressDeliveryReady = $event" @confirm="confirmExpressDelivery" />
 
     <v-dialog
       v-model="customizationDialog"
@@ -1191,6 +1213,8 @@ import {
 } from '@/helpers/receiptBundle'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import { calculateDiscount } from '@/helpers/discount'
+import DeliveryOrderDialog from '@/components/delivery/DeliveryOrderDialog.vue'
+import cashierDelivery from '@/mixins/cashierDelivery'
 // import * as config from '@/nuxt.config'
 const productTracksStock = (product = {}) =>
   [true, 1, '1'].includes(product.track_stock)
@@ -1198,8 +1222,9 @@ export default {
   components: {
     Loading,
     ProductCustomizationWizard,
+    DeliveryOrderDialog,
   },
-  mixins: [price],
+  mixins: [price, cashierDelivery],
   async beforeRouteLeave(to, from, next) {
     if (
       this.isOrderEditActive &&
@@ -1212,6 +1237,10 @@ export default {
       }
       await this.$store.dispatch('orderEdit/cancel')
       next()
+      return
+    }
+    if (this.expressIsDelivery && this.expressPaymentLoading !== null) {
+      next(false)
       return
     }
     next()
@@ -1420,6 +1449,7 @@ export default {
       return 'Choisir une destination'
     },
     expressSelectedServiceLabel() {
+      if (this.expressIsDelivery) return 'Livraison'
       return this.expressIsTakeaway ? 'À emporter' : 'Sur place'
     },
     expressPaymentMethods() {
@@ -1440,6 +1470,7 @@ export default {
       })
     },
     expressCheckoutTotal() {
+      if (this.expressIsDelivery) return (this.expressDeliveryQuote?.grandTotalCents || 0) / 100
       return calculateDiscount({
         subtotal: this.total,
         type: this.expressDiscountType,
@@ -1460,7 +1491,8 @@ export default {
         this.isKitchenClosed ||
         this.expressPaymentLoading !== null ||
         this.cartItem.length === 0 ||
-        !this.expressSelectedTable
+        this.hasUnsafeCheckoutAttempt ||
+        (this.expressIsDelivery ? !this.expressDeliveryValid : !this.expressSelectedTable)
       )
     },
   },
@@ -1688,6 +1720,7 @@ export default {
       this.editingCartIndex = null
     },
     editCartLine(lineIndex) {
+      if (this.expressIsDelivery && this.expressDeliveryLocked) return
       const line = this.cartItem[lineIndex]
       if (!line || !(line.customization_steps || []).length) return
 
@@ -1697,6 +1730,7 @@ export default {
       this.customizationDialog = true
     },
     confirmCustomization(customization) {
+      if (this.expressIsDelivery && this.expressDeliveryLocked) return
       if (!this.selectedItem) return
 
       const isEditing = Number.isInteger(this.editingCartIndex)
@@ -1811,10 +1845,13 @@ export default {
       this.expressTableDialog = false
     },
     selectExpressService(value) {
+      if (this.canUseDeliveryService && this.expressDeliveryLocked) return
       this.setExpressTakeaway(value)
       this.expressServiceDialog = false
     },
     setExpressTakeaway(value) {
+      if (this.canUseDeliveryService && this.expressDeliveryLocked) return
+      this.resetExpressDelivery()
       this.expressIsTakeaway = value === true
     },
     isProductHidden(product) {
@@ -1867,6 +1904,7 @@ export default {
       }
     },
     addToCart(params) {
+      if (this.expressIsDelivery && this.expressDeliveryLocked) return
       if (this.isKitchenClosed && !this.isOrderEditActive) {
         this.showKitchenClosedSnackbar()
         return
@@ -1905,6 +1943,7 @@ export default {
       this.showCartAddFeedback(params)
     },
     minusBtn(params, index) {
+      if (this.expressIsDelivery && this.expressDeliveryLocked) return
       const item = this.cartItem[index]
       if (!item) return
 
@@ -1928,6 +1967,7 @@ export default {
       this.indexCart()
     },
     plusBtn(params, index) {
+      if (this.expressIsDelivery && this.expressDeliveryLocked) return
       const item = this.cartItem[index]
       if (!item) return
 
@@ -1954,6 +1994,7 @@ export default {
       this.indexCart()
     },
     deleteBtn(params) {
+      if (this.expressIsDelivery && this.expressDeliveryLocked) return
       const newData = this.cartItem.filter((item) => {
         return item.id !== params.id
       })
@@ -1985,6 +2026,12 @@ export default {
         return
       }
 
+      if (this.expressIsDelivery) {
+        if (this.validateExpressDelivery()) this.openExpressPaymentDialog()
+        else this.openExpressDeliveryDialog()
+        return
+      }
+
       if (
         ['prewrite_rejected', 'reprice_required'].includes(
           this.clientOrderStatus
@@ -1998,6 +2045,7 @@ export default {
       this.openCart()
     },
     clearMenuCart() {
+      this.resetExpressDelivery()
       this.cartItem = []
       this.total = 0
       this.idxCart = 0
@@ -2014,8 +2062,11 @@ export default {
     },
     async submitExpressPayLater() {
       if (this.isOrderEditActive) return
+      if (this.expressIsDelivery && !this.validateExpressDelivery()) return
       if (this.expressSubmitDisabled) return
       const paymentMethod = 'Paiement au comptoir'
+      const deliveryPayload = this.buildExpressDeliveryPayload()
+      const checkoutContext = this.beginExpressCheckout()
       this.expressPaymentDialog = false
       this.expressPaymentLoading = paymentMethod
       const result = await this.$store.dispatch('cart/checkoutOrder', {
@@ -2024,15 +2075,19 @@ export default {
         total: this.roundPrice(this.expressCheckoutTotal),
         discountType: this.expressDiscountType,
         discountValue: this.expressDiscountValue,
-        payment: 'Paiement au comptoir',
+        payment: this.expressIsDelivery ? 'Paiement a la livraison' : 'Paiement au comptoir',
         remark: this.buildExpressRemark(),
         phone: String(this.expressPhone || '').trim(),
         isTakeaway: this.expressIsTakeaway,
         dataCart: this.cartItem,
         stripe: false,
+        ...deliveryPayload,
       })
+      if (!this.isExpressCheckoutCurrent(checkoutContext)) return
       this.expressPaymentLoading = null
       if (!result || !result.ok) {
+        await this.recoverExpressDelivery(result)
+        if (!this.isExpressCheckoutCurrent(checkoutContext)) return
         const message =
           result && result.error && result.error.message
             ? result.error.message
@@ -2057,7 +2112,7 @@ export default {
       if (orderNote) remarks.push(orderNote)
       return remarks.join('\n')
     },
-    async printExpressReceipt(result, paymentMethod) {
+    async printExpressReceipt(result, paymentMethod, checkoutContext = null) {
       const orderId = result && result.data && result.data.orderId
       if (!orderId) {
         throw new Error('La commande est introuvable pour l’impression.')
@@ -2067,6 +2122,7 @@ export default {
         this.$store.dispatch('orders/getAllOrder'),
         this.$store.dispatch('orders/getDetailOrder', orderId),
       ])
+      if (!this.isExpressCheckoutActorCurrent(checkoutContext)) return
       if (!orderLoaded || !detailsLoaded) {
         throw new Error('Impossible de récupérer les données du ticket.')
       }
@@ -2104,10 +2160,16 @@ export default {
       }
       this.expressReceiptDialog = false
       this.pendingExpressPaymentMethod = null
+      if (this.expressIsDelivery && !this.validateExpressDelivery()) {
+        this.expressReceiptPrinting = false
+        return
+      }
       if (!paymentMethod || this.expressSubmitDisabled) {
         this.expressReceiptPrinting = false
         return
       }
+      const deliveryPayload = this.buildExpressDeliveryPayload()
+      const checkoutContext = this.beginExpressCheckout()
       this.expressPaymentLoading = paymentMethod
       const result = await this.$store.dispatch('cart/checkoutCounterPayBefore', {
         customer: String(this.expressCustomer || '').trim() || 'Client comptoir',
@@ -2120,13 +2182,17 @@ export default {
         phone: String(this.expressPhone || '').trim(),
         isTakeaway: this.expressIsTakeaway,
         dataCart: this.cartItem,
+        ...deliveryPayload,
       })
+      if (!this.isExpressCheckoutCurrent(checkoutContext)) return
       if (result && result.ok && wantsReceipt) {
-        this.printExpressReceipt(result, paymentMethod).catch(() => {})
+        this.printExpressReceipt(result, paymentMethod, checkoutContext).catch(() => {})
       }
       this.expressPaymentLoading = null
       this.expressReceiptPrinting = false
       if (!result || !result.ok) {
+        await this.recoverExpressDelivery(result)
+        if (!this.isExpressCheckoutCurrent(checkoutContext)) return
         const message =
           result && result.error && result.error.message
             ? result.error.message
@@ -2160,6 +2226,7 @@ export default {
         this.$router.push(`/orders/detail/${orderId}`)
         return
       }
+      if (this.expressIsDelivery && this.expressDeliveryLocked) return
       this.clearMenuCart()
     },
     pageProduct() {
@@ -3178,6 +3245,16 @@ export default {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.express-service-grid--delivery {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 599px) {
+  .express-service-grid--delivery {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .express-service-tile {

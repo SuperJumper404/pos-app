@@ -9,6 +9,9 @@ export default {
     isAdminView() {
       return true
     },
+    canUseDeliveryService() {
+      return true
+    },
   },
 }
 </script>

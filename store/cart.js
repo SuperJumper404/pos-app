@@ -124,6 +124,7 @@ const readAuthToken = () =>
   typeof localStorage === 'undefined' ? '' : localStorage.getItem('token')
 
 const buildCheckoutPayload = (params, clientOrderToken) => ({
+  ...(params.loyaltyRewardId ? { loyalty_reward_id: params.loyaltyRewardId, loyalty_confirmed: params.loyaltyConfirmed === true } : {}),
   client_order_token: clientOrderToken,
   expected_total: roundPrice(
     params.total == null ? params.expected_total : params.total

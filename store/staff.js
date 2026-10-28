@@ -30,6 +30,27 @@ export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 
 export const actions = {
+  async readCredentials({ dispatch, rootState }, { id }) {
+    const user = rootState && rootState.users && rootState.users.user
+    if (!isDeliveryAdmin(user) || !/^[1-9]\d*$/.test(String(id))) return false
+    const token = localStorage.getItem('token')
+    const scope = JSON.stringify(user)
+    const current = () => rootState.users.user === user && isDeliveryAdmin(user) &&
+      JSON.stringify(user) === scope && localStorage.getItem('token') === token
+    try {
+      const response = await this.$axios.get(`/baseurl/api/v1/user/${id}/staff-credentials`, {
+        headers: { Authorization: `Bearer ${token}` },
+        skipGlobalErrorNotification: true,
+      })
+      if (!current()) return false
+      const data = response.data.data || {}
+      return { staff_login_id: data.staff_login_id, staff_pin: data.staff_pin, needs_regeneration: data.needs_regeneration === true }
+    } catch (_) {
+      if (current()) dispatch('notifications/error', 'Impossible de consulter ce PIN. Reessayez.', { root: true })
+      return false
+    }
+  },
+
   async getAll({ dispatch, state, rootState }, options = {}) {
     if (rootState && !isDeliveryAdmin(rootState.users && rootState.users.user)) { dispatch('set/data', []); return false }
     const silent = options && options.silent === true

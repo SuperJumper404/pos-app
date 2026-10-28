@@ -1,6 +1,6 @@
 <template>
   <section class="delivery-checkout">
-    <v-select :value="value" :items="modes" label="Mode de remise" outlined :disabled="disabled || locked" @change="selectMode" />
+    <v-select v-if="!hideMode" :value="value" :items="modes" label="Mode de remise" outlined :disabled="disabled || locked" @change="selectMode" />
     <template v-if="value === 'delivery'">
       <v-alert v-if="!available && !locked" type="warning" text role="alert">La livraison est indisponible. Votre panier est conserve.</v-alert>
       <template v-if="!locked">
@@ -20,9 +20,11 @@
           <v-select :value="profileId" :items="profiles" item-text="name" item-value="id" label="Fiche client" outlined clearable :disabled="disabled" @change="selectProfile" />
           <v-expansion-panels flat>
             <v-expansion-panel><v-expansion-panel-header>Creer une fiche client</v-expansion-panel-header><v-expansion-panel-content>
-              <v-text-field v-model="newCustomer.name" label="Nom" outlined />
-              <v-text-field v-model="newCustomer.contactPhone" label="Telephone" type="tel" outlined />
-              <v-btn text :disabled="disabled || !newCustomer.name.trim() || searching" @click="createCustomer"><v-icon left>mdi-account-plus-outline</v-icon>Creer</v-btn>
+              <template v-if="!customerDraft">
+                <v-text-field v-model="newCustomer.name" label="Nom" outlined />
+                <v-text-field v-model="newCustomer.contactPhone" label="Telephone" type="tel" outlined />
+              </template>
+              <v-btn text :disabled="disabled || !customerToCreate.name.trim() || searching" @click="createCustomer"><v-icon left>mdi-account-plus-outline</v-icon>Creer</v-btn>
             </v-expansion-panel-content></v-expansion-panel>
           </v-expansion-panels>
         </template>
@@ -30,6 +32,9 @@
           <template #item="{ item }"><div><strong>{{ item.label }}</strong><CustomerAddressSummary v-if="item.id" :value="item" :loader="displayAddress" :context-key="bookContext" /></div></template>
         </v-select>
         <DeliveryAddressInput :key="addressContext" ref="addressInput" :value="selectedAddress" :context-key="addressContext" :resolver="resolveAddress" :suggester="suggestAddresses" :disabled="disabled || !available" @resolved="onResolved" />
+        <div v-if="distanceLabel" class="mb-3" aria-live="polite">
+          <v-chip small outlined color="primary">{{ distanceLabel }}</v-chip>
+        </div>
         <v-btn v-if="selectedAddress && !resolution" text :disabled="disabled || !available || loading" @click="resolveStored"><v-icon left>mdi-map-marker-check-outline</v-icon>Valider cette adresse</v-btn>
         <v-btn v-if="site && session && resolution && !selectedAddressId" text :disabled="disabled || saving" @click="saveAddress"><v-icon left>mdi-content-save-outline</v-icon>Ajouter au carnet</v-btn>
       </template>
@@ -64,12 +69,15 @@ export default {
     site: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
     locked: { type: Boolean, default: false },
+    hideMode: { type: Boolean, default: false },
+    customerDraft: { type: Object, default: null },
   },
   data: () => ({ resolution: null, currentQuote: null, confirmedBasis: null, sequence: 0, loading: false,
     error: '', loginOpen: false, selectedAddressId: null, profileId: null, customerQuery: '', searching: false,
     newCustomer: { name: '', contactPhone: '' }, saving: false, expiryTimer: null, actorEpoch: 0 }),
   computed: {
     delivery() { return this.$store.state.delivery },
+    customerToCreate() { return this.customerDraft || this.newCustomer },
     available() { return this.delivery.shopId === this.shopId && this.delivery.enabled },
     account() { return this.$store.state.customer },
     session() { return this.site && this.account && this.account.shopId === this.shopId ? this.account.session : null },
@@ -80,6 +88,11 @@ export default {
     addresses() { return this.session ? this.account.addresses : this.profileId ? this.delivery.addresses : [] },
     addressOptions() { return [{ id: null, label: 'Nouvelle adresse' }, ...this.addresses] },
     selectedAddress() { return this.addresses.find(address => address.id === this.selectedAddressId) || null },
+    distanceLabel() {
+      const meters = this.currentQuote && this.currentQuote.distanceMeters
+      if (typeof meters !== 'number' || !Number.isFinite(meters) || meters < 0) return ''
+      return `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(meters / 1000)} km`
+    },
     bookContext() { return `${this.shopId}:${this.session ? this.account.epoch : this.profileId || 'guest'}:${this.actorEpoch}` },
     addressContext() { return `${this.bookContext}:${this.selectedAddressId || 'new'}` },
     basis() { return JSON.stringify({ shop: this.shopId, cart: this.cart, discount: this.discount, resolution: this.resolution, account: this.session && this.session.customerId }) },
@@ -137,7 +150,7 @@ export default {
     async createCustomer() {
       this.searching = true
       try {
-        const profile = await this.$store.dispatch('delivery/createCustomer', this.newCustomer)
+        const profile = await this.$store.dispatch('delivery/createCustomer', this.customerToCreate)
         if (profile) { this.$store.commit('delivery/PROFILES', [profile]); await this.selectProfile(profile.id) }
       } catch (_) { this.error = 'La fiche client ne peut pas etre creee. Reessayez.' }
       finally { this.searching = false }

@@ -1,6 +1,8 @@
 const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
+const compiler = require('vue-template-compiler')
+const postcss = require('postcss')
 
 const root = path.resolve(__dirname, '..')
 const indexSource = fs.readFileSync(path.join(root, 'pages', 'index.vue'), 'utf8')
@@ -127,5 +129,25 @@ assert.match(
   'les modules secondaires doivent garder une largeur compacte fixe'
 )
 assert.match(packageJson.scripts.test, /test\/home-dashboard\.test\.js/)
+
+const sfc = compiler.parseComponent(indexSource)
+const css = postcss.parse(sfc.styles[0].content)
+const declaration = (selector, property) => {
+  let value
+  css.walkRules((rule) => {
+    if (!rule.selectors.includes(selector)) return
+    rule.walkDecls(property, (decl) => { value = decl.value })
+  })
+  return value
+}
+assert.equal(
+  declaration('.module-card .module-card__icon', 'color'),
+  'var(--se-color-primary)',
+  'icons stay blue at rest with enough specificity to override Vuetify icon colors'
+)
+assert.equal(declaration('.module-card__icon-wrap', 'background'), 'var(--se-color-primary-soft)')
+assert.equal(declaration('.module-card:hover', 'background'), 'var(--se-color-primary-soft)')
+assert.equal(declaration('.module-card:hover', 'border-color'), 'var(--se-color-primary)')
+assert.doesNotMatch(indexSource, /--module-icon-color|color-mix\(/, 'all modules must keep the same blue appearance as the reference')
 
 console.log('home dashboard tests passed')

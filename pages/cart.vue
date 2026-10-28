@@ -163,6 +163,7 @@
           <Loading />
         </v-card>
         <v-card v-else outlined class="pa-2 overflow-x-hidden overflow-y-auto">
+          <LoyaltyCheckout v-if="[2, 3].includes(access) && dataCart && !isOrderEditActive" :shop-id="checkoutShopId" :disabled="loadingBtn || stripePreparing || deliveryAttemptLocked" @reward="loyaltyReward = $event" />
           <DeliveryCheckout
             v-if="deliveryContext && dataCart && !isOrderEditActive"
             ref="deliveryCheckout"
@@ -486,6 +487,7 @@ export default {
     ProductCustomizationWizard,
     CustomizationSummary,
     DeliveryCheckout: () => import('@/components/delivery/DeliveryCheckout.vue'),
+    LoyaltyCheckout: () => import('@/components/loyalty/LoyaltyCheckout.vue'),
   },
   mixins: [price],
   async beforeRouteLeave(to, from, next) {
@@ -534,6 +536,7 @@ export default {
   data: () => ({
     ppn: 0,
     total: 0,
+    loyaltyReward: null,
     fulfillmentType: localStorage.getItem('order_source') === 'web' ? 'takeaway' : 'dine_in',
     deliveryQuote: null,
     deliveryResolution: null,
@@ -604,7 +607,7 @@ export default {
     deliverySession() {
       const customer = this.$store.state.customer
       if (this.deliveryAttemptLocked && !this.$store.get('cart/clientOrderPayload').customerContextId) return null
-      return this.isSiteCheckout && customer && customer.shopId === this.checkoutShopId ? customer.session : null
+      return (this.isSiteCheckout || [2, 3].includes(this.access)) && customer && customer.shopId === this.checkoutShopId ? customer.session : null
     },
     deliveryPaymentOptions() { return [
       ...(isStripePaymentRequired(this.qrPaymentMode) ? [{ text: 'Payer en ligne', value: 'online' }] : []),
@@ -1615,7 +1618,8 @@ export default {
     ) {
       return {
         ...(this.deliveryContext ? { fulfillmentType: this.fulfillmentType } : {}),
-        ...(this.isSiteCheckout ? { customerSession: this.deliverySession } : {}),
+        ...(this.isSiteCheckout || [2, 3].includes(this.access) ? { customerSession: this.deliverySession } : {}),
+        ...(this.loyaltyReward && this.deliverySession ? { loyaltyRewardId: this.loyaltyReward.rewardId, loyaltyConfirmed: this.loyaltyReward.confirmed === true } : {}),
         ...(this.isDelivery ? {
           deliveryQuoteToken: this.deliveryQuote && this.deliveryQuote.quoteToken,
           addressResolutionToken: this.deliveryResolution && this.deliveryResolution.addressResolutionToken,

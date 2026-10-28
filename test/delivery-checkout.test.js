@@ -968,6 +968,354 @@ test('cashier menu keeps its original service dialog even when delivery is enabl
   } finally { cashier.$destroy() }
 })
 
+test('cashier delivery opens a modal without navigating or submitting an order', async () => {
+  const f = fixture()
+  const page = new Vue({ ...load('pages/caisse/menu.vue').default, store: f.store })
+  const routes = []
+  page.$router = { push: route => routes.push(route) }
+  try {
+    page.cartItem = copy(cart)
+    page.expressCustomer = 'Alice'
+    page.expressPhone = '0700000000'
+    page.expressRemark = 'Sans couverts'
+    page.openExpressServiceDialog()
+    assert.equal(typeof page.openExpressDeliveryDialog, 'function')
+    await page.openExpressDeliveryDialog()
+    assert.equal(page.expressServiceDialog, false)
+    assert.equal(page.expressDeliveryDialog, true)
+    assert.equal(page.expressIsDelivery, false, 'Opening is not confirmation')
+    assert.deepEqual(routes, [])
+    assert.equal(f.calls.some(call => call.path.endsWith('/checkout')), false)
+    assert.equal(page.expressCustomer, 'Alice')
+    page.selectExpressService(true)
+    assert.equal(page.expressIsDelivery, false)
+    assert.equal(page.expressPhone, '0700000000')
+    assert.equal(page.expressRemark, 'Sans couverts')
+  } finally { page.$destroy() }
+})
+
+test('cashier delivery submits the confirmed fee and keeps order notes separate from courier instructions', async () => {
+  for (const counterPaid of [false, true]) {
+    const f = fixture(call => call.path.endsWith('/checkout') ? { data: { orderId: 91 } } : { data: quote(400) })
+    const page = new Vue({ ...load('pages/caisse/menu.vue').default, store: f.store })
+    try {
+      assert.equal(typeof page.confirmExpressDelivery, 'function')
+      f.store.commit('delivery/RESET', 7)
+      f.store.commit('delivery/AVAILABILITY', true)
+      page.cartItem = copy(cart)
+      page.total = 25
+      page.expressCustomer = 'Alice'
+      page.expressPhone = '0700000000'
+      page.expressRemark = 'Sans couverts'
+      page.expressDeliveryResolution = { ...proof('menu'), complement: 'Etage 2', instructions: 'Sonner B' }
+      page.expressDeliveryQuote = quote(400)
+      page.expressDeliveryReady = true
+      page.$refs.expressDelivery = { ready: true }
+      page.confirmExpressDelivery()
+      assert.equal(page.expressSelectedServiceLabel, 'Livraison')
+      assert.equal(page.expressCheckoutTotal, 29)
+      assert.equal(page.expressSubmitDisabled, false, 'Delivery does not require a table')
+      if (counterPaid) {
+        page.pendingExpressPaymentMethod = 'Especes'
+        await page.confirmExpressReceipt(false)
+      } else await page.submitExpressPayLater()
+      const sent = f.calls.find(call => call.path.endsWith('/checkout')).body
+      assert.equal(sent.fulfillment_type, 'delivery')
+      assert.equal(sent.expected_total, 29)
+      assert.equal(sent.address_resolution_token, 'proof-menu')
+      assert.equal(sent.delivery_quote_token, 'quote-400-0')
+      assert.equal(sent.payment, counterPaid ? 'counter_pay_before:Especes' : 'Paiement a la livraison')
+      assert.equal(sent.customer, 'Alice')
+      assert.equal(sent.phone, '0700000000')
+      assert.equal(sent.remark, 'Sans couverts')
+      assert.deepEqual(copy(sent.delivery_address_details), { complement: 'Etage 2', instructions: 'Sonner B' })
+      assert.equal(page.expressIsDelivery, false)
+      assert.equal(page.expressDeliveryResolution, null)
+    } finally { page.$destroy() }
+  }
+})
+
+async function mountCashierDelivery(f) {
+  const source = compiler.parseComponent(fs.readFileSync(path.join(root, 'pages/menus.vue'), 'utf8')).template.content
+  const fragment = source.match(/<DeliveryOrderDialog\b[\s\S]*?\/>/)[0]
+  const compiled = compiler.compile(fragment)
+  assert.deepEqual(compiled.errors, [])
+  const dialogOptions = compiledComponent('components/delivery/DeliveryOrderDialog.vue')
+  const checkoutOptions = compiledComponent('components/delivery/DeliveryCheckout.vue')
+  checkoutOptions.components.DeliveryAddressInput = compiledComponent('components/delivery/DeliveryAddressInput.vue')
+  dialogOptions.components.DeliveryCheckout = checkoutOptions
+  const page = new Vue({ ...Vue.extend(load('pages/caisse/menu.vue').default).options, components: { DeliveryOrderDialog: dialogOptions }, store: f.store, mounted: [],
+    render: vm.compileFunction(compiled.render, []), staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])),
+  })
+  page.$router = { push() {} }
+  page.cartItem = copy(cart)
+  page.total = 25
+  page.expressCustomer = 'Alice'
+  page.expressPhone = '0700000000'
+  page.expressRemark = 'Sans couverts'
+  page.$mount(document.createElement('div'))
+  page.openExpressDeliveryDialog()
+  await drainVue()
+  return page
+}
+
+test('delivery address shows only a compact French kilometre badge from the current quote', async () => {
+  const f = fixture(call => call.path.endsWith('/quotes') ? { data: { ...quote(), distanceMeters: 5300 } } : null)
+  const options = compiledComponent('components/delivery/DeliveryCheckout.vue')
+  options.components.DeliveryAddressInput = { render: h => h('div') }
+  const checkout = new Vue({ ...options, store: f.store, propsData: { shopId: 7, cart, value: 'delivery' } })
+  checkout.$mount(document.createElement('div'))
+  await drainVue()
+  try {
+    assert.doesNotMatch(checkout.$el.textContent, /\bkm\b/)
+    await checkout.onResolved(proof('distance'))
+    await drainVue()
+    assert.match(checkout.$el.textContent, /5,3 km/)
+    assert.doesNotMatch(checkout.$el.textContent, /vol d.oiseau/i)
+    for (const [distance, label] of [[0, '0,0 km'], [12345, '12,3 km']]) {
+      checkout.currentQuote = { ...quote(), distanceMeters: distance }
+      await drainVue()
+      assert.ok(checkout.$el.textContent.includes(label))
+    }
+    await checkout.onResolved(null)
+    await drainVue()
+    assert.doesNotMatch(checkout.$el.textContent, /\bkm\b/, 'Editing the address clears the old distance')
+  } finally { checkout.$destroy() }
+})
+
+test('delivery distance badge stays hidden for missing or invalid distances', async () => {
+  const f = fixture()
+  const options = compiledComponent('components/delivery/DeliveryCheckout.vue')
+  options.components.DeliveryAddressInput = { render: h => h('div') }
+  const checkout = new Vue({ ...options, store: f.store, propsData: { shopId: 7, cart, value: 'delivery' } })
+  checkout.$mount(document.createElement('div'))
+  await drainVue()
+  try {
+    for (const distance of [null, undefined, NaN, Infinity, -1, '5300']) {
+      checkout.currentQuote = { ...quote(), distanceMeters: distance }
+      await drainVue()
+      assert.doesNotMatch(checkout.$el.textContent, /\bkm\b/)
+    }
+  } finally { checkout.$destroy() }
+})
+
+test('cashier delivery dialog shares Menu contacts and note, selects a profile and invalidates a changed cart', async () => {
+  const f = fixture(call => ({ data: call.path.endsWith('/availability') ? { enabled: true }
+    : call.path.endsWith('/quotes') ? quote(400) : [] }))
+  const page = await mountCashierDelivery(f)
+  try {
+    const dialog = page.$refs.expressDelivery
+    const checkout = dialog.$refs.checkout
+    assert.equal(dialog.customer, 'Alice')
+    assert.equal(dialog.phone, '0700000000')
+    assert.equal(dialog.remark, 'Sans couverts')
+    dialog.$emit('update:customer', 'Bob')
+    dialog.$emit('update:phone', '0611111111')
+    dialog.$emit('update:remark', 'Sans pain')
+    await drainVue()
+    assert.equal(page.expressCustomer, 'Bob')
+    assert.equal(page.expressPhone, '0611111111')
+    assert.equal(page.buildExpressRemark(), 'Sans pain')
+    assert.deepEqual(copy(checkout.customerToCreate), { name: 'Bob', contactPhone: '0611111111' })
+    f.store.commit('delivery/PROFILES', [{ id: '12', name: 'Claire', contactPhone: '0622222222' }])
+    await checkout.selectProfile('12')
+    await drainVue()
+    assert.equal(page.expressCustomer, 'Claire')
+    assert.equal(page.expressPhone, '0622222222')
+    assert.equal(page.expressRemark, 'Sans pain')
+    await checkout.onResolved({ ...proof('dialog'), complement: 'Etage 2', instructions: 'Sonner B' })
+    await drainVue()
+    assert.equal(dialog.canConfirm, false)
+    checkout.confirmQuote()
+    await drainVue()
+    assert.equal(dialog.canConfirm, true)
+    dialog.confirm()
+    await drainVue()
+    assert.equal(page.expressDeliveryDialog, false)
+    assert.equal(page.expressIsDelivery, true)
+    assert.equal(page.expressSubmitDisabled, false)
+    assert.equal(page.expressCheckoutTotal, 29)
+    page.cartItem[0].qty = 2
+    assert.equal(page.validateExpressDelivery(), false, 'Synchronous edits cannot reuse the previous quote')
+    await drainVue()
+    assert.equal(page.expressDeliveryReady, false)
+    assert.equal(page.expressSubmitDisabled, true)
+    f.store.state.users.user = { shopid: 8, session_subject: 'staff', order_source: 'pos' }
+    assert.equal(page.expressCustomer, '')
+    assert.equal(page.expressPhone, '')
+    assert.equal(page.expressRemark, '')
+    assert.equal(page.expressDeliveryResolution, null)
+    assert.equal(f.calls.some(call => call.path.endsWith('/checkout')), false)
+  } finally { page.$destroy() }
+})
+
+test('cashier delivery replaces a rejected quote only after unlocking and requires its confirmation', async () => {
+  let attempts = 0
+  const f = fixture(call => call.path.endsWith('/checkout') ? ++attempts === 1
+    ? { status: 409, code: 'DELIVERY_QUOTE_CHANGED', data: { code: 'DELIVERY_QUOTE_CHANGED', server_quote: quote(500) } }
+    : { data: { orderId: 91 } }
+    : { data: call.path.endsWith('/availability') ? { enabled: true } : quote(400) })
+  const page = await mountCashierDelivery(f)
+  page.showAlert = () => {}
+  try {
+    const dialog = page.$refs.expressDelivery
+    const checkout = dialog.$refs.checkout
+    await checkout.onResolved(proof('reprice'))
+    await drainVue()
+    checkout.confirmQuote()
+    await drainVue()
+    dialog.confirm()
+    await drainVue()
+    await page.submitExpressPayLater()
+    await drainVue()
+    assert.equal(checkout.currentQuote.quoteToken, 'quote-500-0')
+    assert.equal(checkout.ready, false)
+    assert.equal(page.expressDeliveryReady, false)
+    assert.equal(page.expressDeliveryDialog, true)
+    checkout.confirmQuote()
+    await drainVue()
+    dialog.confirm()
+    await drainVue()
+    await page.submitExpressPayLater()
+    assert.deepEqual(f.calls.filter(call => call.path.endsWith('/checkout')).map(call => call.body.delivery_quote_token), ['quote-400-0', 'quote-500-0'])
+  } finally { page.$destroy() }
+})
+
+test('cashier delivery clears the previous actor carnet even after the delivery dialog was removed', async () => {
+  const f = fixture()
+  const page = await mountCashierDelivery(f)
+  try {
+    f.store.commit('delivery/PROFILES', [{ id: '12', name: 'Private customer', contactPhone: '0600000000' }])
+    page.selectExpressService(false)
+    await drainVue()
+    f.store.state.users.user = { ...f.store.state.users.user, id: 99 }
+    assert.deepEqual(copy(f.store.state.delivery.profiles), [])
+    assert.deepEqual(copy(f.store.state.delivery.addresses), [])
+  } finally { page.$destroy() }
+})
+
+test('cashier delivery can reopen and retry availability after a temporary network failure', async () => {
+  let requests = 0
+  const f = fixture(call => call.path.endsWith('/availability') ? ++requests === 1 ? { lost: true } : { data: { enabled: true } } : null)
+  const page = await mountCashierDelivery(f)
+  try {
+    assert.equal(f.store.state.delivery.enabled, false)
+    page.expressDeliveryDialog = false
+    await drainVue()
+    page.openExpressDeliveryDialog()
+    await drainVue()
+    assert.equal(page.expressDeliveryDialog, true)
+    assert.equal(requests, 2)
+    assert.equal(f.store.state.delivery.enabled, true)
+  } finally { page.$destroy() }
+})
+
+test('cashier delivery rejects expired proof and never replaces an uncertain order', async () => {
+  const f = fixture()
+  const page = new Vue({ ...load('pages/caisse/menu.vue').default, store: f.store })
+  try {
+    assert.equal(typeof page.confirmExpressDelivery, 'function')
+    page.cartItem = copy(cart)
+    page.expressCustomer = 'Alice'
+    page.expressPhone = '0700000000'
+    page.expressDeliveryQuote = quote(400)
+    page.expressDeliveryResolution = { ...proof('expired'), expiresAt: '2000-01-01T00:00:00Z' }
+    page.expressDeliveryReady = true
+    page.$refs.expressDelivery = { ready: true }
+    page.confirmExpressDelivery()
+    assert.equal(page.expressIsDelivery, false)
+    page.expressIsDelivery = true
+    await page.submitExpressPayLater()
+    assert.equal(f.calls.length, 0)
+    f.store.state.cart.clientOrderStatus = 'uncertain'
+    const frozen = { fulfillment_type: 'delivery', customer: 'Original' }
+    f.store.state.cart.clientOrderPayload = frozen
+    await page.submitExpressPayLater()
+    assert.equal(f.store.state.cart.clientOrderPayload, frozen)
+    assert.equal(f.calls.length, 0)
+  } finally { page.$destroy() }
+})
+
+test('cashier delivery ignores stale checkout UI and printing after an actor switch in both payment flows', async () => {
+  for (const counterPaid of [false, true]) {
+    const pending = deferred()
+    const f = fixture(call => call.path.endsWith('/checkout') ? pending.promise
+      : { data: call.path.endsWith('/availability') ? { enabled: true } : quote(400) })
+    const page = await mountCashierDelivery(f)
+    let printed = false
+    page.printExpressReceipt = () => { printed = true; return Promise.resolve() }
+    try {
+      const dialog = page.$refs.expressDelivery
+      await dialog.$refs.checkout.onResolved(proof('stale'))
+      await drainVue()
+      dialog.$refs.checkout.confirmQuote()
+      await drainVue()
+      dialog.confirm()
+      await drainVue()
+      page.pendingExpressPaymentMethod = 'Especes'
+      const submission = counterPaid ? page.confirmExpressReceipt(true) : page.submitExpressPayLater()
+      await drainVue()
+      f.store.state.users.user = { ...f.store.state.users.user, id: 99 }
+      await drainVue()
+      page.cartItem = [{ ...cart[0], id: 22 }]
+      page.expressCustomer = 'New actor customer'
+      page.expressPhone = '0611111111'
+      pending.resolve({ data: { orderId: 91 } })
+      await submission
+      assert.equal(page.cartItem.length, 1)
+      assert.equal(page.cartItem[0].id, 22)
+      assert.equal(page.expressCustomer, 'New actor customer')
+      assert.equal(page.expressPhone, '0611111111')
+      assert.equal(page.expressPaymentLoading, null)
+      assert.equal(page.expressReceiptPrinting, false)
+      assert.equal(printed, false)
+    } finally { page.$destroy() }
+  }
+})
+
+test('cashier delivery availability remains retryable after an actor switch clears its network error', async () => {
+  const f = fixture(() => ({ lost: true }))
+  const page = await mountCashierDelivery(f)
+  try {
+    f.store.state.users.user = { ...f.store.state.users.user, id: 99 }
+    await drainVue()
+    assert.equal(page.expressDeliveryUnavailable, false)
+    page.openExpressDeliveryDialog()
+    assert.equal(page.expressDeliveryDialog, true)
+  } finally { page.$destroy() }
+})
+
+test('cashier delivery freezes service and cart edits until checkout has a known outcome', async () => {
+  const pending = deferred()
+  const f = fixture(call => call.path.endsWith('/checkout') ? pending.promise
+    : { data: call.path.endsWith('/availability') ? { enabled: true } : quote(400) })
+  const page = await mountCashierDelivery(f)
+  try {
+    const dialog = page.$refs.expressDelivery
+    await dialog.$refs.checkout.onResolved(proof('locked'))
+    await drainVue()
+    dialog.$refs.checkout.confirmQuote()
+    await drainVue()
+    dialog.confirm()
+    await drainVue()
+    const submission = page.submitExpressPayLater()
+    await drainVue()
+    page.selectExpressService(false)
+    page.setExpressTakeaway(true)
+    assert.equal(page.expressIsDelivery, true)
+    page.plusBtn(page.cartItem[0], 0)
+    page.minusBtn(page.cartItem[0], 0)
+    page.deleteBtn(page.cartItem[0])
+    page.addToCart({ id: 99, price: 10 })
+    await page.btnCancel()
+    assert.deepEqual(copy(page.cartItem), copy(cart))
+    pending.resolve({ data: { orderId: 91 } })
+    await submission
+    assert.equal(page.cartItem.length, 0)
+    assert.equal(f.calls.filter(call => call.path.endsWith('/checkout')).length, 1)
+  } finally { page.$destroy() }
+})
+
 test('cashier can explicitly collect delivery using the existing counter-paid mode without changing the fee', () => {
   const f = fixture()
   const page = new Vue({ ...load('pages/cart.vue').default, store: f.store })

@@ -6,7 +6,7 @@ export const state = () => ({
   session: null,
   addresses: [],
   challenge: null,
-  channels: { email: false, whatsapp: false },
+  channels: { email: false, whatsapp: false, sms: false, smsDevelopment: false },
   channelsLoaded: false,
   busy: false,
   error: null,
@@ -42,7 +42,8 @@ export const mutations = {
     } : null
   },
   CHANNELS(state, channels) {
-    state.channels = { email: channels.email === true, whatsapp: channels.whatsapp === true }
+    state.channels = { email: channels.email === true, whatsapp: channels.whatsapp === true,
+      sms: channels.sms === true, smsDevelopment: channels.smsDevelopment === true }
     state.channelsLoaded = true
   },
   SESSION(state, session) { state.session = session },

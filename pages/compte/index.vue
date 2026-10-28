@@ -15,6 +15,9 @@
         <v-btn outlined :loading="account.busy" @click="logout"><v-icon left>mdi-logout</v-icon>Me deconnecter</v-btn>
       </div>
       <section class="customer-section">
+        <v-btn outlined color="primary" :to="{ path: '/compte/fidelite', query: { shopId: account.shopId } }"><v-icon left>mdi-card-account-details-outline</v-icon>Ma fidélité</v-btn>
+      </section>
+      <section class="customer-section">
         <v-skeleton-loader v-if="loadingBook" type="list-item-three-line" />
         <customer-address-book v-else :key="`book-${account.epoch}`" @select="addressSelected" />
         <p v-if="selectedAddress" class="customer-wrap" role="status">{{ selectedAddress }} selectionnee.</p>

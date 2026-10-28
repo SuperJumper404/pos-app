@@ -7,7 +7,7 @@ const {
 
 export default ({ store }) => {
   createPersistedState({
-    filter: ({ type }) => !/^(customer|delivery|courier)\//.test(type),
+    filter: ({ type }) => !/^(customer|loyalty|delivery|courier)\//.test(type),
     getState(key, storage) {
       const rawState = storage.getItem(key)
       const state = parsePersistedState(rawState)
