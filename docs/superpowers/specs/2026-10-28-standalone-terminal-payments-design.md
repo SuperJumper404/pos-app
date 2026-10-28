@@ -2,11 +2,13 @@
 
 Date : 28 octobre 2026. Statut : conception proposée, à valider avant implémentation.
 
-Relecture indépendante effectuée : aucune question importante ne reste à résoudre pour préparer le plan. Les choix proposés ci-dessous restent soumis à la validation de l'utilisateur.
+Relecture indépendante effectuée, y compris après la correction de l'historique demandée par l'utilisateur : une liste unique mêlant commandes et paiements TPE. Aucune question importante ne reste à résoudre pour préparer le plan. Les choix proposés ci-dessous restent soumis à la validation de l'utilisateur.
 
 ## Besoin confirmé
 
 Un membre du personnel disposant d'un TPE Stripe connecté peut saisir un montant dans une modale accessible par un bouton à côté d'Accueil. Le serveur crée un PaymentIntent et l'envoie au véritable terminal. Ce paiement existe sans commande et figure dans l'historique.
+
+L'utilisateur a confirmé que chaque paiement TPE doit apparaître comme une ligne dans la même liste que les commandes de la page Historique. Aucun onglet supplémentaire n'est ajouté.
 
 L'utilisateur a précisé que les commandes ajoutées ensuite sont uniquement des pièces jointes facultatives. Leur somme peut être inférieure, supérieure ou égale au paiement. Aucune différence n'est calculée, créditée ou remboursée automatiquement. Le rattachement ne règle pas les commandes, ne change pas leur statut et ne lance aucun nouveau débit.
 
@@ -36,13 +38,16 @@ Il s'agit d'une évolution frontend et backend avec migration SQL, et non d'un s
 - Gérer les centimes avec un entier, y compris la saisie au clavier physique, sans addition monétaire en virgule flottante. Valider le montant côté client et serveur selon les bornes Stripe applicables aux paiements EUR et les limites du stockage.
 - Verrouiller le montant et le bouton d'envoi pendant une tentative. Afficher les états préparation, attente de carte, confirmation, réussite, refus/échec, annulation et vérification nécessaire.
 - La fermeture de la modale ne signifie pas une annulation. Le suivi reprend à la réouverture ; le bouton d'annulation utilise le parcours serveur existant et attend sa confirmation.
-- Une réussite présente le montant encaissé et un accès à la rubrique des paiements TPE dans l'historique. Elle ne crée ni panier, ni commande, ni archive de commande.
+- Une réussite présente le montant encaissé et un accès à sa ligne dans la page Historique. Elle ne crée ni panier, ni commande, ni archive de commande.
 
 ### Historique et pièces jointes
 
-- Choix proposé : conserver la liste des commandes actuelle et ajouter un onglet « Paiements TPE » dans `/history`, afin d'afficher ces paiements sans inventer de fausses commandes.
-- Cet onglet liste uniquement les paiements autonomes du commerce : référence, date, montant, caissier, lecteur, état et nombre de commandes jointes. Les tentatives en cours ou échouées restent identifiables ; elles ne sont jamais présentées comme encaissées.
-- Une action « Commandes jointes » ouvre les liens existants et une recherche permettant d'en ajouter plusieurs ou de les retirer.
+- Intégrer les paiements autonomes comme des lignes de la liste existante dans `/history`, au milieu des commandes, sans nouvel onglet. Chaque paiement autonome occupe une seule ligne, quel que soit son nombre de pièces jointes.
+- Une ligne de paiement porte le libellé distinct « Paiement TPE », sa référence, sa date, son montant et son état. Le caissier, le lecteur et le nombre de commandes jointes sont accessibles sur cette ligne ou dans son détail. Les colonnes propres aux commandes, telles que table, client ou préparateur, affichent un tiret lorsqu'elles ne s'appliquent pas.
+- Les tentatives en cours ou échouées restent identifiables et ne sont jamais présentées comme encaissées. Les paiements TPE déjà utilisés pour régler des commandes ne créent pas de ligne autonome supplémentaire dans cette évolution.
+- Les commandes conservent leurs actions actuelles ; les paiements proposent « Commandes jointes » pour ouvrir leurs liens et une recherche permettant d'en ajouter plusieurs ou de les retirer. Une action de suppression, d'impression ou d'expansion propre aux commandes ne doit jamais recevoir une ligne de paiement.
+- Distinguer explicitement les types de lignes et utiliser une clé composée, par exemple `order:123` ou `terminal-payment:123`, pour éviter les collisions d'identifiants, de sélection et d'expansion.
+- La recherche, le tri et la pagination portent sur l'ensemble des deux types. Ne pas fusionner une page partielle de paiements avec toutes les commandes. Le serveur fournit une liste commune paginée, triée par date d'archivage de la commande ou date de confirmation du paiement, avec repli sur la date de création pour une tentative ou une ancienne archive, et un départage stable en cas d'égalité. La date affichée correspond à cette date d'historique. L'ajout d'une pièce jointe ne change pas la position du paiement.
 - Choix proposé pour ce premier périmètre : sélectionner les commandes déjà présentes dans l'historique du même commerce. Les commandes actives restent hors de cette sélection, ce qui évite d'introduire un nouveau suivi de leur déplacement vers les archives.
 - Les commandes payées et non payées peuvent être jointes, sans comparaison des montants. La même commande peut être jointe à plusieurs paiements. Un doublon dans le même paiement n'est pas créé.
 - Les pièces jointes peuvent être modifiées seulement sur un paiement autonome confirmé, par un membre du personnel disposant de l'accès `history`. La lecture et les liens disponibles suivent ce même droit, dans le commerce authentifié.
@@ -61,6 +66,8 @@ Il s'agit d'une évolution frontend et backend avec migration SQL, et non d'un s
 ### Opérations dédiées
 
 Prévoir des opérations sous `/stripe/terminal/standalone-payments` : démarrage avec `amountCents` et clé de tentative, liste paginée/recherche, lecture d'un paiement, annulation et ajout/retrait de pièces jointes. Prévoir également une recherche paginée des archives joignables, ou réutiliser une recherche existante si elle garantit les mêmes droits et filtres.
+
+Pour la page Historique, ajouter une lecture commune des entrées de commandes archivées visibles et de paiements autonomes du commerce, avec type, clé de ligne, date d'historique et champs d'affichage. Effectuer recherche, tri et pagination sur cette source commune côté serveur ; préserver les filtres de visibilité des archives. Conserver les opérations existantes de détail, de ticket et de suppression des commandes. Le choix du nom exact de cette lecture et de son découpage interne reste à l'implémentation.
 
 L'identifiant du commerce et du personnel vient exclusivement de la session. Le lecteur est celui affecté à l'utilisateur, jamais un lecteur arbitraire fourni par le client. Refuser les identifiants d'autres commerces et les types de paiement incorrects.
 
@@ -91,6 +98,8 @@ Utiliser des réponses dédiées validées dans le store : `paymentKind`, identi
 Ajouter des tests ciblés pour le montant, la clé de tentative, les droits et l'isolation par commerce, le lecteur occupé, la reprise après coupure réseau, la notification Stripe et l'absence totale de mutation des commandes. Vérifier qu'un paiement de 50 EUR peut rester sans pièce jointe puis recevoir des commandes de 40 EUR ou 60 EUR, et que l'ajout/retrait ne modifie aucun paiement ni statut de commande.
 
 Vérifier les collisions entre parcours caisse, borne et paiement libre sur un même lecteur, les confirmations répétées, les archives supprimées, les réponses tardives après changement de session et la compatibilité des anciens DTO. Exécuter les tests Stripe Terminal, historique et navigation concernés, puis le lint frontend et une compilation locale. Contrôler visuellement la modale et l'historique sur bureau et mobile. Utiliser seulement des tests simulés pour les transactions ; aucun débit réel sans demande spécifique.
+
+Vérifier aussi une liste contenant une commande et un paiement ayant le même identifiant numérique, les actions propres à chaque type, la recherche et la pagination mêlant les deux types, le tri stable, l'absence de nouvel onglet et l'absence de lignes supplémentaires pour les paiements TPE existants liés au règlement des commandes.
 
 ## Décisions laissées à l'implémentation
 
