@@ -20,6 +20,8 @@
           <span v-else>{{ payment ? statusText(payment.status) : 'Vérification nécessaire' }}</span>
         </div>
         <v-alert v-if="errorMessage" type="error" text dense class="mt-4 mb-3" role="alert">{{ errorMessage }}</v-alert>
+        <v-alert v-if="blockingPayment" type="warning" text dense class="mt-4 mb-3" role="status">Un paiement de {{ formatAmount(blockingPayment.amountCents) }} € est déjà en attente sur ce terminal. Annulez-le pour libérer le TPE.</v-alert>
+        <v-alert v-if="noticeMessage" type="info" text dense class="mt-4 mb-3" role="status">{{ noticeMessage }}</v-alert>
 
         <div v-if="!attempt" class="standalone-terminal__keypad" aria-label="Clavier du montant">
           <v-btn v-for="digit in digits" :key="digit" depressed class="standalone-terminal__key" :disabled="busy" @click="addDigit(digit)">{{ digit }}</v-btn>
@@ -36,15 +38,16 @@
         <p v-if="!attempt" class="standalone-terminal__hint">Paiement libre, sans création de commande.</p>
       </v-card-text>
       <v-card-actions class="standalone-terminal__actions">
+        <v-btn v-if="blockingPayment" block outlined color="error" class="text-none" :loading="canceling" :disabled="busy" @click="cancelBlockingPayment">Annuler le paiement en cours</v-btn>
         <template v-if="!attempt">
           <p v-if="amountCents > 0 && !validAmount(amountCents)" class="text-caption mb-1">Le montant minimum est de 0,50 €.</p>
-          <v-btn block depressed color="success" class="text-none standalone-terminal__send" :loading="busy" :disabled="!ready || !validAmount(amountCents) || busy" @click="sendPayment">
+          <v-btn block depressed color="success" class="text-none standalone-terminal__send" :loading="busy" :disabled="!ready || !validAmount(amountCents) || busy || Boolean(blockingPayment)" @click="sendPayment">
             <v-icon left>mdi-contactless-payment</v-icon>Envoyer au TPE
           </v-btn>
         </template>
         <template v-else-if="!isFinal">
           <v-btn block outlined color="primary" class="text-none" :loading="busy" :disabled="busy" @click="checkPayment">Vérifier le paiement</v-btn>
-          <v-btn text color="error" class="text-none" :disabled="busy || !payment" @click="cancelPayment">Annuler le paiement</v-btn>
+          <v-btn text color="error" class="text-none" :loading="cancelRequested || canceling" :disabled="cancelRequested || canceling || !payment" @click="cancelPayment">Annuler le paiement</v-btn>
         </template>
         <template v-else>
           <v-btn v-if="canViewHistory" block depressed color="primary" class="text-none" @click="goToHistory">Voir dans l’historique</v-btn>
@@ -68,12 +71,13 @@ export default {
   data: () => ({
     amountCents: 0, attempt: null, payment: null, requesting: false,
     errorMessage: '', operationVersion: 0, pollTimer: null, scopeKey: null, resumeAfterRequest: false,
+    blockingPayment: null, checkingReader: false, cancelRequested: false, canceling: false, noticeMessage: '',
     digits: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
   }),
   computed: {
     user() { return this.$store.get('users/user') },
     userScope() { return attemptStorageKey(this.user) },
-    busy() { return this.requesting || Boolean(this.$store.get('terminalPayments/loading')) },
+    busy() { return this.requesting || this.checkingReader || this.canceling || Boolean(this.$store.get('terminalPayments/loading')) },
     ready() { return canUseStandaloneTerminal({ user: this.user, reader: this.reader }) },
     formattedAmount() { return formatTerminalAmount(this.payment ? this.payment.amountCents : this.amountCents) },
     isPending() { return Boolean(this.payment && ['creating', 'processing'].includes(this.payment.status)) },
@@ -93,9 +97,10 @@ export default {
   watch: {
     value(open) {
       if (open) this.onOpen()
-      else { this.resumeAfterRequest = false; this.requesting = false; this.operationVersion += 1; this.stopPolling() }
+      else { this.resumeAfterRequest = false; this.requesting = false; this.checkingReader = false; this.canceling = false; this.cancelRequested = false; this.operationVersion += 1; this.stopPolling() }
     },
     busy(busy) {
+      if (!busy && this.cancelRequested && this.value) { this.cancelPayment(); return }
       if (!busy && this.resumeAfterRequest && this.value && this.attempt) {
         this.resumeAfterRequest = false
         this.checkPayment()
@@ -110,6 +115,10 @@ export default {
         this.amountCents = 0
         this.requesting = false
         this.resumeAfterRequest = false
+        this.blockingPayment = null
+        this.checkingReader = false
+        this.cancelRequested = false
+        this.canceling = false
         this.$emit('input', false)
       }
     },
@@ -117,14 +126,20 @@ export default {
   beforeDestroy() { this.operationVersion += 1; this.stopPolling() },
   methods: {
     validAmount,
+    formatAmount: formatTerminalAmount,
     statusText: terminalStatusText,
     async onOpen() {
       this.stopPolling()
       this.operationVersion += 1
       this.scopeKey = this.userScope
       this.requesting = false
+      this.checkingReader = false
+      this.canceling = false
       this.resumeAfterRequest = false
       this.errorMessage = ''
+      this.noticeMessage = ''
+      this.blockingPayment = null
+      this.cancelRequested = false
       this.payment = null
       this.attempt = readAttempt(typeof localStorage === 'undefined' ? null : localStorage, this.scopeKey)
       this.amountCents = this.attempt ? this.attempt.amountCents : 0
@@ -132,7 +147,46 @@ export default {
       if (this.attempt) {
         if (this.busy) this.resumeAfterRequest = true
         else await this.checkPayment()
-      }
+      } else await this.loadBlockingPayment()
+    },
+    async loadBlockingPayment() {
+      const generation = this.operationVersion
+      const scope = this.userScope
+      this.checkingReader = true
+      try {
+        const reader = await this.$store.dispatch('stripeTerminal/getCurrentReader')
+        if (generation !== this.operationVersion || scope !== this.userScope) return
+        const current = reader && reader.activePayment
+        this.blockingPayment = current && (!this.payment || current.id !== this.payment.id) ? current : null
+      } catch (_) {
+        if (generation === this.operationVersion && scope === this.userScope) this.errorMessage = 'Impossible de vérifier le terminal. Réessayez.'
+      } finally { if (generation === this.operationVersion) this.checkingReader = false }
+    },
+    async cancelBlockingPayment() {
+      if (this.busy || !this.blockingPayment) return
+      const current = this.blockingPayment
+      const generation = this.operationVersion
+      const scope = this.userScope
+      this.canceling = true
+      this.errorMessage = ''
+      try {
+        const module = current.paymentKind === 'standalone' ? 'terminalPayments' : 'stripeTerminal'
+        const result = await this.$store.dispatch(`${module}/cancelPayment`, current.id)
+        if (generation !== this.operationVersion || scope !== this.userScope) return
+        if (!result || !['canceled', 'failed', 'succeeded'].includes(result.status)) {
+          this.errorMessage = 'L’annulation n’est pas encore confirmée. Vérifiez le terminal puis réessayez.'
+          return
+        }
+        this.blockingPayment = null
+        this.noticeMessage = result.status === 'succeeded' ? 'Ce paiement a déjà été encaissé. Il ne peut plus être annulé.' : 'Paiement annulé. Le terminal est disponible.'
+        if (this.attempt && !this.payment) {
+          try { localStorage.removeItem(scope) } catch (_) {}
+          this.attempt = null
+          this.$emit('recovery-change', false)
+        }
+      } catch (_) {
+        if (generation === this.operationVersion && scope === this.userScope) this.errorMessage = 'Annulation impossible. Réessayez pour libérer le terminal.'
+      } finally { if (generation === this.operationVersion) this.canceling = false }
     },
     stopPolling() { if (this.pollTimer) clearTimeout(this.pollTimer); this.pollTimer = null },
     schedulePoll() {
@@ -151,13 +205,14 @@ export default {
       event.preventDefault()
     },
     async sendPayment() {
-      if (this.busy || this.attempt || !this.ready || !validAmount(this.amountCents)) return
+      if (this.busy || this.attempt || this.blockingPayment || !this.ready || !validAmount(this.amountCents)) return
       const attempt = { attemptKey: uuidv4(), amountCents: this.amountCents, paymentId: null }
       if (!saveAttempt(typeof localStorage === 'undefined' ? null : localStorage, this.userScope, attempt)) {
         this.errorMessage = 'Le navigateur ne peut pas conserver cette tentative. Autorisez le stockage avant de payer.'
         return
       }
       this.attempt = attempt
+      this.noticeMessage = ''
       this.$emit('recovery-change', true)
       await this.runPayment('terminalPayments/startPayment', { amountCents: attempt.amountCents, attemptKey: attempt.attemptKey })
     },
@@ -170,8 +225,12 @@ export default {
       }
     },
     async cancelPayment() {
-      if (this.busy || !this.payment || !this.isPending) return
-      await this.runPayment('terminalPayments/cancelPayment', this.payment.id)
+      if (this.canceling || !this.payment || !this.isPending) return
+      if (this.busy) { this.cancelRequested = true; return }
+      this.cancelRequested = false
+      this.canceling = true
+      try { await this.runPayment('terminalPayments/cancelPayment', this.payment.id) }
+      finally { this.canceling = false }
     },
     async runPayment(action, payload) {
       this.stopPolling()
@@ -185,18 +244,24 @@ export default {
         if (!result) {
           const error = this.$store.get('terminalPayments/error')
           this.errorMessage = error && error.message || 'Résultat du paiement inconnu. Vérifiez cette même tentative.'
+          if (error && error.code === 'TERMINAL_READER_BUSY') await this.loadBlockingPayment()
           return
         }
         this.payment = result
         this.attempt = { ...this.attempt, paymentId: result.id }
         if (this.isFinal) {
+          this.cancelRequested = false
           try { localStorage.removeItem(scope) } catch (_) {}
           this.$emit('recovery-change', false)
         } else saveAttempt(typeof localStorage === 'undefined' ? null : localStorage, scope, this.attempt)
       } catch (_) {
         if (generation === this.operationVersion && scope === this.userScope) this.errorMessage = 'Vérification impossible. Réessayez avec cette même tentative.'
       } finally {
-        if (generation === this.operationVersion) { this.requesting = false; this.schedulePoll() }
+        if (generation === this.operationVersion) {
+          this.requesting = false
+          if (this.cancelRequested && this.value) this.cancelPayment()
+          else this.schedulePoll()
+        }
       }
     },
     startNewPayment() {
@@ -208,7 +273,7 @@ export default {
       this.$store.dispatch('terminalPayments/resetSession')
       this.$emit('recovery-change', false)
     },
-    closeDialog() { this.operationVersion += 1; this.requesting = false; this.resumeAfterRequest = false; this.stopPolling(); this.$emit('input', false) },
+    closeDialog() { this.operationVersion += 1; this.requesting = false; this.checkingReader = false; this.canceling = false; this.cancelRequested = false; this.resumeAfterRequest = false; this.stopPolling(); this.$emit('input', false) },
     async goToHistory() {
       if (!this.payment || !this.canViewHistory) return
       const id = this.payment.id

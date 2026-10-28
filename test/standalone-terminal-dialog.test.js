@@ -18,7 +18,8 @@ const make = () => {
   const calls = []
   const network = Vue.observable({ loading: false })
   let response = payment
-  const store = { get: key => ({ 'users/user': user, 'terminalPayments/loading': network.loading })[key],
+  let storeError = null
+  const store = { get: key => ({ 'users/user': user, 'terminalPayments/loading': network.loading, 'terminalPayments/error': storeError })[key],
     dispatch: (name, payload) => { calls.push({ name, payload }); return Promise.resolve(typeof response === 'function' ? response() : response) } }
   const instance = new Vue({ ...component, ...template, beforeCreate() {
     this.$store = store
@@ -26,7 +27,7 @@ const make = () => {
   }, propsData: { value: false,
     reader: { id: 7, label: 'S710', status: 'online', isActive: true, assignedUserId: 4 } } })
   instances.push(instance)
-  return { instance, user, calls, values, network, respond: value => { response = value } }
+  return { instance, user, calls, values, network, respond: value => { response = value }, setError: value => { storeError = value } }
 }
 const run = async () => {
   const keyboard = make()
@@ -35,7 +36,7 @@ const run = async () => {
   keyboard.instance.amountCents = 5000
   let prevented = false
   keyboard.instance.handleKey({ key: 'Enter', target: { tagName: 'BUTTON' }, preventDefault() { prevented = true } })
-  assert.strictEqual(keyboard.calls.length, 0, 'Enter on a focused close/clear/digit button must never send payment')
+  assert.strictEqual(keyboard.calls.filter(call => call.name === 'terminalPayments/startPayment').length, 0, 'Enter on a focused close/clear/digit button must never send payment')
   assert.strictEqual(prevented, false, 'Keep the focused button native keyboard activation')
   keyboard.instance.$destroy()
   const h = make()
@@ -123,6 +124,64 @@ const run = async () => {
   await paid.instance.goToHistory()
   assert.ok(paid.calls.some(call => call.route && call.route.path === '/history'))
   paid.instance.$destroy()
+
+  const blocked = make()
+  const existing = { id: 10, paymentKind: 'order', status: 'processing', amountCents: 2200, currency: 'eur' }
+  blocked.respond({ activePayment: existing })
+  await blocked.instance.onOpen()
+  assert.strictEqual(blocked.instance.blockingPayment.id, 10, 'Opening the modal must recover an already occupied terminal')
+  blocked.respond({ ...existing, status: 'canceled' })
+  await blocked.instance.cancelBlockingPayment()
+  assert.ok(blocked.calls.some(call => call.name === 'stripeTerminal/cancelPayment' && call.payload === 10))
+  assert.strictEqual(blocked.instance.blockingPayment, null)
+  blocked.instance.$destroy()
+
+  const rejected = make()
+  await rejected.instance.onOpen()
+  rejected.instance.amountCents = 5000
+  rejected.setError({ code: 'TERMINAL_READER_BUSY', message: 'Terminal occupé.' })
+  rejected.respond(() => rejected.calls[rejected.calls.length - 1].name === 'stripeTerminal/getCurrentReader' ? { activePayment: existing } : false)
+  await rejected.instance.sendPayment()
+  assert.strictEqual(rejected.instance.blockingPayment.id, 10, 'A rejected new payment must expose the older payment blocking its reader')
+  rejected.respond({ ...existing, status: 'canceled' })
+  await rejected.instance.cancelBlockingPayment()
+  assert.strictEqual(rejected.instance.attempt, null)
+  assert.strictEqual(readAttempt(global.localStorage, attemptStorageKey(rejected.user)), null)
+  assert.strictEqual(rejected.calls.filter(call => call.name === 'terminalPayments/startPayment').length, 1, 'Canceling must never start another collection')
+  rejected.instance.$destroy()
+
+  const polling = make()
+  polling.instance.value = true
+  await Vue.nextTick()
+  await polling.instance.onOpen()
+  polling.instance.attempt = { attemptKey: '12345678-1234-4123-8123-123456789abc', amountCents: 5000, paymentId: 21 }
+  polling.instance.payment = { ...payment }
+  let finishPoll
+  polling.respond(() => new Promise(resolve => { finishPoll = resolve }))
+  const refresh = polling.instance.checkPayment()
+  await polling.instance.cancelPayment()
+  polling.respond({ ...payment, status: 'canceled' })
+  finishPoll({ ...payment })
+  await refresh
+  for (let tick = 0; tick < 8; tick++) { await Promise.resolve(); await Vue.nextTick() }
+  assert.ok(polling.calls.some(call => call.name === 'terminalPayments/cancelPayment'), 'Cancel requested during polling must run as soon as polling finishes')
+  assert.strictEqual(polling.instance.payment.status, 'canceled')
+  polling.instance.$destroy()
+
+  const alreadyPaid = make()
+  alreadyPaid.instance.value = true
+  await Vue.nextTick()
+  alreadyPaid.instance.attempt = { attemptKey: '12345678-1234-4123-8123-123456789abc', amountCents: 5000, paymentId: 21 }
+  alreadyPaid.instance.payment = { ...payment }
+  let confirmSuccess
+  alreadyPaid.respond(() => new Promise(resolve => { confirmSuccess = resolve }))
+  const finalRefresh = alreadyPaid.instance.checkPayment()
+  await alreadyPaid.instance.cancelPayment()
+  confirmSuccess({ ...payment, status: 'succeeded' })
+  await finalRefresh
+  assert.strictEqual(alreadyPaid.instance.cancelRequested, false, 'A payment settled during polling must clear its queued cancellation before the next payment')
+  assert.strictEqual(alreadyPaid.calls.some(call => call.name === 'terminalPayments/cancelPayment'), false)
+  alreadyPaid.instance.$destroy()
   console.log('PASS terminal modal duplicate send, amount lock, uncertain retry, close and success')
 }
 run().catch(error => { for (const instance of instances) instance.$destroy(); console.error(error); process.exitCode = 1 })

@@ -119,3 +119,9 @@ Préfixe frontend : `/baseurl/api/v1/stripe/terminal` ; serveur enregistré sous
 5. Traiter l'accès direct à un paiement hors de la page courante comme une exigence d'usage : ouvrir son détail dans l'Historique préserve l'accès aux pièces jointes sans dépendre du tri courant. Cela ouvre une modale supplémentaire quand ce lien est suivi.
 
 Aucun défaut critique ou important non corrigé n'a été retenu. Les observations de style héritées et la taille spécifique de l'affichage du montant ne justifient pas un refactor du système de design. Les changements sont conservés localement sur `codex/standalone-terminal-payments`, sans publication ni fusion.
+
+## Suivi staging : annulation et terminal occupé
+
+Le déploiement Docker du 28 octobre a été effectué sur staging. Le test utilisateur était bloqué par un paiement de commande de 22 EUR encore en collecte. Cette tentative de test a été annulée et un paiement libre réel auprès de l'API Stripe en mode test de 0,50 EUR a ensuite été créé et annulé avec succès, sans encaissement.
+
+Le lecteur courant expose maintenant un résumé limité au paiement actif du même utilisateur, sans identifiant Stripe ni clé privée. La fenêtre permet d'annuler cette tentative, commande ou paiement libre, après réouverture. Une annulation demandée pendant un contrôle automatique est exécutée dès sa fin. La collecte active aussi l'annulation sur le lecteur physique ; un abandon client confirmé est rapproché comme annulé. Une réponse de lecteur périmée après annulation est contrôlée par une nouvelle lecture, sans libérer une tentative dont la collecte reste active. Ces cas ont des tests de régression et le parcours de récupération/annulation a été vérifié dans Nuxt en navigateur avec API simulée.
