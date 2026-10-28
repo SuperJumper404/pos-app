@@ -67,7 +67,7 @@ export default {
   props: { value: { type: Boolean, default: false }, reader: { type: Object, default: null } },
   data: () => ({
     amountCents: 0, attempt: null, payment: null, requesting: false,
-    errorMessage: '', operationVersion: 0, pollTimer: null, scopeKey: null,
+    errorMessage: '', operationVersion: 0, pollTimer: null, scopeKey: null, resumeAfterRequest: false,
     digits: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
   }),
   computed: {
@@ -91,7 +91,16 @@ export default {
     },
   },
   watch: {
-    value(open) { if (open) this.onOpen(); else this.stopPolling() },
+    value(open) {
+      if (open) this.onOpen()
+      else { this.resumeAfterRequest = false; this.requesting = false; this.operationVersion += 1; this.stopPolling() }
+    },
+    busy(busy) {
+      if (!busy && this.resumeAfterRequest && this.value && this.attempt) {
+        this.resumeAfterRequest = false
+        this.checkPayment()
+      }
+    },
     userScope(next) {
       if (this.scopeKey && next !== this.scopeKey) {
         this.operationVersion += 1
@@ -100,6 +109,7 @@ export default {
         this.payment = null
         this.amountCents = 0
         this.requesting = false
+        this.resumeAfterRequest = false
         this.$emit('input', false)
       }
     },
@@ -112,12 +122,17 @@ export default {
       this.stopPolling()
       this.operationVersion += 1
       this.scopeKey = this.userScope
+      this.requesting = false
+      this.resumeAfterRequest = false
       this.errorMessage = ''
       this.payment = null
       this.attempt = readAttempt(typeof localStorage === 'undefined' ? null : localStorage, this.scopeKey)
       this.amountCents = this.attempt ? this.attempt.amountCents : 0
       this.$emit('recovery-change', Boolean(this.attempt))
-      if (this.attempt) await this.checkPayment()
+      if (this.attempt) {
+        if (this.busy) this.resumeAfterRequest = true
+        else await this.checkPayment()
+      }
     },
     stopPolling() { if (this.pollTimer) clearTimeout(this.pollTimer); this.pollTimer = null },
     schedulePoll() {
@@ -132,7 +147,6 @@ export default {
       if (/^[0-9]$/.test(event.key)) this.addDigit(event.key)
       else if (event.key === 'Backspace') this.removeDigit()
       else if (event.key === 'Delete') this.clearAmount()
-      else if (event.key === 'Enter') this.sendPayment()
       else return
       event.preventDefault()
     },
@@ -194,7 +208,7 @@ export default {
       this.$store.dispatch('terminalPayments/resetSession')
       this.$emit('recovery-change', false)
     },
-    closeDialog() { this.operationVersion += 1; this.requesting = false; this.stopPolling(); this.$emit('input', false) },
+    closeDialog() { this.operationVersion += 1; this.requesting = false; this.resumeAfterRequest = false; this.stopPolling(); this.$emit('input', false) },
     async goToHistory() {
       if (!this.payment || !this.canViewHistory) return
       const id = this.payment.id
@@ -206,9 +220,9 @@ export default {
 </script>
 
 <style scoped>
-.standalone-terminal { border-radius: 20px !important; }
+.standalone-terminal { border-radius: var(--se-radius-lg) !important; }
 .standalone-terminal__heading { padding: 12px 16px 8px 24px; }
-.standalone-terminal__heading h2 { font-size: 1.125rem; font-weight: 600; }
+.standalone-terminal__heading h2 { font-size: var(--se-font-title-sm); font-weight: 600; }
 .standalone-terminal__close { min-width: 44px; min-height: 44px; }
 .standalone-terminal__body { padding: 0 24px 12px !important; }
 .standalone-terminal__reader { display: flex; align-items: center; gap: 8px; min-height: 32px; margin-bottom: 12px; color: var(--se-color-text-muted); }
@@ -217,13 +231,14 @@ export default {
 .standalone-terminal__amount { margin: 8px 0; color: var(--se-color-text); font-size: clamp(2rem, 8vw, 2.75rem); font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .standalone-terminal__amount span { font-size: 1.5rem; }
 .standalone-terminal__keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
-.standalone-terminal__key { min-width: 0 !important; min-height: 56px; font-size: 1.375rem; font-weight: 500; color: var(--se-color-text) !important; background: var(--se-color-surface-muted) !important; border-radius: var(--se-radius-md); }
+.standalone-terminal__key { min-width: 0 !important; min-height: 56px; font-size: var(--se-font-title); font-weight: 500; color: var(--se-color-text) !important; background: var(--se-color-surface-muted) !important; border-radius: var(--se-radius-md); }
 .standalone-terminal__key:focus-visible, .standalone-terminal__close:focus-visible { outline: 2px solid var(--se-color-primary); outline-offset: 2px; }
 .standalone-terminal__clear { color: var(--se-color-danger) !important; background: var(--se-color-danger-soft) !important; }
-.standalone-terminal__hint { margin: 16px 0 0; text-align: center; font-size: .8125rem; }
+.standalone-terminal__hint { margin: 16px 0 0; text-align: center; font-size: var(--se-font-meta); }
 .standalone-terminal__outcome { padding: 24px 0 8px; text-align: center; }
 .standalone-terminal__outcome p { margin: 12px 0 8px; color: var(--se-color-text); }
 .standalone-terminal__actions { flex-direction: column; gap: 10px; padding: 8px 24px 24px; }
 .standalone-terminal__actions .v-btn { margin: 0 !important; min-height: 44px; }
+.standalone-terminal__send.v-btn { color: var(--se-color-text) !important; }
 @media (max-width: 360px) { .standalone-terminal__body { padding-right: 16px !important; padding-left: 16px !important; } .standalone-terminal__actions { padding-right: 16px; padding-left: 16px; } }
 </style>

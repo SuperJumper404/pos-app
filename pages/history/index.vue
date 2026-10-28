@@ -65,6 +65,7 @@
         :footer-props="{ 'items-per-page-options': [10, 25, 50], 'items-per-page-text': 'Lignes par page' }"
         :item-class="historyRowClass"
         no-data-text="Aucune commande ni paiement dans l’historique"
+        loading-text="Chargement de l’historique…"
         :expanded.sync="expanded"
         item-key="rowKey"
         show-expand
@@ -240,7 +241,7 @@
           {{ item.entryType === 'terminal_payment' ? '—' : item.prepared_by_name || 'Non attribuee' }}
         </template>
         <template #[`item.payment_status`]="{ item }">
-          <v-chip small :dark="item.entryType !== 'terminal_payment'" :color="paymentStatusColor(item)">
+          <v-chip small :dark="item.entryType !== 'terminal_payment'" :color="paymentStatusColor(item)" :class="item.entryType === 'terminal_payment' ? ['history-terminal-status', `history-terminal-status--${item.terminalPayment.status}`] : []">
             {{ paymentStatusText(item) }}
           </v-chip>
         </template>
@@ -254,16 +255,16 @@
           <v-chip v-if="item.status === 4" color="warning"> Annulée </v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
-          <v-row class="d-flex flex-nowrap">
-            <v-card-actions>
+          <div class="history-row-actions">
+            <div class="history-row-actions__inner">
               <v-btn
                 v-if="item.entryType === 'terminal_payment'"
                 outlined
                 small
                 color="primary"
-                class="text-none history-touch-button"
+                class="text-none history-touch-button history-attachments-button"
                 @click="openAttachments(item)"
-              >Commandes jointes ({{ item.terminalPayment.attachmentsCount }})<v-icon small right>mdi-paperclip</v-icon></v-btn>
+              ><span>Commandes jointes ({{ item.terminalPayment.attachmentsCount }})</span><v-icon small right>mdi-paperclip</v-icon></v-btn>
               <v-btn
                 v-else
                 outlined
@@ -273,8 +274,8 @@
                 @click="showInvoice(item.id)"
                 >Ticket <v-icon small right>mdi-invoice-text</v-icon>
               </v-btn>
-            </v-card-actions>
-          </v-row>
+            </div>
+          </div>
         </template>
       </v-data-table>
     </v-card>
@@ -302,7 +303,7 @@ const {
   getPaymentStatusText,
   getPaymentStatusColor,
 } = require('@/helpers/paymentStatus')
-const { attemptStorageKey, terminalStatusText, terminalStatusColor } = require('@/helpers/standaloneTerminal')
+const { attemptStorageKey, positiveId, terminalStatusText, terminalStatusColor } = require('@/helpers/standaloneTerminal')
 export default {
   components: { TakeawayChip, VatBreakdown, TerminalPaymentAttachments },
   mixins: [formatdate, price],
@@ -342,7 +343,7 @@ export default {
         { text: 'Total', value: 'subtotal', filterable: true },
         { text: 'Paiement', value: 'payment_status', filterable: true },
         { text: 'Statut', value: 'status', filterable: true },
-        { text: 'Actions', value: 'actions', sortable: false },
+        { text: 'Actions', value: 'actions', sortable: false, width: 176 },
       ],
       items: [
         {
@@ -406,7 +407,7 @@ export default {
   watch: {
     tableOptions: { deep: true, handler() { this.queueEntries() } },
     searchFilter() { this.tableOptions.page = 1; this.queueEntries() },
-    '$route.query.payment'() { this.searchFilter = ''; this.tableOptions.page = 1; this.queueEntries() },
+    '$route.query.payment'() { this.searchFilter = ''; this.tableOptions.page = 1; this.openFocusedPayment(); this.queueEntries() },
     userScope() {
       this.historyVersion += 1
       this.attachmentsDialog = false
@@ -421,6 +422,7 @@ export default {
   mounted() {
     this.historyReady = true
     this.loadEntries()
+    this.openFocusedPayment()
   },
   beforeDestroy() {
     this.historyReady = false
@@ -457,6 +459,12 @@ export default {
     openAttachments(item) {
       if (item.entryType !== 'terminal_payment') return
       this.attachmentsPaymentId = item.id
+      this.attachmentsDialog = true
+    },
+    openFocusedPayment() {
+      const id = Number(this.$route.query.payment)
+      if (!positiveId(id)) return
+      this.attachmentsPaymentId = id
       this.attachmentsDialog = true
     },
     expandOrder(item, expand, isExpanded) {
@@ -524,6 +532,16 @@ export default {
 <style scoped>
 .history-touch-button { min-width: 44px !important; min-height: 44px !important; }
 .history-terminal-label { display: flex; align-items: center; gap: 6px; }
+.history-row-actions, .history-row-actions__inner { display: flex; align-items: center; min-height: 44px; max-width: 100%; }
+.history-attachments-button { width: 144px; max-width: 144px; letter-spacing: normal; }
+::v-deep .history-attachments-button .v-btn__content { flex: 1 1 auto; min-width: 0; width: 100%; white-space: normal; line-height: 1.3; }
+::v-deep .history-attachments-button .v-btn__content > span { flex: 1 1 auto; min-width: 0; white-space: normal; }
+::v-deep .history-attachments-button .v-btn__content > .v-icon { flex: 0 0 auto; }
+.history-terminal-status.v-chip { background-color: var(--se-color-surface-muted) !important; color: var(--se-color-text) !important; }
+.history-terminal-status--succeeded.v-chip { background-color: var(--se-color-success-soft) !important; }
+.history-terminal-status--failed.v-chip { background-color: var(--se-color-danger-soft) !important; }
+.history-terminal-status--creating.v-chip { background-color: var(--se-color-warning-soft) !important; }
+.history-terminal-status--processing.v-chip { background-color: var(--se-color-primary-soft) !important; }
 ::v-deep .history-payment-focus { background: var(--se-color-primary-soft); }
 .history-panel-card,
 .history-detail-card {

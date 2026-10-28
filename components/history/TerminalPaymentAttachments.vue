@@ -30,7 +30,9 @@
           <h3 class="terminal-attachments__subtitle">Ajouter des commandes de l’historique</h3>
           <v-text-field v-model="search" outlined dense hide-details clearable class="se-search-field mb-3" placeholder="Rechercher une commande" aria-label="Rechercher une commande à joindre" prepend-inner-icon="mdi-magnify" :disabled="busy" />
           <v-alert v-if="candidatesError" text dense type="error">{{ candidatesError }} <v-btn text small @click="loadCandidates">Réessayer</v-btn></v-alert>
-          <v-data-table v-model="selectedCandidates" :headers="headers" :items="candidateRows" item-key="archiveId" selectable-key="isSelectable" show-select :options.sync="candidateOptions" :server-items-length="candidatesTotal" :loading="loadingCandidates" :footer-props="{ 'items-per-page-options': [10, 25, 50], 'items-per-page-text': 'Commandes par page' }" disable-sort no-data-text="Aucune commande correspondante" dense>
+          <v-data-table v-model="selectedCandidates" :headers="headers" :items="candidateRows" item-key="archiveId" selectable-key="isSelectable" show-select :options.sync="candidateOptions" :server-items-length="candidatesTotal" :loading="loadingCandidates" :footer-props="{ 'items-per-page-options': [10, 25, 50], 'items-per-page-text': 'Commandes par page' }" disable-sort no-data-text="Aucune commande correspondante" loading-text="Chargement des commandes…" dense>
+            <template #[`header.data-table-select`]="{ props, on }"><v-checkbox :input-value="props.value" :indeterminate="props.indeterminate" :disabled="busy || !hasSelectableCandidates" hide-details dense color="primary" class="terminal-attachments__select" aria-label="Sélectionner les commandes de cette page" @change="on.input($event)" @click.stop /></template>
+            <template #[`item.data-table-select`]="{ item, isSelected, select }"><v-checkbox :input-value="isSelected" :disabled="busy || !item.isSelectable" hide-details dense color="primary" class="terminal-attachments__select" :aria-label="`Joindre la commande ${item.orderNumber}`" @change="select($event)" @click.stop /></template>
             <template #[`item.orderNumber`]="{ item }"><strong>#{{ item.orderNumber }}</strong><span v-if="!item.isSelectable" class="text-caption d-block">Déjà jointe</span></template>
             <template #[`item.tableName`]="{ item }">{{ item.tableName || '—' }}</template>
             <template #[`item.amountCents`]="{ item }"><span class="terminal-attachments__money">{{ money(item.amountCents) }}</span></template>
@@ -62,6 +64,7 @@ export default {
   computed: {
     userScope() { return attemptStorageKey(this.$store.get('users/user')) },
     canModify() { return Boolean(this.payment && this.payment.status === 'succeeded') },
+    hasSelectableCandidates() { return this.candidateRows.some(item => item.isSelectable) },
     candidateRows() {
       const joined = new Set(this.attachments.map(item => item.archiveId))
       return this.candidates.map(item => ({ ...item, isSelectable: !joined.has(item.archiveId) }))
@@ -164,7 +167,7 @@ export default {
 
 <style scoped>
 .terminal-attachments__heading { align-items: flex-start; padding: 20px 20px 12px 24px; }
-.terminal-attachments__heading h2 { font-size: 1.125rem; line-height: 1.4; font-weight: 600; }
+.terminal-attachments__heading h2 { font-size: var(--se-font-title-sm); line-height: 1.4; font-weight: 600; }
 .terminal-attachments__body { padding: 0 24px 16px !important; }
 .terminal-attachments__notice { color: var(--se-color-text-muted); line-height: 1.6; margin: 0 0 16px; }
 .terminal-attachments__list { list-style: none; padding: 0; margin: 0; }
@@ -176,6 +179,7 @@ export default {
 .terminal-attachments__subtitle { font-size: 1rem; font-weight: 600; margin: 24px 0 12px; color: var(--se-color-text); }
 .terminal-attachments__actions { padding: 12px 24px 20px; border-top: 1px solid var(--se-color-border-soft); gap: 8px; }
 .terminal-attachments__touch { min-width: 44px !important; min-height: 44px !important; }
+.terminal-attachments__select { margin: 0; padding: 0; min-height: 44px; align-items: center; }
 .terminal-attachments__touch:focus-visible { outline: 2px solid var(--se-color-primary); outline-offset: 2px; }
 @media (max-width: 480px) { .terminal-attachments__body { padding-left: 16px !important; padding-right: 16px !important; } .terminal-attachments__actions { padding-left: 16px; padding-right: 16px; } }
 </style>

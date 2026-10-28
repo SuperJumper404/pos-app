@@ -58,11 +58,11 @@ Préfixe frontend : `/baseurl/api/v1/stripe/terminal` ; serveur enregistré sous
 
 **Interfaces:** Consomme le module Terminal et ses verrous existants. Produit les trois opérations paiement du contrat. La finalisation sélectionne le type stocké ; les validateurs et DTO des commandes restent stricts.
 
-- [ ] Écrire des tests démontrant que 5000 centimes sans commande créent un paiement autonome, que deux appels avec la même clé ne créent qu'un intent, qu'une clé avec 6000 est refusée, et que les statuts/notifications n'altèrent aucune commande.
-- [ ] Exécuter `node test/stripe-terminal-standalone-payments.test.js` ; constater l'échec pour fonctionnalité absente.
-- [ ] Implémenter `payment_kind` (défaut order), `confirmed_at`, la création autonome, l'idempotence durable et le routage de finalisation. Maintenir le verrou commun du lecteur ; interdire la récupération/annulation inter-types. Montants EUR entiers entre 50 et 99999999 centimes. Une tentative ambiguë ne devient pas libre de créer un deuxième paiement.
-- [ ] Exécuter les tests nouveaux et `node test/stripe-terminal-payments.test.js`, `node test/stripe-terminal-kiosk-payments.test.js`, `node test/stripe-terminal-webhooks.test.js`, `node test/stripe-terminal-locking.test.js` ; attendu aucun échec.
-- [ ] Commit ciblé après vérification.
+- [x] Écrire des tests démontrant que 5000 centimes sans commande créent un paiement autonome, que deux appels avec la même clé ne créent qu'un intent, qu'une clé avec 6000 est refusée, et que les statuts/notifications n'altèrent aucune commande.
+- [x] Exécuter `node test/stripe-terminal-standalone-payments.test.js` ; constater l'échec pour fonctionnalité absente.
+- [x] Implémenter `payment_kind` (défaut order), `confirmed_at`, la création autonome, l'idempotence durable et le routage de finalisation. Maintenir le verrou commun du lecteur ; interdire la récupération/annulation inter-types. Montants EUR entiers entre 50 et 99999999 centimes. Une tentative ambiguë ne devient pas libre de créer un deuxième paiement.
+- [x] Exécuter les tests nouveaux et `node test/stripe-terminal-payments.test.js`, `node test/stripe-terminal-kiosk-payments.test.js`, `node test/stripe-terminal-webhooks.test.js`, `node test/stripe-terminal-locking.test.js` ; attendu aucun échec.
+- [x] Commit ciblé après vérification.
 
 ## Task 2: Historique commun et commandes jointes (backend)
 
@@ -70,10 +70,10 @@ Préfixe frontend : `/baseurl/api/v1/stripe/terminal` ; serveur enregistré sous
 
 **Interfaces:** Produit les opérations history/candidats/attachments du contrat. Ne jamais réutiliser la table d'allocations pour les pièces jointes. Réutiliser les projections ou lectures existantes quand possible sans refactor global.
 
-- [ ] Écrire des tests de liste mêlant order:123 et terminal-payment:123, pagination/recherche communes, isolation commerce/droits, archives masquées, ajout de commandes à montants différents et retrait idempotent.
-- [ ] Lancer `node test/terminal-payment-history.test.js` ; attendu échec dû aux fonctions absentes.
-- [ ] Implémenter le module injectable, le contrôleur et les routes avec requêtes paramétrées, validation, transaction d'ajout/retrait et copie minimale. La modification des pièces jointes n'affecte ni date de confirmation, ni allocations, ni paiement, ni archive.
-- [ ] Lancer le test puis `npm test` dans le backend ; attendu sortie 0. Commit des fichiers backend ciblés.
+- [x] Écrire des tests de liste mêlant order:123 et terminal-payment:123, pagination/recherche communes, isolation commerce/droits, archives masquées, ajout de commandes à montants différents et retrait idempotent.
+- [x] Lancer `node test/terminal-payment-history.test.js` ; attendu échec dû aux fonctions absentes.
+- [x] Implémenter le module injectable, le contrôleur et les routes avec requêtes paramétrées, validation, transaction d'ajout/retrait et copie minimale. La modification des pièces jointes n'affecte ni date de confirmation, ni allocations, ni paiement, ni archive.
+- [x] Lancer le test puis `npm test` dans le backend ; attendu sortie 0. Commit des fichiers backend ciblés.
 
 ## Task 3: Store, clavier et modale de paiement (frontend)
 
@@ -81,11 +81,11 @@ Préfixe frontend : `/baseurl/api/v1/stripe/terminal` ; serveur enregistré sous
 
 **Interfaces:** Consomme `stripeTerminal/currentReader` et les trois opérations paiement. Le nouveau store est indépendant de `stripeTerminal/activePayment`. Utilise `terminalPayments/startPayment({amountCents,attemptKey})`, `refreshPayment(id)`, `cancelPayment(id)`, `resetSession()` ; états activePayment/loading/error. La copie de reprise contient uniquement attemptKey, amountCents, paymentId et est scellée au contexte commerce/caissier.
 
-- [ ] Écrire les tests de saisie en centimes, reprise d'une clé, DTO de succès sans commande, erreur réseau conservant la tentative et réponse tardive rejetée après reset/changement de session.
-- [ ] Lancer les tests et constater les échecs avant implémentation.
-- [ ] Implémenter les helpers, actions et la modale Vuetify : clavier tactile/physique, affichage 0,00 EUR, libellés français, verrou pendant attente, annulation serveur, reprise et lien vers `/history` après succès. Utiliser des cibles d'au moins 44 px et les tokens existants.
-- [ ] Ajouter le bouton à côté d'Accueil, avec vérification staff/cashregister et lecteur actif en ligne ; conserver l'accès à une tentative existante si le lecteur disparaît. Nettoyer le store à la déconnexion et l'exclure de la persistance générale.
-- [ ] Lancer les tests ciblés, ceux de session et de navigation ; attendu sortie 0. Commit ciblé.
+- [x] Écrire les tests de saisie en centimes, reprise d'une clé, DTO de succès sans commande, erreur réseau conservant la tentative et réponse tardive rejetée après reset/changement de session.
+- [x] Lancer les tests et constater les échecs avant implémentation.
+- [x] Implémenter les helpers, actions et la modale Vuetify : clavier tactile/physique, affichage 0,00 EUR, libellés français, verrou pendant attente, annulation serveur, reprise et lien vers `/history` après succès. Utiliser des cibles d'au moins 44 px et les tokens existants.
+- [x] Ajouter le bouton à côté d'Accueil, avec vérification staff/cashregister et lecteur actif en ligne ; conserver l'accès à une tentative existante si le lecteur disparaît. Nettoyer le store à la déconnexion et l'exclure de la persistance générale.
+- [x] Lancer les tests ciblés, ceux de session et de navigation ; attendu sortie 0. Commit ciblé.
 
 ## Task 4: Lignes mixtes et modale de pièces jointes (frontend)
 
@@ -93,9 +93,29 @@ Préfixe frontend : `/baseurl/api/v1/stripe/terminal` ; serveur enregistré sous
 
 **Interfaces:** Consomme la lecture commune du contrat via `history/getEntries({search,page,itemsPerPage,sortBy,sortDesc})`, états `entries` et `entriesTotal`. Les actions de pièces jointes utilisent le module `terminalPayments` et retournent les DTO sans modifier la tentative active du caissier.
 
-- [ ] Écrire des tests de rendu réel/Vue des deux types portant le même id, actions propres à chaque type, montant 50 EUR avec commande de 40 EUR et résultat de recherche tardif ignoré.
-- [ ] Lancer le test et constater l'échec avant modification.
-- [ ] Brancher la table unique sur pagination serveur, distinguer les clés/types et rendre la ligne de paiement. Garder les tickets/détails/suppression de commandes ; charger les détails des archives affichées après la liste.
-- [ ] Implémenter la modale de pièces jointes avec recherche des archives, multi-ajout, retrait et message informatif ; ne montrer aucun contrôle d'égalité ni calcul de différence. Une source disparue garde sa copie et un lien désactivé.
-- [ ] Vérifier les tests historiques/navigation puis `npm test`, `npm run lint`, `npm run build-local` ; attendu sortie 0, signaler les défauts préexistants si présents.
-- [ ] Contrôler bureau et mobile avec API simulée, sans paiement réel, puis faire relire la modification complète et corriger les défauts matériels. Commit ciblé et livraison locale ; ne pas publier ni fusionner sans demande.
+- [x] Écrire des tests de rendu réel/Vue des deux types portant le même id, actions propres à chaque type, montant 50 EUR avec commande de 40 EUR et résultat de recherche tardif ignoré.
+- [x] Lancer le test et constater l'échec avant modification.
+- [x] Brancher la table unique sur pagination serveur, distinguer les clés/types et rendre la ligne de paiement. Garder les tickets/détails/suppression de commandes ; charger les détails des archives affichées après la liste.
+- [x] Implémenter la modale de pièces jointes avec recherche des archives, multi-ajout, retrait et message informatif ; ne montrer aucun contrôle d'égalité ni calcul de différence. Une source disparue garde sa copie et un lien désactivé.
+- [x] Vérifier les tests historiques/navigation puis `npm test`, `npm run lint`, `npm run build-local` ; attendu sortie 0, signaler les défauts préexistants si présents.
+- [x] Contrôler bureau et mobile avec API simulée, sans paiement réel, puis faire relire la modification complète et corriger les défauts matériels. Commit ciblé et livraison locale ; ne pas publier ni fusionner sans demande.
+
+## Validation et livraison
+
+- Backend : `npm test` passe après les commits `0a91b22` et `e69f014`. La relecture indépendante a identifié deux défauts de reprise, corrigés avec tests RED→GREEN : réservation jamais soumise à Stripe, et intention déjà confirmée avec lecteur hors ligne. Le marqueur durable `stripe_create_submitted_at` préserve la distinction avec une création Stripe incertaine.
+- Frontend : `npm test` passe sur la version finale ; `npm run lint` termine sans erreur (avertissements du projet et des scripts de test) ; `npm run build-local` passe avec les avertissements de taille des bundles.
+- Les six scripts de `npm run test:standalone-terminal` couvrent montants entiers, même clé après erreur, réponses tardives/changement de session, commandes et paiements ayant le même identifiant, total de commande différent du paiement et sélection accessible.
+- Parcours réel Nuxt/Vuetify vérifié en navigateur avec API simulée, à 1440 et 390 px : clavier, Enter sur Fermer/Effacer/chiffre sans débit, sélection par Espace, fermeture/réouverture pendant la requête, un seul paiement logique de 50 EUR et commande jointe de 40 EUR. Aucun appel Stripe réel.
+- Relecture frontend : reprise automatique après réouverture corrigée avec test réactif RED→GREEN. Le lien vers un ancien paiement ouvre son détail même si sa ligne est hors de la page courante.
+- Relecture visuelle : quatre corrections demandées résolues, disposition `ship` pour les corrections examinées. Le documenter confirme l'héritage du système existant ; aucun changement de PRODUCT.md, DESIGN.md ou du sidecar.
+- La base locale a refusé la connexion (`ECONNREFUSED`). Migration SQL préparée mais non appliquée ; les requêtes/migrations et verrous n'ont pas été exécutés sur MySQL réel. Appliquer la migration backend avant d'activer les nouveaux endpoints. Le comportement du lecteur physique et la livraison des webhooks restent à vérifier sur l'environnement Stripe de test.
+
+## Décisions d'exécution
+
+1. Garder les checkouts propres existants sur des branches dédiées dans les deux dépôts : préserve les dépendances et les environnements locaux. Les changements sont visibles dans le workspace jusqu'au changement de branche.
+2. Répartir les domaines backend/frontend avec contrat d'API fixe puis vérifier leur intégration : évite les écritures concurrentes sur les mêmes fichiers. Le parcours navigateur utilise des réponses conformes à ce contrat ; l'intégration avec une vraie base reste la limite ci-dessus.
+3. Charger les détails d'archive à l'expansion et retourner leur résultat directement : supprime la concurrence sur l'ancien détail partagé et évite de charger toute l'histoire. Le premier dépliage affiche un chargement.
+4. Laisser le serveur décider de l'annulation d'une réservation `creating` sous verrou : une réservation jamais soumise est annulable ; une création incertaine reste protégée et peut exiger un rapprochement.
+5. Traiter l'accès direct à un paiement hors de la page courante comme une exigence d'usage : ouvrir son détail dans l'Historique préserve l'accès aux pièces jointes sans dépendre du tri courant. Cela ouvre une modale supplémentaire quand ce lien est suivi.
+
+Aucun défaut critique ou important non corrigé n'a été retenu. Les observations de style héritées et la taille spécifique de l'affichage du montant ne justifient pas un refactor du système de design. Les changements sont conservés localement sur `codex/standalone-terminal-payments`, sans publication ni fusion.

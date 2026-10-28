@@ -6,6 +6,7 @@ const { attemptStorageKey, readAttempt } = require('../helpers/standaloneTermina
 const file = 'components/terminal/StandaloneTerminalDialog.vue'
 assert.ok(fs.existsSync(path.resolve(__dirname, '..', file)), 'The free-amount terminal modal must exist')
 const { component, template } = require('./helpers/vue-component')(file)
+const instances = []
 const payment = { id: 21, paymentKind: 'standalone', readerId: 7, status: 'processing', amountCents: 5000,
   currency: 'eur', createdAt: '2026-10-28T12:00:00Z', confirmedAt: null,
   failureCode: null, failureMessage: null, cardTicket: null, attachmentsCount: 0 }
@@ -15,17 +16,28 @@ const make = () => {
     setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) }
   const user = { id: 4, shopid: 7, access: 1, module_permissions: ['cashregister', 'history'] }
   const calls = []
+  const network = Vue.observable({ loading: false })
   let response = payment
-  const store = { get: key => ({ 'users/user': user, 'terminalPayments/loading': false })[key],
+  const store = { get: key => ({ 'users/user': user, 'terminalPayments/loading': network.loading })[key],
     dispatch: (name, payload) => { calls.push({ name, payload }); return Promise.resolve(typeof response === 'function' ? response() : response) } }
   const instance = new Vue({ ...component, ...template, beforeCreate() {
     this.$store = store
     this.$router = { push: route => { calls.push({ route }); return Promise.resolve() } }
   }, propsData: { value: false,
     reader: { id: 7, label: 'S710', status: 'online', isActive: true, assignedUserId: 4 } } })
-  return { instance, user, calls, values, respond: value => { response = value } }
+  instances.push(instance)
+  return { instance, user, calls, values, network, respond: value => { response = value } }
 }
 const run = async () => {
+  const keyboard = make()
+  keyboard.instance.value = true
+  await Vue.nextTick()
+  keyboard.instance.amountCents = 5000
+  let prevented = false
+  keyboard.instance.handleKey({ key: 'Enter', target: { tagName: 'BUTTON' }, preventDefault() { prevented = true } })
+  assert.strictEqual(keyboard.calls.length, 0, 'Enter on a focused close/clear/digit button must never send payment')
+  assert.strictEqual(prevented, false, 'Keep the focused button native keyboard activation')
+  keyboard.instance.$destroy()
   const h = make()
   for (const key of ['5', '0', '0', '0']) h.instance.handleKey({ key, preventDefault() {} })
   assert.strictEqual(h.instance.amountCents, 0, 'Closed modal must not consume keyboard input')
@@ -74,6 +86,32 @@ const run = async () => {
   assert.ok(unsubmitted.calls.some(call => call.name === 'terminalPayments/cancelPayment'), 'Server must decide whether a creating reservation can safely be canceled')
   unsubmitted.instance.$destroy()
 
+  const reopened = make()
+  reopened.instance.value = true
+  await Vue.nextTick()
+  reopened.instance.amountCents = 5000
+  let settleFirst
+  reopened.respond(() => {
+    reopened.network.loading = true
+    return new Promise(resolve => { settleFirst = resolve }).finally(() => { reopened.network.loading = false })
+  })
+  const originalRequest = reopened.instance.sendPayment()
+  const originalKey = reopened.instance.attempt.attemptKey
+  reopened.instance.closeDialog()
+  reopened.instance.value = false
+  await Vue.nextTick()
+  reopened.instance.value = true
+  await Vue.nextTick()
+  reopened.respond({ ...payment, status: 'succeeded', confirmedAt: '2026-10-28T12:01:00Z' })
+  settleFirst({ ...payment, status: 'succeeded', confirmedAt: '2026-10-28T12:01:00Z' })
+  await originalRequest
+  for (let tick = 0; tick < 8; tick++) { await Promise.resolve(); await Vue.nextTick() }
+  assert.strictEqual(reopened.instance.payment && reopened.instance.payment.status, 'succeeded', 'Reopen during request must recover automatically when it settles')
+  const reopenCalls = reopened.calls.filter(call => call.name === 'terminalPayments/startPayment')
+  assert.strictEqual(reopenCalls.length, 2)
+  assert.ok(reopenCalls.every(call => call.payload.attemptKey === originalKey))
+  reopened.instance.$destroy()
+
   const paid = make()
   await paid.instance.onOpen()
   paid.instance.amountCents = 5000
@@ -87,4 +125,4 @@ const run = async () => {
   paid.instance.$destroy()
   console.log('PASS terminal modal duplicate send, amount lock, uncertain retry, close and success')
 }
-run().catch(error => { console.error(error); process.exitCode = 1 })
+run().catch(error => { for (const instance of instances) instance.$destroy(); console.error(error); process.exitCode = 1 })

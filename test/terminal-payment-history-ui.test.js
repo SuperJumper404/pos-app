@@ -34,6 +34,12 @@ assert.ok(!text(slots['item.actions']({ item: row })).includes('Ticket'))
 assert.ok(text(slots['item.actions']({ item: order })).includes('Ticket'))
 assert.ok(text(slots['item.ordernumber']({ item: row })).includes('Paiement TPE'))
 assert.ok(!find(vnode, node => node.tag === 'v-tabs'))
+assert.strictEqual(typeof page.openFocusedPayment, 'function', 'History link must reach a payment even when its row is off-page')
+page.$route.query.payment = '999'
+page.tableOptions.sortBy = ['subtotal']
+page.openFocusedPayment()
+assert.strictEqual(page.attachmentsPaymentId, 999)
+assert.strictEqual(page.attachmentsDialog, true)
 page.$destroy()
 
 const attachmentFile = 'components/history/TerminalPaymentAttachments.vue'
@@ -54,6 +60,16 @@ const run = async () => {
       } }
   }, propsData: { value: false, paymentId: 123 } })
   await instance.loadPayment()
+  instance.candidates = [candidate]
+  const candidateTable = find(instance._render(), node => node.tag === 'v-data-table')
+  const selection = candidateTable.data.scopedSlots['item.data-table-select']
+  assert.strictEqual(typeof selection, 'function', 'Attachment selection must override the non-keyboard Vuetify simple checkbox')
+  let checked = false
+  const checkbox = selection({ item: { ...candidate, isSelectable: true }, isSelected: false, select: value => { checked = value } })[0]
+  assert.strictEqual(checkbox.tag, 'v-checkbox')
+  assert.ok(checkbox.data.attrs['aria-label'].includes('C5'))
+  checkbox.data.on.change(true)
+  assert.strictEqual(checked, true)
   instance.selectedCandidates = [candidate]
   await instance.addSelected()
   assert.strictEqual(instance.attachments[0].amountCents, 4000, '50 EUR payment accepts a 40 EUR order without matching')
