@@ -273,7 +273,7 @@
                   :aria-label="`Commandes jointes au paiement TPE ${item.id} (${item.terminalPayment.attachmentsCount})`"
                   :title="`Commandes jointes (${item.terminalPayment.attachmentsCount})`"
                   @click="openAttachments(item)"
-                ><v-icon>mdi-paperclip</v-icon></v-btn>
+                ><v-icon>mdi-link-box</v-icon></v-btn>
               </template>
               <v-btn
                 v-else

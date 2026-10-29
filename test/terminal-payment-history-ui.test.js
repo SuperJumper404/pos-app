@@ -29,6 +29,7 @@ assert.ok(table)
 assert.strictEqual(table.data.attrs['item-key'], 'rowKey')
 assert.strictEqual(table.data.attrs['server-items-length'], 2)
 const slots = table.data.scopedSlots
+assert.ok(text(slots['item.actions']({ item: row })).includes('mdi-link-box'), 'Order links use a filled link icon rather than an attachment clip')
 const terminalActions = { children: [].concat(slots['item.actions']({ item: row })) }
 const attachmentsButton = find(terminalActions, node => node.tag === 'v-btn' && node.data.attrs['aria-label'] === 'Commandes jointes au paiement TPE 123 (0)')
 assert.ok(attachmentsButton, 'Attachments remain accessible with their count')
