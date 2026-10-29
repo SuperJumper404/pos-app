@@ -81,7 +81,7 @@
     </v-data-table>
 
     <v-dialog v-model="formDialog" max-width="560" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>{{ isEditing ? 'Modifier un utilisateur' : 'Ajouter un utilisateur' }}</v-card-title>
         <v-card-text>
           <v-form ref="form" v-model="formValid" @submit.prevent="submit">
@@ -132,10 +132,11 @@
             />
           </v-form>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer />
-          <v-btn text class="text-none" @click="closeForm">Annuler</v-btn>
-          <v-btn color="primary" class="text-none" :loading="submitting" @click="submit">
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="closeForm"><v-icon left>mdi-close</v-icon>Annuler</v-btn>
+          <v-btn color="primary" class="se-modal-action se-modal-action--primary text-none" :loading="submitting" @click="submit">
+            <v-icon left>mdi-content-save</v-icon>
             Enregistrer
           </v-btn>
         </v-card-actions>
@@ -143,7 +144,7 @@
     </v-dialog>
 
     <v-dialog v-model="credentialsDialog" max-width="420" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Identifiants caisse</v-card-title>
         <v-card-text>
           <v-text-field
@@ -162,16 +163,17 @@
             @click:append="showCredentialPin = !showCredentialPin"
           />
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer />
-          <v-btn text class="text-none" @click="finishCredentials">Fermer</v-btn>
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="finishCredentials"><v-icon left>mdi-close</v-icon>Fermer</v-btn>
           <v-btn
             v-if="credentialUser && !(credentialResult && credentialResult.staff_pin)"
             color="primary"
-            class="text-none"
+            class="se-modal-action se-modal-action--primary text-none"
             :loading="credentialLoading"
             @click="saveCredentials"
           >
+            <v-icon left>mdi-key</v-icon>
             Generer un PIN
           </v-btn>
         </v-card-actions>
@@ -179,15 +181,16 @@
     </v-dialog>
 
     <v-dialog v-model="removeDialog" max-width="420">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Supprimer cet utilisateur ?</v-card-title>
         <v-card-text>
           {{ removeTarget ? removeTarget.username : '' }} ne pourra plus se connecter.
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer />
-          <v-btn text class="text-none" @click="removeDialog = false">Annuler</v-btn>
-          <v-btn color="error" class="text-none" :loading="removing" @click="removeStaff">
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="removeDialog = false"><v-icon left>mdi-close</v-icon>Annuler</v-btn>
+          <v-btn color="error" class="se-modal-action se-modal-action--danger text-none" :loading="removing" @click="removeStaff">
+            <v-icon left>mdi-delete</v-icon>
             Supprimer
           </v-btn>
         </v-card-actions>

@@ -1,5 +1,5 @@
 <template>
-  <v-card class="customization-wizard">
+  <v-card class="customization-wizard se-modal">
     <v-card-title class="customization-wizard__header d-flex align-center">
       <div>
         <div class="text-h6">{{ product.name || 'Personnalisation' }}</div>
@@ -15,7 +15,7 @@
           {{ formatCurrency(previewUnitPrice) }}
         </div>
       </div>
-      <v-btn icon aria-label="Fermer" @click="cancel">
+      <v-btn icon class="se-modal-icon" aria-label="Fermer" @click="cancel">
         <v-icon>mdi-close</v-icon>
       </v-btn>
     </v-card-title>
@@ -67,17 +67,17 @@
       </template>
     </v-card-text>
 
-    <v-divider></v-divider>
-    <v-card-actions class="customization-wizard__footer pa-4">
-      <v-btn text class="text-none" @click="goBack">
+    <v-card-actions class="customization-wizard__footer se-modal-actions pa-4">
+      <v-btn outlined class="text-none se-modal-action se-modal-action--secondary" @click="goBack">
         <v-icon left>mdi-arrow-left</v-icon>
         {{ backButtonLabel }}
       </v-btn>
       <v-spacer></v-spacer>
       <v-btn
         v-if="!isSummary"
+        depressed
         color="primary"
-        class="text-none"
+        class="text-none se-modal-action se-modal-action--primary"
         :disabled="continueDisabled"
         @click="goForward"
       >
@@ -86,8 +86,9 @@
       </v-btn>
       <v-btn
         v-else
+        depressed
         color="success"
-        class="text-none"
+        class="text-none se-modal-action se-modal-action--success"
         :disabled="!allStepsValid"
         @click="confirmCustomization"
       >

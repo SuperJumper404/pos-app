@@ -32,24 +32,26 @@
       color="success"
       inset
     ></v-switch>
-    <div class="d-flex justify-end">
+    <div class="d-flex justify-end" :class="{ 'se-modal-actions': showCancel }">
       <v-btn
         v-if="showCancel"
-        text
-        class="text-none mr-2"
+        class="text-none se-modal-action se-modal-action--secondary"
         @click="$emit('cancel')"
       >
+        <v-icon left>mdi-close</v-icon>
         Annuler
       </v-btn>
       <v-btn
         color="primary"
         class="text-none"
+        :class="{ 'se-modal-action se-modal-action--primary': showCancel }"
         type="submit"
         :loading="saving"
         :disabled="!valid"
       >
+        <v-icon v-if="showCancel" left>mdi-content-save</v-icon>
         Enregistrer
-        <v-icon small right>mdi-content-save</v-icon>
+        <v-icon v-if="!showCancel" small right>mdi-content-save</v-icon>
       </v-btn>
     </div>
   </v-form>

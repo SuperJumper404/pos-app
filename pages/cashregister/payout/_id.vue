@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <v-dialog v-model="dialog" persistent max-width="760">
-      <v-card class="cashregister-payout-modal">
+      <v-card class="cashregister-payout-modal se-modal">
         <div class="cashregister-payout-hero">
           <div class="cashregister-payout-hero__icon">
             <v-icon>mdi-cash-register</v-icon>
@@ -110,13 +110,13 @@
           />
         </v-card-text>
 
-        <v-card-actions class="cashregister-payout-actions">
+        <v-card-actions class="cashregister-payout-actions se-modal-actions">
           <v-btn
             v-if="requiresPaymentMethod"
             :disabled="paymentControlsLocked || hasDeliveryOrders"
             outlined
             color="warning"
-            class="cashregister-payout-action text-none"
+            class="cashregister-payout-action se-modal-action se-modal-action--warning text-none"
             @click="openDiscountDialog"
           >
             <v-icon left small>mdi-percent</v-icon>
@@ -125,6 +125,7 @@
           <v-btn
             v-if="deliveryEditOrder"
             text
+            class="se-modal-action se-modal-action--secondary text-none"
             :disabled="paymentControlsLocked"
             :to="`/orders/detail/${deliveryEditOrder.id}?deliveryEdit=1`"
           >
@@ -137,7 +138,7 @@
             :disabled="confirmDisabled"
             color="success"
             depressed
-            class="cashregister-payout-action cashregister-payout-action--confirm text-none"
+            class="cashregister-payout-action cashregister-payout-action--confirm se-modal-action se-modal-action--success text-none"
             @click="requestReceiptChoice"
             >{{ actionButtonLabel }}
             <v-icon small right>mdi-cash-multiple</v-icon></v-btn
@@ -146,7 +147,7 @@
             :disabled="loadingBtn || terminalBusy"
             outlined
             color="primary"
-            class="cashregister-payout-action text-none"
+            class="cashregister-payout-action se-modal-action se-modal-action--secondary text-none"
             @click="btnNo"
           >
             {{ showTerminalStatus ? 'Fermer' : 'Annuler' }} <v-icon small right>mdi-close-circle</v-icon>
@@ -156,7 +157,7 @@
     </v-dialog>
 
     <v-dialog v-model="receiptDialog" max-width="560" persistent>
-      <v-card class="cashregister-receipt-modal">
+      <v-card class="cashregister-receipt-modal se-modal">
         <v-card-title class="cashregister-receipt-modal__title">
           Ticket de caisse
         </v-card-title>
@@ -171,10 +172,9 @@
           <div class="cashregister-receipt-grid">
             <v-btn
               color="primary"
-              class="cashregister-receipt-tile text-none"
+              class="cashregister-receipt-tile se-modal-choice text-none"
               :disabled="receiptPrinting || loadingBtn"
               depressed
-              dark
               @click="confirmReceiptChoice(true)"
             >
               <template v-if="receiptPrinting">
@@ -182,18 +182,17 @@
                 <span>Impression...</span>
               </template>
               <template v-else>
-                <v-icon class="mb-2">mdi-printer-outline</v-icon>
+                <v-icon class="mb-2">mdi-printer</v-icon>
                 <span>Imprimer ticket</span>
               </template>
             </v-btn>
             <v-btn
-              color="grey lighten-3"
-              class="cashregister-receipt-tile text-none"
+              class="cashregister-receipt-tile se-modal-choice se-modal-choice--neutral text-none"
               depressed
               :disabled="receiptPrinting || loadingBtn"
               @click="confirmReceiptChoice(false)"
             >
-              <v-icon class="mb-2">mdi-receipt-text-remove-outline</v-icon>
+              <v-icon class="mb-2">mdi-receipt-text-remove</v-icon>
               <span>Pas de ticket</span>
             </v-btn>
           </div>
@@ -202,7 +201,7 @@
     </v-dialog>
 
     <v-dialog v-model="discountDialog" max-width="520">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title class="cashregister-discount-title">
           <v-icon color="warning" left>mdi-percent</v-icon>
           Remise globale
@@ -211,25 +210,38 @@
           <v-btn-toggle
             v-model="discountDraftType"
             mandatory
-            color="primary"
-            class="d-flex mb-4"
+            class="d-flex flex-wrap mb-4"
           >
-            <v-btn value="percent" class="flex-grow-1 text-none">
-              Pourcentage
+            <v-btn
+              value="percent"
+              class="se-modal-choice se-modal-choice--compact se-modal-choice--orange flex-grow-1 text-none"
+              :class="{ 'se-modal-choice--selected': discountDraftType === 'percent' }"
+              :aria-pressed="discountDraftType === 'percent'"
+            >
+              <v-icon>mdi-percent</v-icon>
+              <span>Pourcentage</span>
             </v-btn>
-            <v-btn value="amount" class="flex-grow-1 text-none">
-              Montant en euros
+            <v-btn
+              value="amount"
+              class="se-modal-choice se-modal-choice--compact flex-grow-1 text-none"
+              :class="{ 'se-modal-choice--selected': discountDraftType === 'amount' }"
+              :aria-pressed="discountDraftType === 'amount'"
+            >
+              <v-icon>mdi-currency-eur</v-icon>
+              <span>Montant en euros</span>
             </v-btn>
           </v-btn-toggle>
           <div v-if="discountDraftType === 'percent'" class="d-flex flex-wrap">
             <v-btn
               v-for="percentage in discountPercentages"
               :key="percentage"
-              outlined
-              color="primary"
-              class="mr-2 mb-2 text-none"
+              depressed
+              class="se-modal-preset mr-2 mb-2 text-none"
+              :class="{ 'se-modal-preset--active': Number(discountDraftValue) === percentage }"
+              :aria-pressed="Number(discountDraftValue) === percentage"
               @click="discountDraftValue = percentage"
             >
+              <v-icon v-if="Number(discountDraftValue) === percentage" left small>mdi-check-circle</v-icon>
               {{ percentage }} %
             </v-btn>
           </div>
@@ -254,15 +266,17 @@
             </div>
           </div>
         </v-card-text>
-        <v-card-actions>
-          <v-btn text class="text-none" @click="clearDiscount">
+        <v-card-actions class="se-modal-actions">
+          <v-btn class="se-modal-action se-modal-action--warning text-none" @click="clearDiscount">
+            <v-icon left>mdi-delete</v-icon>
             Supprimer
           </v-btn>
           <v-spacer />
-          <v-btn text class="text-none" @click="discountDialog = false">
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="discountDialog = false">
             Annuler
           </v-btn>
-          <v-btn color="primary" class="text-none" @click="applyDiscount">
+          <v-btn depressed class="se-modal-action se-modal-action--primary text-none" @click="applyDiscount">
+            <v-icon left>mdi-check-circle</v-icon>
             Appliquer
           </v-btn>
         </v-card-actions>
@@ -1609,11 +1623,6 @@ export default {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.cashregister-receipt-tile {
-  border-radius: var(--se-radius-md) !important;
-  min-height: 132px;
 }
 
 ::v-deep .cashregister-receipt-tile .v-btn__content {

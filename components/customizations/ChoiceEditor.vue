@@ -102,27 +102,29 @@
       ]"
     ></v-text-field>
 
-    <div class="d-flex justify-end mt-4">
-      <v-btn text class="text-none mr-2" @click="$emit('cancel')">
+    <div class="se-modal-actions mt-4">
+      <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="$emit('cancel')">
+        <v-icon left>mdi-close</v-icon>
         Annuler
       </v-btn>
       <v-btn
         type="submit"
         color="primary"
-        class="text-none"
+        class="se-modal-action se-modal-action--primary text-none"
         :loading="saving"
         :disabled="!valid"
       >
+        <v-icon left>mdi-content-save</v-icon>
         Enregistrer
-        <v-icon small right>mdi-content-save</v-icon>
       </v-btn>
     </div>
     <v-dialog v-model="imageLibraryDialog" max-width="980" scrollable>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title class="d-flex align-center">
           <span class="text-subtitle-1">Bibliothèque d'images</span>
           <v-spacer />
           <v-btn
+            class="se-modal-icon"
             icon
             title="Fermer"
             aria-label="Fermer"

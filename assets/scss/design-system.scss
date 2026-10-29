@@ -69,6 +69,238 @@
   color: var(--se-color-text-body);
 }
 
+/* Opt-in controls for task dialogs. Color complements icons and action labels. */
+.se-modal > .v-card__actions,
+.se-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--se-space-3);
+  border-top: 1px solid var(--se-color-border-soft);
+  padding: var(--se-space-4) var(--se-space-6) !important;
+}
+
+.se-modal .v-card__title {
+  word-break: normal;
+}
+
+.se-modal-action {
+  --modal-action-bg: var(--se-color-primary);
+  --modal-action-fg: var(--se-color-surface);
+  --modal-action-border: var(--modal-action-bg);
+}
+
+.se-modal-action--secondary {
+  --modal-action-bg: var(--se-color-surface);
+  --modal-action-fg: var(--se-color-text-body);
+  --modal-action-border: var(--se-color-border);
+}
+
+.se-modal-action--success {
+  --modal-action-bg: var(--se-color-success-ink);
+}
+
+.se-modal-action--danger {
+  --modal-action-bg: var(--se-color-danger);
+}
+
+.se-modal-action--warning {
+  --modal-action-bg: var(--se-color-warning-soft);
+  --modal-action-fg: var(--se-color-warning-ink);
+  --modal-action-border: var(--se-color-warning-ink);
+}
+
+.se-modal-action--terminal {
+  --modal-action-bg: var(--se-color-brand-purple);
+}
+
+.v-application .se-modal-action.v-btn {
+  background: var(--modal-action-bg) !important;
+  border: 1px solid var(--modal-action-border) !important;
+  border-radius: var(--se-radius-md);
+  color: var(--modal-action-fg) !important;
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-semibold);
+  height: auto;
+  letter-spacing: 0;
+  min-height: var(--se-touch-target);
+  min-width: 0;
+  max-width: 100%;
+  padding: 10px 16px;
+  text-transform: none;
+}
+
+.se-modal-action .v-btn__content {
+  line-height: var(--se-line-body);
+  min-width: 0;
+  white-space: normal;
+}
+
+.v-application .se-modal-action .v-icon {
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.v-application .se-modal-icon.v-btn {
+  border-radius: var(--se-radius-md);
+  color: var(--se-color-text-muted);
+  flex: 0 0 var(--se-touch-target);
+  height: var(--se-touch-target);
+  width: var(--se-touch-target);
+}
+
+.v-application .se-modal-icon--warning.v-btn {
+  background: var(--se-color-warning-soft);
+  color: var(--se-color-warning-ink);
+}
+
+.v-application .se-modal-icon--danger.v-btn {
+  background: var(--se-color-danger-soft);
+  color: var(--se-color-danger);
+}
+
+.v-application .se-modal-icon .v-icon {
+  color: inherit !important;
+}
+
+.se-modal-choice {
+  --choice-ink: var(--se-color-primary-hover);
+  --choice-soft: var(--se-color-primary-soft);
+  --choice-fg: var(--choice-ink);
+}
+
+.se-modal-choice--green {
+  --choice-ink: var(--se-color-success-ink);
+  --choice-soft: var(--se-color-success-soft);
+}
+
+.se-modal-choice--purple {
+  --choice-ink: var(--se-color-brand-purple);
+  --choice-soft: var(--se-color-brand-purple-soft);
+}
+
+.se-modal-choice--orange {
+  --choice-ink: var(--se-color-warning-ink);
+  --choice-soft: var(--se-color-warning-soft);
+}
+
+.se-modal-choice--neutral {
+  --choice-ink: var(--se-color-text-body);
+  --choice-soft: var(--se-color-surface-muted);
+}
+
+.v-application .se-modal-choice.v-btn {
+  background: var(--choice-soft) !important;
+  border: 1px solid var(--choice-ink) !important;
+  border-radius: var(--se-radius-lg) !important;
+  color: var(--choice-fg) !important;
+  font-size: var(--se-font-small);
+  font-weight: var(--se-weight-semibold);
+  height: auto !important;
+  letter-spacing: 0;
+  min-height: 104px !important;
+  min-width: 0 !important;
+  padding: var(--se-space-3) !important;
+  text-transform: none;
+}
+
+.se-modal-choice .v-btn__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-space-2);
+  line-height: var(--se-line-body);
+  min-width: 0;
+  white-space: normal;
+  width: 100%;
+}
+
+.v-application .se-modal-choice.v-btn:not(.v-btn--disabled) {
+  opacity: 1;
+}
+
+.v-application .se-modal-choice .v-icon {
+  color: var(--choice-fg) !important;
+  flex-shrink: 0;
+  font-size: 30px;
+}
+
+.v-application .se-modal-choice--compact.v-btn {
+  min-height: 64px !important;
+}
+
+.v-application .se-modal-choice .se-modal-choice__check {
+  font-size: 18px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.v-application .se-modal-choice .se-modal-choice__state-icon {
+  font-size: 18px;
+}
+
+.se-modal-choice--selected,
+.se-modal-choice.v-btn--active {
+  --choice-fg: var(--se-color-surface);
+}
+
+.v-application .se-modal-choice--selected.v-btn,
+.v-application .se-modal-choice.v-btn--active {
+  background: var(--choice-ink) !important;
+}
+
+.se-modal-choice.v-btn--active::before {
+  opacity: 0;
+}
+
+.v-application .se-modal-preset.v-btn {
+  background: var(--se-color-warning-soft) !important;
+  border: 1px solid var(--se-color-warning-ink);
+  border-radius: var(--se-radius-md);
+  color: var(--se-color-warning-ink) !important;
+  font-size: var(--se-font-small);
+  letter-spacing: 0;
+  min-height: var(--se-touch-target);
+}
+
+.v-application .se-modal-preset--active.v-btn {
+  background: var(--se-color-warning-ink) !important;
+  color: var(--se-color-surface) !important;
+}
+
+.se-modal-action:focus-visible,
+.se-modal-choice:focus-visible,
+.se-modal-preset:focus-visible,
+.se-modal-icon:focus-visible {
+  outline: 3px solid var(--se-color-primary);
+  outline-offset: 3px;
+}
+
+.se-modal-action.v-btn--disabled,
+.se-modal-choice.v-btn--disabled,
+.se-modal-preset.v-btn--disabled,
+.se-modal-icon.v-btn--disabled {
+  opacity: 0.55;
+}
+
+@media (max-width: 480px) {
+  .se-modal > .v-card__actions,
+  .se-modal-actions {
+    gap: var(--se-space-2);
+    padding: var(--se-space-3) var(--se-space-4) !important;
+  }
+
+  .se-modal > .v-card__actions > .spacer,
+  .se-modal-actions > .spacer {
+    display: none;
+  }
+
+  .se-modal > .v-card__actions > .se-modal-action,
+  .se-modal-actions > .se-modal-action {
+    flex: 1 1 auto;
+    margin: 0;
+  }
+}
+
 /* Stable payment identities across menu, order detail and cash register. */
 .payment-choice {
   --payment-ink: var(--se-color-primary-hover);

@@ -302,17 +302,17 @@
     </v-card>
 
     <v-dialog v-model="replaceCartDialog" max-width="480">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Remplacer le panier actuel ?</v-card-title>
         <v-card-text>
           Le panier en cours sera remplacé par les produits de cette commande.
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer></v-spacer>
-          <v-btn text class="text-none" @click="cancelReplaceCart">
+          <v-btn text class="se-modal-action se-modal-action--secondary text-none" @click="cancelReplaceCart">
             Garder le panier
           </v-btn>
-          <v-btn color="primary" class="text-none" @click="confirmReplaceCart">
+          <v-btn color="primary" class="se-modal-action se-modal-action--primary text-none" @click="confirmReplaceCart">
             Continuer
           </v-btn>
         </v-card-actions>
@@ -320,28 +320,27 @@
     </v-dialog>
 
     <v-dialog v-model="cancelOrderDialog" max-width="420" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>{{ cancelActionLabel }}</v-card-title>
         <v-card-text>{{ cancelActionMessage }}</v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer />
           <v-btn
-            text
-            class="text-none"
+            class="se-modal-action se-modal-action--secondary text-none"
             :disabled="statusActionLoading"
             @click="closeCancelDialog"
           >
             Retour
           </v-btn>
           <v-btn
-            color="error"
-            dark
-            class="text-none"
+            depressed
+            class="se-modal-action se-modal-action--danger text-none"
             :loading="statusActionLoading"
             :disabled="statusActionLoading"
             @click="confirmCancelOrder"
           >
-            Confirmer
+            <v-icon left>mdi-cancel</v-icon>
+            {{ cancelActionLabel }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -399,7 +398,7 @@
     </v-dialog>
 
     <v-dialog v-model="deliveryEditDialog" :persistent="deliveryEditBusy || Boolean(deliveryEditAttempt)" max-width="640">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Modifier le prix de la livraison</v-card-title>
         <v-card-text>
           <v-alert v-if="deliveryEditError" type="error" text>{{ deliveryEditError }}</v-alert>
@@ -420,17 +419,17 @@
             />
           </template>
         </v-card-text>
-        <v-card-actions>
-          <v-btn text :disabled="deliveryEditBusy || Boolean(deliveryEditAttempt)" @click="deliveryEditDialog = false">Annuler</v-btn>
+        <v-card-actions class="se-modal-actions">
+          <v-btn text class="se-modal-action se-modal-action--secondary text-none" :disabled="deliveryEditBusy || Boolean(deliveryEditAttempt)" @click="deliveryEditDialog = false">Annuler</v-btn>
           <v-spacer />
-          <v-btn color="primary" :loading="deliveryEditBusy" :disabled="!deliveryEditAttempt && !deliveryEditReady" @click="confirmDeliveryEdit">
+          <v-btn color="primary" class="se-modal-action se-modal-action--primary text-none" :loading="deliveryEditBusy" :disabled="!deliveryEditAttempt && !deliveryEditReady" @click="confirmDeliveryEdit">
             <v-icon left>mdi-check</v-icon>{{ deliveryEditAttempt ? 'Reprendre' : 'Enregistrer' }}
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
     <v-dialog v-model="orderDiscountDialog" max-width="520">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Remise globale</v-card-title>
         <v-card-text>
           <div class="text-body-2 mb-3">
@@ -439,14 +438,25 @@
           <v-btn-toggle
             v-model="orderDiscountDraftType"
             mandatory
-            color="primary"
-            class="d-flex mb-4"
+            class="d-flex flex-wrap mb-4"
           >
-            <v-btn value="percent" class="flex-grow-1 text-none">
-              Pourcentage
+            <v-btn
+              value="percent"
+              class="se-modal-choice se-modal-choice--compact se-modal-choice--orange flex-grow-1 text-none"
+              :class="{ 'se-modal-choice--selected': orderDiscountDraftType === 'percent' }"
+              :aria-pressed="orderDiscountDraftType === 'percent'"
+            >
+              <v-icon>mdi-percent</v-icon>
+              <span>Pourcentage</span>
             </v-btn>
-            <v-btn value="amount" class="flex-grow-1 text-none">
-              Montant en euros
+            <v-btn
+              value="amount"
+              class="se-modal-choice se-modal-choice--compact flex-grow-1 text-none"
+              :class="{ 'se-modal-choice--selected': orderDiscountDraftType === 'amount' }"
+              :aria-pressed="orderDiscountDraftType === 'amount'"
+            >
+              <v-icon>mdi-currency-eur</v-icon>
+              <span>Montant en euros</span>
             </v-btn>
           </v-btn-toggle>
           <div
@@ -456,11 +466,13 @@
             <v-btn
               v-for="percentage in discountPercentages"
               :key="percentage"
-              outlined
-              color="primary"
-              class="mr-2 mb-2 text-none"
+              depressed
+              class="se-modal-preset mr-2 mb-2 text-none"
+              :class="{ 'se-modal-preset--active': Number(orderDiscountDraftValue) === percentage }"
+              :aria-pressed="Number(orderDiscountDraftValue) === percentage"
               @click="orderDiscountDraftValue = percentage"
             >
+              <v-icon v-if="Number(orderDiscountDraftValue) === percentage" left small>mdi-check-circle</v-icon>
               {{ percentage }} %
             </v-btn>
           </div>
@@ -489,19 +501,20 @@
             </div>
           </div>
         </v-card-text>
-        <v-card-actions>
-          <v-btn text class="text-none" @click="clearOrderDiscount">
+        <v-card-actions class="se-modal-actions">
+          <v-btn class="se-modal-action se-modal-action--warning text-none" @click="clearOrderDiscount">
+            <v-icon left>mdi-delete</v-icon>
             Supprimer
           </v-btn>
           <v-spacer />
           <v-btn
-            text
-            class="text-none"
+            class="se-modal-action se-modal-action--secondary text-none"
             @click="paymentDialog = true; orderDiscountDialog = false"
           >
             Annuler
           </v-btn>
-          <v-btn color="primary" class="text-none" @click="applyOrderDiscount">
+          <v-btn depressed class="se-modal-action se-modal-action--primary text-none" @click="applyOrderDiscount">
+            <v-icon left>mdi-check-circle</v-icon>
             Appliquer
           </v-btn>
         </v-card-actions>
@@ -509,16 +522,15 @@
     </v-dialog>
 
     <v-dialog v-model="receiptDialog" max-width="560" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Ticket de caisse</v-card-title>
         <v-card-text>
           <div class="order-receipt-grid">
             <v-btn
               color="primary"
-              class="order-receipt-tile text-none"
+              class="order-receipt-tile se-modal-choice text-none"
               :disabled="receiptPrinting"
               depressed
-              dark
               @click="confirmOrderReceipt(true)"
             >
               <template v-if="receiptPrinting">
@@ -526,27 +538,25 @@
                 <span>Impression...</span>
               </template>
               <template v-else>
-                <v-icon class="mb-2">mdi-printer-outline</v-icon>
+                <v-icon class="mb-2">mdi-printer</v-icon>
                 <span>Imprimer ticket</span>
               </template>
             </v-btn>
             <v-btn
-              color="grey lighten-3"
-              class="order-receipt-tile text-none"
+              class="order-receipt-tile se-modal-choice se-modal-choice--neutral text-none"
               depressed
               :disabled="receiptPrinting"
               @click="confirmOrderReceipt(false)"
             >
-              <v-icon class="mb-2">mdi-receipt-text-remove-outline</v-icon>
+              <v-icon class="mb-2">mdi-receipt-text-remove</v-icon>
               <span>Pas de ticket</span>
             </v-btn>
           </div>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer />
           <v-btn
-            text
-            class="text-none"
+            class="se-modal-action se-modal-action--secondary text-none"
             :disabled="receiptPrinting"
             @click="receiptDialog = false"
           >

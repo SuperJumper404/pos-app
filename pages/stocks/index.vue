@@ -235,7 +235,7 @@
     </v-card>
 
     <v-dialog v-model="ingredientDialog" max-width="720">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title class="stock-dialog-title">
           <v-icon left color="primary">mdi-food-apple-outline</v-icon>
           {{ editingIngredientId ? "Modifier l'ingrédient" : 'Ajouter un ingrédient' }}
@@ -253,12 +253,22 @@
           <v-text-field v-model="ingredientForm.default_supplier" label="Fournisseur par défaut" prepend-icon="mdi-truck-outline" outlined dense />
           <v-textarea v-model="ingredientForm.note" label="Note" prepend-icon="mdi-note-text-outline" outlined dense rows="3" />
         </v-card-text>
-        <v-card-actions class="stock-dialog-actions"><v-spacer /><v-btn text @click="ingredientDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" depressed @click="saveIngredient"><v-icon left small>mdi-content-save</v-icon>Enregistrer</v-btn></v-card-actions>
+        <v-card-actions class="se-modal-actions stock-dialog-actions">
+          <v-spacer />
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="ingredientDialog = false">
+            <v-icon left>mdi-close</v-icon>
+            Annuler
+          </v-btn>
+          <v-btn color="primary" class="se-modal-action se-modal-action--primary text-none" depressed @click="saveIngredient">
+            <v-icon left>mdi-content-save</v-icon>
+            Enregistrer
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="replenishDialog" max-width="560">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title class="stock-dialog-title">
           <v-icon left color="primary">mdi-truck-delivery-outline</v-icon>
           Réapprovisionner
@@ -272,18 +282,38 @@
           <v-text-field v-model="replenishForm.total_price" label="Prix total" type="number" min="0" prepend-icon="mdi-cash-multiple" outlined dense />
           <v-textarea v-model="replenishForm.remark" label="Remarque" prepend-icon="mdi-note-text-outline" outlined dense rows="3" />
         </v-card-text>
-        <v-card-actions class="stock-dialog-actions"><v-spacer /><v-btn text @click="replenishDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" depressed @click="replenishItem"><v-icon left small>mdi-content-save</v-icon>Enregistrer</v-btn></v-card-actions>
+        <v-card-actions class="se-modal-actions stock-dialog-actions">
+          <v-spacer />
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="replenishDialog = false">
+            <v-icon left>mdi-close</v-icon>
+            Annuler
+          </v-btn>
+          <v-btn color="primary" class="se-modal-action se-modal-action--primary text-none" depressed @click="replenishItem">
+            <v-icon left>mdi-content-save</v-icon>
+            Enregistrer
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="inventoryDialog" max-width="560">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title class="stock-dialog-title">
           <v-icon left color="primary">mdi-clipboard-check-outline</v-icon>
           Inventaire rapide
         </v-card-title>
         <v-card-text><v-text-field v-model="inventoryForm.quantity" label="Quantité constatée" type="number" min="0" step="1" prepend-icon="mdi-counter" outlined dense /><v-textarea v-model="inventoryForm.remark" label="Remarque" prepend-icon="mdi-note-text-outline" outlined dense rows="3" /></v-card-text>
-        <v-card-actions class="stock-dialog-actions"><v-spacer /><v-btn text @click="inventoryDialog = false">Annuler</v-btn><v-btn color="primary" class="text-none" depressed @click="inventoryItem"><v-icon left small>mdi-content-save</v-icon>Enregistrer</v-btn></v-card-actions>
+        <v-card-actions class="se-modal-actions stock-dialog-actions">
+          <v-spacer />
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="inventoryDialog = false">
+            <v-icon left>mdi-close</v-icon>
+            Annuler
+          </v-btn>
+          <v-btn color="primary" class="se-modal-action se-modal-action--primary text-none" depressed @click="inventoryItem">
+            <v-icon left>mdi-content-save</v-icon>
+            Enregistrer
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
   </v-container>

@@ -116,16 +116,20 @@ export default {
     transform 0.15s ease;
 }
 
-.choice-card:hover,
-.choice-card:focus {
+.choice-card:hover {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
-  outline: none;
   transform: translateY(-1px);
 }
 
+.choice-card:focus-visible {
+  outline: 3px solid var(--se-color-primary);
+  outline-offset: 3px;
+}
+
 .choice-card--selected {
-  border-color: var(--v-primary-base) !important;
+  border-color: var(--se-color-primary) !important;
   border-width: 2px;
+  background-color: var(--se-color-primary-soft) !important;
 }
 
 .choice-card--disabled {
@@ -146,5 +150,15 @@ export default {
 .choice-card__name {
   min-height: 3rem;
   overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .choice-card {
+    transition: none;
+  }
+
+  .choice-card:hover {
+    transform: none;
+  }
 }
 </style>

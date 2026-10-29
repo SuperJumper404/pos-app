@@ -5,17 +5,16 @@
       :key="group.stepId || `${group.stepName}-${groupIndex}`"
       class="customization-summary__group mb-3"
     >
-      <div class="d-flex align-center mb-1">
+      <div class="d-flex flex-wrap align-center mb-1 customization-summary__heading">
         <span class="font-weight-bold">{{ group.stepName }}</span>
         <v-spacer></v-spacer>
         <v-btn
           v-if="canEditGroup(group)"
-          text
-          x-small
-          color="primary"
-          class="text-none"
+          outlined
+          class="text-none se-modal-action se-modal-action--secondary"
           @click="editGroup(group)"
         >
+          <v-icon left small>mdi-pencil</v-icon>
           Modifier
         </v-btn>
       </div>
@@ -107,6 +106,11 @@ export default {
 <style scoped>
 .customization-summary__group {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.customization-summary__heading {
+  gap: 8px;
+  overflow-wrap: anywhere;
 }
 
 .customization-summary__choices {

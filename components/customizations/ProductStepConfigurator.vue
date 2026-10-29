@@ -175,7 +175,7 @@
     </v-card>
 
     <v-dialog v-model="attachDialog" max-width="520">
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Ajouter une étape partagée</v-card-title>
         <v-card-text>
           <v-select
@@ -190,17 +190,19 @@
             Toutes les étapes actives sont déjà attachées à ce produit.
           </v-alert>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer></v-spacer>
-          <v-btn text class="text-none" @click="closeAttachDialog">
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="closeAttachDialog">
+            <v-icon left>mdi-close</v-icon>
             Annuler
           </v-btn>
           <v-btn
             color="primary"
-            class="text-none"
+            class="se-modal-action se-modal-action--primary text-none"
             :disabled="!selectedStepId"
             @click="attachSelectedStep"
           >
+            <v-icon left>mdi-plus</v-icon>
             Ajouter
           </v-btn>
         </v-card-actions>

@@ -16,9 +16,9 @@
     <div v-if="state === 'recovery' || canCancel" class="terminal-payment-status__actions">
       <v-btn
         v-if="state === 'recovery'"
-        outlined
+        depressed
         color="primary"
-        class="text-none"
+        class="text-none se-modal-action se-modal-action--primary"
         min-height="44"
         :disabled="busy"
         :loading="busy && !canceling"
@@ -29,14 +29,15 @@
       </v-btn>
       <v-btn
         v-if="canCancel || canceling"
-        outlined
-        class="text-none"
+        depressed
+        color="error"
+        class="text-none se-modal-action se-modal-action--danger"
         min-height="44"
         :disabled="busy"
         :loading="canceling"
         @click="$emit('cancel')"
       >
-        <v-icon left small>mdi-close-circle-outline</v-icon>
+        <v-icon left small>mdi-close-circle</v-icon>
         Annuler le paiement
       </v-btn>
     </div>
@@ -69,14 +70,14 @@ export default {
     },
     icon() {
       return {
-        idle: 'mdi-credit-card-wireless-outline',
+        idle: 'mdi-credit-card-wireless',
         starting: 'mdi-timer-sand',
-        processing: 'mdi-credit-card-wireless-outline',
-        succeeded: 'mdi-check-circle-outline',
-        failed: 'mdi-alert-circle-outline',
-        canceled: 'mdi-close-circle-outline',
-        recovery: 'mdi-alert-outline',
-      }[this.state] || 'mdi-alert-outline'
+        processing: 'mdi-credit-card-wireless',
+        succeeded: 'mdi-check-circle',
+        failed: 'mdi-alert-circle',
+        canceled: 'mdi-close-circle',
+        recovery: 'mdi-alert',
+      }[this.state] || 'mdi-alert'
     },
     defaultMessage() {
       if (this.canceling) return 'Confirmation du terminal en attente.'
@@ -122,20 +123,20 @@ export default {
   font-variant-numeric: tabular-nums;
 }
 
-.terminal-payment-status .v-icon {
+.terminal-payment-status__heading .v-icon {
   color: var(--se-color-primary);
 }
 
-.terminal-payment-status--succeeded .v-icon {
+.terminal-payment-status--succeeded .terminal-payment-status__heading .v-icon {
   color: #176638;
 }
 
-.terminal-payment-status--failed .v-icon {
+.terminal-payment-status--failed .terminal-payment-status__heading .v-icon {
   color: var(--se-color-danger);
 }
 
-.terminal-payment-status--recovery .v-icon,
-.terminal-payment-status--canceled .v-icon {
+.terminal-payment-status--recovery .terminal-payment-status__heading .v-icon,
+.terminal-payment-status--canceled .terminal-payment-status__heading .v-icon {
   color: #805100;
 }
 

@@ -173,7 +173,7 @@
     </template>
 
     <v-dialog v-model="dialogOpen" max-width="520" :persistent="busy" aria-labelledby="terminal-register-title">
-      <v-card class="terminal-readers__dialog">
+      <v-card class="se-modal terminal-readers__dialog">
         <v-card-title id="terminal-register-title">Connecter TPE</v-card-title>
         <v-card-text>
           <v-form ref="registrationForm" @submit.prevent="registerReader">
@@ -268,9 +268,10 @@
             </v-alert>
           </v-form>
         </v-card-text>
-        <v-card-actions class="justify-end">
-          <v-btn text class="text-none" :disabled="!stripeReady || busy" @click="closeRegistration">Annuler</v-btn>
-          <v-btn color="primary" class="text-none" :loading="busy" :disabled="!stripeReady || busy" @click="registerReader">
+        <v-card-actions class="se-modal-actions justify-end">
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" :disabled="!stripeReady || busy" @click="closeRegistration"><v-icon left>mdi-close</v-icon>Annuler</v-btn>
+          <v-btn color="primary" class="se-modal-action se-modal-action--terminal text-none" :loading="busy" :disabled="!stripeReady || busy" @click="registerReader">
+            <v-icon left>mdi-credit-card-plus</v-icon>
             Connecter TPE
           </v-btn>
         </v-card-actions>

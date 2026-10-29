@@ -583,7 +583,7 @@
               </v-col>
             </v-row>
             <v-dialog v-model="themeJsonDialog" max-width="860">
-              <v-card class="pa-5 settings-theme-dialog">
+              <v-card class="se-modal pa-5 settings-theme-dialog">
                 <v-card-title class="settings-theme-dialog-title px-0 pt-0">
                   Modifier le JSON du theme
                 </v-card-title>
@@ -598,17 +598,19 @@
                   no-resize
                   outlined
                 ></v-textarea>
-                <v-card-actions class="px-0 pb-0">
+                <v-card-actions class="se-modal-actions px-0 pb-0">
                   <v-spacer></v-spacer>
-                  <v-btn text class="text-none" @click="closeThemeJsonDialog">
+                  <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="closeThemeJsonDialog">
+                    <v-icon left>mdi-close</v-icon>
                     Annuler
                   </v-btn>
                   <v-btn
                     color="primary"
                     depressed
-                    class="text-none"
+                    class="se-modal-action se-modal-action--primary text-none"
                     @click="applyThemeJsonDraft"
                   >
+                    <v-icon left>mdi-check</v-icon>
                     Appliquer
                   </v-btn>
                 </v-card-actions>

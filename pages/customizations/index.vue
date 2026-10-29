@@ -235,7 +235,7 @@
     </v-card>
 
     <v-dialog v-model="newStepDialog" max-width="620" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Nouvelle étape</v-card-title>
         <v-card-text>
           <StepEditor
@@ -250,7 +250,7 @@
     </v-dialog>
 
     <v-dialog v-model="choiceDialog" max-width="720" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>
           {{ editingChoice ? 'Modifier le choix' : 'Nouveau choix' }}
         </v-card-title>
@@ -269,7 +269,7 @@
     </v-dialog>
 
     <v-dialog v-model="stepDeactivateDialog" max-width="560" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Désactiver cette étape ?</v-card-title>
         <v-card-text>
           <p>
@@ -294,17 +294,19 @@
             Aucun produit ne référence actuellement cette étape.
           </v-alert>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer></v-spacer>
-          <v-btn text class="text-none" @click="cancelStepDeactivation">
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="cancelStepDeactivation">
+            <v-icon left>mdi-close</v-icon>
             Annuler
           </v-btn>
           <v-btn
-            color="error"
-            class="text-none"
+            color="warning"
+            class="se-modal-action se-modal-action--warning text-none"
             :loading="savingStep"
             @click="confirmStepDeactivation"
           >
+            <v-icon left>mdi-eye-off</v-icon>
             Désactiver
           </v-btn>
         </v-card-actions>
@@ -312,7 +314,7 @@
     </v-dialog>
 
     <v-dialog v-model="stepDeleteDialog" max-width="560" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Supprimer définitivement cette étape ?</v-card-title>
         <v-card-text>
           <p v-if="stepToDelete">
@@ -338,22 +340,23 @@
             inchangées.
           </v-alert>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer></v-spacer>
           <v-btn
-            text
-            class="text-none"
+            class="se-modal-action se-modal-action--secondary text-none"
             :disabled="savingStep"
             @click="cancelStepDeletion"
           >
+            <v-icon left>mdi-close</v-icon>
             Annuler
           </v-btn>
           <v-btn
             color="error"
-            class="text-none"
+            class="se-modal-action se-modal-action--danger text-none"
             :loading="savingStep"
             @click="confirmStepDeletion"
           >
+            <v-icon left>mdi-delete</v-icon>
             Supprimer définitivement
           </v-btn>
         </v-card-actions>
@@ -361,23 +364,25 @@
     </v-dialog>
 
     <v-dialog v-model="choiceDeactivateDialog" max-width="480" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Désactiver ce choix ?</v-card-title>
         <v-card-text>
           {{ choiceToDeactivate && choiceToDeactivate.name }} ne sera plus
           proposé sur les produits utilisant cette étape.
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer></v-spacer>
-          <v-btn text class="text-none" @click="cancelChoiceDeactivation">
+          <v-btn class="se-modal-action se-modal-action--secondary text-none" @click="cancelChoiceDeactivation">
+            <v-icon left>mdi-close</v-icon>
             Annuler
           </v-btn>
           <v-btn
-            color="error"
-            class="text-none"
+            color="warning"
+            class="se-modal-action se-modal-action--warning text-none"
             :loading="savingChoice"
             @click="confirmChoiceDeactivation"
           >
+            <v-icon left>mdi-eye-off</v-icon>
             Désactiver
           </v-btn>
         </v-card-actions>
@@ -385,7 +390,7 @@
     </v-dialog>
 
     <v-dialog v-model="choiceDeleteDialog" max-width="560" persistent>
-      <v-card>
+      <v-card class="se-modal">
         <v-card-title>Supprimer définitivement ce choix ?</v-card-title>
         <v-card-text>
           <p v-if="choiceToDelete">
@@ -414,22 +419,23 @@
             inchangées.
           </v-alert>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="se-modal-actions">
           <v-spacer></v-spacer>
           <v-btn
-            text
-            class="text-none"
+            class="se-modal-action se-modal-action--secondary text-none"
             :disabled="savingChoice"
             @click="cancelChoicePermanentDeletion"
           >
+            <v-icon left>mdi-close</v-icon>
             Annuler
           </v-btn>
           <v-btn
             color="error"
-            class="text-none"
+            class="se-modal-action se-modal-action--danger text-none"
             :loading="savingChoice"
             @click="confirmChoicePermanentDeletion"
           >
+            <v-icon left>mdi-delete</v-icon>
             Supprimer définitivement
           </v-btn>
         </v-card-actions>

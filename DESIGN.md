@@ -368,6 +368,22 @@ couleur. La selection devient pleine avec son controle radio ; le focus reste vi
 Remise et paiement differe restent des actions secondaires separees. Sur mobile,
 le menu et le detail conservent deux colonnes de choix tactiles.
 
+### Boutons des modals
+
+Les cartes `se-modal` et pieds de formulaire `se-modal-actions` partagent des
+actions tactiles de 44px minimum, un espacement de 12px et un focus visible.
+`se-modal-action` distingue validation bleue, validation finale verte foncee,
+retour neutre, suppression rouge, retrait de lien orange et connexion TPE violette.
+Les icones MDI remplies accompagnent des verbes explicites. Une action de fermeture
+ne doit pas concurrencer visuellement la validation.
+
+Les grands choix `se-modal-choice` restent teintes avec une selection pleine,
+un repere textuel ou une coche et un etat presse accessible. Le service utilise
+bleu pour sur place, orange pour a emporter et violet pour livraison. Les choix
+d'impression utilisent bleu et neutre. Les modes de remise % / euros et raccourcis
+de pourcentage restent selectionnables avec le meme contraste que les paiements.
+Les etats desactives et de chargement conservent leurs verrouillages existants.
+
 ### Do:
 
 - **Do** utiliser le bleu action pour les actions primaires, selections et focus.

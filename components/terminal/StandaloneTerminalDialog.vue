@@ -4,7 +4,7 @@
       <v-card-title class="standalone-terminal__heading">
         <h2 id="standalone-terminal-title">Paiement TPE</h2>
         <v-spacer />
-        <v-btn icon aria-label="Fermer le paiement TPE" class="standalone-terminal__close" @click="closeDialog">
+        <v-btn icon aria-label="Fermer le paiement TPE" class="standalone-terminal__close se-modal-icon" @click="closeDialog">
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-card-title>
@@ -27,32 +27,32 @@
           <v-btn v-for="digit in digits" :key="digit" depressed class="standalone-terminal__key" :disabled="busy" @click="addDigit(digit)">{{ digit }}</v-btn>
           <v-btn depressed class="standalone-terminal__key standalone-terminal__clear" :disabled="busy" aria-label="Effacer le montant" @click="clearAmount">C</v-btn>
           <v-btn depressed class="standalone-terminal__key" :disabled="busy" @click="addDigit('0')">0</v-btn>
-          <v-btn depressed class="standalone-terminal__key" :disabled="busy" aria-label="Corriger le dernier chiffre" @click="removeDigit"><v-icon>mdi-backspace-outline</v-icon></v-btn>
+          <v-btn depressed class="standalone-terminal__key" :disabled="busy" aria-label="Corriger le dernier chiffre" @click="removeDigit"><v-icon>mdi-backspace</v-icon></v-btn>
         </div>
         <div v-else class="standalone-terminal__outcome" aria-live="polite">
           <v-progress-circular v-if="busy || isPending" indeterminate color="primary" size="32" width="3" />
-          <v-icon v-else size="36" :color="payment && payment.status === 'succeeded' ? 'success' : 'warning'">{{ payment && payment.status === 'succeeded' ? 'mdi-check-circle-outline' : 'mdi-credit-card-alert-outline' }}</v-icon>
+          <v-icon v-else size="36" :color="payment && payment.status === 'succeeded' ? 'success' : 'warning'">{{ payment && payment.status === 'succeeded' ? 'mdi-check-circle' : 'mdi-credit-card-alert' }}</v-icon>
           <p>{{ outcomeMessage }}</p>
           <span v-if="isPending || !payment" class="text-caption">Vous pouvez fermer cette fenêtre. Le paiement continue sur le terminal.</span>
         </div>
         <p v-if="!attempt" class="standalone-terminal__hint">Le client présentera sa carte sur le terminal.</p>
       </v-card-text>
-      <v-card-actions class="standalone-terminal__actions">
-        <v-btn v-if="blockingPayment" block outlined color="error" class="text-none" :loading="canceling" :disabled="busy" @click="cancelBlockingPayment">Annuler le paiement en cours</v-btn>
+      <v-card-actions class="standalone-terminal__actions se-modal-actions">
+        <v-btn v-if="blockingPayment" block depressed color="error" class="text-none se-modal-action se-modal-action--danger" :loading="canceling" :disabled="busy" @click="cancelBlockingPayment"><v-icon left>mdi-close-circle</v-icon>Annuler le paiement en cours</v-btn>
         <template v-if="!attempt">
           <p v-if="amountCents > 0 && !validAmount(amountCents)" class="text-caption mb-1">Le montant minimum est de 0,50 €.</p>
-          <v-btn block depressed color="primary" class="text-none standalone-terminal__send" :loading="busy" :disabled="!ready || !validAmount(amountCents) || busy || Boolean(blockingPayment)" @click="sendPayment">
-            <v-icon left>mdi-credit-card-outline</v-icon>Encaisser par carte
+          <v-btn block depressed color="primary" class="text-none standalone-terminal__send se-modal-action se-modal-action--primary" :loading="busy" :disabled="!ready || !validAmount(amountCents) || busy || Boolean(blockingPayment)" @click="sendPayment">
+            <v-icon left>mdi-credit-card</v-icon>Encaisser par carte
           </v-btn>
         </template>
         <template v-else-if="!isFinal">
-          <v-btn block outlined color="primary" class="text-none" :loading="busy" :disabled="busy" @click="checkPayment">Vérifier le paiement</v-btn>
-          <v-btn text color="error" class="text-none" :loading="cancelRequested || canceling" :disabled="cancelRequested || canceling || !payment" @click="cancelPayment">Annuler le paiement</v-btn>
+          <v-btn block depressed color="primary" class="text-none se-modal-action se-modal-action--primary" :loading="busy" :disabled="busy" @click="checkPayment"><v-icon left>mdi-refresh</v-icon>Vérifier le paiement</v-btn>
+          <v-btn block depressed color="error" class="text-none se-modal-action se-modal-action--danger" :loading="cancelRequested || canceling" :disabled="cancelRequested || canceling || !payment" @click="cancelPayment"><v-icon left>mdi-close-circle</v-icon>Annuler le paiement</v-btn>
         </template>
         <template v-else>
-          <v-btn v-if="payment.status === 'succeeded'" block depressed color="primary" class="text-none" @click="goToTicket">Ticket <v-icon right small>mdi-invoice-text</v-icon></v-btn>
-          <v-btn v-if="canViewHistory" block depressed color="primary" class="text-none" @click="goToHistory">Voir dans l’historique</v-btn>
-          <v-btn block outlined class="text-none" :disabled="!ready || busy" @click="startNewPayment">Nouveau paiement</v-btn>
+          <v-btn v-if="payment.status === 'succeeded'" block depressed color="primary" class="text-none se-modal-action se-modal-action--primary" @click="goToTicket">Ticket <v-icon right small>mdi-invoice-text</v-icon></v-btn>
+          <v-btn v-if="canViewHistory" block outlined class="text-none se-modal-action se-modal-action--secondary" @click="goToHistory"><v-icon left>mdi-history</v-icon>Voir dans l’historique</v-btn>
+          <v-btn block depressed color="success" class="text-none se-modal-action se-modal-action--success" :disabled="!ready || busy" @click="startNewPayment"><v-icon left>mdi-plus-circle</v-icon>Nouveau paiement</v-btn>
         </template>
       </v-card-actions>
     </v-card>

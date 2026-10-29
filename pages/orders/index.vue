@@ -336,23 +336,24 @@
         </div>
       </article>
     </section>
-    <v-dialog v-model="cancelDialog" max-width="350" persistent>
-      <v-card>
+    <v-dialog v-model="cancelDialog" max-width="440" persistent>
+      <v-card class="se-modal">
         <v-card-title>{{ cancelDialogTitle }}</v-card-title>
         <v-card-text>{{ cancelDialogMessage }}</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text class="text-none" @click="closeCancelDialog">
-            Annuler
+          <v-btn class="se-modal-action se-modal-action--secondary" @click="closeCancelDialog">
+            <v-icon small left>mdi-arrow-left</v-icon>Retour
           </v-btn>
           <v-btn
-            color="red"
+            color="error"
             dark
-            class="text-none"
+            class="se-modal-action se-modal-action--danger"
             :loading="cancelLoading"
             @click="confirmCancelOrder"
           >
-            Confirmer
+            <v-icon small left>{{ isPendingCancelRefund ? 'mdi-cash-refund' : 'mdi-cancel' }}</v-icon>
+            {{ isPendingCancelRefund ? 'Rembourser la commande' : 'Annuler la commande' }}
           </v-btn>
         </v-card-actions>
       </v-card>

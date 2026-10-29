@@ -306,8 +306,17 @@ const runAsyncAssertions = async () => {
   assert.ok(payoutSource.includes('mdi-tag-percent-outline'))
   assert.ok(payoutSource.includes('mdi-percent'))
   assert.ok(payoutSource.includes('cashregister-discount-title'))
-  assert.ok(payoutSource.includes('.normalize(\'NFD\')'))
-  assert.ok(payoutSource.includes("return 'mdi-cash-multiple'"))
+  assert.ok(payoutSource.includes('getPaymentMethodOptions'))
+  const { getPaymentMethodOptions } = require('../helpers/paymentMethods')
+  assert.deepStrictEqual(
+    getPaymentMethodOptions(['ESPÈCES ', 'Ticket resto', 'Cheques'])
+      .map(({ value, icon }) => [value, icon]),
+    [
+      ['Espèces', 'mdi-cash-multiple'],
+      ['Ticket restaurant', 'mdi-ticket-confirmation'],
+      ['Chèque', 'mdi-checkbook'],
+    ]
+  )
   assert.ok(!payoutSource.includes("ordersToArchive.join(', ')"))
   assert.ok(payoutSource.includes('receiptDialog'))
   assert.ok(payoutSource.includes('@click="requestReceiptChoice"'))

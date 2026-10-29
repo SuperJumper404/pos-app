@@ -1,9 +1,9 @@
 <template>
   <v-container>
-    <v-dialog v-model="dialog" max-width="350">
-      <v-card class="pa-3">
+    <v-dialog v-model="dialog" max-width="420">
+      <v-card class="pa-3 se-modal">
         <div class="text-center">
-          <v-icon size="80" color="warning">mdi-information-outline</v-icon>
+          <v-icon size="64" color="error">mdi-delete-alert</v-icon>
         </div>
         <v-card-title class="justify-center">
           <h3>Supprimer la catégorie</h3>
@@ -13,16 +13,16 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" class="text-none" @click="btnNo"
-            >Non <v-icon small right>mdi-close-circle</v-icon></v-btn
+          <v-btn class="se-modal-action se-modal-action--secondary" @click="btnNo"
+            >Annuler <v-icon small right>mdi-arrow-left</v-icon></v-btn
           >
           <v-btn
             :loading="loadingBtn"
-            color="#e53935"
+            color="error"
             dark
-            class="text-none"
+            class="se-modal-action se-modal-action--danger"
             @click="btnYes"
-            >Oui, supprimer ! <v-icon small right>mdi-trash-can</v-icon></v-btn
+            >Supprimer la catégorie <v-icon small right>mdi-trash-can</v-icon></v-btn
           >
         </v-card-actions>
       </v-card>
