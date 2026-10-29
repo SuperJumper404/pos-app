@@ -86,6 +86,10 @@ export const actions = {
     return run(context, () => this.$axios.get(`${baseUrl}/standalone-payments/${requiredId(id)}`, config()),
       payment => validStandalonePayment(payment) && payment.id === id, true)
   },
+  getPayment(context, id) {
+    return run(context, () => this.$axios.get(`${baseUrl}/standalone-payments/${requiredId(id)}`, config()),
+      payment => validStandalonePayment(payment) && payment.id === id)
+  },
   cancelPayment(context, id) {
     return run(context, () => this.$axios.post(`${baseUrl}/standalone-payments/${requiredId(id)}/cancel`, {}, config()),
       payment => validStandalonePayment(payment) && payment.id === id, true)

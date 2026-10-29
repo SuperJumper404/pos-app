@@ -1,7 +1,7 @@
 const moment = require('moment')
 const { formatPrice, roundPrice } = require('./price-functions')
 
-const PAYMENT_METHOD = 'Carte bancaire - TPE Stripe'
+const { terminalReaderLabel } = require('./stripeTerminal')
 
 const xmlEscape = (value) =>
   String(value == null ? '' : value)
@@ -34,6 +34,7 @@ const maskPan = (last4) => (/^[0-9]{4}$/.test(String(last4 || '')) ? `**********
 const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}) => {
   const card = payment.cardTicket || {}
   const orderId = payment.orderId || order.id || order.orderId
+  const created = payment.confirmedAt || order.created || payment.createdAt || new Date()
   const amountCents = Number.isSafeInteger(card.amountCents)
     ? card.amountCents
     : payment.amountCents
@@ -42,9 +43,10 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
     ticketType: 'carte',
     orderId,
     orderNumber: payment.orderNumber || order.ordernumber || order.orderNumber || orderId || '',
-    created: order.created || new Date(),
-    currentDate: moment(order.created || new Date()).local().format('DD/MM/YYYY [a] HH:mm'),
-    paymentMethod: PAYMENT_METHOD,
+    created,
+    currentDate: moment(created).local().format('DD/MM/YYYY [a] HH:mm'),
+    paymentMethod: terminalReaderLabel({ ...order, ...payment }),
+    readerLabel: terminalReaderLabel({ ...order, ...payment }),
     amountCents,
     amount: centsToAmount(amountCents),
     brand: normalizeBrand(card.brand),
@@ -69,6 +71,8 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
 }
 
 const cardLines = (payload = {}) => [
+  ['Terminal', payload.readerLabel || payload.paymentMethod],
+  ['Référence', payload.terminalPaymentId],
   ['Commande', payload.orderNumber],
   ['Date', payload.currentDate],
   ['Carte', payload.brand],
@@ -155,6 +159,8 @@ const buildCardTicketData = (payload = {}) => ({
     },
     currentDate: payload.currentDate,
     paymentMethod: payload.paymentMethod,
+    readerLabel: payload.readerLabel,
+    terminalPaymentId: payload.terminalPaymentId,
     amountCents: payload.amountCents,
     amount: payload.amount,
     brand: payload.brand,
@@ -205,14 +211,29 @@ const sendCardTicket = ({
   printerIp,
   dispatch,
   fetchImplementation,
+  checked = false,
 } = {}) => {
-  if (!payload || !payload.orderId) {
+  if (!payload || (!payload.orderId && !(Number.isSafeInteger(payload.terminalPaymentId) && payload.terminalPaymentId > 0))) {
     throw new TypeError("La commande est introuvable pour l'impression.")
   }
 
   if (isEnabled(smartPrint)) {
     const requestFetch = fetchImplementation || (typeof fetch === 'function' ? fetch : null)
     if (!requestFetch || !printerIp) throw new TypeError("SmartPrint n'est pas configure.")
+    if (checked) {
+      return Promise.resolve().then(() => requestFetch(`http://${printerIp}:8989/print`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketType: 'carte',
+          dataFormatESCPOS: buildCardTicketEscPos(payload).toString('base64'),
+          dataFormatXML: buildCardTicketCloudXml(payload),
+          ticketData: buildCardTicketData(payload),
+        }),
+      })).then(response => {
+        if (!response || response.ok !== true) throw new Error("L'impression n'a pas pu être envoyée.")
+        return true
+      })
+    }
     Promise.resolve(
       requestFetch(`http://${printerIp}:8989/print`, {
         method: 'POST',
@@ -234,11 +255,20 @@ const sendCardTicket = ({
   if (typeof dispatch !== 'function') {
     throw new TypeError("Le service d'impression cloud est indisponible.")
   }
+  if (checked) {
+    return Promise.resolve().then(() => dispatch('printing/postPrintingJobChecked', {
+      requete: buildCardTicketCloudXml(payload), ticketType: 'carte',
+      ...(payload.orderId ? { orderId: payload.orderId } : { terminalPaymentId: payload.terminalPaymentId }),
+    })).then(sent => {
+      if (sent !== true) throw new Error("L'impression n'a pas pu être envoyée.")
+      return true
+    })
+  }
   Promise.resolve(
     dispatch('printing/postPrintingJob', {
       requete: buildCardTicketCloudXml(payload),
       ticketType: 'carte',
-      orderId: payload.orderId,
+      ...(payload.orderId ? { orderId: payload.orderId } : { terminalPaymentId: payload.terminalPaymentId }),
     })
   ).catch(() => {})
   return true

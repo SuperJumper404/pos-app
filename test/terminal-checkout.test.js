@@ -1,0 +1,21 @@
+const assert = require('assert')
+const { getPaymentMethodOptions } = require('../helpers/paymentMethods')
+const { buildCardTicketPayload, cardTicketLines, sendCardTicket } = require('../helpers/cardTicket')
+const { buildCashierReceiptPayload } = require('../helpers/cashierReceipt')
+
+const reader = { id: 7, label: 'TPE terrasse', isActive: true }
+const choices = getPaymentMethodOptions(['Espèces'], reader)
+assert.deepStrictEqual(choices.map(method => [method.text, method.value]), [['Espèces', 'Espèces'], ['TPE terrasse', 'stripe_terminal']])
+assert.strictEqual(getPaymentMethodOptions(['Espèces'], { ...reader, isActive: false }).length, 1)
+const payload = buildCardTicketPayload({ payment: { id: 81, readerLabel: 'TPE terrasse', amountCents: 1500, confirmedAt: '2026-10-29T12:00:00Z' } })
+assert.strictEqual(payload.paymentMethod, 'TPE terrasse')
+assert.strictEqual(payload.created, '2026-10-29T12:00:00Z')
+assert.ok(cardTicketLines(payload).some(([label, value]) => label === 'Terminal' && value === 'TPE terrasse'))
+assert.ok(cardTicketLines(payload).some(([label, value]) => label === 'Référence' && value === 81))
+assert.strictEqual(buildCardTicketPayload().paymentMethod, 'TPE')
+const jobs = []
+assert.strictEqual(sendCardTicket({ payload, dispatch: (name, job) => { jobs.push({ name, job }); return true } }), true)
+assert.strictEqual(jobs[0].job.terminalPaymentId, 81)
+assert.strictEqual(jobs[0].job.orderId, undefined)
+assert.strictEqual(buildCashierReceiptPayload({ order: { id: 3, payment_provider: 'stripe_terminal', payment: 'Carte bancaire - TPE Stripe', terminal_reader_label: 'TPE terrasse' } }).paymentMethod, 'TPE terrasse')
+console.log('Terminal checkout labels and standalone printing passed')

@@ -50,6 +50,7 @@
           <v-btn text color="error" class="text-none" :loading="cancelRequested || canceling" :disabled="cancelRequested || canceling || !payment" @click="cancelPayment">Annuler le paiement</v-btn>
         </template>
         <template v-else>
+          <v-btn v-if="payment.status === 'succeeded'" block depressed color="primary" class="text-none" @click="goToTicket">Ticket <v-icon right small>mdi-invoice-text</v-icon></v-btn>
           <v-btn v-if="canViewHistory" block depressed color="primary" class="text-none" @click="goToHistory">Voir dans l’historique</v-btn>
           <v-btn block outlined class="text-none" :disabled="!ready || busy" @click="startNewPayment">Nouveau paiement</v-btn>
         </template>
@@ -279,6 +280,12 @@ export default {
       const id = this.payment.id
       this.closeDialog()
       await this.$router.push({ path: '/history', query: { payment: String(id) } })
+    },
+    async goToTicket() {
+      if (!this.payment || this.payment.status !== 'succeeded') return
+      const id = this.payment.id
+      this.closeDialog()
+      await this.$router.push(`/history/terminal-ticket/${id}`)
     },
   },
 }

@@ -106,7 +106,8 @@ const terminalReceiptSnapshot = (orders, payment) => {
     return { ...order, ...terminalTaxFields(order, allocation.amountCents), subtotal: allocation.amountCents / 100,
       subtotal_before_discount: baseCents / 100, discount_type: discount ? 'amount' : 'none',
       discount_value: discount, discount_amount: discount, payment_status: 'paid',
-      payment_provider: 'stripe_terminal', payment: 'Carte bancaire - TPE Stripe',
+      payment_provider: 'stripe_terminal', payment: require('./stripeTerminal').terminalReaderLabel(payment),
+      terminal_reader_label: require('./stripeTerminal').terminalReaderLabel(payment),
       stripe_terminal_payment_id: payment.id }
   })
 }

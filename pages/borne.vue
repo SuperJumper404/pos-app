@@ -577,6 +577,7 @@
 
 <script>
 import price from '@/helpers/price'
+import { terminalReaderLabel } from '@/helpers/stripeTerminal'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
 import { applyServerQuoteToCart } from '@/helpers/customizations'
 import {
@@ -1175,7 +1176,7 @@ export default {
       try {
         const payment = await this.$store.dispatch(
           'stripeTerminal/startKioskPayment',
-          this.buildPayload('Carte bancaire - TPE Stripe', false, true)
+          this.buildPayload('stripe_terminal', false, true)
         )
         if (!payment) {
           this.handleCheckoutFailure(
@@ -1302,7 +1303,7 @@ export default {
             orderNumber: payment.orderNumber,
           },
         },
-        paid ? 'Carte bancaire - TPE Stripe' : 'À encaisser',
+        paid ? terminalReaderLabel(payment) : 'À encaisser',
         {
           outcome: paid ? 'paid' : 'counter',
           payment,

@@ -47,7 +47,7 @@ assert.strictEqual(hasSettledTerminalAllocations({
 
 assert.match(payoutSource, /this\.currentReader\.isActive/)
 assert.match(payoutSource, /this\.currentReader\.assignedUserId === Number\(user\.id\)/)
-assert.match(payoutSource, /Carte bancaire - TPE Stripe/)
+assert.match(payoutSource, /terminalReaderLabel\(this\.currentReader/)
 assert.match(payoutSource, /stripeTerminal\/startPayment/)
 assert.match(payoutSource, /stripeTerminal\/refreshPayment/)
 assert.match(payoutSource, /stripeTerminal\/cancelPayment/)

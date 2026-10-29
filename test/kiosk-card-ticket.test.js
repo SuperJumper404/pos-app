@@ -48,7 +48,7 @@ const payload = buildCardTicketPayload({
 
 assert.strictEqual(payload.ticketTitle, 'Ticket carte')
 assert.strictEqual(payload.ticketType, 'carte')
-assert.strictEqual(payload.paymentMethod, 'Carte bancaire - TPE Stripe')
+assert.strictEqual(payload.paymentMethod, 'TPE')
 assert.strictEqual(payload.orderId, 100)
 assert.strictEqual(payload.orderNumber, 'B100')
 assert.strictEqual(payload.amountCents, 2000)

@@ -688,7 +688,7 @@ export default {
 
       push(
         alignRight(),
-        esc('Paiement : ' + this.dataArchivedOrder.used_payment_method + '\n')
+        esc('Paiement : ' + this.paymentLabel + '\n')
       )
       push(line())
 

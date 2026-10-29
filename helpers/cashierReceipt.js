@@ -3,6 +3,13 @@ const { normalizeVatBreakdown, normalizeDeliveryCharge, deliveryChargeFor } = re
 const { formatPrice, parsePrice, roundPrice } = require('./price-functions')
 const { groupCustomizationSelections } = require('./customizations')
 const { cardTicketLines } = require('./cardTicket')
+const { terminalReaderLabel } = require('./stripeTerminal')
+
+const receiptPaymentMethod = (order = {}, fallback) => {
+  const method = order.used_payment_method || order.payment || fallback || 'Caisse'
+  return order.payment_provider === 'stripe_terminal' || /tpe\s+stripe/i.test(String(method))
+    ? terminalReaderLabel(order) : method
+}
 
 const isEnabled = (value) => [true, 1, '1', 'true'].includes(value)
 
@@ -149,11 +156,7 @@ const buildCashierReceiptPayload = ({
       ? Math.max(0, subtotalBeforeDiscount - totalAmount)
       : order.discount_amount
   )
-  const paymentMethod =
-    order.used_payment_method ||
-    order.payment ||
-    fallbackPaymentMethod ||
-    'Caisse'
+  const paymentMethod = receiptPaymentMethod(order, fallbackPaymentMethod)
   const normalizedTicketKind = ticketKind === 'commande' ? 'commande' : 'caisse'
 
   return {
@@ -285,7 +288,7 @@ const buildGroupedCashierReceiptPayload = ({
         service_point_name: tables.length === 1 ? tables[0] : fallbackTable,
         customer: fallbackCustomer,
         created: normalizedOrders[0] && normalizedOrders[0].created,
-        payment: fallbackPaymentMethod,
+        payment: [...new Set(normalizedOrders.map(order => receiptPaymentMethod(order, fallbackPaymentMethod)))].join(' / ') || fallbackPaymentMethod,
         subtotal: totalAmount,
         subtotal_before_discount: subtotalBeforeDiscount,
         discount_amount: discountAmount,

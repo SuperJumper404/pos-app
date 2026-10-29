@@ -222,7 +222,7 @@ const submitTerminalPaymentSource = pageSource.slice(
   finishCheckoutStart
 )
 assert.match(submitTerminalPaymentSource, /catch \(error\)[\s\S]*checkoutErrorMessage/)
-assert.match(submitTerminalPaymentSource, /this\.buildPayload\('Carte bancaire - TPE Stripe', false, true\)/)
+assert.match(submitTerminalPaymentSource, /this\.buildPayload\('stripe_terminal', false, true\)/)
 
 const resetKioskStart = pageSource.indexOf('    async resetKiosk() {', finishCheckoutStart)
 const finishCheckoutSource = pageSource.slice(finishCheckoutStart, resetKioskStart)

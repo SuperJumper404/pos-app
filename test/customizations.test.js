@@ -539,7 +539,7 @@ const loadComponentOptions = (source, dependencyNames, dependencies) => {
     .replace('export default', 'return')
 
   // eslint-disable-next-line no-new-func
-  return new Function(...dependencyNames, executable)(...dependencies)
+  return new Function(...dependencyNames, 'terminalCheckout', executable)(...dependencies, {})
 }
 
 const wizardOptions = loadComponentOptions(
@@ -1792,6 +1792,7 @@ const cartOptions = new Function(
   'isStripePaymentRequired',
   'buildCheckoutPayloadSignature',
   'shouldAutoPrepareStripeCheckout',
+  'terminalCheckout',
   cartExecutable
 )(
   () => null,
@@ -1806,7 +1807,8 @@ const cartOptions = new Function(
   () => false,
   (mode) => mode === 'stripe_before_order',
   buildCheckoutPayloadSignature,
-  () => false
+  () => false,
+  {}
 )
 
 const cartEditVm = {

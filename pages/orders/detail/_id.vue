@@ -576,6 +576,7 @@ import price from '@/helpers/price'
 import { calculateDiscount } from '@/helpers/discount'
 import { groupCustomizationSelections } from '@/helpers/customizations'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
+import terminalCheckout from '@/mixins/terminalCheckout'
 import {
   buildCashierReceiptPayload,
 } from '@/helpers/cashierReceipt'
@@ -606,7 +607,7 @@ export default {
     LoyaltyPos,
     CustomizationSummary,
   },
-  mixins: [price],
+  mixins: [price, terminalCheckout],
   beforeRouteLeave(to, from, next) {
     next(this.deliveryEditBusy || this.deliveryEditAttempt ? false : undefined)
   },
@@ -878,7 +879,7 @@ export default {
     },
     paymentMethods() {
       return getPaymentMethodOptions(
-        this.$store.get('shop/shop_payment_methods')
+        this.$store.get('shop/shop_payment_methods'), this.checkoutTerminalReader
       )
     },
     discountPercentages() {
@@ -1377,6 +1378,12 @@ export default {
       this.paymentLoading = true
       this.receiptDialog = false
       try {
+        if (this.isCheckoutTerminalMethod(paymentMethod)) {
+          await this.$router.push(this.terminalCheckoutLocation(order.id, wantsReceipt, {
+            type: this.archiveDiscountType, value: this.archiveDiscountValue,
+          }))
+          return
+        }
         const collected = await this.$store.dispatch('orders/collectOrderPayment', {
           id: order.id,
           payment_method: paymentMethod,

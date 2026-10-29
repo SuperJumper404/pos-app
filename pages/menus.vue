@@ -1215,6 +1215,7 @@ import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import { calculateDiscount } from '@/helpers/discount'
 import DeliveryOrderDialog from '@/components/delivery/DeliveryOrderDialog.vue'
 import cashierDelivery from '@/mixins/cashierDelivery'
+import terminalCheckout from '@/mixins/terminalCheckout'
 // import * as config from '@/nuxt.config'
 const productTracksStock = (product = {}) =>
   [true, 1, '1'].includes(product.track_stock)
@@ -1224,7 +1225,7 @@ export default {
     ProductCustomizationWizard,
     DeliveryOrderDialog,
   },
-  mixins: [price, cashierDelivery],
+  mixins: [price, cashierDelivery, terminalCheckout],
   async beforeRouteLeave(to, from, next) {
     if (
       this.isOrderEditActive &&
@@ -1454,7 +1455,7 @@ export default {
     },
     expressPaymentMethods() {
       return getPaymentMethodOptions(
-        this.$store.get('shop/shop_payment_methods')
+        this.$store.get('shop/shop_payment_methods'), this.checkoutTerminalReader
       )
     },
     expressDiscountPercentages() {
@@ -2171,13 +2172,14 @@ export default {
       const deliveryPayload = this.buildExpressDeliveryPayload()
       const checkoutContext = this.beginExpressCheckout()
       this.expressPaymentLoading = paymentMethod
-      const result = await this.$store.dispatch('cart/checkoutCounterPayBefore', {
+      const terminal = this.isCheckoutTerminalMethod(paymentMethod)
+      const result = await this.$store.dispatch(terminal ? 'cart/checkoutOrder' : 'cart/checkoutCounterPayBefore', {
         customer: String(this.expressCustomer || '').trim() || 'Client comptoir',
         servicePointId: this.expressSelectedTable,
         total: this.roundPrice(this.expressCheckoutTotal),
         discountType: this.expressDiscountType,
         discountValue: this.expressDiscountValue,
-        payment: paymentMethod,
+        payment: terminal ? (this.expressIsDelivery ? 'Paiement a la livraison' : 'Paiement au comptoir') : paymentMethod,
         remark: this.buildExpressRemark(),
         phone: String(this.expressPhone || '').trim(),
         isTakeaway: this.expressIsTakeaway,
@@ -2185,7 +2187,7 @@ export default {
         ...deliveryPayload,
       })
       if (!this.isExpressCheckoutCurrent(checkoutContext)) return
-      if (result && result.ok && wantsReceipt) {
+      if (result && result.ok && wantsReceipt && !terminal) {
         this.printExpressReceipt(result, paymentMethod, checkoutContext).catch(() => {})
       }
       this.expressPaymentLoading = null
@@ -2206,6 +2208,10 @@ export default {
       this.expressRemark = ''
       this.clearExpressDiscount({ reopenPaymentDialog: false })
       this.expressIsTakeaway = false
+      if (terminal) {
+        await this.$router.push(this.terminalCheckoutLocation(result.data.orderId, wantsReceipt))
+        return
+      }
       this.$store.dispatch(
         'notifications/success',
         'Commande encaissée et envoyée en attente.'

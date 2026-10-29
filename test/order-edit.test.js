@@ -528,7 +528,7 @@ const loadPageOptions = (source, dependencies, values) => {
     .replace('export default', 'return')
 
   // eslint-disable-next-line no-new-func
-  return new Function(...dependencies, executable)(...values)
+  return new Function(...dependencies, 'terminalCheckout', executable)(...values, {})
 }
 
 const runCartEditContracts = async () => {

@@ -31,6 +31,9 @@ const run = async () => {
   assert.strictEqual(h.calls[0].args[2].skipGlobalErrorNotification, true)
   assert.deepStrictEqual(h.current.activePayment, payment)
   assert.strictEqual(h.current.loading, false)
+  const previousPayment = h.current.activePayment
+  await h.call('getPayment', 21)
+  assert.strictEqual(h.current.activePayment, previousPayment, 'Receipt reads must not replace the active collection')
   const invalid = make()
   assert.strictEqual(await invalid.call('startPayment', { amountCents: 49, attemptKey }), false)
   assert.strictEqual(invalid.calls.length, 0)

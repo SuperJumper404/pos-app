@@ -9,6 +9,10 @@ const isTerminalMethod = (method) => {
 const isTerminalPaymentPending = (payment) =>
   Boolean(payment && ['creating', 'processing'].includes(payment.status))
 
+const terminalReaderLabel = (source = {}) =>
+  [source.readerLabel, source.terminal_reader_label, source.reader_label, source.label]
+    .find(value => typeof value === 'string' && value.trim())?.trim() || 'TPE'
+
 const hasSettledTerminalAllocations = (payment) => Boolean(payment &&
   payment.status === 'succeeded' && Array.isArray(payment.orderIds) &&
   Array.isArray(payment.allocations) && payment.allocations.length > 0 &&
@@ -64,6 +68,7 @@ const terminalErrorMessage = (code) =>
     : null
 
 module.exports = {
+  terminalReaderLabel,
   terminalErrorMessage,
   isTerminalMethod,
   isTerminalPaymentPending,

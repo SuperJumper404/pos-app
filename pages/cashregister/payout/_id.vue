@@ -307,6 +307,7 @@ const {
   terminalErrorMessage,
   terminalPaymentMessage,
   hasSettledTerminalAllocations,
+  terminalReaderLabel,
 } = require('@/helpers/stripeTerminal')
 
 const parseCardReceiptDetails = (value) => {
@@ -375,6 +376,15 @@ export default {
     }
   },
   computed: {
+    collectOnly() {
+      return this.$route.query.collectOnly === '1' && this.$route.query.terminal === '1'
+    },
+    payoutReturnPath() {
+      const path = this.$route.query.returnTo
+      return this.collectOnly && typeof path === 'string' &&
+        /^(\/caisse\/menu|\/menus|\/cart|\/orders\/detail\/\d+)$/.test(path)
+        ? path : '/cashregister'
+    },
     cashierIdentity() {
       const user = this.$store.get('users/user')
       return this.$store.get('authenticated') && user && user.id && user.shopid
@@ -394,6 +404,7 @@ export default {
     },
     paymentMethods() {
       const manual = (this.shop_payment_methods || []).filter((method) => !isTerminalMethod(method))
+      if (this.collectOnly) return this.terminalAvailable ? ['stripe_terminal'] : []
       return this.terminalAvailable ? [...manual, 'stripe_terminal'] : manual
     },
     paymentControlsLocked() {
@@ -565,7 +576,7 @@ export default {
   },
   methods: {
     paymentMethodLabel(method) {
-      return isTerminalMethod(method) ? 'Carte bancaire - TPE Stripe' : method
+      return isTerminalMethod(method) ? terminalReaderLabel(this.currentReader || {}) : method
     },
     selectPaymentMethod(method) {
       if (this.paymentControlsLocked) return
@@ -683,6 +694,20 @@ export default {
       if (recovered) { this.offerTerminalReceipt(); return }
       this.terminalAttempt = this.readTerminalAttempt()
       if (this.terminalAttempt) return this.retryTerminalPayment()
+      if (this.$route.query.terminal === '1') {
+        this.selectedPaymentMethod = 'stripe_terminal'
+        if (!this.terminalAvailable) {
+          this.terminalNotice = terminalErrorMessage('TERMINAL_NO_READER')
+          return
+        }
+        const type = this.$route.query.discountType
+        const value = Number(this.$route.query.discountValue)
+        if (!this.hasDeliveryOrders && ['none', 'amount', 'percent'].includes(type) && Number.isFinite(value) && value >= 0) {
+          this.discountType = type
+          this.discountValue = value
+        }
+        return this.startTerminalPayment()
+      }
     },
     async startTerminalPayment() {
       if (this.terminalBusy || this.terminalChecking || this.terminalDisposed || !this.terminalAvailable) return
@@ -792,6 +817,7 @@ export default {
       const orders = paid.filter((order) => Number(order.stripe_terminal_payment_id) === paymentId)
       const allocations = orders.map((order) => ({ orderId: Number(order.id), amountCents: order.stripe_terminal_amount_cents }))
       const payment = { id: paymentId, status: 'succeeded', currency: 'eur', allocations,
+        readerLabel: terminalReaderLabel(orders[0]),
         orderIds: allocations.map((a) => a.orderId), amountCents: allocations.reduce((sum, a) => sum + a.amountCents, 0) }
       if (!hasSettledTerminalAllocations(payment)) return false
       this.stopTerminalPolling()
@@ -858,6 +884,9 @@ export default {
     },
     offerTerminalReceipt() {
       if (this.terminalState === 'succeeded' && this.terminalReceiptOrders.length && !this.receiptDialog) {
+        if (this.collectOnly && ['0', '1'].includes(this.$route.query.receipt)) {
+          return this.completeTerminalCheckout(this.$route.query.receipt === '1')
+        }
         this.requestReceiptChoice()
       }
     },
@@ -1084,6 +1113,7 @@ export default {
             }
         const payment = {
           ...activePayment,
+          readerLabel: terminalReaderLabel({ ...firstOrder, ...activePayment }),
           id: paymentId,
           orderId: order.id,
           orderNumber,
@@ -1140,11 +1170,27 @@ export default {
       this.receiptDialog = false
       this.dialog = false
       Promise.resolve()
-        .then(() => this.$router.push('/cashregister'))
+        .then(() => this.$router.push(this.payoutReturnPath))
         .catch(() => {})
+    },
+    async completeTerminalCheckout(wantsReceipt) {
+      if (this.loadingBtn || this.terminalState !== 'succeeded' || !this.terminalReceiptOrders.length) return
+      this.loadingBtn = true
+      try {
+        if (wantsReceipt) {
+          const orders = await this.buildReceiptOrdersWithDetails(this.terminalReceiptOrders)
+          if (this.terminalDisposed) return
+          this.printReceiptsForOrders(orders, terminalReaderLabel(this.terminalPayment || {}))
+        }
+        this.resolveTerminalArchives(this.terminalReceiptOrders.map(order => Number(order.id)))
+        this.receiptDialog = false
+        this.dialog = false
+        await this.$router.push(this.payoutReturnPath)
+      } finally { this.loadingBtn = false }
     },
     async btnYes(wantsReceipt = false) {
       if (this.loadingBtn) return
+      if (this.collectOnly) return this.completeTerminalCheckout(wantsReceipt)
       const terminalArchive = this.terminalReceiptOrders.length > 0
       if (this.terminalBusy || this.terminalChecking ||
         ['starting', 'processing', 'recovery'].includes(this.terminalState) ||

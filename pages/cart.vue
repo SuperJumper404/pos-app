@@ -469,6 +469,7 @@ import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { buildCheckoutIntentSignature as buildCheckoutPayloadSignature, buildCounterPayBeforePayment, getCounterPayBeforeMethod } from '@/helpers/counterCheckout'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
+import terminalCheckout from '@/mixins/terminalCheckout'
 import {
   applyServerQuoteToCart,
   findCartTargetForCheckoutError,
@@ -489,7 +490,7 @@ export default {
     DeliveryCheckout: () => import('@/components/delivery/DeliveryCheckout.vue'),
     LoyaltyCheckout: () => import('@/components/loyalty/LoyaltyCheckout.vue'),
   },
-  mixins: [price],
+  mixins: [price, terminalCheckout],
   async beforeRouteLeave(to, from, next) {
     if (this.deliveryAttemptLocked && to.path === '/compte') { next(); return }
     if (this.$store.get('cart/clientOrderAuthRedirect')) {
@@ -613,7 +614,7 @@ export default {
       ...(isStripePaymentRequired(this.qrPaymentMode) ? [{ text: 'Payer en ligne', value: 'online' }] : []),
       { text: 'Payer a la livraison', value: 'on_delivery' },
     ] },
-    counterPaymentMethods() { return getPaymentMethodOptions(this.$store.get('shop/shop_payment_methods')) },
+    counterPaymentMethods() { return getPaymentMethodOptions(this.$store.get('shop/shop_payment_methods'), this.checkoutTerminalReader) },
     deliveryAttemptLocked() {
       return this.$store.get('cart/clientOrderPayload')?.fulfillment_type === 'delivery' &&
         ['pending', 'uncertain', 'stripe_prepared'].includes(this.$store.get('cart/clientOrderStatus'))
@@ -1592,11 +1593,25 @@ export default {
     async submitOrderWithoutStripe(paymentMethod, repriceConfirmation = false) {
       this.loadingBtn = true
       try {
+        const terminal = this.isCheckoutTerminalMethod(paymentMethod)
+        const payload = this.buildOrderPayload(paymentMethod, false, repriceConfirmation)
+        if (terminal) payload.payment = this.isDelivery ? 'Paiement a la livraison' : 'Paiement au comptoir'
         const result = await this.$store.dispatch(
           'cart/checkoutOrder',
-          this.buildOrderPayload(paymentMethod, false, repriceConfirmation)
+          payload
         )
         if (result.ok) {
+          if (terminal) {
+            if (this.isDelivery) await this.publishDeliveryTracking(result.data)
+            this.checkoutFinalized = true
+            this.$store.set('stateDialog', false)
+            this.$store.dispatch('cart/setTotal', 0)
+            this.$store.dispatch('cart/setIndex', 0)
+            this.$store.dispatch('cart/setTocart', null)
+            if (this.isDelivery) this.$store.dispatch('delivery/resetForShop', this.checkoutShopId)
+            await this.$router.push(this.terminalCheckoutLocation(result.data.orderId, false))
+            return
+          }
           if (this.isDelivery) { this.finishDeliveryCheckout(result.data); return }
           this.checkoutFinalized = true
           this.$store.set('stateDialog', false)

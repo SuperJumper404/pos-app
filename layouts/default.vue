@@ -406,6 +406,7 @@ export default {
       )
     },
     currentPage() {
+      if (this.$route.name === 'history-terminal-ticket-id') return { title: 'Ticket de paiement', icon: 'mdi-receipt-text-check-outline' }
       if (this.$route.path === '/livraison') return { title: 'Livraison', icon: 'mdi-truck-delivery-outline' }
       const title = this.list.find(
         (item) => item.routeName === this.$route.name

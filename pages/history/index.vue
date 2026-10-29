@@ -257,15 +257,24 @@
         <template #[`item.actions`]="{ item }">
           <div class="history-row-actions">
             <div class="history-row-actions__inner">
-              <v-btn
-                v-if="item.entryType === 'terminal_payment'"
-                outlined
-                small
-                color="primary"
-                class="text-none history-action-button history-attachments-button"
-                :aria-label="`Commandes jointes au paiement TPE ${item.id} (${item.terminalPayment.attachmentsCount})`"
-                @click="openAttachments(item)"
-              >Commandes ({{ item.terminalPayment.attachmentsCount }})<v-icon small right>mdi-paperclip</v-icon></v-btn>
+              <template v-if="item.entryType === 'terminal_payment'">
+                <v-btn
+                  v-if="item.terminalPayment.status === 'succeeded'"
+                  outlined
+                  small
+                  color="primary"
+                  class="text-none history-action-button"
+                  @click="showTerminalTicket(item)"
+                >Ticket <v-icon small right>mdi-invoice-text</v-icon></v-btn>
+                <v-btn
+                  icon
+                  color="primary"
+                  class="history-touch-button history-attachments-button"
+                  :aria-label="`Commandes jointes au paiement TPE ${item.id} (${item.terminalPayment.attachmentsCount})`"
+                  :title="`Commandes jointes (${item.terminalPayment.attachmentsCount})`"
+                  @click="openAttachments(item)"
+                ><v-icon>mdi-paperclip</v-icon></v-btn>
+              </template>
               <v-btn
                 v-else
                 outlined
@@ -462,6 +471,10 @@ export default {
       this.attachmentsPaymentId = item.id
       this.attachmentsDialog = true
     },
+    showTerminalTicket(item) {
+      if (item.entryType !== 'terminal_payment' || item.terminalPayment.status !== 'succeeded') return
+      this.$router.push(`/history/terminal-ticket/${item.id}`)
+    },
     openFocusedPayment() {
       const id = Number(this.$route.query.payment)
       if (!positiveId(id)) return
@@ -533,7 +546,7 @@ export default {
 <style scoped>
 .history-touch-button { min-width: 44px !important; min-height: 44px !important; }
 .history-terminal-label { display: flex; align-items: center; gap: 6px; }
-.history-row-actions, .history-row-actions__inner { display: flex; align-items: center; min-height: 44px; max-width: 100%; }
+.history-row-actions, .history-row-actions__inner { display: flex; align-items: center; gap: 4px; min-height: 44px; max-width: 100%; }
 .history-action-button { max-width: 100%; letter-spacing: normal; }
 .history-attachments-button { padding-right: 10px !important; padding-left: 10px !important; }
 @media (max-width: 600px) { .history-action-button { min-height: 44px; } }

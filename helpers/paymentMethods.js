@@ -101,14 +101,19 @@ const normalizePaymentSummary = (rows) => {
   return Array.from(grouped.values())
 }
 
-const getPaymentMethodOptions = (methods) => {
+const getPaymentMethodOptions = (methods, reader = null) => {
   const normalized = normalizePaymentMethods(methods)
   const active = normalized.length
     ? normalized
     : PAYMENT_METHOD_OPTIONS.map((option) => option.value)
-  return active
+  const options = active
     .map((method) => findPaymentMethodOption(method))
     .filter(Boolean)
+  if (reader && reader.isActive) options.push({
+    text: require('./stripeTerminal').terminalReaderLabel(reader),
+    value: 'stripe_terminal', icon: 'mdi-credit-card-wireless-outline',
+  })
+  return options
 }
 
 module.exports = {

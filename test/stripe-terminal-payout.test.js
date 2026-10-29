@@ -1092,6 +1092,41 @@ test('delivery Terminal receipt preserves product VAT and fee snapshot without s
   assert.strictEqual(payload.subtotalBeforeDiscount, 24)
 })
 
+test('paid recovery retains the historic terminal name in cash and card receipts', async () => {
+  const h = make({ orders: [order(1, { payment_status: 'paid', payment_provider: 'stripe_terminal',
+    stripe_terminal_payment_id: 91, stripe_terminal_amount_cents: 1200, terminal_reader_label: 'TPE terrasse' })] })
+  await h.initialize()
+  assert.strictEqual(h.instance.terminalReceiptOrders[0].terminal_reader_label, 'TPE terrasse')
+  assert.strictEqual(h.instance.buildTerminalCardTicketPayloads(h.instance.terminalReceiptOrders)[0].readerLabel, 'TPE terrasse')
+})
+
+test('checkout handoff starts TPE and collects without archiving a pending order', async () => {
+  const h = make()
+  Object.assign(h.instance.$route.query, { terminal: '1', collectOnly: '1', receipt: '0', returnTo: '/caisse/menu' })
+  await h.initialize()
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 1)
+  assert.strictEqual(count(h, 'orders/archiveOrder'), 0)
+  assert.strictEqual(count(h, 'navigate'), 0)
+  h.state.activePayment = payment('succeeded', { readerLabel: 'TPE terrasse' })
+  await h.tick()
+  await Promise.resolve()
+  assert.strictEqual(count(h, 'orders/archiveOrder'), 0)
+  assert.ok(h.calls.some(call => call.name === 'navigate' && call.payload === '/caisse/menu'))
+  assert.strictEqual(h.state.orders[0].payment_status, 'unpaid', 'view must not forge local paid state')
+})
+
+test('checkout handoff reports an unavailable assigned terminal and allows closing', async () => {
+  const h = make()
+  h.state.reader = null
+  Object.assign(h.instance.$route.query, { terminal: '1', collectOnly: '1', returnTo: '/orders/detail/1' })
+  await h.initialize()
+  assert.strictEqual(count(h, 'stripeTerminal/startPayment'), 0)
+  assert.ok(h.instance.terminalNotice)
+  h.instance.btnNo()
+  await Promise.resolve()
+  assert.ok(h.calls.some(call => call.name === 'navigate' && call.payload === '/orders/detail/1'))
+})
+
 const run = async () => {
   let failed = 0
   const selected = tests.filter(test => !process.env.TASK15_PAYOUT_FILTER || test.name.includes(process.env.TASK15_PAYOUT_FILTER))

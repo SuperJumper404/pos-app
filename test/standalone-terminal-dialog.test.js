@@ -7,6 +7,8 @@ const file = 'components/terminal/StandaloneTerminalDialog.vue'
 assert.ok(fs.existsSync(path.resolve(__dirname, '..', file)), 'The free-amount terminal modal must exist')
 const { component, template } = require('./helpers/vue-component')(file)
 const instances = []
+const find = (node, predicate) => node && (predicate(node) ? node : (node.children || []).map(child => find(child, predicate)).find(Boolean))
+const text = node => node ? `${node.text || ''} ${(node.children || []).map(text).join(' ')}` : ''
 const payment = { id: 21, paymentKind: 'standalone', readerId: 7, status: 'processing', amountCents: 5000,
   currency: 'eur', createdAt: '2026-10-28T12:00:00Z', confirmedAt: null,
   failureCode: null, failureMessage: null, cardTicket: null, attachmentsCount: 0 }
@@ -14,7 +16,7 @@ const make = () => {
   const values = new Map()
   global.localStorage = { getItem: key => values.get(key) || null,
     setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) }
-  const user = { id: 4, shopid: 7, access: 1, module_permissions: ['cashregister', 'history'] }
+  const user = Vue.observable({ id: 4, shopid: 7, access: 1, module_permissions: ['cashregister', 'history'] })
   const calls = []
   const network = Vue.observable({ loading: false })
   let response = payment
@@ -121,6 +123,18 @@ const run = async () => {
   assert.strictEqual(paid.instance.payment.status, 'succeeded')
   assert.strictEqual(readAttempt(global.localStorage, attemptStorageKey(paid.user)), null)
   assert.ok(paid.instance._render(), 'Real Vue template must render the payment outcome')
+  const ticket = find(paid.instance._render(), node => node.tag === 'v-btn' && text(node).trim().startsWith('Ticket'))
+  assert.ok(ticket, 'Successful payment provides a ticket action')
+  paid.user.module_permissions = ['cashregister']
+  assert.ok(find(paid.instance._render(), node => node.tag === 'v-btn' && text(node).trim().startsWith('Ticket')), 'The payer can access their ticket without history permission')
+  await ticket.data.on.click()
+  assert.ok(paid.calls.some(call => call.route === '/history/terminal-ticket/21'))
+  paid.instance.payment = { ...payment, status: 'failed' }
+  assert.ok(!find(paid.instance._render(), node => node.tag === 'v-btn' && text(node).trim().startsWith('Ticket')), 'Failed payment has no card receipt')
+  await paid.instance.goToTicket()
+  assert.strictEqual(paid.calls.filter(call => call.route === '/history/terminal-ticket/21').length, 1)
+  paid.instance.payment = { ...payment, status: 'succeeded' }
+  paid.user.module_permissions = ['cashregister', 'history']
   await paid.instance.goToHistory()
   assert.ok(paid.calls.some(call => call.route && call.route.path === '/history'))
   paid.instance.$destroy()
