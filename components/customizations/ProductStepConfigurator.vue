@@ -176,7 +176,7 @@
 
     <v-dialog v-model="attachDialog" max-width="520">
       <v-card class="se-modal">
-        <v-card-title>Ajouter une étape partagée</v-card-title>
+        <v-card-title class="se-modal-title">Ajouter une étape partagée</v-card-title>
         <v-card-text>
           <v-select
             v-model="selectedStepId"

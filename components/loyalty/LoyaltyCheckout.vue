@@ -24,7 +24,7 @@
       <v-btn outlined class="text-none" :loading="loyalty.busy" @click="$store.dispatch('loyalty/enroll')">Rejoindre le programme</v-btn>
     </template>
     <p v-else-if="!loyalty.busy" class="mt-2 mb-0 text--secondary">Le programme n’est pas disponible dans ce restaurant.</p>
-    <v-dialog v-model="confirming" max-width="460"><v-card><v-card-title class="subtitle-1">Utiliser mes points</v-card-title><v-card-text v-if="chosenReward">Confirmez-vous l’utilisation de {{ chosenReward.points }} points pour « {{ chosenReward.name }} » ? Aucun point ne sera dépensé avant le paiement.</v-card-text><v-card-actions><v-spacer /><v-btn text @click="confirming = false">Annuler</v-btn><v-btn color="primary" :disabled="disabled" @click="confirmReward">Confirmer</v-btn></v-card-actions></v-card></v-dialog>
+    <v-dialog v-model="confirming" max-width="460"><v-card><v-card-title class="subtitle-1 se-modal-title">Utiliser mes points</v-card-title><v-card-text v-if="chosenReward">Confirmez-vous l’utilisation de {{ chosenReward.points }} points pour « {{ chosenReward.name }} » ? Aucun point ne sera dépensé avant le paiement.</v-card-text><v-card-actions><v-spacer /><v-btn text @click="confirming = false">Annuler</v-btn><v-btn color="primary" :disabled="disabled" @click="confirmReward">Confirmer</v-btn></v-card-actions></v-card></v-dialog>
   </section>
 </template>
 <script>

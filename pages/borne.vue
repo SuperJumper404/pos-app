@@ -315,7 +315,7 @@
         content-class="kiosk-mode-dialog"
       >
         <v-card class="kiosk-dialog-card">
-          <v-card-title>Votre commande</v-card-title>
+          <v-card-title class="se-modal-title">Votre commande</v-card-title>
           <v-card-text class="kiosk-mode-actions">
             <v-btn
               color="primary"
@@ -346,7 +346,7 @@
         content-class="kiosk-name-dialog"
       >
         <v-card class="kiosk-dialog-card">
-          <v-card-title>Votre nom</v-card-title>
+          <v-card-title class="se-modal-title">Votre nom</v-card-title>
           <v-card-text>
             <div class="kiosk-keyboard-input-wrap">
               <v-text-field
@@ -423,7 +423,7 @@
         content-class="kiosk-phone-dialog"
       >
         <v-card class="kiosk-dialog-card">
-          <v-card-title>Votre numero</v-card-title>
+          <v-card-title class="se-modal-title">Votre numero</v-card-title>
           <v-card-text>
             <div class="kiosk-keyboard-input-wrap">
               <v-text-field
@@ -492,7 +492,7 @@
         @input="handleExitDialogInput"
       >
         <v-card class="kiosk-exit-card">
-          <v-card-title>
+          <v-card-title class="se-modal-title">
             <span>Confirmer la déconnexion</span>
             <v-spacer />
             <v-btn

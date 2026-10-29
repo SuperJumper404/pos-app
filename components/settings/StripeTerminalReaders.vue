@@ -174,7 +174,7 @@
 
     <v-dialog v-model="dialogOpen" max-width="520" :persistent="busy" aria-labelledby="terminal-register-title">
       <v-card class="se-modal terminal-readers__dialog">
-        <v-card-title id="terminal-register-title">Connecter TPE</v-card-title>
+        <v-card-title id="terminal-register-title" class="se-modal-title">Connecter TPE</v-card-title>
         <v-card-text>
           <v-form ref="registrationForm" @submit.prevent="registerReader">
             <v-text-field

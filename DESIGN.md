@@ -377,12 +377,17 @@ retour neutre, suppression rouge, retrait de lien orange et connexion TPE violet
 Les icones MDI remplies accompagnent des verbes explicites. Une action de fermeture
 ne doit pas concurrencer visuellement la validation.
 
-Les grands choix `se-modal-choice` restent teintes avec une selection pleine,
-un repere textuel ou une coche et un etat presse accessible. Le service utilise
-bleu pour sur place, orange pour a emporter et violet pour livraison. Les choix
-d'impression utilisent bleu et neutre. Les modes de remise % / euros et raccourcis
-de pourcentage restent selectionnables avec le meme contraste que les paiements.
+Ce pattern s'applique aux actions TPE, annulations/suppressions, associations de
+commandes et formulaires. Les boutons de remise, choix de ticket, mode de remise,
+selection de table et personnalisation produit conservent leur presentation precedente.
 Les etats desactives et de chargement conservent leurs verrouillages existants.
+
+Les titres de dialogue utilisent `se-modal-title` : Poppins, 20px sur ordinateur,
+18px sur mobile, graisse 600 et interligne 1.35. Les titres imbriques heritent de
+cette typographie ; les sous-titres restent en 14px normal. Le bouton de fermeture
+garde sa cible de 44px a droite, sans passer sous le titre. La variante `--flush`
+evite de doubler la marge dans une carte deja rembourree. `se-modal-heading`
+porte la meme typographie dans les en-tetes personnalises et les barres d'outils.
 
 ### Do:
 

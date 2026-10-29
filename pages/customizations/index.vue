@@ -236,7 +236,7 @@
 
     <v-dialog v-model="newStepDialog" max-width="620" persistent>
       <v-card class="se-modal">
-        <v-card-title>Nouvelle étape</v-card-title>
+        <v-card-title class="se-modal-title">Nouvelle étape</v-card-title>
         <v-card-text>
           <StepEditor
             :key="`new-step-${newStepEditorKey}`"
@@ -251,7 +251,7 @@
 
     <v-dialog v-model="choiceDialog" max-width="720" persistent>
       <v-card class="se-modal">
-        <v-card-title>
+        <v-card-title class="se-modal-title">
           {{ editingChoice ? 'Modifier le choix' : 'Nouveau choix' }}
         </v-card-title>
         <v-card-text>
@@ -270,7 +270,7 @@
 
     <v-dialog v-model="stepDeactivateDialog" max-width="560" persistent>
       <v-card class="se-modal">
-        <v-card-title>Désactiver cette étape ?</v-card-title>
+        <v-card-title class="se-modal-title">Désactiver cette étape ?</v-card-title>
         <v-card-text>
           <p>
             L'étape restera dans la bibliothèque mais ne sera plus proposée à la
@@ -315,7 +315,7 @@
 
     <v-dialog v-model="stepDeleteDialog" max-width="560" persistent>
       <v-card class="se-modal">
-        <v-card-title>Supprimer définitivement cette étape ?</v-card-title>
+        <v-card-title class="se-modal-title">Supprimer définitivement cette étape ?</v-card-title>
         <v-card-text>
           <p v-if="stepToDelete">
             L’étape « {{ stepToDelete.name }} », ses choix et leurs images
@@ -365,7 +365,7 @@
 
     <v-dialog v-model="choiceDeactivateDialog" max-width="480" persistent>
       <v-card class="se-modal">
-        <v-card-title>Désactiver ce choix ?</v-card-title>
+        <v-card-title class="se-modal-title">Désactiver ce choix ?</v-card-title>
         <v-card-text>
           {{ choiceToDeactivate && choiceToDeactivate.name }} ne sera plus
           proposé sur les produits utilisant cette étape.
@@ -391,7 +391,7 @@
 
     <v-dialog v-model="choiceDeleteDialog" max-width="560" persistent>
       <v-card class="se-modal">
-        <v-card-title>Supprimer définitivement ce choix ?</v-card-title>
+        <v-card-title class="se-modal-title">Supprimer définitivement ce choix ?</v-card-title>
         <v-card-text>
           <p v-if="choiceToDelete">
             Le choix « {{ choiceToDelete.name }} » sera supprimé définitivement

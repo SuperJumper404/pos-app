@@ -1,21 +1,21 @@
 <template>
-  <v-card class="customization-wizard se-modal">
-    <v-card-title class="customization-wizard__header d-flex align-center">
-      <div>
-        <div class="text-h6">{{ product.name || 'Personnalisation' }}</div>
+  <v-card class="customization-wizard">
+    <v-card-title class="customization-wizard__header d-flex align-center se-modal-title">
+      <div class="se-modal-title__copy">
+        <div class="se-modal-title__text">{{ product.name || 'Personnalisation' }}</div>
         <div v-if="!isSummary" class="text-caption grey--text">
           Étape {{ currentStepNumber }} / {{ visibleStepCount }}
         </div>
         <div v-else class="text-caption grey--text">Résumé</div>
       </div>
       <v-spacer></v-spacer>
-      <div class="text-right mr-2">
+      <div class="se-modal-title__meta text-right mr-2">
         <div class="text-caption grey--text">Prix actuel</div>
         <div class="font-weight-bold primary--text">
           {{ formatCurrency(previewUnitPrice) }}
         </div>
       </div>
-      <v-btn icon class="se-modal-icon" aria-label="Fermer" @click="cancel">
+      <v-btn icon aria-label="Fermer" @click="cancel">
         <v-icon>mdi-close</v-icon>
       </v-btn>
     </v-card-title>
@@ -28,7 +28,7 @@
 
     <v-card-text class="customization-wizard__body">
       <template v-if="currentStep && !isSummary">
-        <h2 class="text-h5 mb-1">{{ currentStep.name || 'Étape' }}</h2>
+        <h2 class="se-modal-section-title mb-1">{{ currentStep.name || 'Étape' }}</h2>
         <p v-if="currentStep.description" class="grey--text mb-2">
           {{ currentStep.description }}
         </p>
@@ -56,7 +56,7 @@
       </template>
 
       <template v-else>
-        <h2 class="text-h5 mb-4">Votre sélection</h2>
+        <h2 class="se-modal-section-title mb-4">Votre sélection</h2>
         <CustomizationSummary
           :groups="summaryGroups"
           :unit-price="previewUnitPrice"
@@ -67,17 +67,17 @@
       </template>
     </v-card-text>
 
-    <v-card-actions class="customization-wizard__footer se-modal-actions pa-4">
-      <v-btn outlined class="text-none se-modal-action se-modal-action--secondary" @click="goBack">
+    <v-divider></v-divider>
+    <v-card-actions class="customization-wizard__footer pa-4">
+      <v-btn text class="text-none" @click="goBack">
         <v-icon left>mdi-arrow-left</v-icon>
         {{ backButtonLabel }}
       </v-btn>
       <v-spacer></v-spacer>
       <v-btn
         v-if="!isSummary"
-        depressed
         color="primary"
-        class="text-none se-modal-action se-modal-action--primary"
+        class="text-none"
         :disabled="continueDisabled"
         @click="goForward"
       >
@@ -86,9 +86,8 @@
       </v-btn>
       <v-btn
         v-else
-        depressed
         color="success"
-        class="text-none se-modal-action se-modal-action--success"
+        class="text-none"
         :disabled="!allStepsValid"
         @click="confirmCustomization"
       >

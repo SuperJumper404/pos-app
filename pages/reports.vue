@@ -246,7 +246,7 @@
 
     <v-dialog v-model="closeClosureDialog" max-width="520">
       <v-card class="reports-dialog">
-        <v-card-title class="reports-dialog__title">
+        <v-card-title class="reports-dialog__title se-modal-title">
           <v-icon color="primary" left>mdi-lock-check</v-icon>
           Clôturer la caisse
         </v-card-title>
@@ -275,7 +275,7 @@
       <v-card class="reports-detail">
         <div class="reports-detail__header">
           <div>
-            <div class="reports-detail__title">
+            <div class="reports-detail__title se-modal-heading">
               Ticket Z #{{ selectedClosureDetail.closure_number || '-' }}
             </div>
             <div class="reports-detail__subtitle">
@@ -283,7 +283,7 @@
               {{ formatClosureDate(selectedClosureDetail.closed_at) }}
             </div>
           </div>
-          <v-btn icon small @click="closureDetailDialog = false">
+          <v-btn icon class="se-modal-icon" aria-label="Fermer le ticket Z" @click="closureDetailDialog = false">
             <v-icon small>mdi-close</v-icon>
           </v-btn>
         </div>

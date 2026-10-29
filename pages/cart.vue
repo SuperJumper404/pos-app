@@ -407,7 +407,7 @@
 
     <v-dialog v-model="repriceDialog" max-width="520" persistent>
       <v-card>
-        <v-card-title>Le prix de la commande a changé</v-card-title>
+        <v-card-title class="se-modal-title">Le prix de la commande a changé</v-card-title>
         <v-card-text>
           Le nouveau total est de
           <strong>{{ formatCurrency(total) }}</strong
@@ -424,7 +424,7 @@
     </v-dialog>
     <v-dialog v-model="cancelDialog" max-width="350" persistent>
       <v-card>
-        <v-card-title>Annulation</v-card-title>
+        <v-card-title class="se-modal-title">Annulation</v-card-title>
         <v-card-text>Êtes-vous sûr de vouloir annuler ?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>

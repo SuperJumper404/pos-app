@@ -236,8 +236,8 @@
 
     <v-dialog v-model="ingredientDialog" max-width="720">
       <v-card class="se-modal">
-        <v-card-title class="stock-dialog-title">
-          <v-icon left color="primary">mdi-food-apple-outline</v-icon>
+        <v-card-title class="stock-dialog-title se-modal-title">
+          <v-icon color="primary">mdi-food-apple-outline</v-icon>
           {{ editingIngredientId ? "Modifier l'ingrédient" : 'Ajouter un ingrédient' }}
         </v-card-title>
         <v-card-text>
@@ -269,8 +269,8 @@
 
     <v-dialog v-model="replenishDialog" max-width="560">
       <v-card class="se-modal">
-        <v-card-title class="stock-dialog-title">
-          <v-icon left color="primary">mdi-truck-delivery-outline</v-icon>
+        <v-card-title class="stock-dialog-title se-modal-title">
+          <v-icon color="primary">mdi-truck-delivery-outline</v-icon>
           Réapprovisionner
         </v-card-title>
         <v-card-text>
@@ -298,8 +298,8 @@
 
     <v-dialog v-model="inventoryDialog" max-width="560">
       <v-card class="se-modal">
-        <v-card-title class="stock-dialog-title">
-          <v-icon left color="primary">mdi-clipboard-check-outline</v-icon>
+        <v-card-title class="stock-dialog-title se-modal-title">
+          <v-icon color="primary">mdi-clipboard-check-outline</v-icon>
           Inventaire rapide
         </v-card-title>
         <v-card-text><v-text-field v-model="inventoryForm.quantity" label="Quantité constatée" type="number" min="0" step="1" prepend-icon="mdi-counter" outlined dense /><v-textarea v-model="inventoryForm.remark" label="Remarque" prepend-icon="mdi-note-text-outline" outlined dense rows="3" /></v-card-text>
@@ -701,9 +701,6 @@ export default {
   padding: 16px 20px 10px;
 }
 .stock-dialog-title {
-  gap: var(--se-space-2);
-  font-size: var(--se-font-title-sm);
-  font-weight: var(--se-weight-semibold);
   border-bottom: 1px solid var(--se-color-border-soft);
 }
 .stock-dialog-actions {

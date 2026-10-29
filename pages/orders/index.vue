@@ -338,7 +338,7 @@
     </section>
     <v-dialog v-model="cancelDialog" max-width="440" persistent>
       <v-card class="se-modal">
-        <v-card-title>{{ cancelDialogTitle }}</v-card-title>
+        <v-card-title class="se-modal-title">{{ cancelDialogTitle }}</v-card-title>
         <v-card-text>{{ cancelDialogMessage }}</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>

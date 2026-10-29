@@ -1,7 +1,7 @@
 <template>
   <v-dialog :value="value" max-width="680" scrollable :persistent="locked" @input="$emit('input', $event)">
     <v-card class="delivery-order-dialog">
-      <v-card-title class="delivery-order-title">
+      <v-card-title class="delivery-order-title se-modal-title">
         <span>Livraison</span>
         <v-btn icon :disabled="locked" aria-label="Fermer la livraison" title="Fermer la livraison" @click="$emit('input', false)"><v-icon>mdi-close</v-icon></v-btn>
       </v-card-title>

@@ -22,7 +22,7 @@
       </template>
     </v-data-table>
     <v-dialog v-model="detailsOpen" max-width="640" scrollable>
-      <v-card v-if="selected"><v-card-title>{{ currentDelivery.orderReference }}</v-card-title><v-card-text>
+      <v-card v-if="selected"><v-card-title class="se-modal-title">{{ currentDelivery.orderReference }}</v-card-title><v-card-text>
         <p>{{ statusLabel(currentDelivery.deliveryStatus) }} / {{ paymentLabel(currentDelivery.paymentStatus) }}</p>
         <address v-if="currentDelivery.addressSnapshot && currentDelivery.addressSnapshot.street">{{ currentDelivery.addressSnapshot.street }}, {{ currentDelivery.addressSnapshot.postalCode }} {{ currentDelivery.addressSnapshot.city }}<br>{{ currentDelivery.addressSnapshot.complement }}<br>{{ currentDelivery.addressSnapshot.instructions }}</address>
         <p v-else-if="currentDelivery.addressSnapshot">Adresse indisponible</p>
@@ -33,7 +33,7 @@
       </v-card-text><v-card-actions><v-spacer /><v-btn text @click="detailsOpen = false">Fermer</v-btn></v-card-actions></v-card>
     </v-dialog>
     <v-dialog :value="actionOpen" max-width="560" persistent>
-      <v-card><v-card-title>{{ actionLabel(operation) }}</v-card-title><v-card-text>
+      <v-card><v-card-title class="se-modal-title">{{ actionLabel(operation) }}</v-card-title><v-card-text>
         <v-alert v-if="operator.error" type="error" text role="alert">{{ operator.error }}</v-alert>
         <p v-if="selected">{{ currentDelivery.orderReference }} / {{ statusLabel(currentDelivery.deliveryStatus) }} / version {{ currentDelivery.version }}</p>
         <v-alert v-if="pending" type="warning" text>{{ pending.status === 'conflict' ? 'Etat serveur relu. Une nouvelle confirmation est requise.' : 'Tentative conservee. La reprise utilise la meme demande.' }}</v-alert>
@@ -45,7 +45,7 @@
       </v-card-text><v-card-actions class="flex-wrap"><v-spacer /><v-btn text :disabled="locked" @click="actionOpen = false">Fermer</v-btn><v-btn color="primary" :loading="sending" :disabled="!actionValid || sending || (pending && pending.status === 'conflict' && !pending.reloaded)" @click="confirmAction(Boolean(pending && pending.status === 'conflict'))">{{ pending && pending.status === 'unresolved' ? 'Reprendre la tentative' : pending && pending.status === 'conflict' ? 'Confirmer le nouvel etat' : 'Confirmer' }}</v-btn></v-card-actions></v-card>
     </v-dialog>
     <v-dialog :value="refundOpen" max-width="600" persistent>
-      <v-card><v-card-title>Remboursement manuel complet</v-card-title><v-card-text>
+      <v-card><v-card-title class="se-modal-title">Remboursement manuel complet</v-card-title><v-card-text>
         <v-alert v-if="operator.error" type="error" text role="alert">{{ operator.error }}</v-alert>
         <v-progress-linear v-if="refundLoading" indeterminate />
         <v-alert v-if="refundReadFailed && !refundLoading" type="warning" text>Lecture de l'eligibilite indisponible. Aucune nouvelle restitution ne peut etre confirmee.</v-alert>

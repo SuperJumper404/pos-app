@@ -584,7 +584,7 @@
             </v-row>
             <v-dialog v-model="themeJsonDialog" max-width="860">
               <v-card class="se-modal pa-5 settings-theme-dialog">
-                <v-card-title class="settings-theme-dialog-title px-0 pt-0">
+                <v-card-title class="se-modal-title--flush settings-theme-dialog-title se-modal-title">
                   Modifier le JSON du theme
                 </v-card-title>
                 <v-textarea
@@ -1314,8 +1314,6 @@ export default {
 
 .settings-theme-dialog-title {
   color: var(--se-color-text, #121826);
-  font-size: var(--se-font-title, 1.25rem);
-  font-weight: var(--se-weight-semibold, 600);
 }
 
 .settings-theme-json ::v-deep textarea {

@@ -11,7 +11,7 @@
         <v-btn icon aria-label="Fermer la modification" @click="requestClose">
           <v-icon>mdi-close</v-icon>
         </v-btn>
-        <v-toolbar-title>
+        <v-toolbar-title class="se-modal-heading">
           Modification de la commande #{{ orderNumber }}
         </v-toolbar-title>
       </v-toolbar>

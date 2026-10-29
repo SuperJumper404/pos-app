@@ -92,7 +92,7 @@
 
     <v-dialog v-model="formDialog" max-width="560" persistent>
       <v-card class="se-modal">
-        <v-card-title>{{ form.id ? 'Modifier la borne' : 'Ajouter une borne' }}</v-card-title>
+        <v-card-title class="se-modal-title">{{ form.id ? 'Modifier la borne' : 'Ajouter une borne' }}</v-card-title>
         <v-card-text>
           <v-form ref="form" v-model="formValid" @submit.prevent="submit">
             <v-text-field
@@ -136,7 +136,7 @@
 
     <v-dialog v-model="credentialsDialog" max-width="420">
       <v-card class="se-modal">
-        <v-card-title>Acces borne</v-card-title>
+        <v-card-title class="se-modal-title">Acces borne</v-card-title>
         <v-card-text>
           <v-text-field :value="credentials.kiosk_login_id" label="Identifiant" readonly />
           <v-text-field

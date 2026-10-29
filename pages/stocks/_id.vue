@@ -87,7 +87,7 @@
 
     <v-dialog v-model="replenishDialog" max-width="560">
       <v-card>
-        <v-card-title class="stock-dialog-title">
+        <v-card-title class="stock-dialog-title se-modal-title">
           <v-icon left color="primary">mdi-truck-delivery-outline</v-icon>
           Réapprovisionner
         </v-card-title>
@@ -106,7 +106,7 @@
 
     <v-dialog v-model="inventoryDialog" max-width="520">
       <v-card>
-        <v-card-title class="stock-dialog-title">
+        <v-card-title class="stock-dialog-title se-modal-title">
           <v-icon left color="primary">mdi-clipboard-check-outline</v-icon>
           Inventaire rapide
         </v-card-title>
@@ -117,7 +117,7 @@
 
     <v-dialog v-model="editDialog" max-width="640">
       <v-card>
-        <v-card-title class="stock-dialog-title">
+        <v-card-title class="stock-dialog-title se-modal-title">
           <v-icon left color="primary">mdi-food-apple-outline</v-icon>
           Modifier l'ingrédient
         </v-card-title>

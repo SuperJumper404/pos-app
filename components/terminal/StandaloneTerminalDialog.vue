@@ -1,8 +1,8 @@
 <template>
   <v-dialog :value="value" max-width="420" scrollable aria-labelledby="standalone-terminal-title" @input="!$event && closeDialog()">
     <v-card class="standalone-terminal" @keydown="handleKey">
-      <v-card-title class="standalone-terminal__heading">
-        <h2 id="standalone-terminal-title">Paiement TPE</h2>
+      <v-card-title class="standalone-terminal__heading se-modal-title">
+        <h2 id="standalone-terminal-title" class="se-modal-title__copy">Paiement TPE</h2>
         <v-spacer />
         <v-btn icon aria-label="Fermer le paiement TPE" class="standalone-terminal__close se-modal-icon" @click="closeDialog">
           <v-icon>mdi-close</v-icon>
@@ -293,8 +293,6 @@ export default {
 
 <style scoped>
 .standalone-terminal { border-radius: var(--se-radius-lg) !important; }
-.standalone-terminal__heading { padding: 12px 16px 8px 24px; }
-.standalone-terminal__heading h2 { font-size: var(--se-font-title-sm); font-weight: 600; }
 .standalone-terminal__close { min-width: 44px; min-height: 44px; }
 .standalone-terminal__body { padding: 0 24px 12px !important; }
 .standalone-terminal__reader { display: flex; align-items: center; gap: 8px; min-height: 32px; margin-bottom: 12px; color: var(--se-color-text-muted); }

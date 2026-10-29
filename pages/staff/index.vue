@@ -82,7 +82,7 @@
 
     <v-dialog v-model="formDialog" max-width="560" persistent>
       <v-card class="se-modal">
-        <v-card-title>{{ isEditing ? 'Modifier un utilisateur' : 'Ajouter un utilisateur' }}</v-card-title>
+        <v-card-title class="se-modal-title">{{ isEditing ? 'Modifier un utilisateur' : 'Ajouter un utilisateur' }}</v-card-title>
         <v-card-text>
           <v-form ref="form" v-model="formValid" @submit.prevent="submit">
             <v-text-field
@@ -145,7 +145,7 @@
 
     <v-dialog v-model="credentialsDialog" max-width="420" persistent>
       <v-card class="se-modal">
-        <v-card-title>Identifiants caisse</v-card-title>
+        <v-card-title class="se-modal-title">Identifiants caisse</v-card-title>
         <v-card-text>
           <v-text-field
             v-if="credentialResult"
@@ -182,7 +182,7 @@
 
     <v-dialog v-model="removeDialog" max-width="420">
       <v-card class="se-modal">
-        <v-card-title>Supprimer cet utilisateur ?</v-card-title>
+        <v-card-title class="se-modal-title">Supprimer cet utilisateur ?</v-card-title>
         <v-card-text>
           {{ removeTarget ? removeTarget.username : '' }} ne pourra plus se connecter.
         </v-card-text>

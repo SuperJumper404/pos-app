@@ -20,7 +20,7 @@
       </template>
     </v-card-text>
     <v-dialog v-model="confirming" max-width="460" :persistent="loyalty.busy">
-      <v-card><v-card-title class="subtitle-1">Confirmer l’utilisation des points</v-card-title><v-card-text v-if="chosenReward">Réserver {{ chosenReward.points }} points pour « {{ chosenReward.name }} » sur cette commande ? Les points seront dépensés uniquement après confirmation du paiement.</v-card-text><v-card-actions><v-spacer /><v-btn text :disabled="loyalty.busy" @click="confirming = false">Annuler</v-btn><v-btn color="primary" :loading="loyalty.busy" @click="reserve">Confirmer</v-btn></v-card-actions></v-card>
+      <v-card><v-card-title class="subtitle-1 se-modal-title">Confirmer l’utilisation des points</v-card-title><v-card-text v-if="chosenReward">Réserver {{ chosenReward.points }} points pour « {{ chosenReward.name }} » sur cette commande ? Les points seront dépensés uniquement après confirmation du paiement.</v-card-text><v-card-actions><v-spacer /><v-btn text :disabled="loyalty.busy" @click="confirming = false">Annuler</v-btn><v-btn color="primary" :loading="loyalty.busy" @click="reserve">Confirmer</v-btn></v-card-actions></v-card>
     </v-dialog>
   </v-card>
 </template>

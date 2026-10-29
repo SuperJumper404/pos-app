@@ -120,9 +120,8 @@
     </div>
     <v-dialog v-model="imageLibraryDialog" max-width="980" scrollable>
       <v-card class="se-modal">
-        <v-card-title class="d-flex align-center">
-          <span class="text-subtitle-1">Bibliothèque d'images</span>
-          <v-spacer />
+        <v-card-title class="se-modal-title">
+          <span class="se-modal-title__copy">Bibliothèque d'images</span>
           <v-btn
             class="se-modal-icon"
             icon

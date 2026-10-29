@@ -872,7 +872,7 @@
       max-width="640"
     >
       <v-card class="payment-picker">
-        <v-card-title>Encaisser</v-card-title>
+        <v-card-title class="se-modal-title">Encaisser</v-card-title>
         <v-card-text>
           <div class="express-payment-total mb-4">
             <div class="d-flex justify-space-between">
@@ -940,8 +940,8 @@
       v-model="expressDiscountDialog"
       max-width="520"
     >
-      <v-card class="se-modal">
-        <v-card-title>Remise globale</v-card-title>
+      <v-card>
+        <v-card-title class="se-modal-title">Remise globale</v-card-title>
         <v-card-text>
           <div class="text-body-2 mb-3">
             La remise s'applique à toute la commande.
@@ -949,38 +949,25 @@
           <v-btn-toggle
             v-model="expressDiscountDraftType"
             mandatory
-            class="d-flex flex-wrap mb-4"
+            color="primary"
+            class="d-flex mb-4"
           >
-            <v-btn
-              value="percent"
-              class="se-modal-choice se-modal-choice--compact se-modal-choice--orange flex-grow-1 text-none"
-              :class="{ 'se-modal-choice--selected': expressDiscountDraftType === 'percent' }"
-              :aria-pressed="expressDiscountDraftType === 'percent'"
-            >
-              <v-icon>mdi-percent</v-icon>
-              <span>Pourcentage</span>
+            <v-btn value="percent" class="flex-grow-1 text-none">
+              Pourcentage
             </v-btn>
-            <v-btn
-              value="amount"
-              class="se-modal-choice se-modal-choice--compact flex-grow-1 text-none"
-              :class="{ 'se-modal-choice--selected': expressDiscountDraftType === 'amount' }"
-              :aria-pressed="expressDiscountDraftType === 'amount'"
-            >
-              <v-icon>mdi-currency-eur</v-icon>
-              <span>Montant en euros</span>
+            <v-btn value="amount" class="flex-grow-1 text-none">
+              Montant en euros
             </v-btn>
           </v-btn-toggle>
           <div v-if="expressDiscountDraftType === 'percent'" class="d-flex flex-wrap">
             <v-btn
               v-for="percentage in expressDiscountPercentages"
               :key="percentage"
-              depressed
-              class="se-modal-preset mr-2 mb-2 text-none"
-              :class="{ 'se-modal-preset--active': Number(expressDiscountDraftValue) === percentage }"
-              :aria-pressed="Number(expressDiscountDraftValue) === percentage"
+              outlined
+              color="primary"
+              class="mr-2 mb-2 text-none"
               @click="expressDiscountDraftValue = percentage"
             >
-              <v-icon v-if="Number(expressDiscountDraftValue) === percentage" left small>mdi-check-circle</v-icon>
               {{ percentage }} %
             </v-btn>
           </div>
@@ -1009,20 +996,19 @@
             </div>
           </div>
         </v-card-text>
-        <v-card-actions class="se-modal-actions">
-          <v-btn class="se-modal-action se-modal-action--warning text-none" @click="clearExpressDiscount">
-            <v-icon left>mdi-delete</v-icon>
+        <v-card-actions>
+          <v-btn text class="text-none" @click="clearExpressDiscount">
             Supprimer
           </v-btn>
           <v-spacer />
           <v-btn
-            class="se-modal-action se-modal-action--secondary text-none"
+            text
+            class="text-none"
             @click="expressPaymentDialog = true; expressDiscountDialog = false"
           >
             Annuler
           </v-btn>
-          <v-btn depressed class="se-modal-action se-modal-action--primary text-none" @click="applyExpressDiscount">
-            <v-icon left>mdi-check-circle</v-icon>
+          <v-btn color="primary" class="text-none" @click="applyExpressDiscount">
             Appliquer
           </v-btn>
         </v-card-actions>
@@ -1035,15 +1021,16 @@
       max-width="560"
       persistent
     >
-      <v-card class="se-modal">
-        <v-card-title>Ticket de caisse</v-card-title>
+      <v-card>
+        <v-card-title class="se-modal-title">Ticket de caisse</v-card-title>
         <v-card-text>
           <div class="express-receipt-grid">
             <v-btn
-              class="express-receipt-tile se-modal-choice text-none"
+              class="express-receipt-tile text-none"
               color="primary"
               :disabled="expressReceiptPrinting"
               depressed
+              dark
               @click="confirmExpressReceipt(true)"
             >
               <template v-if="expressReceiptPrinting">
@@ -1051,24 +1038,26 @@
                 <span>Impression...</span>
               </template>
               <template v-else>
-                <v-icon class="mb-2">mdi-printer</v-icon>
+                <v-icon class="mb-2">mdi-printer-outline</v-icon>
                 <span>Imprimer ticket</span>
               </template>
             </v-btn>
             <v-btn
-              class="express-receipt-tile se-modal-choice se-modal-choice--neutral text-none"
+              class="express-receipt-tile text-none"
+              color="grey lighten-3"
               depressed
               @click="confirmExpressReceipt(false)"
             >
-              <v-icon class="mb-2">mdi-receipt-text-remove</v-icon>
+              <v-icon class="mb-2">mdi-receipt-text-remove-outline</v-icon>
               <span>Pas de ticket</span>
             </v-btn>
           </div>
         </v-card-text>
-        <v-card-actions class="se-modal-actions pt-0">
+        <v-card-actions class="pt-0">
           <v-spacer />
           <v-btn
-            class="se-modal-action se-modal-action--secondary text-none"
+            text
+            class="text-none"
             @click="expressReceiptDialog = false"
           >
             Retour
@@ -1078,22 +1067,25 @@
     </v-dialog>
 
     <v-dialog v-model="expressTableDialog" max-width="720">
-      <v-card class="se-modal">
-        <v-card-title>Choisir la table</v-card-title>
+      <v-card>
+        <v-card-title class="se-modal-title">Choisir la table</v-card-title>
         <v-card-text>
           <div class="express-table-grid">
             <v-btn
               v-for="table in dataTables"
               :key="table.id"
-              class="express-table-tile se-modal-choice text-none"
-              :class="{ 'se-modal-choice--selected': String(expressSelectedTable) === String(table.id) }"
-              :aria-pressed="String(expressSelectedTable) === String(table.id)"
+              class="express-table-tile text-none"
+              :color="
+                String(expressSelectedTable) === String(table.id)
+                  ? 'primary'
+                  : 'grey lighten-3'
+              "
+              :dark="String(expressSelectedTable) === String(table.id)"
               depressed
               @click="selectExpressTable(table)"
             >
               <v-icon class="mb-2">mdi-table-chair</v-icon>
               <span>{{ table.name }}</span>
-              <v-icon v-if="String(expressSelectedTable) === String(table.id)" class="se-modal-choice__check" small>mdi-check-circle</v-icon>
             </v-btn>
           </div>
         </v-card-text>
@@ -1101,58 +1093,49 @@
     </v-dialog>
 
     <v-dialog v-model="expressServiceDialog" max-width="560">
-      <v-card class="se-modal">
-        <v-card-title>{{ canUseDeliveryService ? 'Mode de remise' : 'Sur place ou à emporter' }}</v-card-title>
+      <v-card>
+        <v-card-title class="se-modal-title">{{ canUseDeliveryService ? 'Mode de remise' : 'Sur place ou à emporter' }}</v-card-title>
         <v-card-text>
           <div class="express-service-grid" :class="{ 'express-service-grid--delivery': canUseDeliveryService && !isOrderEditActive }">
             <v-btn
-              class="express-service-tile se-modal-choice text-none"
-              :class="{ 'se-modal-choice--selected': !expressIsTakeaway && !expressIsDelivery }"
-              :aria-pressed="!expressIsTakeaway && !expressIsDelivery"
+              class="express-service-tile text-none"
+              :class="{ 'express-service-tile--active': !expressIsTakeaway && !expressIsDelivery }"
+              :color="!expressIsTakeaway && !expressIsDelivery ? 'primary' : 'grey lighten-3'"
+              :dark="!expressIsTakeaway && !expressIsDelivery"
               :disabled="canUseDeliveryService && expressDeliveryLocked"
               depressed
               @click="selectExpressService(false)"
             >
-              <v-icon class="mb-2">mdi-storefront</v-icon>
+              <v-icon class="mb-2">mdi-storefront-outline</v-icon>
               <span>
                 Sur place
                 <small v-if="!expressIsTakeaway && !expressIsDelivery" class="express-choice-state">
-                  <v-icon class="se-modal-choice__state-icon" small>mdi-check-circle</v-icon> Choisi
+                  Choisi
                 </small>
               </span>
             </v-btn>
             <v-btn
-              class="express-service-tile se-modal-choice se-modal-choice--orange text-none"
-              :class="{ 'se-modal-choice--selected': expressIsTakeaway && !expressIsDelivery }"
-              :aria-pressed="expressIsTakeaway && !expressIsDelivery"
+              class="express-service-tile text-none"
+              :class="{ 'express-service-tile--active': expressIsTakeaway && !expressIsDelivery }"
+              :color="expressIsTakeaway && !expressIsDelivery ? 'primary' : 'grey lighten-3'"
+              :dark="expressIsTakeaway && !expressIsDelivery"
               :disabled="canUseDeliveryService && expressDeliveryLocked"
               depressed
               @click="selectExpressService(true)"
             >
-              <v-icon class="mb-2">mdi-shopping</v-icon>
+              <v-icon class="mb-2">mdi-shopping-outline</v-icon>
               <span>
                 À emporter
                 <small v-if="expressIsTakeaway && !expressIsDelivery" class="express-choice-state">
-                  <v-icon class="se-modal-choice__state-icon" small>mdi-check-circle</v-icon> Choisi
+                  Choisi
                 </small>
               </span>
             </v-btn>
-            <v-btn
-              v-if="canUseDeliveryService && !isOrderEditActive"
-              class="express-service-tile se-modal-choice se-modal-choice--purple text-none"
-              :class="{ 'se-modal-choice--selected': expressIsDelivery }"
-              :aria-pressed="expressIsDelivery"
-              :disabled="expressDeliveryUnavailable || expressDeliveryLocked"
-              depressed
-              @click="openExpressDeliveryDialog"
-            >
-              <v-icon class="mb-2">mdi-truck-delivery</v-icon>
-              <span>
-                Livraison
-                <small v-if="expressIsDelivery" class="express-choice-state">
-                  <v-icon class="se-modal-choice__state-icon" small>mdi-check-circle</v-icon> Choisi
-                </small>
-              </span>
+            <v-btn v-if="canUseDeliveryService && !isOrderEditActive" class="express-service-tile text-none"
+              :class="{ 'express-service-tile--active': expressIsDelivery }" :color="expressIsDelivery ? 'primary' : 'grey lighten-3'"
+              :dark="expressIsDelivery" :disabled="expressDeliveryUnavailable || expressDeliveryLocked" depressed @click="openExpressDeliveryDialog">
+              <v-icon class="mb-2">mdi-truck-delivery-outline</v-icon>
+              <span>Livraison<small v-if="expressIsDelivery" class="express-choice-state">Choisi</small></span>
             </v-btn>
           </div>
         </v-card-text>
@@ -3281,8 +3264,16 @@ export default {
 }
 
 .express-service-tile {
+  border-radius: 8px !important;
   flex-direction: column;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  height: 118px !important;
   min-width: 0 !important;
+}
+
+.express-service-tile--active {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.42) !important;
 }
 
 .express-service-tile ::v-deep .v-btn__content {
@@ -3291,7 +3282,11 @@ export default {
 }
 
 .express-table-tile {
+  border-radius: 8px !important;
   flex-direction: column;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  height: 112px !important;
   min-width: 0 !important;
 }
 
@@ -3309,7 +3304,11 @@ export default {
 }
 
 .express-receipt-tile {
+  border-radius: 8px !important;
   flex-direction: column;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  height: 118px !important;
   min-width: 0 !important;
 }
 

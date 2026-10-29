@@ -1,10 +1,10 @@
 <template>
   <v-dialog :value="value" max-width="780" scrollable aria-labelledby="terminal-attachments-title" @input="!$event && closeDialog()">
     <v-card class="terminal-attachments se-modal">
-      <v-card-title class="terminal-attachments__heading">
-        <div>
+      <v-card-title class="terminal-attachments__heading se-modal-title">
+        <div class="se-modal-title__copy">
           <h2 id="terminal-attachments-title">Commandes jointes</h2>
-          <p v-if="payment" class="text-body-2 mb-0 mt-1">Paiement TPE #{{ payment.id }} · {{ money(payment.amountCents) }}</p>
+          <p v-if="payment" class="se-modal-title__subtitle">Paiement TPE #{{ payment.id }} · {{ money(payment.amountCents) }}</p>
         </div>
         <v-spacer />
         <v-btn icon class="terminal-attachments__touch se-modal-icon" aria-label="Fermer les commandes jointes" @click="closeDialog"><v-icon>mdi-close</v-icon></v-btn>
@@ -173,8 +173,6 @@ export default {
 </script>
 
 <style scoped>
-.terminal-attachments__heading { align-items: flex-start; padding: 20px 20px 12px 24px; }
-.terminal-attachments__heading h2 { font-size: var(--se-font-title-sm); line-height: 1.4; font-weight: 600; }
 .terminal-attachments__body { padding: 0 24px 16px !important; }
 .terminal-attachments__notice { color: var(--se-color-text-muted); line-height: 1.6; margin: 0 0 16px; }
 .terminal-attachments__list { list-style: none; padding: 0; margin: 0; }

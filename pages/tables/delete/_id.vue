@@ -5,7 +5,7 @@
         <div class="text-center">
           <v-icon size="64" color="error">mdi-delete-alert</v-icon>
         </div>
-        <v-card-title class="justify-center">
+        <v-card-title class="justify-center se-modal-title">
           <h3>Supprimer la table?</h3>
         </v-card-title>
         <v-card-text class="text-center">

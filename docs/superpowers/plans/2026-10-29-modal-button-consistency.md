@@ -42,3 +42,7 @@
 - [x] Review the final diff.
 
 Release: commit and push feature/staging, deploy Docker staging, and confirm actual readiness; release evidence is recorded in the chat and GitHub Actions.
+
+## Revision approved after visual review
+
+Keep groups 5, 6, 7 and 9. Restore discount, receipt, service-mode, table and customization buttons to commit 0281110; keep the earlier payment-method palette. Harmonize dialog titles and custom dialog headings at 20px desktop / 18px mobile, weight600, with inset-aware spacing and stable close placement. Preserve handlers, locks and all financial behavior. The primary agent verified nine button-dialog comparisons against 0281110 and inspected fourteen representative dialog headers at desktop/mobile widths.

@@ -158,8 +158,8 @@
 
     <v-dialog v-model="imageLibraryDialog" max-width="980" scrollable>
       <v-card class="image-library-dialog">
-        <v-card-title class="image-library-dialog__header">
-          <div class="image-library-dialog__title">
+        <v-card-title class="image-library-dialog__header se-modal-title">
+          <div class="image-library-dialog__title se-modal-title__text">
             <v-icon color="primary" class="mr-2">
               mdi-image-search-outline
             </v-icon>
