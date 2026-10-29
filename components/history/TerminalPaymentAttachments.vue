@@ -10,13 +10,13 @@
         <v-btn icon class="terminal-attachments__touch" aria-label="Fermer les commandes jointes" @click="closeDialog"><v-icon>mdi-close</v-icon></v-btn>
       </v-card-title>
       <v-card-text class="terminal-attachments__body">
-        <p class="terminal-attachments__notice">Pièces jointes informatives : ces commandes ne sont pas réglées par ce rattachement.</p>
+        <p class="terminal-attachments__notice">Liens informatifs, même pour un paiement annulé. Aucun montant ni statut de commande n’est modifié.</p>
         <v-alert v-if="errorMessage" type="error" text dense role="alert">{{ errorMessage }}</v-alert>
         <v-progress-linear v-if="loadingPayment" indeterminate color="primary" class="mb-4" aria-label="Chargement des pièces jointes" />
         <ul v-if="attachments.length" class="terminal-attachments__list" aria-label="Commandes déjà jointes">
-          <li v-for="item in attachments" :key="item.archiveId" class="terminal-attachments__item">
+          <li v-for="item in attachments" :key="sourceKey(item)" class="terminal-attachments__item">
             <div>
-              <v-btn v-if="item.available" text color="primary" class="text-none terminal-attachments__reference" :to="`/history/ticket/${item.archiveId}`">#{{ item.orderNumber }}<v-icon small right>mdi-open-in-new</v-icon></v-btn>
+              <v-btn v-if="item.available" text color="primary" class="text-none terminal-attachments__reference" :to="item.archiveId ? `/history/ticket/${item.archiveId}` : `/orders/detail/${item.orderId}`">#{{ item.orderNumber }}<v-icon small right>mdi-open-in-new</v-icon></v-btn>
               <strong v-else>#{{ item.orderNumber }}</strong>
               <span v-if="!item.available" class="text-caption d-block">Commande d’origine indisponible</span>
             </div>
@@ -27,18 +27,18 @@
         <p v-else-if="!loadingPayment" class="terminal-attachments__empty">Aucune commande jointe. Ce paiement peut rester sans pièce jointe.</p>
 
         <template v-if="canModify">
-          <h3 class="terminal-attachments__subtitle">Ajouter des commandes de l’historique</h3>
+          <h3 class="terminal-attachments__subtitle">Ajouter des commandes en cours ou archivées</h3>
           <v-text-field v-model="search" outlined dense hide-details clearable class="se-search-field mb-3" placeholder="Rechercher une commande" aria-label="Rechercher une commande à joindre" prepend-inner-icon="mdi-magnify" :disabled="busy" />
           <v-alert v-if="candidatesError" text dense type="error">{{ candidatesError }} <v-btn text small @click="loadCandidates">Réessayer</v-btn></v-alert>
-          <v-data-table v-model="selectedCandidates" :headers="headers" :items="candidateRows" item-key="archiveId" selectable-key="isSelectable" show-select :options.sync="candidateOptions" :server-items-length="candidatesTotal" :loading="loadingCandidates" :footer-props="{ 'items-per-page-options': [10, 25, 50], 'items-per-page-text': 'Commandes par page' }" disable-sort no-data-text="Aucune commande correspondante" loading-text="Chargement des commandes…" dense>
+          <v-data-table v-model="selectedCandidates" :headers="headers" :items="candidateRows" item-key="sourceKey" selectable-key="isSelectable" show-select :options.sync="candidateOptions" :server-items-length="candidatesTotal" :loading="loadingCandidates" :footer-props="{ 'items-per-page-options': [10, 25, 50], 'items-per-page-text': 'Commandes par page' }" disable-sort no-data-text="Aucune commande correspondante" loading-text="Chargement des commandes…" dense>
             <template #[`header.data-table-select`]="{ props, on }"><v-checkbox :input-value="props.value" :indeterminate="props.indeterminate" :disabled="busy || !hasSelectableCandidates" hide-details dense color="primary" class="terminal-attachments__select" aria-label="Sélectionner les commandes de cette page" @change="on.input($event)" @click.stop /></template>
             <template #[`item.data-table-select`]="{ item, isSelected, select }"><v-checkbox :input-value="isSelected" :disabled="busy || !item.isSelectable" hide-details dense color="primary" class="terminal-attachments__select" :aria-label="`Joindre la commande ${item.orderNumber}`" @change="select($event)" @click.stop /></template>
             <template #[`item.orderNumber`]="{ item }"><strong>#{{ item.orderNumber }}</strong><span v-if="!item.isSelectable" class="text-caption d-block">Déjà jointe</span></template>
             <template #[`item.tableName`]="{ item }">{{ item.tableName || '—' }}</template>
+            <template #[`item.orderStatus`]="{ item }"><span>{{ item.archiveId ? 'Archivée' : orderStatusText(item.orderStatus) }}</span></template>
             <template #[`item.amountCents`]="{ item }"><span class="terminal-attachments__money">{{ money(item.amountCents) }}</span></template>
           </v-data-table>
         </template>
-        <v-alert v-else-if="payment && !loadingPayment" text dense type="info" class="mt-4">Les pièces jointes pourront être modifiées après confirmation du paiement.</v-alert>
       </v-card-text>
       <v-card-actions class="terminal-attachments__actions">
         <v-btn text class="text-none terminal-attachments__touch" @click="closeDialog">Fermer</v-btn>
@@ -59,15 +59,15 @@ export default {
     busy: false, loadingPayment: false, loadingCandidates: false,
     detailVersion: 0, candidateVersion: 0, searchTimer: null,
     candidateOptions: { page: 1, itemsPerPage: 10 },
-    headers: [{ text: 'Commande', value: 'orderNumber' }, { text: 'Table', value: 'tableName' }, { text: 'Client', value: 'customer' }, { text: 'Montant', value: 'amountCents', align: 'end' }],
+    headers: [{ text: 'Commande', value: 'orderNumber' }, { text: 'Statut', value: 'orderStatus' }, { text: 'Table', value: 'tableName' }, { text: 'Client', value: 'customer' }, { text: 'Montant', value: 'amountCents', align: 'end' }],
   }),
   computed: {
     userScope() { return attemptStorageKey(this.$store.get('users/user')) },
-    canModify() { return Boolean(this.payment && this.payment.status === 'succeeded') },
+    canModify() { return Boolean(this.payment) },
     hasSelectableCandidates() { return this.candidateRows.some(item => item.isSelectable) },
     candidateRows() {
-      const joined = new Set(this.attachments.map(item => item.archiveId))
-      return this.candidates.map(item => ({ ...item, isSelectable: !joined.has(item.archiveId) }))
+      const joined = this.joinedSources()
+      return this.candidates.map(item => ({ ...item, sourceKey: this.sourceKey(item), isSelectable: !joined.has(this.sourceKey(item)) }))
     },
   },
   watch: {
@@ -83,6 +83,11 @@ export default {
   },
   beforeDestroy() { this.invalidate() },
   methods: {
+    sourceKey(item) { return item.archiveId ? `archive:${item.archiveId}` : `order:${item.orderId}` },
+    joinedSources() {
+      return new Set(this.attachments.flatMap(item => [item.archiveId && `archive:${item.archiveId}`, item.orderId && `order:${item.orderId}`].filter(Boolean)))
+    },
+    orderStatusText(status) { return ({ 1: 'En attente', 2: 'En préparation', 3: 'Terminée', 4: 'Annulée' })[status] || 'En cours' },
     money(cents) { return `${formatTerminalAmount(cents)} €` },
     invalidate() {
       this.detailVersion += 1
@@ -152,13 +157,15 @@ export default {
       this.$emit('changed')
     },
     async addSelected() {
-      const joined = new Set(this.attachments.map(item => item.archiveId))
-      const archiveIds = [...new Set(this.selectedCandidates.map(item => item.archiveId))].filter(id => !joined.has(id))
-      if (!archiveIds.length || archiveIds.length > 50) return
-      await this.mutateAttachments('terminalPayments/addAttachments', { id: this.paymentId, archiveIds })
+      const joined = this.joinedSources()
+      const selected = this.selectedCandidates.filter(item => !joined.has(this.sourceKey(item)))
+      const archiveIds = [...new Set(selected.filter(item => item.archiveId).map(item => item.archiveId))]
+      const orderIds = [...new Set(selected.filter(item => !item.archiveId).map(item => item.orderId))]
+      if (!archiveIds.length && !orderIds.length || archiveIds.length + orderIds.length > 50) return
+      await this.mutateAttachments('terminalPayments/addAttachments', { id: this.paymentId, archiveIds, ...(orderIds.length && { orderIds }) })
     },
     async removeAttachment(item) {
-      await this.mutateAttachments('terminalPayments/removeAttachment', { id: this.paymentId, archiveId: item.archiveId })
+      await this.mutateAttachments('terminalPayments/removeAttachment', { id: this.paymentId, ...(item.orderId ? { orderId: item.orderId } : { archiveId: item.archiveId }) })
     },
     closeDialog() { this.invalidate(); this.$emit('input', false) },
   },

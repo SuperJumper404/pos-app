@@ -64,6 +64,13 @@ const run = async () => {
   assert.deepStrictEqual(docs.calls[0].args[1], { archiveIds: [123] })
   assert.strictEqual(await docs.call('addAttachments', { id: 21, archiveIds: [123, 123] }), false)
   assert.strictEqual(docs.calls.length, 1)
+  const activeAttachment = { ...attachment, archiveId: null, orderId: 123 }
+  const canceledInfo = { payment: { ...payment, status: 'canceled' }, attachments: [attachment, activeAttachment] }
+  const activeDocs = make(() => Promise.resolve(ok(canceledInfo)))
+  assert.deepStrictEqual(await activeDocs.call('addAttachments', { id: 21, archiveIds: [123], orderIds: [123] }), canceledInfo)
+  assert.deepStrictEqual(activeDocs.calls[0].args[1], { archiveIds: [123], orderIds: [123] })
+  await activeDocs.call('removeAttachment', { id: 21, orderId: 123 })
+  assert.strictEqual(activeDocs.calls[1].args[0], '/baseurl/api/v1/stripe/terminal/standalone-payments/21/attachments/orders/123')
   console.log('PASS standalone store payloads, isolated state, uncertain requests and session races')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

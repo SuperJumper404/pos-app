@@ -54,12 +54,15 @@ const run = async (context, send, validate, paymentRequest = false) => {
     }
   }
 }
-const validAttachment = item => Boolean(item && positiveId(item.archiveId) &&
+const validSource = item => Boolean(item && (positiveId(item.archiveId) || (item.archiveId === null && positiveId(item.orderId))) &&
+  (item.orderId === undefined || positiveId(item.orderId)))
+const sourceKey = item => positiveId(item.archiveId) ? `archive:${item.archiveId}` : `order:${item.orderId}`
+const validAttachment = item => Boolean(validSource(item) &&
   typeof item.orderNumber === 'string' && Number.isSafeInteger(item.amountCents) && item.amountCents >= 0 &&
   typeof item.attachedAt === 'string' && typeof item.available === 'boolean')
 const validAttachmentResult = result => Boolean(result && validStandalonePayment(result.payment) &&
   Array.isArray(result.attachments) && result.attachments.every(validAttachment) &&
-  new Set(result.attachments.map(item => item.archiveId)).size === result.attachments.length)
+  new Set(result.attachments.map(sourceKey)).size === result.attachments.length)
 const attachmentResultFor = id => result => validAttachmentResult(result) && result.payment.id === id
 const pageParams = (input = {}) => ({
   search: typeof input.search === 'string' ? input.search.slice(0, 200) : '',
@@ -92,24 +95,25 @@ export const actions = {
   },
   searchCandidates(context, input = {}) {
     return run(context, () => this.$axios.get(`${baseUrl}/standalone-payments/attachment-candidates`, {
-      ...config(), params: pageParams(input),
+      ...config(), params: { ...pageParams(input), includeActive: true },
     }), result => Boolean(result && Number.isSafeInteger(result.total) && result.total >= 0 &&
-      Array.isArray(result.items) && result.items.every(item => positiveId(item.archiveId) &&
+      Array.isArray(result.items) && result.items.every(item => validSource(item) &&
         typeof item.orderNumber === 'string' && Number.isSafeInteger(item.amountCents) && item.amountCents >= 0)))
   },
   addAttachments(context, input) {
     const id = input && input.id
     return run(context, () => {
       requiredId(id)
-      const ids = input.archiveIds
-      if (!Array.isArray(ids) || !ids.length || ids.length > 50 || !ids.every(positiveId) || new Set(ids).size !== ids.length) invalid()
-      return this.$axios.post(`${baseUrl}/standalone-payments/${id}/attachments`, { archiveIds: ids }, config())
+      const ids = input.archiveIds === undefined ? [] : input.archiveIds
+      const orderIds = input.orderIds === undefined ? [] : input.orderIds
+      if (![ids, orderIds].every(values => Array.isArray(values) && values.every(positiveId) && new Set(values).size === values.length) || ids.length + orderIds.length < 1 || ids.length + orderIds.length > 50) invalid()
+      return this.$axios.post(`${baseUrl}/standalone-payments/${id}/attachments`, { archiveIds: ids, ...(orderIds.length && { orderIds }) }, config())
     }, attachmentResultFor(id))
   },
   removeAttachment(context, input) {
     const id = input && input.id
     return run(context, () => this.$axios.delete(
-      `${baseUrl}/standalone-payments/${requiredId(id)}/attachments/${requiredId(input.archiveId)}`, config()
+      `${baseUrl}/standalone-payments/${requiredId(id)}/attachments/${input.orderId === undefined ? requiredId(input.archiveId) : `orders/${requiredId(input.orderId)}`}`, config()
     ), attachmentResultFor(id))
   },
   resetSession({ state, dispatch }) {

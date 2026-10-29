@@ -78,6 +78,16 @@ const run = async () => {
   assert.ok(!calls.some(call => /orders\/|archiveOrder|startPayment/.test(call.name)))
   await instance.removeAttachment(instance.attachments[0])
   assert.strictEqual(instance.attachments.length, 0)
+  instance.payment = { ...payment, status: 'canceled' }
+  const active = { ...candidate, archiveId: null, orderId: 5, orderNumber: 'ACTIVE5', orderStatus: 2 }
+  instance.candidates = [candidate, active]
+  assert.strictEqual(instance.canModify, true, 'Canceled payments still support informational links')
+  assert.deepStrictEqual(instance.candidateRows.map(row => row.sourceKey), ['archive:5', 'order:5'])
+  instance.selectedCandidates = [candidate, active]
+  await instance.addSelected()
+  assert.deepStrictEqual(calls.filter(call => call.name === 'terminalPayments/addAttachments').pop().payload, { id: 123, archiveIds: [5], orderIds: [5] })
+  await instance.removeAttachment({ ...active, available: true })
+  assert.deepStrictEqual(calls.filter(call => call.name === 'terminalPayments/removeAttachment').pop().payload, { id: 123, orderId: 5 })
   const searches = []
   instance.$store.dispatch = () => new Promise(resolve => searches.push(resolve))
   const firstSearch = instance.loadCandidates()
