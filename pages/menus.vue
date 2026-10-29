@@ -871,7 +871,7 @@
       v-model="expressPaymentDialog"
       max-width="640"
     >
-      <v-card>
+      <v-card class="payment-picker">
         <v-card-title>Encaisser</v-card-title>
         <v-card-text>
           <div class="express-payment-total mb-4">
@@ -893,8 +893,8 @@
             <v-btn
               v-for="method in expressPaymentMethods"
               :key="method.value"
-              color="success"
-              class="express-payment-tile text-none font-weight-bold"
+              class="express-payment-tile payment-choice text-none font-weight-bold"
+              :class="`payment-choice--${method.tone}`"
               :disabled="expressSubmitDisabled"
               :loading="expressPaymentLoading === method.value"
               depressed
@@ -903,25 +903,25 @@
               <v-icon class="mb-2">{{ method.icon }}</v-icon>
               <span>{{ method.text }}</span>
             </v-btn>
+          </div>
+          <div class="payment-picker-utilities">
             <v-btn
-              color="primary"
-              class="express-payment-tile text-none font-weight-bold"
+              class="payment-picker-utility text-none"
               :disabled="expressSubmitDisabled"
               :loading="expressPaymentLoading === 'Paiement au comptoir'"
               depressed
               @click="submitExpressPayLater"
             >
-              <v-icon class="mb-2">mdi-clock-outline</v-icon>
+              <v-icon left>mdi-clock-outline</v-icon>
               <span>{{ expressIsDelivery ? 'Payer a la livraison' : 'Payer plus tard' }}</span>
             </v-btn>
             <v-btn
-              color="warning"
-              class="express-payment-tile text-none font-weight-bold"
+              class="payment-picker-utility text-none"
               :disabled="expressSubmitDisabled"
               depressed
               @click="openExpressDiscountDialog"
             >
-              <v-icon class="mb-2">mdi-percent</v-icon>
+              <v-icon left>mdi-percent</v-icon>
               <span>{{ expressDiscountLabel }}</span>
             </v-btn>
           </div>
@@ -3652,9 +3652,13 @@ export default {
     width: 100%;
   }
 
-  .express-choice-row,
-  .express-payment-grid {
+  .express-choice-row {
     grid-template-columns: 1fr;
+  }
+
+  .express-payment-tile {
+    font-size: var(--se-font-small) !important;
+    height: 104px !important;
   }
 }
 

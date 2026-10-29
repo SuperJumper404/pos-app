@@ -78,8 +78,9 @@
                 :aria-disabled="paymentControlsLocked"
                 :aria-checked="selectedPaymentMethod === method"
                 :class="[
-                  'cashregister-payout-method',
-                  { 'cashregister-payout-method--active': selectedPaymentMethod === method },
+                  'cashregister-payout-method payment-choice',
+                  `payment-choice--${paymentMethodTone(method)}`,
+                  { 'cashregister-payout-method--active': selectedPaymentMethod === method, 'payment-choice--active': selectedPaymentMethod === method },
                 ]"
                 @click="selectPaymentMethod(method)"
                 @keydown.enter="selectPaymentMethod(method)"
@@ -270,6 +271,7 @@
   </v-container>
 </template>
 <script>
+import { getPaymentMethodOptions, getPaymentMethodTone } from '@/helpers/paymentMethods'
 import price from '@/helpers/price'
 import TerminalPaymentStatus from '@/components/cashregister/TerminalPaymentStatus.vue'
 import { calculateDiscount } from '@/helpers/discount'
@@ -931,18 +933,11 @@ export default {
       this.offerTerminalReceipt()
     },
     paymentMethodIcon(method) {
-      const value = String(method || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036F]/g, '')
-        .toLowerCase()
-      if (value.includes('espece') || value.includes('cash')) {
-        return 'mdi-cash-multiple'
-      }
-      if (value.includes('ticket')) {
-        return 'mdi-ticket-confirmation-outline'
-      }
-      return 'mdi-credit-card-outline'
+      const options = getPaymentMethodOptions([method], this.currentReader)
+      const option = options.find((option) => option.value === method) || options[0]
+      return option ? option.icon : 'mdi-credit-card'
     },
+    paymentMethodTone: getPaymentMethodTone,
     openDiscountDialog() {
       if (this.hasDeliveryOrders) return
       if (!this.requiresPaymentMethod || this.paymentControlsLocked) return
@@ -1529,7 +1524,7 @@ export default {
 ::v-deep .cashregister-payout-methods__group .v-input--radio-group__input {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   width: 100%;
 }
 

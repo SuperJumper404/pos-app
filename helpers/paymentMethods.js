@@ -2,25 +2,29 @@ const PAYMENT_METHOD_OPTIONS = [
   {
     text: 'Carte bancaire',
     value: 'Carte bancaire',
-    icon: 'mdi-credit-card-outline',
+    icon: 'mdi-credit-card',
+    tone: 'card',
     aliases: ['Carte', 'Carte Bleu', 'Carte Bleu ', 'CB'],
   },
   {
     text: 'Espèces',
     value: 'Espèces',
-    icon: 'mdi-cash',
+    icon: 'mdi-cash-multiple',
+    tone: 'cash',
     aliases: ['Espèce', 'Espèces '],
   },
   {
     text: 'Ticket restaurant',
     value: 'Ticket restaurant',
-    icon: 'mdi-ticket-confirmation-outline',
+    icon: 'mdi-ticket-confirmation',
+    tone: 'voucher',
     aliases: ['Ticket resto', 'Ticket Restaurant', 'Tickets Restaurants'],
   },
   {
     text: 'Chèque',
     value: 'Chèque',
-    icon: 'mdi-file-document-outline',
+    icon: 'mdi-checkbook',
+    tone: 'cheque',
     aliases: ['Cheque', 'Cheques', 'Chèques'],
   },
 ]
@@ -38,6 +42,12 @@ const findPaymentMethodOption = (method) => {
     const names = [option.text, option.value, ...(option.aliases || [])]
     return names.some((name) => normalizeText(name) === normalized)
   })
+}
+
+const getPaymentMethodTone = (method) => {
+  if (method === 'stripe_terminal') return 'terminal'
+  const option = findPaymentMethodOption(method)
+  return option ? option.tone : 'card'
 }
 
 const normalizePaymentMethod = (method, provider) => {
@@ -111,7 +121,7 @@ const getPaymentMethodOptions = (methods, reader = null) => {
     .filter(Boolean)
   if (reader && reader.isActive) options.push({
     text: require('./stripeTerminal').terminalReaderLabel(reader),
-    value: 'stripe_terminal', icon: 'mdi-credit-card-wireless-outline',
+    value: 'stripe_terminal', icon: 'mdi-contactless-payment', tone: 'terminal',
   })
   return options
 }
@@ -119,6 +129,7 @@ const getPaymentMethodOptions = (methods, reader = null) => {
 module.exports = {
   PAYMENT_METHOD_OPTIONS,
   getPaymentMethodOptions,
+  getPaymentMethodTone,
   normalizePaymentMethod,
   normalizePaymentMethods,
   normalizePaymentSummary,

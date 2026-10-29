@@ -9,6 +9,8 @@
   --se-color-success-soft: #e8f8ef;
   --se-color-warning: #ffa014;
   --se-color-warning-soft: #fff4df;
+  --se-color-success-ink: #176647;
+  --se-color-warning-ink: #8b4b0a;
   --se-color-danger: #d83b3b;
   --se-color-danger-soft: #ffecec;
   --se-color-info: #1976d2;
@@ -65,6 +67,126 @@
   border: 1px solid var(--se-color-border);
   border-radius: var(--se-radius-md);
   color: var(--se-color-text-body);
+}
+
+/* Stable payment identities across menu, order detail and cash register. */
+.payment-choice {
+  --payment-ink: var(--se-color-primary-hover);
+  --payment-soft: var(--se-color-primary-soft);
+  --payment-foreground: var(--payment-ink);
+  background: var(--payment-soft) !important;
+  border: 1px solid var(--payment-ink) !important;
+  border-radius: var(--se-radius-lg) !important;
+  color: var(--payment-foreground) !important;
+  transition: background-color var(--se-transition-fast), color var(--se-transition-fast);
+}
+
+.payment-choice--cash {
+  --payment-ink: var(--se-color-success-ink);
+  --payment-soft: var(--se-color-success-soft);
+}
+
+.payment-choice--voucher {
+  --payment-ink: var(--se-color-warning-ink);
+  --payment-soft: var(--se-color-warning-soft);
+}
+
+.payment-choice--terminal {
+  --payment-ink: var(--se-color-brand-purple);
+  --payment-soft: var(--se-color-brand-purple-soft);
+}
+
+.payment-choice--cheque {
+  --payment-ink: var(--se-color-text-body);
+  --payment-soft: var(--se-color-surface-muted);
+}
+
+.v-application .payment-choice .v-icon,
+.payment-choice.cashregister-payout-method span {
+  color: var(--payment-foreground) !important;
+}
+
+.payment-choice > .v-icon,
+.payment-choice .v-btn__content > .v-icon {
+  font-size: 30px;
+}
+
+.payment-choice--active {
+  --payment-foreground: var(--se-color-surface);
+  background: var(--payment-ink) !important;
+}
+
+.payment-choice:focus-visible {
+  outline: 3px solid var(--payment-ink);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .payment-choice:not(:disabled):not([aria-disabled='true']):hover {
+    --payment-foreground: var(--se-color-surface);
+    background: var(--payment-ink) !important;
+  }
+}
+
+.payment-choice.v-btn--disabled,
+.payment-choice[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.payment-choice .v-btn__content {
+  flex-direction: column;
+  letter-spacing: 0;
+  line-height: var(--se-line-body);
+  white-space: normal;
+}
+
+.payment-picker .v-card__title {
+  font-weight: var(--se-weight-bold);
+}
+
+.payment-picker .express-payment-total,
+.payment-picker .order-payment-total {
+  color: var(--se-color-text-body);
+  padding-bottom: var(--se-space-4);
+  border-bottom: 1px solid var(--se-color-border-soft);
+}
+
+.payment-picker .express-payment-total strong,
+.payment-picker .order-payment-total strong {
+  color: var(--se-color-text);
+  font-size: var(--se-font-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.express-payment-grid > .payment-choice:last-child:nth-child(odd),
+.order-payment-grid > .payment-choice:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.payment-picker-utilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--se-space-3);
+  border-top: 1px solid var(--se-color-border-soft);
+  margin-top: var(--se-space-5);
+  padding-top: var(--se-space-4);
+}
+
+.payment-picker-utilities .payment-picker-utility {
+  flex: 1 1 140px;
+  min-height: var(--se-touch-target);
+  background: var(--se-color-surface-muted) !important;
+  color: var(--se-color-text-body) !important;
+  border: 1px solid var(--se-color-border);
+  border-radius: var(--se-radius-md);
+  letter-spacing: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-choice {
+    transition: none;
+  }
 }
 
 .se-panel-header {

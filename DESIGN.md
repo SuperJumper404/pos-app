@@ -8,8 +8,10 @@ colors:
   brand-purple-soft: "#f3e8ff"
   success: "#00e676"
   success-soft: "#e8f8ef"
+  success-ink: "#176647"
   warning: "#ffa014"
   warning-soft: "#fff4df"
+  warning-ink: "#8b4b0a"
   danger: "#d83b3b"
   danger-soft: "#ffecec"
   info: "#1976d2"
@@ -355,6 +357,16 @@ La navigation principale reste Vuetify drawer + app bar. Les entrees visibles do
 Les notifications sont des surfaces flottantes compactes avec icone semantique, message court, fermeture accessible et barre de progression. Elles utilisent les tokens semantiques, pas des couleurs locales.
 
 ## 6. Do's and Don'ts
+
+### Repères des moyens de paiement
+
+Les modals d'encaissement partagent les tuiles `payment-choice` : carte en bleu,
+especes en vert, titres-restaurant en orange, cheque en ardoise et TPE en violet.
+Les fonds restent teintes, les textes utilisent les variantes foncees de la palette
+pour le contraste. Les icones MDI remplies de 30px et les libelles completent la
+couleur. La selection devient pleine avec son controle radio ; le focus reste visible.
+Remise et paiement differe restent des actions secondaires separees. Sur mobile,
+le menu et le detail conservent deux colonnes de choix tactiles.
 
 ### Do:
 

@@ -348,7 +348,7 @@
     </v-dialog>
 
     <v-dialog v-model="paymentDialog" max-width="640">
-      <v-card>
+      <v-card class="payment-picker">
         <v-card-title>Encaisser</v-card-title>
         <v-card-text>
           <div class="order-payment-total mb-4">
@@ -366,8 +366,8 @@
             <v-btn
               v-for="method in paymentMethods"
               :key="method.value"
-              color="success"
-              class="order-payment-tile text-none font-weight-bold"
+              class="order-payment-tile payment-choice text-none font-weight-bold"
+              :class="`payment-choice--${method.tone}`"
               :disabled="paymentLoading"
               :loading="paymentLoading && selectedPaymentMethod === method.value"
               depressed
@@ -376,14 +376,15 @@
               <v-icon class="mb-2">{{ method.icon }}</v-icon>
               <span>{{ method.text }}</span>
             </v-btn>
+          </div>
+          <div class="payment-picker-utilities">
             <v-btn
-              color="warning"
-              class="order-payment-tile text-none font-weight-bold"
+              class="payment-picker-utility text-none"
               :disabled="paymentLoading || isDeliveryOrder"
               depressed
               @click="openOrderDiscountDialog"
             >
-              <v-icon class="mb-2">mdi-percent</v-icon>
+              <v-icon left>mdi-percent</v-icon>
               <span>{{ effectiveDiscountLabel }}</span>
             </v-btn>
           </div>
@@ -2019,7 +2020,6 @@ export default {
     padding: 8px;
   }
 
-  .order-payment-grid,
   .order-receipt-grid {
     grid-template-columns: 1fr;
   }
