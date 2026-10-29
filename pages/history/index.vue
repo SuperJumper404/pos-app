@@ -262,15 +262,16 @@
                 outlined
                 small
                 color="primary"
-                class="text-none history-touch-button history-attachments-button"
+                class="text-none history-action-button history-attachments-button"
+                :aria-label="`Commandes jointes au paiement TPE ${item.id} (${item.terminalPayment.attachmentsCount})`"
                 @click="openAttachments(item)"
-              ><span>Commandes jointes ({{ item.terminalPayment.attachmentsCount }})</span><v-icon small right>mdi-paperclip</v-icon></v-btn>
+              >Commandes ({{ item.terminalPayment.attachmentsCount }})<v-icon small right>mdi-paperclip</v-icon></v-btn>
               <v-btn
                 v-else
                 outlined
                 small
                 color="primary"
-                class="text-none history-touch-button"
+                class="text-none history-action-button"
                 @click="showInvoice(item.id)"
                 >Ticket <v-icon small right>mdi-invoice-text</v-icon>
               </v-btn>
@@ -533,10 +534,9 @@ export default {
 .history-touch-button { min-width: 44px !important; min-height: 44px !important; }
 .history-terminal-label { display: flex; align-items: center; gap: 6px; }
 .history-row-actions, .history-row-actions__inner { display: flex; align-items: center; min-height: 44px; max-width: 100%; }
-.history-attachments-button { width: 144px; max-width: 144px; letter-spacing: normal; }
-::v-deep .history-attachments-button .v-btn__content { flex: 1 1 auto; min-width: 0; width: 100%; white-space: normal; line-height: 1.3; }
-::v-deep .history-attachments-button .v-btn__content > span { flex: 1 1 auto; min-width: 0; white-space: normal; }
-::v-deep .history-attachments-button .v-btn__content > .v-icon { flex: 0 0 auto; }
+.history-action-button { max-width: 100%; letter-spacing: normal; }
+.history-attachments-button { padding-right: 10px !important; padding-left: 10px !important; }
+@media (max-width: 600px) { .history-action-button { min-height: 44px; } }
 .history-terminal-status.v-chip { background-color: var(--se-color-surface-muted) !important; color: var(--se-color-text) !important; }
 .history-terminal-status--succeeded.v-chip { background-color: var(--se-color-success-soft) !important; }
 .history-terminal-status--failed.v-chip { background-color: var(--se-color-danger-soft) !important; }

@@ -35,14 +35,14 @@
           <p>{{ outcomeMessage }}</p>
           <span v-if="isPending || !payment" class="text-caption">Vous pouvez fermer cette fenêtre. Le paiement continue sur le terminal.</span>
         </div>
-        <p v-if="!attempt" class="standalone-terminal__hint">Paiement libre, sans création de commande.</p>
+        <p v-if="!attempt" class="standalone-terminal__hint">Le client présentera sa carte sur le terminal.</p>
       </v-card-text>
       <v-card-actions class="standalone-terminal__actions">
         <v-btn v-if="blockingPayment" block outlined color="error" class="text-none" :loading="canceling" :disabled="busy" @click="cancelBlockingPayment">Annuler le paiement en cours</v-btn>
         <template v-if="!attempt">
           <p v-if="amountCents > 0 && !validAmount(amountCents)" class="text-caption mb-1">Le montant minimum est de 0,50 €.</p>
-          <v-btn block depressed color="success" class="text-none standalone-terminal__send" :loading="busy" :disabled="!ready || !validAmount(amountCents) || busy || Boolean(blockingPayment)" @click="sendPayment">
-            <v-icon left>mdi-contactless-payment</v-icon>Envoyer au TPE
+          <v-btn block depressed color="primary" class="text-none standalone-terminal__send" :loading="busy" :disabled="!ready || !validAmount(amountCents) || busy || Boolean(blockingPayment)" @click="sendPayment">
+            <v-icon left>mdi-credit-card-outline</v-icon>Encaisser par carte
           </v-btn>
         </template>
         <template v-else-if="!isFinal">
@@ -302,8 +302,9 @@ export default {
 .standalone-terminal__hint { margin: 16px 0 0; text-align: center; font-size: var(--se-font-meta); }
 .standalone-terminal__outcome { padding: 24px 0 8px; text-align: center; }
 .standalone-terminal__outcome p { margin: 12px 0 8px; color: var(--se-color-text); }
-.standalone-terminal__actions { flex-direction: column; gap: 10px; padding: 8px 24px 24px; }
+.standalone-terminal .standalone-terminal__actions { flex-direction: column; gap: 10px; padding: 12px 24px 24px !important; }
 .standalone-terminal__actions .v-btn { margin: 0 !important; min-height: 44px; }
-.standalone-terminal__send.v-btn { color: var(--se-color-text) !important; }
-@media (max-width: 360px) { .standalone-terminal__body { padding-right: 16px !important; padding-left: 16px !important; } .standalone-terminal__actions { padding-right: 16px; padding-left: 16px; } }
+.standalone-terminal__send.v-btn { min-height: 48px; border-radius: var(--se-radius-md); font-weight: 600; letter-spacing: normal; }
+.standalone-terminal__send:focus-visible { outline: 2px solid var(--se-color-primary); outline-offset: 3px; }
+@media (max-width: 360px) { .standalone-terminal__body { padding-right: 16px !important; padding-left: 16px !important; } .standalone-terminal .standalone-terminal__actions { padding-right: 16px !important; padding-left: 16px !important; } }
 </style>
