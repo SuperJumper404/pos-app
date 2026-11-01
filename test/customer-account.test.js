@@ -380,7 +380,7 @@ test('independent Axios ignores poisoned global/staff defaults and logout interc
     assert.equal(staffLogout, 0)
     for (const call of f.calls) {
       assert.ok(!Object.keys(call.headers).some(key => /^(authorization|authentication)$/i.test(key)))
-      assert.equal(call.credentials, true)
+      assert.equal(call.credentials, !call.path.includes('/shopInfo/'))
       assert.equal(call.auth, undefined)
       assert.ok(!call.params || !call.params.staffOnly)
     }
@@ -393,6 +393,22 @@ test('independent Axios ignores poisoned global/staff defaults and logout interc
     axios.defaults.params = previousParams
     axios.interceptors.response.eject(interceptor)
   }
+})
+
+test('public restaurant metadata loads across origins without cookies while personal requests keep them', async () => {
+  const f = make({ authenticated: false, reply: call => {
+    if (call.path.includes('/shopInfo/') && call.credentials) throw new Error('Browser CORS rejects credentials with wildcard origin')
+    return null
+  } })
+  await f.dispatch('loadSession', { shopId: 7 })
+  assert.equal(f.state.error, null)
+  assert.equal(f.state.shop.shop_name, 'Restaurant 7')
+  assert.equal(f.calls.find(call => call.path.includes('/shopInfo/')).credentials, false)
+  assert.equal(f.calls.find(call => call.path.endsWith('/session')).credentials, true)
+  await f.dispatch('requestCode', { channel: 'email', destination: 'me@example.test', purpose: 'login' })
+  await f.dispatch('verifyCode', { challengeId: f.state.challenge.challengeId, code: '123456' })
+  assert.equal(f.calls.find(call => call.path.endsWith('/verify')).credentials, true, 'login must accept the session cookie')
+  assert.ok(f.state.session)
 })
 
 test('login/link/logout/401 preserve staff shop/products/cart/storage/theme and never quote/geocode', async () => {

@@ -109,9 +109,11 @@ async function adminTransfer(host, context, { path, data, responseType }) {
   const epoch = state.epoch; const identity = staffIdentity(rootState)
   const current = () => epoch === state.epoch && identity === staffIdentity(rootState)
   if (data && state.assetsBusy) return null
+  const token = rootState.users && rootState.users.user && rootState.users.user.token
+  if (typeof token !== 'string' || !token.trim()) { commit('ASSETS_ERROR', errors.LOYALTY_FORBIDDEN); return null }
   if (data) { commit('ASSETS_BUSY', true); commit('ASSETS_ERROR', '') }
   try {
-    const response = await host.$axios.request({ method: data ? 'post' : 'get', url: `${process.env.privateURL}${path}`, ...(data ? { data } : {}), ...(responseType ? { responseType } : {}), skipGlobalErrorNotification: true })
+    const response = await host.$axios.request({ method: data ? 'post' : 'get', url: `${process.env.privateURL}${path}`, headers: { Authorization: `Bearer ${token}` }, ...(data ? { data } : {}), ...(responseType ? { responseType } : {}), skipGlobalErrorNotification: true })
     if (!current()) return null
     return responseType === 'blob' ? response.data : response.data && response.data.data
   } catch (error) { if (responseType === 'blob' && error.response && error.response.status === 404) return null; if (current()) commit('ASSETS_ERROR', errorMessage(error)); return null }

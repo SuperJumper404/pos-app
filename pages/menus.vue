@@ -17,6 +17,11 @@
     >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
+    <div v-if="tableLoyaltyRoute" class="d-flex justify-end">
+      <v-btn :to="tableLoyaltyRoute" outlined color="primary" class="text-none">
+        <v-icon left>mdi-card-account-details-outline</v-icon>Ma fidélité
+      </v-btn>
+    </div>
     <v-row
       class="menu-content-row mt-5"
       :class="{ 'menu-content-row--express': isLargeProductView }"
@@ -1401,6 +1406,13 @@ export default {
     },
     isClientMenuView() {
       return !this.isAdminView && !this.isOrderEditActive
+    },
+    tableLoyaltyRoute() {
+      const user = this.$store.get('users/user') || {}
+      const shopId = Number(user.shopid)
+      if (!this.isClientMenuView || user.session_subject !== 'service_point' ||
+        (user.source || user.order_source) !== 'table_qr' || !Number.isInteger(shopId) || shopId < 1) return null
+      return { path: '/compte/fidelite', query: { shopId: String(shopId) } }
     },
     selectedClientTable() {
       const storedTable = process.client

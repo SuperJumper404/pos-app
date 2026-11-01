@@ -35,9 +35,12 @@ export function buildCustomerApi({ baseURL, adapter = xhrAdapter }) {
     },
     async request({ method = 'get', path, body, shopId, csrfToken, tableSessionToken }) {
       try {
+        // Public shop metadata uses wildcard CORS; personal routes still need their session cookie.
+        const publicShopInfo = String(method).toLowerCase() === 'get' && /^\/shopInfo\/click-and-collect\/[1-9]\d*$/.test(path)
         const response = await transport.request({
           method,
           url: `/baseurl/api/v1${path}`,
+          withCredentials: !publicShopInfo,
           params: shopId == null ? undefined : { shopId },
           data: body,
           headers: { ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}), ...(tableSessionToken ? { 'X-Table-Session': tableSessionToken } : {}) },

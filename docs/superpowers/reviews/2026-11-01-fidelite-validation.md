@@ -53,3 +53,13 @@ Les fichiers publics du frontend correspondent au build du conteneur (empreinte 
 La signature Apple a été vérifiée de nouveau avec le code déployé et les vrais certificats : génération en mémoire, manifeste, signature PKCS#7 et chaîne Apple valides, mention TEST et URL HTTPS correctes. Ce contrôle utilise un dépôt fictif sans écriture SQL ni requête fournisseur ; aucun client ou pass réel n'a été créé.
 
 Le programme reste à configurer et activer par l'utilisateur dans Fidélité. L'essai sur iPhone depuis un QR de table, l'ajout effectif à Wallet et la réception d'une mise à jour/notification APNs restent à réaliser. Aucun SMS, aucune notification et aucun paiement réel n'ont été déclenchés. Les commits de ce compte rendu n'exigent pas un nouveau déploiement applicatif.
+
+## Retour de test : import et accès depuis la table
+
+Le navigateur staging a confirmé que le QR de Table Test ouvre le menu sans accès direct à la fidélité. La page personnelle ouverte directement affichait « Service client indisponible » : la lecture publique des informations du restaurant envoyait des cookies alors que cette route répond avec une origine CORS générique. L'import et les aperçus Wallet utilisaient de leur côté Axios sans transmettre le jeton administrateur, contrairement aux autres appels fidélité.
+
+Le correctif transmet explicitement la connexion administrateur pour les visuels, refuse un transfert sans connexion et laisse le navigateur construire la délimitation multipart. La lecture GET des seules métadonnées publiques du restaurant omet les cookies ; la connexion et les routes personnelles les conservent. Le menu affiche désormais « Ma fidélité » dans une session issue d'un QR de table, vers le restaurant de cette session. Ce lien n'ajoute aucune adhésion à la caisse ou à la borne.
+
+Trois régressions ont d'abord été observées en échec, puis réussies : authentification de l'import et de l'aperçu, absence de requête anonyme, métadonnées publiques sans erreur CORS avec maintien du cookie de connexion. Les suites générales et fidélité frontend, le lint (0 erreur, 162 avertissements) et la génération statique staging passent après correction.
+
+Au diagnostic, le programme staging était désactivé, sans récompense, adhérent, pass ni appareil enregistré. Aucun de ces réglages ou enregistrements n'a été créé par le correctif : l'utilisateur active son programme puis effectue sa première adhésion. Le test complet de l'installation Wallet sur iPhone et d'un envoi APNs reste nécessaire.

@@ -20,7 +20,7 @@ function load(relative) {
 }
 function store(host) {
   const module = load('store/loyalty.js'); const state = module.state()
-  const rootState = { users: { user: { id: 2, shopid: 7, access: 0 } } }
+  const rootState = { users: { user: { id: 2, shopid: 7, access: 0, token: 'staff-admin-token' } } }
   const context = { state, rootState, commit: (name, value) => module.mutations[name](state, value) }
   return { state, rootState, run: (name, input) => module.actions[name].call(host, context, input) }
 }
@@ -38,8 +38,22 @@ test('admin upload preserves FormData and artwork previews use an authenticated 
   const body = new FormData(); body.append('strip', new Blob(['png']), 'strip.png')
   assert.equal((await s.run('uploadWalletAssets', body)).assetVersion, 'v')
   assert.equal(calls[0].data, body)
+  assert.equal((calls[0].headers || {}).Authorization, 'Bearer staff-admin-token')
+  assert.equal((calls[0].headers || {})['Content-Type'], undefined, 'the browser sets the multipart boundary')
   const result = await s.run('loadWalletAssetPreview', '/baseurl/api/v1/loyalty/wallet/assets/00000000-0000-4000-8000-000000000001/strip.png')
   assert(result instanceof Blob); assert.equal(calls[1].responseType, 'blob')
+  assert.equal((calls[1].headers || {}).Authorization, 'Bearer staff-admin-token')
+})
+
+test('missing administrator credentials never send an anonymous Wallet upload', async () => {
+  const calls = []
+  const s = store({ $axios: { request: input => { calls.push(input); return { data: { data: { assetVersion: 'v' } } } } } })
+  s.rootState.users.user.token = null
+  const body = new FormData(); body.append('logo', new Blob(['png']), 'logo.png')
+  assert.equal(await s.run('uploadWalletAssets', body), null)
+  assert.equal(calls.length, 0)
+  assert(s.state.assetsError)
+  assert.equal(s.state.assetsBusy, false)
 })
 test('a late administrator list result cannot replace a newer filter or a different restaurant', async () => {
   const replies = []
