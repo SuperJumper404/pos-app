@@ -17,11 +17,6 @@
     >
       La cuisine est fermée. Aucune nouvelle commande possible.
     </v-alert>
-    <div v-if="tableLoyaltyRoute" class="d-flex justify-end">
-      <v-btn :to="tableLoyaltyRoute" outlined color="primary" class="text-none">
-        <v-icon left>mdi-card-account-details-outline</v-icon>Ma fidélité
-      </v-btn>
-    </div>
     <v-row
       class="menu-content-row mt-5"
       :class="{ 'menu-content-row--express': isLargeProductView }"
@@ -238,6 +233,11 @@
               </div>
 
               <div ref="mobileCategoryProducts" class="mobile-category-products">
+                <div v-if="tableLoyaltyRoute" class="d-flex justify-end mb-4">
+                  <v-btn :to="tableLoyaltyRoute" outlined color="primary" class="text-none">
+                    <v-icon left>mdi-card-account-details-outline</v-icon>Ma fidélité
+                  </v-btn>
+                </div>
                 <section
                   v-for="category in categories"
                   :key="category"
