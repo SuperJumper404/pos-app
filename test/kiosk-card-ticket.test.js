@@ -47,7 +47,7 @@ const payload = buildCardTicketPayload({
 })
 
 assert.strictEqual(payload.ticketTitle, 'Ticket carte')
-assert.strictEqual(payload.ticketType, 'carte')
+assert.strictEqual(payload.ticketType, 'caisse')
 assert.strictEqual(payload.paymentMethod, 'TPE')
 assert.strictEqual(payload.orderId, 100)
 assert.strictEqual(payload.orderNumber, 'B100')
@@ -133,7 +133,7 @@ assert.strictEqual(sendCardTicket({
 assert.strictEqual(smartCalls.length, 1)
 assert.strictEqual(smartCalls[0].url, 'http://192.168.1.20:8989/print')
 const smartBody = JSON.parse(smartCalls[0].options.body)
-assert.strictEqual(smartBody.ticketType, 'carte')
+assert.strictEqual(smartBody.ticketType, 'caisse')
 assert.ok(smartBody.dataFormatESCPOS)
 assert.ok(smartBody.dataFormatXML)
 assert.strictEqual(smartBody.ticketData.kind, 'card_ticket')
@@ -149,7 +149,7 @@ assert.strictEqual(sendCardTicket({
 }), true)
 assert.strictEqual(cloudCalls.length, 1)
 assert.strictEqual(cloudCalls[0].action, 'printing/postPrintingJob')
-assert.strictEqual(cloudCalls[0].params.ticketType, 'carte')
+assert.strictEqual(cloudCalls[0].params.ticketType, 'caisse')
 assert.strictEqual(cloudCalls[0].params.orderId, 100)
 assert.match(cloudCalls[0].params.requete, /Ticket carte/)
 

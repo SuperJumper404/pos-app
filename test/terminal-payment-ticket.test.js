@@ -15,18 +15,20 @@ const make = (permissions = ['history']) => {
   const user = Vue.observable({ id: 4, shopid: 7, access: 1, token: 'session', module_permissions: permissions })
   const calls = []
   let result = { payment, attachments: [] }
+  let cardTicketResult = false
   let printResult = true
   const instance = new Vue({ ...component, ...template, beforeCreate() {
     this.$route = { params: { id: '21' } }
     this.$store = { get: key => ({ 'users/user': user, 'shop/shop_name': 'Le Comptoir', 'shop/shop_printer_ip': '127.0.0.1' })[key],
       dispatch: (name, payload) => {
         calls.push({ name, payload })
+        if (name === 'terminalPayments/getCardTicket') return Promise.resolve(typeof cardTicketResult === 'function' ? cardTicketResult() : cardTicketResult)
         if (name.startsWith('printing/')) return Promise.resolve(typeof printResult === 'function' ? printResult() : printResult)
         return Promise.resolve(typeof result === 'function' ? result(name) : result)
       } }
   } })
   instances.push(instance)
-  return { instance, user, calls, respond: value => { result = value }, printRespond: value => { printResult = value } }
+  return { instance, user, calls, respond: value => { result = value }, printRespond: value => { printResult = value }, cardRespond: value => { cardTicketResult = value } }
 }
 const run = async () => {
   const ready = make()
@@ -41,6 +43,7 @@ const run = async () => {
   const print = ready.calls.find(call => call.name === 'printing/postPrintingJobChecked')
   assert.ok(print, 'Use the existing cloud printer transport')
   assert.strictEqual(print.payload.terminalPaymentId, 21)
+  assert.strictEqual(print.payload.ticketType, 'caisse')
   assert.ok(!print.payload.orderId)
   let browserPrints = 0
   ready.instance.$refs.preview = { contentWindow: { focus() {}, print() { browserPrints++ } } }
@@ -48,6 +51,16 @@ const run = async () => {
   ready.instance.printBrowser()
   assert.strictEqual(browserPrints, 1)
   assert.ok(!ready.calls.some(call => /orders\/|archiveOrder|startPayment/.test(call.name)))
+
+  const recovered = make()
+  recovered.respond({ payment: { ...payment, cardTicket: null }, attachments: [] })
+  recovered.cardRespond({ terminalPaymentId: 21, amountCents: 5000, brand: 'visa', last4: '4242', funding: 'debit', applicationPreferredName: 'VISA' })
+  await recovered.instance.loadPayment()
+  assert.strictEqual(recovered.instance.ticketPayload.brand, 'VISA')
+  assert.strictEqual(recovered.instance.ticketPayload.maskedPan, '************4242')
+  await recovered.instance.printTicket()
+  assert.match(recovered.calls.find(call => call.name === 'printing/postPrintingJobChecked').payload.requete, /PAN : \*{12}4242/)
+  recovered.instance.$destroy()
 
   const printing = make()
   await printing.instance.loadPayment()

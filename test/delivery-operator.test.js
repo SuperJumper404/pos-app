@@ -195,7 +195,25 @@ test('operator role gate denies courier and forged primary flags; one Delivery e
   const layout = load('layouts/default.vue').default
   const entries = layout.computed.navigationItems.call({ userAccess: 0, list: [], modulePermissions: null, isPrimaryAdmin: true })
   assert.equal(entries.filter(item => item.to === '/livraison').length, 1)
-  assert.deepEqual(new Vue({ ...page, store: fixture().store }).tabs.map(tab => tab.text), ['Commandes', 'Livreurs', "Remises d'especes", 'Reglages'])
+  assert.deepEqual(new Vue({ ...page, store: fixture().store }).tabs.map(tab => tab.text), ['Commandes', "Remises d'especes", 'Reglages'])
+})
+
+test('delivery no longer mounts courier management and cash/settings keep their correct tabs', async () => {
+  const f = fixture(admin)
+  const { page, child } = mountedPage(f)
+  try {
+    await drainVue()
+    assert.equal(Boolean(child('DeliveryCouriers')), false)
+    page.tab = 1
+    await Vue.nextTick()
+    assert.notEqual(child('DeliveryCashRemittances').$el.style.display, 'none')
+    assert.equal(child('DeliverySettings').$el.style.display, 'none')
+    page.tab = 2
+    await Vue.nextTick()
+    assert.equal(child('DeliveryCashRemittances').$el.style.display, 'none')
+    assert.notEqual(child('DeliverySettings').$el.style.display, 'none')
+    assert.ok(f.calls.some(call => call.path === '/delivery/couriers'), 'Assignments still load available couriers')
+  } finally { page.$destroy() }
 })
 
 test('middleware denies operator/settings/accounts for courier regardless stored flags, and cashier accounts/settings', async () => {
@@ -305,6 +323,19 @@ test('courier accounts use existing staff actions; availability is distinct; rol
   await assert.rejects(denied.dispatch('operatorLoad', { resource: 'missions' }))
   assert.equal(denied.calls.length, 0)
   component.$destroy()
+})
+
+test('availability confirmation is unknown when PATCH succeeds but the directory reload fails', async () => {
+  let changed = false
+  const f = fixture(admin, call => {
+    if (call.path.endsWith('/availability')) { changed = true; return { data: { available: 0 } } }
+    if (call.path === '/delivery/couriers') return changed ? { lost: true } : { data: [{ id: 11, status: 1, available: 1 }] }
+    return null
+  })
+  await f.dispatch('operatorLoad', { resource: 'couriers' })
+  const result = await f.dispatch('operatorAvailability', { courierId: 11, available: false })
+  assert.equal(changed, true)
+  assert.equal(result, null)
 })
 
 test('former promoted cash holder is listed for cashier independently of assignment list', async () => {

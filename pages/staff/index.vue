@@ -1,13 +1,22 @@
 <template>
   <v-container fluid>
-    <v-toolbar flat class="mb-4">
-      <v-toolbar-title>Staff / Equipe</v-toolbar-title>
-      <v-spacer />
-      <v-btn color="primary" class="text-none" @click="openCreate">
-        <v-icon left>mdi-account-plus</v-icon>
-        Ajouter un utilisateur
-      </v-btn>
-    </v-toolbar>
+    <header class="staff-heading mb-4">
+      <h1>Staff / Equipe</h1>
+      <div class="staff-heading__actions">
+        <v-btn outlined color="primary" class="text-none" @click="openCreateCourier">
+          <v-icon left>mdi-truck-delivery</v-icon>
+          Ajouter un livreur
+        </v-btn>
+        <v-btn color="primary" class="text-none" @click="openCreate">
+          <v-icon left>mdi-account-plus</v-icon>
+          Ajouter un utilisateur
+        </v-btn>
+      </div>
+    </header>
+    <v-alert v-if="courierError" type="warning" text role="alert">
+      {{ courierError }}
+      <v-btn text color="primary" class="text-none" :loading="loading" @click="refresh">Actualiser</v-btn>
+    </v-alert>
 
     <v-data-table
       :headers="headers"
@@ -28,6 +37,26 @@
       </template>
       <template #[`item.staff_login_id`]="{ item }">
         {{ item.staff_login_id || 'A creer' }}
+      </template>
+      <template #[`item.courierAvailability`]="{ item }">
+        <template v-if="Number(item.access) === 6">
+          <v-switch
+            v-if="courierInfo(item)"
+            :input-value="Number(courierInfo(item).available) === 1"
+            :label="Number(courierInfo(item).available) === 1 ? 'Disponible' : 'Indisponible'"
+            :aria-label="`Disponibilite de ${item.username}`"
+            :disabled="Number(item.status) !== 1 || Boolean(courierSaving) || loading"
+            :loading="Boolean(courierSaving && courierSaving.id === item.id)"
+            hide-details
+            class="my-2"
+            @change="setCourierAvailable(item, $event)"
+          />
+          <span v-else>{{ loading ? 'Chargement...' : 'Non chargee' }}</span>
+        </template>
+        <span v-else>-</span>
+      </template>
+      <template #[`item.courierMissions`]="{ item }">
+        {{ courierInfo(item) ? courierInfo(item).missionCount : '-' }}
       </template>
       <template #[`item.pin`]="{ item }">
         <div v-if="!isPrimaryAdmin(item)" class="staff-pin">
@@ -245,12 +274,19 @@ export default {
       credentialScopeVersion: 0,
       removeTarget: null,
       handledCourierQuery: false,
+      courierDirectoryActor: null,
+      courierSaving: null,
+      courierError: '',
+      courierContextVersion: 0,
+      courierReadSequence: 0,
       headers: [
         { text: 'Nom', value: 'username' },
         { text: 'ID caisse', value: 'staff_login_id' },
         { text: 'PIN', value: 'pin', sortable: false },
         { text: 'Role', value: 'access' },
         { text: 'Statut', value: 'status' },
+        { text: 'Disponibilite', value: 'courierAvailability', sortable: false },
+        { text: 'Missions affectees', value: 'courierMissions', sortable: false },
         { text: 'Actions', value: 'actions', sortable: false },
       ],
       requiredRules: [(value) => !!value || 'Champ requis'],
@@ -275,7 +311,7 @@ export default {
   watch: {
     credentialActor: {
       sync: true,
-      handler() { this.clearRevealedPin(); this.closeCredentials() },
+      handler() { this.clearRevealedPin(); this.closeCredentials(); this.clearCourierContext() },
     },
     '$route.fullPath': {
       sync: true,
@@ -292,11 +328,46 @@ export default {
   beforeDestroy() {
     this.clearRevealedPin()
     this.closeCredentials()
+    this.clearCourierContext()
   },
   mounted() {
     this.refresh()
   },
   methods: {
+    clearCourierContext() {
+      this.courierContextVersion++
+      this.courierReadSequence++
+      this.courierDirectoryActor = null
+      this.courierSaving = null
+      this.courierError = ''
+    },
+    courierInfo(user) {
+      if (Number(user.access) !== 6 || this.courierDirectoryActor !== this.credentialActor) return null
+      const rows = this.$store.state.delivery && this.$store.state.delivery.operator.couriers
+      return (rows || []).find(row => Number(row.id) === Number(user.id)) || null
+    },
+    async setCourierAvailable(user, available) {
+      if (!isDeliveryAdmin(this.$store.state.users.user) || Number(user.access) !== 6 || Number(user.status) !== 1 ||
+        !this.courierInfo(user) || this.courierSaving || this.loading) return
+      const scope = this.courierContextVersion
+      const request = { id: user.id }
+      this.courierSaving = request
+      this.courierError = ''
+      try {
+        const result = await this.$store.dispatch('delivery/operatorAvailability', { courierId: Number(user.id), available: Boolean(available) })
+        if (scope === this.courierContextVersion && result == null) {
+          this.courierDirectoryActor = null
+          this.courierError = 'La disponibilite ne peut pas etre confirmee. Actualisez la liste.'
+        }
+      } catch (_) {
+        if (scope === this.courierContextVersion) {
+          this.courierDirectoryActor = null
+          this.courierError = 'Impossible de confirmer la disponibilite du livreur. Actualisez la liste.'
+        }
+      } finally {
+        if (this.courierSaving === request) this.courierSaving = null
+      }
+    },
     clearRevealedPin() {
       this.pinRequest++
       this.revealedPin = ''
@@ -337,8 +408,25 @@ export default {
       return Number(user.access) === 0 && Number(user.is_primary_admin) === 1
     },
     async refresh() {
+      const sequence = ++this.courierReadSequence
+      const current = () => sequence === this.courierReadSequence && !this._isDestroyed
       this.loading = true
       await this.$store.dispatch('staff/getAll')
+      if (!current()) return
+      this.courierDirectoryActor = null
+      this.courierError = ''
+      if (this.staff.some(user => Number(user.access) === 6)) {
+        try {
+          const rows = await this.$store.dispatch('delivery/operatorLoad', { resource: 'couriers' })
+          if (current()) {
+            if (Array.isArray(rows)) this.courierDirectoryActor = this.credentialActor
+            else this.courierError = 'La disponibilite des livreurs est indisponible. Les comptes restent accessibles.'
+          }
+        } catch (_) {
+          if (current()) this.courierError = 'La disponibilite des livreurs est indisponible. Les comptes restent accessibles.'
+        }
+      }
+      if (!current()) return
       this.loading = false
       if (this.handledCourierQuery) return
       this.handledCourierQuery = true
@@ -346,14 +434,18 @@ export default {
       const target = this.staff.find(user => user.id === courierId && Number(user.access) === 6)
       if (target && !this.formDialog && !this.credentialsDialog) this.openEdit(target)
       if (this.$route && this.$route.query.create === 'courier' && !this.formDialog) {
-        this.openCreate()
-        this.form.access = 6
-        this.applyRolePreset(6)
+        this.openCreateCourier()
       }
     },
     openCreate() {
       this.form = emptyForm()
       this.formDialog = true
+    },
+    openCreateCourier() {
+      if (!isDeliveryAdmin(this.$store.state.users.user)) return
+      this.openCreate()
+      this.form.access = 6
+      this.applyRolePreset(6)
     },
     openEdit(user) {
       const access = Number(user.access)
@@ -461,6 +553,11 @@ export default {
 </script>
 
 <style scoped>
+.staff-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
+.staff-heading h1 { font-size: 20px; font-weight: 500; line-height: 1.35; margin: 0; }
+.staff-heading__actions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+.staff-heading__actions .v-btn { min-height: 44px; max-width: 100%; white-space: normal; }
+.staff-heading__actions ::v-deep .v-btn__content { white-space: normal; }
 .staff-pin { display: flex; align-items: center; gap: 8px; min-height: 36px; flex-wrap: wrap; }
 .staff-pin__value { display: inline-block; min-width: 4ch; font-variant-numeric: tabular-nums; }
 </style>
