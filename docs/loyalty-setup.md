@@ -3,8 +3,10 @@
 ## Parcours disponibles
 
 - Compte client : `/compte?shopId=ID` puis « Ma fidélité », ou directement `/compte/fidelite?shopId=ID`.
-- Administration : page Clients, lien « Programme de fidélité » vers `/fidelite`. Configuration et corrections réservées à l'administration.
-- Caisse : détail d'une commande, section Fidélité. Un lecteur QR USB peut saisir le QR dans le champ prévu. « Retrouver » ne dépense aucun point ; l'utilisation d'une récompense exige une confirmation distincte.
+- Administration : entrée « Fidélité » vers `/fidelite`, avec Clients, Programme et offres, Carte Wallet et Notifications. Configuration et corrections réservées à l'administration.
+- Caisse : recherche par téléphone vérifié, numéro de carte ou QR. « Retrouver » ne dépense aucun point ; une récompense exige une confirmation distincte, sans code téléphone.
+- Borne : recherche des cartes existantes, cumul au paiement et aperçu du total net avant confirmation d'une récompense. Aucune inscription ni code téléphone. La sélection est effacée après la commande, un changement de panier ou l'inactivité.
+- Adhésion : sur téléphone après le QR d'une table active du restaurant, avec la session client personnelle existante. L'ajout à Apple Wallet exige ensuite une confirmation dans Wallet.
 - Panier QR : « Continuer sans compte » ou identification inline, adhésion explicite et sélection confirmée d'une récompense. L'identification ne remplace ni le panier ni la table. Le montant attendu contrôle les prix avant fidélité ; le serveur calcule ensuite la remise réelle avant de créer le paiement.
 - Le lien Wallet ouvre uniquement la page fidélité. Il ne transporte aucun secret de session et n'associe aucune ancienne table à une nouvelle commande.
 
@@ -32,6 +34,7 @@ Chaque adhésion conserve son UUID, ses points et son historique indépendants. 
    - `20261024140000_loyalty.sql` ;
    - `20261024141000_loyalty_wallet.sql` ;
    - `20261024142000_customer_global_sms.sql`.
+   Puis les quatre migrations `20261101120000_loyalty_card_numbers.sql`, `20261101121000_loyalty_marketing_consent.sql`, `20261101122000_loyalty_wallet_assets.sql`, `20261101123000_loyalty_wallet_campaigns.sql`.
 2. Reporter les variables de `express-pos/.env.loyalty.example` dans l'environnement serveur protégé. Ne jamais placer les clés de signature ou SMS dans `.env` frontend, les stores ou Git.
 3. Respecter le mapping existant `config/config.json` : frontend local `localhost:8083`, API locale `localhost:5005`, préfixe API `/baseurl/api/v1`. Ajouter l'origine exacte du frontend à `CUSTOMER_ALLOWED_ORIGINS`. Conserver l'authentification client par cookies et les protections CSRF/CORS existantes.
 4. Pour un test SMS **sans envoi**, définir côté serveur `CUSTOMER_SMS_MODE=development`, un `CUSTOMER_SMS_DEV_CODE` de six chiffres et un environnement local/development/test. L'écran affiche ce mode explicitement ; aucun code n'est écrit dans les logs. Ce mode est refusé avec `NODE_ENV=production`.
@@ -42,6 +45,14 @@ Chaque adhésion conserve son UUID, ses points et son historique indépendants. 
 L'application serveur lance chaque minute une maintenance sans chevauchement : expiration sûre des réservations, puis synchronisation Wallet hors transaction de paiement. Les tâches sont conservées en SQL et reprises après erreur ; les secrets et réponses fournisseur ne sont jamais enregistrés comme message d'erreur. Surveiller les tâches `pending/processing`, `attempts`, `next_attempt_at` et `last_error` dans `loyalty_wallet_jobs`. Une panne d'API Wallet ne bloque pas la commande.
 
 ## Paramètres externes à fournir
+
+Les anciennes cartes reçoivent un numéro à 16 chiffres sans changement du QR ou des points. Pour un remplissage préalable reprenable : `node scripts/backfill-loyalty-card-numbers.js` côté backend, avec `LOYALTY_BACKFILL_DATABASE_URL` explicitement définie pour la base voulue.
+
+La recherche est limitée à 30/minute par borne et 60/minute par membre du personnel dans chaque restaurant. Un téléphone libre d'une fiche client ne constitue pas une identité vérifiée ; une recherche ambiguë ne choisit aucun compte.
+
+Carte Wallet : importer et recadrer logo/bandeau, puis publier les variantes PNG. Les images sont versionnées et les anciennes cartes sont mises à jour. Les icônes et certificats restent à préparer sur le serveur. L'aperçu web est indicatif.
+
+Notifications : consentement distinct, désactivé par défaut et modifiable depuis la page personnelle. La préparation fige l'audience consentante ayant un appareil Apple enregistré, affiche son nombre puis exige une confirmation. Un envoi par restaurant toutes les cinq minutes. Le worker revérifie le consentement ; « traité » ne signifie jamais « lu ». Aucun point n'est modifié.
 
 - Secret d'authentification client indépendant du JWT staff, origines autorisées et configuration HTTPS/proxy fiable.
 - SMS : mode, compte Twilio, secret et expéditeur ; ou code local de développement sans SMS.

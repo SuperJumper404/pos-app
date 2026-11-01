@@ -75,7 +75,7 @@ export default {
 }
 </script>
 <style scoped>
-.wallet-card-preview { max-width: 360px; padding: 24px; border: 1px solid var(--se-color-border); border-radius: 16px; overflow: hidden; }
+.wallet-card-preview { max-width: 360px; padding: 24px; border: 1px solid var(--se-color-border); border-radius: 12px; overflow: hidden; }
 .wallet-card-logo { width: 100px; max-height: 40px; object-fit: contain; }
 .wallet-card-strip { display: block; width: 100%; height: auto; }
 </style>

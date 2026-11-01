@@ -1,8 +1,8 @@
 const assert = require('node:assert/strict')
-const { test } = require('node:test')
 const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
+const { test } = require('node:test')
 const { canAccessModule, getAccessibleNavigationItems } = require('../helpers/staffRoles')
 function load(relative) {
   const filename = path.join(__dirname, '..', relative)
@@ -34,7 +34,7 @@ test('loyalty administration navigation is exclusive to administrators and keeps
 })
 test('admin upload preserves FormData and artwork previews use an authenticated Blob request', async () => {
   const calls = []
-  const s = store({ $axios: { request: async input => { calls.push(input); return { data: input.responseType === 'blob' ? new Blob(['png']) : { success: true, data: { assetVersion: 'v' } } } } } })
+  const s = store({ $axios: { request: input => { calls.push(input); return { data: input.responseType === 'blob' ? new Blob(['png']) : { success: true, data: { assetVersion: 'v' } } } } } })
   const body = new FormData(); body.append('strip', new Blob(['png']), 'strip.png')
   assert.equal((await s.run('uploadWalletAssets', body)).assetVersion, 'v')
   assert.equal(calls[0].data, body)
@@ -55,7 +55,7 @@ test('all new admin components compile and a campaign uses the previewed draft f
   load('components/loyalty/LoyaltyMembers.vue'); load('components/loyalty/LoyaltyCardEditor.vue')
   const options = load('components/loyalty/LoyaltyCampaigns.vue').default
   const calls = []
-  const ctx = { ...options.data(), recipient: null, loyalty: { busy: false }, $emit() {}, $store: { dispatch: async (action, input) => {
+  const ctx = { ...options.data(), recipient: null, loyalty: { busy: false }, $emit() {}, $store: { dispatch: (action, input) => {
     calls.push({ action, input }); return action === 'loyalty/createCampaignDraft' ? { id: '12', recipientCount: 3, message: input.message } : { id: '12', status: 'queued' }
   } } }
   for (const [name, fn] of Object.entries(options.methods)) ctx[name] = fn.bind(ctx)

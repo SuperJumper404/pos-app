@@ -1,8 +1,8 @@
 const assert = require('node:assert/strict')
-const { test } = require('node:test')
 const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
+const { test } = require('node:test')
 const { buildKioskCheckoutPayload } = require('../helpers/kioskCheckout')
 const { buildCheckoutIntentSignature } = require('../helpers/counterCheckout')
 const memberId = '00000000-0000-4000-8000-000000000001'
@@ -43,7 +43,7 @@ test('kiosk checkout includes identified loyalty and the exact confirmed discoun
 })
 test('kiosk lookup emits accumulation intent and explicit redemption without requesting a telephone code', async () => {
   const calls = []
-  const { ctx, events } = component(async (action, payload) => {
+  const { ctx, events } = component((action, payload) => {
     calls.push({ action, payload })
     return action === 'loyalty/lookupKiosk' ? { id: memberId, cardNumber: selection.cardNumber, available: 50, rewards: [{ id: 'coffee', name: 'Café', points: 30, available: true }] }
       : { grossCents: 1000, discountCents: payload.rewardId ? 200 : 0, totalCents: payload.rewardId ? 800 : 1000, pointsCost: payload.rewardId ? 30 : 0 }
@@ -70,7 +70,7 @@ test('the actual kiosk submits counter payment or a server-verified free order a
     let paymentMode
     const ctx = { checkoutDisabled: false, checkoutLoading: null, loyaltyIsFree: free,
       buildPayload: payment => { paymentMode = payment; return { payment } },
-      $store: { dispatch: async () => ({ ok: true, data: { orderId: 1 } }) }, finishCheckout: async () => {} }
+      $store: { dispatch: () => Promise.resolve({ ok: true, data: { orderId: 1 } }) }, finishCheckout: () => Promise.resolve() }
     await options.methods.submitPayAtCounter.call(ctx)
     assert.equal(paymentMode, expected); assert.equal(ctx.checkoutFinalized, true)
   }
