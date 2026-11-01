@@ -10,6 +10,7 @@ Le restaurant doit reconnaître ses adhérents pendant une commande, leur permet
 Décisions explicites de l'utilisateur :
 
 - Caisse et borne : retrouver uniquement les adhésions existantes par numéro de carte ou téléphone ; pouvoir cumuler des points et utiliser une récompense.
+- Aucun code reçu par téléphone n'est demandé pour retrouver une carte, cumuler ou utiliser des points à la caisse et sur la borne.
 - Adhésion : uniquement sur le téléphone du client après ouverture du parcours par le QR d'une table. Aucune inscription à la caisse ou sur la borne.
 - Après paiement : points calculés selon les euros dépensés et solde visible sur la carte Apple Wallet.
 - Un accès « Fidélité » côté restaurant : liste des clients et soldes, configuration des offres, nombre de points par euro dépensé, image de la carte et envoi de notifications Wallet.
@@ -61,11 +62,11 @@ La validation de l'offre reste celle du personnel autorisé, comme dans le parco
 
 Ajouter une étape facultative « Ma fidélité » avant le choix du paiement, en conservant le parcours nom/téléphone actuel. Rechercher une carte existante par numéro de carte ou téléphone, puis permettre son association pour cumuler et la sélection explicite d'une récompense. La commande reste possible sans fidélité et sans compte trouvé.
 
-Choix proposé par l'agent à valider : une saisie de téléphone ou de numéro lisible permet d'associer les gains, mais la dépense sur cette surface publique exige un code reçu sur le téléphone vérifié de l'adhérent. Réutiliser les challenges existants avec un objectif spécifique de validation de récompense : aucune session personnelle durable, aucune création de compte ou inscription sur la borne. Le code valide seulement cette adhésion, cette borne et cette tentative de commande pendant une courte durée. Une modification de récompense ou de panier invalide l'autorisation correspondante. Une récompense ne peut pas être utilisée si la vérification n'est pas disponible ; cumuler et commander restent possibles.
+Décision utilisateur : la saisie du téléphone ou du numéro de carte suffit à retrouver l'adhésion, afficher ses points, associer les gains et choisir une récompense, sans code reçu par téléphone. L'utilisation de la récompense demande seulement une confirmation explicite à l'écran. Aucun challenge SMS ou WhatsApp ni autorisation de dépense fondée sur un code n'est ajouté sur la borne. Cette recherche n'ouvre pas de session personnelle durable et ne crée ni compte ni adhésion. Une modification de récompense ou de panier impose de recalculer les conditions et de faire confirmer à nouveau la récompense si nécessaire.
 
-Avant cette vérification, retourner uniquement un résultat d'identification réduit ; après vérification, afficher le solde et les offres utilisables, sans coordonnées complètes ni historique personnel. Les routes borne exigent une session active autorisée pour la borne du restaurant ; elles ne donnent jamais accès à la liste des clients, aux corrections ou aux réglages. Les bornes ouvertes par un compte staff autorisé et celles ouvertes par un service point sont couvertes sans élargir les droits des autres rôles.
+Après une recherche exacte, retourner uniquement les informations nécessaires à la commande, notamment le solde et les offres utilisables, sans coordonnées complètes ni historique personnel. Les routes borne exigent une session active autorisée pour la borne du restaurant ; elles ne donnent jamais accès à la liste des clients, aux corrections ou aux réglages. Les bornes ouvertes par un compte staff autorisé et celles ouvertes par un service point sont couvertes sans élargir les droits des autres rôles.
 
-Réinitialiser la fidélité sélectionnée, les codes, les offres et les données d'affichage après commande terminée, abandon ou expiration d'inactivité. Ne pas conserver ces données dans la persistance navigateur. Lier les actions à la tentative active pour ignorer les réponses tardives d'un client précédent.
+Réinitialiser la fidélité sélectionnée, les saisies, les offres et les données d'affichage après commande terminée, abandon ou expiration d'inactivité. Ne pas conserver ces données dans la persistance navigateur. Lier les actions à la tentative active pour ignorer les réponses tardives d'un client précédent.
 
 ### Téléphone après QR de table
 
@@ -91,7 +92,7 @@ Les recherches sont exactes et limitées en fréquence, sans annuaire public ou 
 
 Réutiliser les calculs existants : points sur le montant réellement payé après remises, règle d'arrondi et exclusions configurées, prix et éligibilité vérifiés au serveur. Une commande ne consomme au plus qu'une récompense dans cette version, comme actuellement. Un produit offert doit être présent et admissible ; les minimums, expirations et règles de cumul s'appliquent.
 
-La création de commande borne et la réservation fidélité doivent former un traitement cohérent avant le démarrage du paiement. Calculer la remise et le total final avant de créer le paiement terminal ; ne pas créer un paiement sur l'ancien montant puis y attacher une remise après coup. Même comportement pour une commande borne à payer ensuite en caisse. Le panier affiche le total confirmé après récompense. Un changement de prix ou d'éligibilité demande une nouvelle confirmation, sans réutiliser silencieusement une autorisation de dépense devenue caduque.
+La création de commande borne et la réservation fidélité doivent former un traitement cohérent avant le démarrage du paiement. Calculer la remise et le total final avant de créer le paiement terminal ; ne pas créer un paiement sur l'ancien montant puis y attacher une remise après coup. Même comportement pour une commande borne à payer ensuite en caisse. Le panier affiche le total confirmé après récompense. Un changement de prix ou d'éligibilité demande une nouvelle confirmation à l'écran de la récompense et du montant final.
 
 Réserver les points à la confirmation, les débiter au paiement fiable, et créditer les nouveaux gains une seule fois. Deux commandes concurrentes ne peuvent pas dépenser le même solde. Libérer la réservation à l'annulation/expiration selon les règles de paiement existantes ; ne pas libérer un paiement toujours actif. Une modification de commande déjà remisée suit le mécanisme de libération et recalcul existant.
 
@@ -132,9 +133,9 @@ Les campagnes mettent à jour une offre ou une information utile de la carte. La
 
 ## Données et compatibilité
 
-Étendre le schéma par de nouvelles migrations : numéro de carte et index, consentement/version/date, référence d'images/version, campagnes/destinataires/tâches, et preuve de dépense borne si un stockage dédié est nécessaire. Réutiliser les sessions et challenges existants sans leur donner un nouvel objectif implicite. Les noms précis des tables, DTO et routes seront fixés dans le plan après validation.
+Étendre le schéma par de nouvelles migrations : numéro de carte et index, consentement/version/date, référence d'images/version et campagnes/destinataires/tâches. Ne pas ajouter de stockage ou de challenge de code de dépense pour la borne. Conserver les mécanismes d'authentification personnelle existants pour le compte client sur téléphone. Les noms précis des tables, DTO et routes seront fixés dans le plan après validation.
 
-Les réponses caisse et borne sont distinctes des DTO administrateur ; aucun jeton Apple, secret de signature, historique personnel complet ou identité globale n'est exposé sur borne. Une autorisation temporaire ne peut ni créer un compte ni ouvrir une session client générale.
+Les réponses caisse et borne sont distinctes des DTO administrateur ; aucun jeton Apple, secret de signature, historique personnel complet ou identité globale n'est exposé sur borne. La recherche et l'association d'une carte ne peuvent ni créer un compte ni ouvrir une session client générale.
 
 Mettre en file la synchronisation lors des changements qui affectent la carte : points, réservation/libération, publication des offres, identité visuelle et message. Réutiliser le compteur monotone global de révision des passes et les baux des workers ; ne pas fabriquer les curseurs avec l'horloge seule. L'envoi des notifications et la génération de pass restent hors transaction de paiement.
 
@@ -148,7 +149,7 @@ La validation d'implémentation doit couvrir les scénarios déterminants :
 
 - Recherche par téléphone et numéro, normalisation, non-adhérent, compte ambigu, isolement entre restaurants et attribution des numéros aux cartes anciennes.
 - Refus d'inscription sans preuve QR de table, depuis caisse/borne ou depuis le lien Wallet ; succès après QR et téléphone vérifié ; préservation table/panier.
-- Borne : droits limités, preuve de dépense expirée/rejouée ou attachée à une autre tentative, changement de client, et commande possible sans offre.
+- Borne : recherche, cumul et utilisation d'une récompense sans code reçu par téléphone ; confirmation à l'écran obligatoire, droits limités, refus d'inscription, changement de client, réponses tardives et commande possible sans offre.
 - Calcul et remise avant création du paiement borne pour terminal et caisse, concurrence des réservations, paiement rejoué, annulation et remboursement.
 - Import d'image refusé/valide, cohérence de publication, mise à jour des anciennes cartes sans changement d'identité.
 - Campagne confirmée une seule fois, consentement retiré, désenregistrement, reprise après panne et ordre des messages ; aucun faux état « lu ».
@@ -157,13 +158,12 @@ La validation d'implémentation doit couvrir les scénarios déterminants :
 
 ## Propositions à rendre visibles lors de la validation
 
-L'utilisateur a fixé les canaux d'adhésion et l'usage des points. Les choix complémentaires suivants viennent de l'agent et peuvent être corrigés avant le plan :
+L'utilisateur a fixé les canaux d'adhésion, l'usage des points et l'absence de code reçu par téléphone à la caisse et sur la borne. Les choix complémentaires suivants viennent de l'agent et peuvent être corrigés avant le plan :
 
-1. Vérification par code téléphone avant une dépense sur borne par numéro ; gains possibles sans cette étape.
-2. Réutilisation des règles actuelles de paiement, remboursement et d'une seule récompense par commande.
-3. Messages commerciaux facultatifs et séparés de l'adhésion ; envoi manuel immédiat à une personne ou à tous les adhérents éligibles, sans planification.
-4. Personnalisation par logo, bannière et couleurs dans la structure Apple, avec aperçu indicatif.
-5. Numéro lisible ajouté sans remplacer les identifiants ou QR existants ; téléphone vérifié utilisé pour éviter les rapprochements erronés.
+1. Réutilisation des règles actuelles de paiement, remboursement et d'une seule récompense par commande.
+2. Messages commerciaux facultatifs et séparés de l'adhésion ; envoi manuel immédiat à une personne ou à tous les adhérents éligibles, sans planification.
+3. Personnalisation par logo, bannière et couleurs dans la structure Apple, avec aperçu indicatif.
+4. Numéro lisible ajouté sans remplacer les identifiants ou QR existants ; téléphone vérifié utilisé pour éviter les rapprochements erronés.
 
 ## Références
 
