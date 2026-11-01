@@ -304,7 +304,7 @@ export default {
         {
           key: 'pilotage',
           title: 'Pilotage',
-          routeNames: ['history', 'statistics', 'clients'],
+          routeNames: ['history', 'statistics', 'clients', 'fidelite'],
           names: [],
         },
         {

@@ -1,7 +1,7 @@
 import { buildDeliveryApi } from './delivery'
 
 export const namespaced = true
-export const state = () => ({ member: null, program: null, canEnroll: false, members: [], selected: null, busy: false, error: '', epoch: 0 })
+export const state = () => ({ member: null, program: null, canEnroll: false, members: [], membersTotal: 0, membersBusy: false, membersError: '', assetsBusy: false, assetsError: '', campaigns: [], campaignsTotal: 0, selected: null, busy: false, error: '', epoch: 0 })
 const initial = state
 const staffIdentity = root => JSON.stringify(root.users && root.users.user)
 const personalIdentity = root => {
@@ -15,6 +15,10 @@ const errors = {
   LOYALTY_LOOKUP_AMBIGUOUS: 'Plusieurs cartes correspondent à ce téléphone. Utilisez le numéro de carte.',
   LOYALTY_RATE_LIMITED: 'Trop de recherches. Patientez une minute avant de réessayer.',
   LOYALTY_TABLE_REQUIRED: 'Scannez le QR de votre table pour rejoindre le programme.',
+  LOYALTY_IMAGE_INVALID: 'Le visuel est invalide. Choisissez une image PNG ou JPEG et recadrez-la avant de publier.',
+  LOYALTY_CAMPAIGN_EMPTY: 'Aucun adhérent ayant accepté les offres ne dispose actuellement d’une carte Apple Wallet enregistrée.',
+  LOYALTY_CAMPAIGN_RATE_LIMITED: 'Patientez cinq minutes entre deux envois.',
+  LOYALTY_CAMPAIGN_CONFLICT: 'Ce message a déjà été préparé. Actualisez avant de recommencer.',
   LOYALTY_FORBIDDEN: 'Vous n’avez pas les droits nécessaires.',
   LOYALTY_INVALID: 'Vérifiez les champs saisis puis réessayez.',
   LOYALTY_REWARD_CONDITIONS: 'La commande ne remplit pas les conditions de cette récompense.',
@@ -42,7 +46,12 @@ export const mutations = {
     current.canEnroll = !!(result && result.canEnroll)
   },
   PROGRAM(current, program) { current.program = program },
-  MEMBERS(current, members) { current.members = Array.isArray(members) ? members : [] },
+  MEMBERS(current, result) { current.members = Array.isArray(result) ? result : result && result.items || []; current.membersTotal = Array.isArray(result) ? result.length : result && result.total || 0 },
+  MEMBERS_BUSY(current, value) { current.membersBusy = value },
+  MEMBERS_ERROR(current, value) { current.membersError = value },
+  ASSETS_BUSY(current, value) { current.assetsBusy = value },
+  ASSETS_ERROR(current, value) { current.assetsError = value },
+  CAMPAIGNS(current, result) { current.campaigns = result && result.items || []; current.campaignsTotal = result && result.total || 0 },
   SELECTED(current, member) { current.selected = member },
 }
 
@@ -94,6 +103,20 @@ async function kioskRequest(host, context, path, body) {
     throw new Error(errorMessage(error))
   }
 }
+const memberRequests = new WeakMap()
+async function adminTransfer(host, context, { path, data, responseType }) {
+  const { state, rootState, commit } = context
+  const epoch = state.epoch; const identity = staffIdentity(rootState)
+  const current = () => epoch === state.epoch && identity === staffIdentity(rootState)
+  if (data && state.assetsBusy) return null
+  if (data) { commit('ASSETS_BUSY', true); commit('ASSETS_ERROR', '') }
+  try {
+    const response = await host.$axios.request({ method: data ? 'post' : 'get', url: `${process.env.privateURL}${path}`, ...(data ? { data } : {}), ...(responseType ? { responseType } : {}), skipGlobalErrorNotification: true })
+    if (!current()) return null
+    return responseType === 'blob' ? response.data : response.data && response.data.data
+  } catch (error) { if (responseType === 'blob' && error.response && error.response.status === 404) return null; if (current()) commit('ASSETS_ERROR', errorMessage(error)); return null }
+  finally { if (data && current()) commit('ASSETS_BUSY', false) }
+}
 export const actions = {
   reset({ commit }) { commit('RESET') },
   loadMember(context) { return request(this, context, { personal: true, tableContext: true, path: '/customer/loyalty', mutation: 'MEMBER' }) },
@@ -109,7 +132,30 @@ export const actions = {
       .filter(key => program[key] !== undefined).map(key => [key, program[key]]))
     return request(this, context, { method: 'put', path: '/loyalty/program', body, mutation: 'PROGRAM' })
   },
-  loadMembers(context) { return request(this, context, { path: '/loyalty/members', mutation: 'MEMBERS' }) },
+  async loadMembers(context, { page = 1, pageSize = 25, search = '' } = {}) {
+    const { state, rootState, commit } = context
+    const ticket = (memberRequests.get(state) || 0) + 1; memberRequests.set(state, ticket)
+    const epoch = state.epoch; const identity = staffIdentity(rootState)
+    const current = () => epoch === state.epoch && identity === staffIdentity(rootState) && ticket === memberRequests.get(state)
+    commit('MEMBERS_BUSY', true); commit('MEMBERS_ERROR', '')
+    try {
+      const api = this.$deliveryApi || (this.$deliveryApi = buildDeliveryApi({ baseURL: process.env.privateURL }))
+      const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize), search })
+      const response = await api.request({ method: 'get', path: `/loyalty/members?${query}` })
+      const result = response && response.data && response.data.data
+      if (!current()) return null
+      commit('MEMBERS', result); return result
+    } catch (error) { if (current()) commit('MEMBERS_ERROR', errorMessage(error)); return null }
+    finally { if (current()) commit('MEMBERS_BUSY', false) }
+  },
+  uploadWalletAssets(context, data) { return adminTransfer(this, context, { path: '/baseurl/api/v1/loyalty/wallet/assets', data }) },
+  loadWalletAssetPreview(context, path) {
+    if (typeof path !== 'string' || !/^\/baseurl\/api\/v1\/loyalty\/wallet\/assets\/[a-f0-9-]{36}\/(?:logo|strip)(?:@2x|@3x)?\.png$/.test(path)) return null
+    return adminTransfer(this, context, { path, responseType: 'blob' })
+  },
+  createCampaignDraft(context, body) { return request(this, context, { method: 'post', path: '/loyalty/campaigns', body }) },
+  sendCampaign(context, { campaignId, confirmed }) { return request(this, context, { method: 'post', path: `/loyalty/campaigns/${encodeURIComponent(campaignId)}/send`, body: { confirmed } }) },
+  loadCampaigns(context, { page = 1, pageSize = 25 } = {}) { return request(this, context, { path: `/loyalty/campaigns?page=${page}&pageSize=${pageSize}`, mutation: 'CAMPAIGNS' }) },
   memberHistory(context, id) { return request(this, context, { path: `/loyalty/members/${encodeURIComponent(id)}`, mutation: 'SELECTED' }) },
   lookup(context, input) { return request(this, context, { method: 'post', path: '/loyalty/lookup', body: typeof input === 'string' ? { qr: input.trim() } : input, mutation: 'SELECTED' }) },
   lookupKiosk(context, input) { return kioskRequest(this, context, '/loyalty/kiosk/lookup', input) },
