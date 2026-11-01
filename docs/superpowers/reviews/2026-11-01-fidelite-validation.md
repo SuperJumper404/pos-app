@@ -33,3 +33,13 @@ Une revue indépendante de l'ensemble des deux plages de commits a trouvé trois
 Le test `test/loyalty-terminal-flow.test.js` nécessite les deux dépôts voisins et leurs dépendances locales. Il n'utilise ni serveur SQL ni réseau. Les suites générales, les suites fidélité, le lint et le build ont été relancés après la correction. Aucune remarque mineure différée et aucune seconde revue déléguée.
 
 La revue a écarté explicitement les modifications terminal/impression des instantanés de référence et les nouvelles fonctions Google, hors périmètre. Les essais réels iPhone/APNs restent une étape de mise en service, sans validation présumée.
+
+## Complément avant déploiement Docker staging
+
+À la demande de l'utilisateur, les seuls commits de la feature ont été réintégrés sur les branches staging actuelles (frontend `98b66db`, backend `efe81e1`), en conservant les autres correctifs présents. Les branches `codex/loyalty-wallet-implementation` conservent les versions initiales de travail. Un conflit limité à la documentation a été résolu en conservant le plan et sa spécification.
+
+Les suites générales et fidélité des deux dépôts passent après intégration ; le lint frontend reste à 0 erreur et 162 avertissements. La génération statique avec `ENV=staging` est réussie. Le contrôle local utilise un cache Nuxt isolé car `node_modules` est une jonction vers le checkout original ; cette adaptation de vérification ne modifie pas le produit.
+
+**La validation MySQL n'est plus ignorée pour ce déploiement** : le test a été exécuté avec MySQL 8 dans Docker, dans une base jetable créée puis supprimée par le helper existant. Résultat PASS pour les migrations, recherche/remplissage des numéros, isolation des restaurants, réservations concurrentes, paiement/remboursement/rollback, remise borne/replay et audience figée/retrait de consentement.
+
+Avant modification du staging, une sauvegarde privée de la base `pointofsalestaging`, des sources backend/frontend et de la configuration des conteneurs a été préparée. Le programme du restaurant `demo` reste à configurer par l'utilisateur, conformément à son choix. Aucun client ni programme de démonstration supplémentaire n'est créé, et aucune notification réelle n'est envoyée par le déploiement.
