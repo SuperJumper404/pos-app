@@ -42,7 +42,7 @@ export const mutations = {
   SELECTED(current, member) { current.selected = member },
 }
 
-async function request(host, context, { personal = false, method = 'get', path, body, mutation }) {
+async function request(host, context, { personal = false, tableContext = false, method = 'get', path, body, mutation }) {
   const { state, rootState, commit } = context
   if (state.busy) return null
   const account = rootState.customer || {}
@@ -54,7 +54,11 @@ async function request(host, context, { personal = false, method = 'get', path, 
   commit('ERROR', '')
   try {
     let result
-    if (personal) result = await host.$customerApi.request({ method, path, body, shopId: account.shopId, csrfToken: account.session.csrfToken })
+    if (personal) {
+      const user = rootState.users && rootState.users.user || {}
+      const token = tableContext && user.session_subject === 'service_point' && (user.source || user.order_source) === 'table_qr' && Number(user.shopid) === Number(account.shopId) ? user.token : undefined
+      result = await host.$customerApi.request({ method, path, body, shopId: account.shopId, csrfToken: account.session.csrfToken, ...(token ? { tableSessionToken: token } : {}) })
+    }
     else {
       const api = host.$deliveryApi || (host.$deliveryApi = buildDeliveryApi({ baseURL: process.env.privateURL }))
       const response = await api.request({ method, path, body })
@@ -77,8 +81,9 @@ async function request(host, context, { personal = false, method = 'get', path, 
 
 export const actions = {
   reset({ commit }) { commit('RESET') },
-  loadMember(context) { return request(this, context, { personal: true, path: '/customer/loyalty', mutation: 'MEMBER' }) },
-  enroll(context) { return request(this, context, { personal: true, method: 'post', path: '/customer/loyalty', body: {}, mutation: 'MEMBER' }) },
+  loadMember(context) { return request(this, context, { personal: true, tableContext: true, path: '/customer/loyalty', mutation: 'MEMBER' }) },
+  enroll(context, { marketingConsent = false } = {}) { return request(this, context, { personal: true, tableContext: true, method: 'post', path: '/customer/loyalty', body: { marketingConsent }, mutation: 'MEMBER' }) },
+  setMarketingConsent(context, marketingConsent) { return request(this, context, { personal: true, method: 'patch', path: '/customer/loyalty/preferences', body: { marketingConsent }, mutation: 'MEMBER' }) },
   wallet(context, provider) {
     if (!['apple', 'google'].includes(provider)) return null
     return request(this, context, { personal: true, method: 'post', path: `/customer/loyalty/wallet/${provider}`, body: {} })
