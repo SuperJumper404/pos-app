@@ -173,6 +173,8 @@ const kioskCheckoutPayload = (input) => {
   const allowed = [
     'customer', 'customerID', 'phone', 'remark', 'items', 'expected_total',
     'discount_type', 'discount_value', 'is_takeaway', 'client_order_token',
+    'loyalty_member_id', 'loyalty_reward_id', 'loyalty_confirmed', 'loyalty_expected_discount_cents',
+    'loyalty_expected_points_cost', 'loyalty_program_version',
   ]
   return allowed.reduce((payload, key) => {
     if (input[key] !== undefined) payload[key] = input[key]

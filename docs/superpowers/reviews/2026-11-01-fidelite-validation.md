@@ -24,4 +24,12 @@ Implémentation dans deux copies de travail isolées, sans modification des base
 
 ## Revue indépendante
 
-Revue finale de l'ensemble des deux plages de commits prévue après ces vérifications. Les résultats et corrections seront consignés ici avant la remise.
+Une revue indépendante de l'ensemble des deux plages de commits a trouvé trois problèmes, corrigés dans une seule passe avec des régressions observées en échec puis réussies :
+
+1. Deux listes de champs autorisés perdaient la fidélité entre l'écran et le service TPE. Le nouveau test traverse le vrai store, le contrôleur HTTP, le service terminal et le checkout jusqu'au fournisseur simulé : 10 € bruts, 2 € de récompense, 8 € effectivement envoyés au terminal et 30 points réservés.
+2. La confirmation ne protégeait que la remise. Elle transporte désormais le coût en points et la version du programme, liés à l'adhérent et à l'offre et inclus dans les signatures d'idempotence. Un changement administratif entre aperçu et paiement provoque un rollback et une nouvelle confirmation.
+3. Les erreurs métier étaient converties en erreurs terminal génériques. Une liste explicite préserve seulement les codes fidélité connus et leurs statuts ; la borne efface la sélection périmée. Les exceptions inconnues restent génériques, sans détail privé.
+
+Le test `test/loyalty-terminal-flow.test.js` nécessite les deux dépôts voisins et leurs dépendances locales. Il n'utilise ni serveur SQL ni réseau. Les suites générales, les suites fidélité, le lint et le build ont été relancés après la correction. Aucune remarque mineure différée et aucune seconde revue déléguée.
+
+La revue a écarté explicitement les modifications terminal/impression des instantanés de référence et les nouvelles fonctions Google, hors périmètre. Les essais réels iPhone/APNs restent une étape de mise en service, sans validation présumée.

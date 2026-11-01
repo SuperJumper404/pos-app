@@ -58,6 +58,7 @@ export default {
     emitSelection() {
       this.$emit('change', this.member ? { memberId: this.member.id, cardNumber: this.member.cardNumber, rewardId: this.confirmed ? this.rewardId : null,
         confirmed: this.confirmed, expectedDiscountCents: this.confirmed ? this.quote.discountCents : 0,
+        expectedPointsCost: this.confirmed ? this.quote.pointsCost : 0, programVersion: this.confirmed ? this.quote.programVersion : null,
         totalCents: this.confirmed ? this.quote.totalCents : Math.round(this.grossTotal * 100) } : null)
     },
     async lookup() {
@@ -83,6 +84,12 @@ export default {
         const quote = await this.$store.dispatch('loyalty/previewKiosk', { memberId: this.member.id, rewardId: this.rewardId, items: buildCheckoutItems(this.items),
           isTakeaway: this.isTakeaway, expectedTotal: this.grossTotal, servicePointId: this.servicePointId })
         if (sequence !== this.sequence || this._isDestroyed) return
+        if (quote && (!Number.isSafeInteger(quote.programVersion) || quote.programVersion < 1 ||
+          !Number.isSafeInteger(quote.pointsCost) || quote.pointsCost < 1 ||
+          quote.grossCents !== Math.round(this.grossTotal * 100) || !Number.isSafeInteger(quote.discountCents) || quote.discountCents <= 0 ||
+          !Number.isSafeInteger(quote.totalCents) || quote.totalCents < 0 || quote.totalCents !== quote.grossCents - quote.discountCents)) {
+          throw new Error('Le programme a changé. Actualisez la récompense avant de confirmer.')
+        }
         this.quote = quote; this.confirming = !!quote
       } catch (error) { if (sequence === this.sequence) this.error = error.message }
       finally { if (sequence === this.sequence) { this.busy = false; this.$emit('busy', false) } }

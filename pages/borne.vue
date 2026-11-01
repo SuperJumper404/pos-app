@@ -1168,7 +1168,7 @@ export default {
         await this.finishCheckout(result, this.loyaltyIsFree ? 'Récompense fidélité' : 'À encaisser', { outcome: this.loyaltyIsFree ? 'paid' : 'counter' })
         this.kioskStep = 'confirmation'
       } catch (error) {
-        this.checkoutErrorMessage = error.message
+        this.handleCheckoutFailure(error, 'Impossible de finaliser la commande.')
       } finally {
         this.checkoutLoading = null
       }
@@ -1201,7 +1201,7 @@ export default {
         this.kioskTerminalPayment = payment
         await this.resolveTerminalPayment(payment)
       } catch (error) {
-        this.checkoutErrorMessage = error.message
+        this.handleCheckoutFailure(error, 'Impossible de lancer le paiement sur le TPE.')
       } finally {
         this.checkoutLoading = null
       }

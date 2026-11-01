@@ -127,7 +127,8 @@ const readAuthToken = () =>
 
 const buildCheckoutPayload = (params, clientOrderToken) => ({
   ...(params.loyaltyMemberId ? { loyalty_member_id: params.loyaltyMemberId,
-    ...(params.loyaltyRewardId ? { loyalty_expected_discount_cents: params.loyaltyExpectedDiscountCents } : {}) } : {}),
+    ...(params.loyaltyRewardId ? { loyalty_expected_discount_cents: params.loyaltyExpectedDiscountCents,
+      loyalty_expected_points_cost: params.loyaltyExpectedPointsCost, loyalty_program_version: params.loyaltyProgramVersion } : {}) } : {}),
   ...(params.loyaltyRewardId ? { loyalty_reward_id: params.loyaltyRewardId, loyalty_confirmed: params.loyaltyConfirmed === true } : {}),
   client_order_token: clientOrderToken,
   expected_total: roundPrice(
