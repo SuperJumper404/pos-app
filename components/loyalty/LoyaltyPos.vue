@@ -4,9 +4,11 @@
     <v-card-text>
       <v-alert v-if="loyalty.error" type="error" dense text>{{ loyalty.error }}</v-alert>
       <form @submit.prevent="lookup">
-        <v-text-field v-model="qr" outlined dense label="Scanner le QR de fidélité" hint="Utilisez votre lecteur QR ou collez l’identifiant de la carte." persistent-hint autocomplete="off" :disabled="loyalty.busy" />
+        <v-select v-model="kind" :items="searchModes" outlined dense label="Rechercher avec" :disabled="loyalty.busy" @change="clearMember" />
+        <v-text-field v-model="qr" outlined dense :type="kind === 'phone' ? 'tel' : 'text'" :label="kind === 'phone' ? 'Numéro de téléphone' : kind === 'card' ? 'Numéro de carte' : 'Scanner le QR de fidélité'" hint="Retrouvez une carte existante pour cette commande." persistent-hint autocomplete="off" :disabled="loyalty.busy" />
         <v-btn type="submit" outlined class="text-none mt-2" :loading="loyalty.busy" :disabled="!qr.trim()">Retrouver la carte</v-btn>
       </form>
+      <p v-if="loyalty.error" class="text-body-2 mt-3">Pour rejoindre le programme, le client doit scanner le QR de sa table sur son téléphone.</p>
       <template v-if="member">
         <p class="mt-4"><strong>{{ member.program.name }} · {{ member.available }} points disponibles</strong></p>
         <v-btn v-if="!attached" color="primary" class="text-none" :loading="loyalty.busy" @click="attach">Associer à la vente</v-btn>
@@ -27,7 +29,7 @@
 <script>
 export default {
   props: { orderId: { type: [Number, String], required: true } },
-  data: () => ({ qr: '', member: null, attached: false, rewardId: null, confirming: false, reservation: null, sequence: 0 }),
+  data: () => ({ kind: 'phone', searchModes: [{ text: 'Téléphone', value: 'phone' }, { text: 'Numéro de carte', value: 'card' }, { text: 'QR de fidélité', value: 'qr' }], qr: '', member: null, attached: false, rewardId: null, confirming: false, reservation: null, sequence: 0 }),
   computed: {
     loyalty() { return this.$store.state.loyalty },
     staffScope() { const user = this.$store.state.users.user; return JSON.stringify([user.id, user.shopid, user.access, user.module_permissions, user.session_subject]) },
@@ -37,12 +39,13 @@ export default {
   watch: { orderId() { this.reset() }, staffScope() { this.reset() } },
   beforeDestroy() { this.sequence++ },
   methods: {
+    clearMember() { this.reset(); this.qr = '' },
     reset() { this.sequence++; Object.assign(this, { member: null, attached: false, rewardId: null, confirming: false, reservation: null, qr: '' }); this.$store.dispatch('loyalty/reset') },
     async lookup() {
       const sequence = ++this.sequence
       this.attached = false
       this.reservation = null
-      const member = await this.$store.dispatch('loyalty/lookup', this.qr.trim())
+      const member = await this.$store.dispatch('loyalty/lookup', { kind: this.kind, value: this.qr.trim(), countryCode: 'FR' })
       if (sequence === this.sequence && !this._isDestroyed) this.member = member
     },
     async attach() {

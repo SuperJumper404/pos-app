@@ -163,7 +163,7 @@
                   {{ cartItemCount }} article{{ cartItemCount > 1 ? 's' : '' }}
                 </span>
               </div>
-              <strong>{{ formatCurrency(total) }}</strong>
+              <strong>{{ formatCurrency(loyaltyTotal) }}</strong>
             </div>
             <div v-if="cartItems.length === 0" class="kiosk-empty">
               Votre panier est vide
@@ -225,6 +225,7 @@
             <v-alert v-if="servicePointError" type="error" dense>
               {{ servicePointError }}
             </v-alert>
+            <LoyaltyKiosk v-if="kioskStep === 'payment'" :key="loyaltyEpoch" :service-point-id="servicePointId" :items="cartItems" :gross-total="total" :is-takeaway="saleMode === 'takeaway'" :attempt-key="loyaltyEpoch" :disabled="Boolean(checkoutLoading) || checkoutInteractionLocked" @change="loyaltySelection = $event" @busy="loyaltyBusy = $event" @idle="resetKiosk" />
             <v-alert v-if="isKitchenClosed" type="warning" dense>
               La cuisine est fermée. Aucune nouvelle commande n'est possible.
             </v-alert>
@@ -256,7 +257,7 @@
                 :loading="checkoutLoading === 'counter'"
                 @click="submitPayAtCounter"
               >
-                Payer au comptoir
+                {{ loyaltyIsFree ? 'Valider ma commande offerte' : 'Payer au comptoir' }}
               </v-btn>
               <v-btn
                 v-if="showStripePayment"
@@ -579,6 +580,7 @@
 import price from '@/helpers/price'
 import { terminalReaderLabel } from '@/helpers/stripeTerminal'
 import ProductCustomizationWizard from '@/components/products/ProductCustomizationWizard'
+import LoyaltyKiosk from '@/components/loyalty/LoyaltyKiosk.vue'
 import { applyServerQuoteToCart } from '@/helpers/customizations'
 import {
   buildOrderTicketPayload,
@@ -607,6 +609,7 @@ const KIOSK_TERMINAL_SESSION_TIMEOUT_MS = 35 * 1000
 export default {
   components: {
     ProductCustomizationWizard,
+    LoyaltyKiosk,
   },
   mixins: [price],
   async beforeRouteLeave(to, from, next) {
@@ -624,6 +627,9 @@ export default {
       activeCategory: '',
       customer: '',
       phone: '',
+      loyaltySelection: null,
+      loyaltyBusy: false,
+      loyaltyEpoch: 0,
       saleMode: 'dine_in',
       cartItems: [],
       customizationDialog: false,
@@ -801,8 +807,10 @@ export default {
       return true
     },
     showStripePayment() {
-      return this.paymentAvailability.stripe
+      return this.paymentAvailability.stripe && !(this.loyaltySelection && this.loyaltySelection.confirmed && this.loyaltySelection.totalCents < 50)
     },
+    loyaltyTotal() { return this.loyaltySelection && this.loyaltySelection.confirmed ? this.loyaltySelection.totalCents / 100 : this.total },
+    loyaltyIsFree() { return !!(this.loyaltySelection && this.loyaltySelection.confirmed && this.loyaltySelection.totalCents === 0) },
     terminalCardAvailable() {
       return Boolean(
         this.kioskTerminalReader &&
@@ -826,6 +834,7 @@ export default {
         !String(this.phone || '').trim() ||
         !this.servicePointId ||
         this.isKitchenClosed ||
+        this.loyaltyBusy ||
         this.terminalPaymentInProgress
       )
     },
@@ -945,6 +954,7 @@ export default {
       await this.logout()
     },
     startNewOrder() {
+      this.loyaltySelection = null; this.loyaltyEpoch++
       this.clearConfirmationReturnTimer()
       this.customer = ''
       this.phone = ''
@@ -1132,6 +1142,7 @@ export default {
         terminal,
         clientOrderToken: terminal ? this.ensureTerminalClientOrderToken() : undefined,
         repriceConfirmation: this.repriceConfirmation,
+        loyaltySelection: this.loyaltySelection,
         source: 'borne',
       })
     },
@@ -1143,7 +1154,7 @@ export default {
       try {
         const result = await this.$store.dispatch(
           'cart/checkoutOrder',
-          this.buildPayload('À encaisser', false)
+          this.buildPayload(this.loyaltyIsFree ? 'loyalty_zero_total' : 'À encaisser', false)
         )
         if (!result || !result.ok) {
           this.handleCheckoutFailure(
@@ -1154,7 +1165,7 @@ export default {
         }
         this.repriceConfirmation = false
         this.checkoutFinalized = true
-        await this.finishCheckout(result, 'À encaisser')
+        await this.finishCheckout(result, this.loyaltyIsFree ? 'Récompense fidélité' : 'À encaisser', { outcome: this.loyaltyIsFree ? 'paid' : 'counter' })
         this.kioskStep = 'confirmation'
       } catch (error) {
         this.checkoutErrorMessage = error.message
@@ -1318,6 +1329,12 @@ export default {
       }
     },
     handleCheckoutFailure(error, fallbackMessage) {
+      if (error?.code && error.code.startsWith('LOYALTY_')) {
+        this.loyaltySelection = null; this.loyaltyEpoch++
+        this.checkoutAlertType = 'warning'
+        this.checkoutErrorMessage = 'La récompense doit être vérifiée à nouveau. Retrouvez votre carte ou continuez sans récompense.'
+        return
+      }
       if (error?.code === 'ORDER_REPRICE_REQUIRED' && error.server_quote) {
         this.cartItems = applyServerQuoteToCart(
           this.cartItems,
@@ -1370,6 +1387,7 @@ export default {
       await this.$store.dispatch('cart/setIndex', 0)
       await this.$store.dispatch('cart/setTocart', null)
       this.scheduleConfirmationReturn()
+      this.loyaltySelection = null; this.loyaltyEpoch++
     },
     async fetchKioskOrder(orderId) {
       if (!orderId) return null
@@ -1533,6 +1551,8 @@ export default {
       }
     },
     async resetKiosk() {
+      if (this.checkoutLoading || this.terminalPaymentInProgress) return
+      this.loyaltySelection = null; this.loyaltyEpoch++
       this.clearConfirmationReturnTimer()
       await this.$store.dispatch('cart/abandonCheckout', { safe: true })
       this.cartItems = []

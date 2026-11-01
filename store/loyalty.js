@@ -1,7 +1,7 @@
 import { buildDeliveryApi } from './delivery'
 
 export const namespaced = true
-export const state = () => ({ member: null, program: null, members: [], selected: null, busy: false, error: '', epoch: 0 })
+export const state = () => ({ member: null, program: null, canEnroll: false, members: [], selected: null, busy: false, error: '', epoch: 0 })
 const initial = state
 const staffIdentity = root => JSON.stringify(root.users && root.users.user)
 const personalIdentity = root => {
@@ -12,6 +12,9 @@ const errors = {
   LOYALTY_DISABLED: 'Le programme de fidélité est suspendu.',
   LOYALTY_INSUFFICIENT_POINTS: 'Le solde disponible ne permet plus cette récompense. Actualisez la carte.',
   LOYALTY_NOT_FOUND: 'Carte ou commande introuvable dans ce restaurant.',
+  LOYALTY_LOOKUP_AMBIGUOUS: 'Plusieurs cartes correspondent à ce téléphone. Utilisez le numéro de carte.',
+  LOYALTY_RATE_LIMITED: 'Trop de recherches. Patientez une minute avant de réessayer.',
+  LOYALTY_TABLE_REQUIRED: 'Scannez le QR de votre table pour rejoindre le programme.',
   LOYALTY_FORBIDDEN: 'Vous n’avez pas les droits nécessaires.',
   LOYALTY_INVALID: 'Vérifiez les champs saisis puis réessayez.',
   LOYALTY_REWARD_CONDITIONS: 'La commande ne remplit pas les conditions de cette récompense.',
@@ -36,6 +39,7 @@ export const mutations = {
   MEMBER(current, result) {
     current.member = result && result.id ? result : result && result.member || null
     current.program = result && result.program || null
+    current.canEnroll = !!(result && result.canEnroll)
   },
   PROGRAM(current, program) { current.program = program },
   MEMBERS(current, members) { current.members = Array.isArray(members) ? members : [] },
@@ -79,6 +83,17 @@ async function request(host, context, { personal = false, tableContext = false, 
   } finally { if (current()) commit('BUSY', false) }
 }
 
+async function kioskRequest(host, context, path, body) {
+  const identity = staffIdentity(context.rootState)
+  const api = host.$deliveryApi || (host.$deliveryApi = buildDeliveryApi({ baseURL: process.env.privateURL }))
+  try {
+    const response = await api.request({ method: 'post', path, body })
+    return identity === staffIdentity(context.rootState) ? response && response.data && response.data.data : null
+  } catch (error) {
+    if (identity !== staffIdentity(context.rootState)) return null
+    throw new Error(errorMessage(error))
+  }
+}
 export const actions = {
   reset({ commit }) { commit('RESET') },
   loadMember(context) { return request(this, context, { personal: true, tableContext: true, path: '/customer/loyalty', mutation: 'MEMBER' }) },
@@ -96,7 +111,9 @@ export const actions = {
   },
   loadMembers(context) { return request(this, context, { path: '/loyalty/members', mutation: 'MEMBERS' }) },
   memberHistory(context, id) { return request(this, context, { path: `/loyalty/members/${encodeURIComponent(id)}`, mutation: 'SELECTED' }) },
-  lookup(context, qr) { return request(this, context, { method: 'post', path: '/loyalty/lookup', body: { qr: String(qr || '').trim() }, mutation: 'SELECTED' }) },
+  lookup(context, input) { return request(this, context, { method: 'post', path: '/loyalty/lookup', body: typeof input === 'string' ? { qr: input.trim() } : input, mutation: 'SELECTED' }) },
+  lookupKiosk(context, input) { return kioskRequest(this, context, '/loyalty/kiosk/lookup', input) },
+  previewKiosk(context, input) { return kioskRequest(this, context, '/loyalty/kiosk/preview', input) },
   adjust(context, { memberId, points, reason }) {
     if (!Number.isSafeInteger(points) || !points || typeof reason !== 'string' || !reason.trim()) return null
     return request(this, context, { method: 'post', path: `/loyalty/members/${encodeURIComponent(memberId)}/adjustments`, body: { points, reason: reason.trim() }, mutation: 'SELECTED' })
