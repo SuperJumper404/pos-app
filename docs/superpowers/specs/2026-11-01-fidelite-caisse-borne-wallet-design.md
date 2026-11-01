@@ -1,7 +1,7 @@
 # Fidélité SmartEat : caisse, borne, QR de table et Apple Wallet
 
 Date : 1 novembre 2026.
-Statut : conception proposée, en attente de validation utilisateur ; aucun développement produit autorisé par ce document seul.
+Statut : conception validée par l'utilisateur le 1 novembre 2026, après suppression de la vérification par code à la caisse et sur la borne. Préparer et faire relire le plan d'implémentation avant le développement selon le workflow Superpowers demandé.
 
 ## Intention et décisions exprimées
 
