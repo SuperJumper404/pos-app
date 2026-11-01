@@ -88,6 +88,7 @@ export default {
 
   // Vue 2 v-model: prop = value, event = input
   props: {
+    outputMimeType: { type: String, default: 'image/webp', validator: value => ['image/webp', 'image/png', 'image/jpeg'].includes(value) },
     value: {
       type: [Blob, null],
       default: null,
@@ -195,7 +196,7 @@ export default {
           // >>> v-model mis à jour ici <<<
           this.$emit('input', blob)
         },
-        'image/webp',
+        this.outputMimeType,
         0.9
       )
     },
