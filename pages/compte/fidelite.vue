@@ -9,6 +9,7 @@
       <v-card v-if="member" outlined class="pa-5 mb-5" :style="cardStyle">
         <div class="customer-section-heading mb-2"><h2 class="mb-0">{{ member.program.name }}</h2><img v-if="member.program.logoUrl" :src="member.program.logoUrl" alt="" width="52" height="52" class="loyalty-logo"></div>
         <p>{{ account.shop ? account.shop.shop_name : 'Votre restaurant' }}</p>
+        <p v-if="member.cardNumber">Carte {{ member.cardNumber }}</p>
         <p class="text-h4 font-weight-bold mb-2">{{ member.balance }} points</p>
         <p v-if="member.reserved">{{ member.reserved }} points réservés · {{ member.available }} disponibles</p>
         <div class="loyalty-qr"><qr-code :text="member.qr" :size="180" /></div>
@@ -25,8 +26,9 @@
           <p v-if="nextReward" class="mt-4">Prochain palier : {{ nextReward.name }} à {{ nextReward.points }} points.</p>
           <v-progress-linear v-if="nextReward" :value="Math.min(100, member.available / nextReward.points * 100)" height="8" rounded :aria-label="`Progression vers ${nextReward.name}`" />
         </section>
-        <section class="customer-section">
+        <section id="wallet" class="customer-section">
           <h2>Emportez votre carte</h2>
+          <v-switch :input-value="member.marketingConsent" label="Recevoir les offres du restaurant dans Wallet" :disabled="loyalty.busy" @change="$store.dispatch('loyalty/setMarketingConsent', $event)" />
           <p>Apple Wallet et Google Wallet affichent la même adhésion et le même solde.</p>
           <div class="customer-actions">
             <button v-if="appleArtwork" type="button" class="wallet-add-button" :disabled="loyalty.busy" aria-label="Ajouter à Apple Wallet" @click="addWallet('apple')"><img src="/wallet/apple-wallet-fr.svg" alt="Ajouter à Apple Wallet" height="48" @error="appleArtwork = false"></button>
@@ -41,7 +43,8 @@
           <ul class="loyalty-history"><li v-for="movement in member.history" :key="movement.id"><div><strong>{{ movementLabel(movement.kind) }}</strong><p class="mb-0 text--secondary">{{ date(movement.createdAt) }}<span v-if="movement.reason && movement.kind === 'adjustment'"> · {{ movement.reason }}</span></p></div><strong>{{ movement.points > 0 ? '+' : '' }}{{ movement.points }}</strong></li></ul>
         </section>
       </template>
-      <section v-else-if="loyalty.program && loyalty.program.enabled" class="customer-section"><h2>{{ loyalty.program.name }}</h2><p>Adhérez gratuitement pour cumuler des points dans ce restaurant. L’adhésion ne vous inscrit pas aux communications marketing.</p><v-btn color="primary" :loading="loyalty.busy" @click="$store.dispatch('loyalty/enroll')">Rejoindre le programme</v-btn></section>
+      <section v-else-if="loyalty.program && loyalty.program.enabled && loyalty.canEnroll" class="customer-section"><h2>{{ loyalty.program.name }}</h2><p>Adhérez gratuitement pour cumuler des points dans ce restaurant.</p><v-checkbox v-model="marketingConsent" label="Recevoir les offres dans Wallet (facultatif)" :disabled="loyalty.busy" /><v-btn color="primary" :loading="loyalty.busy" @click="join">Rejoindre le programme</v-btn></section>
+      <v-alert v-else-if="loyalty.program && loyalty.program.enabled && !loyalty.busy" type="info" text>Scannez le QR de votre table sur votre téléphone pour rejoindre le programme.</v-alert>
       <v-alert v-else-if="!loyalty.busy && !loyalty.error" type="info" text>Le restaurant n’a pas activé son programme de fidélité.</v-alert>
       <section class="customer-section"><h2>Commander sur place</h2><p>Scanner le QR de votre table pour commencer une commande. Aucune table précédente n’est sélectionnée depuis cette page.</p><v-btn text :loading="loyalty.busy" @click="refresh"><v-icon left>mdi-refresh</v-icon>Actualiser mes points</v-btn></section>
     </template>
@@ -53,7 +56,7 @@ import QrCode from 'vue-qrcode-component/src/QRCode.vue'
 export default {
   components: { CustomerCodeLogin, QrCode },
   layout: 'customer',
-  data: () => ({ opening: true, adding: '', walletMessage: '', sequence: 0, appleArtwork: true }),
+  data: () => ({ opening: true, adding: '', walletMessage: '', sequence: 0, appleArtwork: true, marketingConsent: false }),
   computed: {
     account() { return this.$store.state.customer },
     loyalty() { return this.$store.state.loyalty },
@@ -70,6 +73,7 @@ export default {
   mounted() { this.open() },
   beforeDestroy() { this.sequence++; this.$store.dispatch('loyalty/reset') },
   methods: {
+    async join() { const member = await this.$store.dispatch('loyalty/enroll', { marketingConsent: this.marketingConsent }); if (member && !this._isDestroyed) this.walletMessage = 'Votre carte est prête. Ajoutez-la à Apple Wallet avec le bouton ci-dessous.' },
     async open() {
       const sequence = ++this.sequence
       this.opening = true

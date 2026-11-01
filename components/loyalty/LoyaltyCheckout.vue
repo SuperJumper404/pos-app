@@ -10,6 +10,7 @@
       <customer-code-login v-if="identifying" :key="account.epoch" @authenticated="authenticated" />
     </template>
     <template v-else-if="loyalty.member">
+      <v-alert v-if="joined" type="success" text dense>Votre carte est créée. Vous pouvez maintenant l’ajouter à Apple Wallet.</v-alert>
       <p class="mt-2 mb-1"><strong>{{ loyalty.member.available }} points disponibles</strong></p>
       <p class="mb-2 text--secondary">Vos points seront attribués après confirmation du paiement.</p>
       <template v-if="usableRewards.length">
@@ -18,12 +19,14 @@
         <v-alert v-if="confirmedReward" type="info" text dense>{{ confirmedReward.name }} · {{ confirmedReward.points }} points seront réservés à la validation de la commande. Le total final sera recalculé par le restaurant avant le paiement.<v-btn text small :disabled="disabled" @click="removeReward">Retirer</v-btn></v-alert>
       </template>
       <v-btn text class="text-none" color="primary" :to="{ path: '/compte/fidelite', query: { shopId } }">Voir mes récompenses</v-btn>
+      <v-btn v-if="joined" outlined class="text-none mt-2" :to="{ path: '/compte/fidelite', query: { shopId }, hash: '#wallet' }">Ajouter ma carte à Apple Wallet</v-btn>
     </template>
-    <template v-else-if="loyalty.program && loyalty.program.enabled">
+    <template v-else-if="loyalty.program && loyalty.program.enabled && loyalty.canEnroll">
       <p class="mt-2">Rejoignez {{ loyalty.program.name }} pour cumuler des points dans ce restaurant.</p>
-      <v-btn outlined class="text-none" :loading="loyalty.busy" @click="$store.dispatch('loyalty/enroll')">Rejoindre le programme</v-btn>
+      <v-checkbox v-model="marketingConsent" label="Recevoir les offres du restaurant dans Wallet (facultatif)" :disabled="loyalty.busy" />
+      <v-btn outlined class="text-none" :loading="loyalty.busy" @click="join">Rejoindre le programme</v-btn>
     </template>
-    <p v-else-if="!loyalty.busy" class="mt-2 mb-0 text--secondary">Le programme n’est pas disponible dans ce restaurant.</p>
+    <p v-else-if="!loyalty.busy" class="mt-2 mb-0 text--secondary">Pour rejoindre la fidélité, scannez le QR de votre table depuis votre téléphone.</p>
     <v-dialog v-model="confirming" max-width="460"><v-card><v-card-title class="subtitle-1 se-modal-title">Utiliser mes points</v-card-title><v-card-text v-if="chosenReward">Confirmez-vous l’utilisation de {{ chosenReward.points }} points pour « {{ chosenReward.name }} » ? Aucun point ne sera dépensé avant le paiement.</v-card-text><v-card-actions><v-spacer /><v-btn text @click="confirming = false">Annuler</v-btn><v-btn color="primary" :disabled="disabled" @click="confirmReward">Confirmer</v-btn></v-card-actions></v-card></v-dialog>
   </section>
 </template>
@@ -32,7 +35,7 @@ import CustomerCodeLogin from '@/components/customer/CustomerCodeLogin.vue'
 export default {
   components: { CustomerCodeLogin },
   props: { shopId: { type: Number, required: true }, disabled: { type: Boolean, default: false } },
-  data: () => ({ identifying: false, guest: false, sequence: 0, rewardId: null, confirming: false, confirmedReward: null }),
+  data: () => ({ identifying: false, guest: false, sequence: 0, rewardId: null, confirming: false, confirmedReward: null, marketingConsent: false, joined: false }),
   computed: {
     account() { return this.$store.state.customer },
     loyalty() { return this.$store.state.loyalty },
@@ -47,6 +50,7 @@ export default {
   mounted() { this.initialize() },
   beforeDestroy() { this.sequence++ },
   methods: {
+    async join() { const member = await this.$store.dispatch('loyalty/enroll', { marketingConsent: this.marketingConsent }); if (member && !this._isDestroyed) this.joined = true },
     async initialize() {
       const sequence = ++this.sequence
       this.identifying = false

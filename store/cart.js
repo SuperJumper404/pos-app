@@ -86,6 +86,8 @@ const trackingConfirmation = (store, rootState, state, record) => {
   return context && trackingFrameCurrent(store, rootState, state, record, context) ? context : null
 }
 const SAFE_PREWRITE_ERROR_CODES = new Set([
+  'LOYALTY_REQUOTE_REQUIRED', 'LOYALTY_INSUFFICIENT_POINTS', 'LOYALTY_REWARD_UNAVAILABLE', 'LOYALTY_REWARD_CONDITIONS',
+  'LOYALTY_DISABLED', 'LOYALTY_NOT_FOUND', 'LOYALTY_NOT_STACKABLE', 'LOYALTY_COUNTER_PAYMENT_REQUIRED',
   'CHECKOUT_REQUEST_INVALID',
   'INSUFFICIENT_STOCK',
   'KITCHEN_CLOSED',
@@ -124,6 +126,8 @@ const readAuthToken = () =>
   typeof localStorage === 'undefined' ? '' : localStorage.getItem('token')
 
 const buildCheckoutPayload = (params, clientOrderToken) => ({
+  ...(params.loyaltyMemberId ? { loyalty_member_id: params.loyaltyMemberId,
+    ...(params.loyaltyRewardId ? { loyalty_expected_discount_cents: params.loyaltyExpectedDiscountCents } : {}) } : {}),
   ...(params.loyaltyRewardId ? { loyalty_reward_id: params.loyaltyRewardId, loyalty_confirmed: params.loyaltyConfirmed === true } : {}),
   client_order_token: clientOrderToken,
   expected_total: roundPrice(

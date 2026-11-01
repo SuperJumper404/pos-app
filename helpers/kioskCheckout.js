@@ -1,4 +1,5 @@
 const { roundPrice } = require('./price-functions')
+const { loyaltyCheckoutFields } = require('./loyaltyCheckout')
 const {
   buildCheckoutItems,
   buildConfigurationSignature,
@@ -28,6 +29,7 @@ const buildKioskCheckoutPayload = ({
   terminal = false,
   clientOrderToken,
   repriceConfirmation = false,
+  loyaltySelection = null,
 } = {}) => {
   const normalizedServicePointId = Number(servicePointId || 0)
   if (!normalizedServicePointId) {
@@ -39,6 +41,7 @@ const buildKioskCheckoutPayload = ({
 
   if (terminal === true) {
     return {
+      ...loyaltyCheckoutFields(loyaltySelection, true),
       customer: {
         name: requiredText(customer, 'Le nom'),
         phone: requiredText(phone, 'Le numero'),
@@ -60,6 +63,7 @@ const buildKioskCheckoutPayload = ({
   }
 
   return {
+    ...loyaltyCheckoutFields(loyaltySelection),
     customer: requiredText(customer, 'Le nom'),
     phone: requiredText(phone, 'Le numero'),
     servicePointId: normalizedServicePointId,

@@ -9,9 +9,10 @@ const deliveryDetails = (details = {}) => Object.fromEntries(
 
 const buildCheckoutIntentSignature = (params = {}) => {
   const base = buildCheckoutPayloadSignature(params)
-  const legacy = params.loyaltyRewardId || params.customerSession ? JSON.stringify({ base,
+  const legacy = params.loyaltyRewardId || params.loyaltyMemberId || params.customerSession ? JSON.stringify({ base,
     loyaltyRewardId: params.loyaltyRewardId || null, loyaltyConfirmed: params.loyaltyConfirmed === true,
     customerContextId: params.customerSession ? params.customerSession.customerId : null,
+    ...(params.loyaltyMemberId ? { loyaltyMemberId: params.loyaltyMemberId, loyaltyExpectedDiscountCents: params.loyaltyExpectedDiscountCents } : {}),
   }) : base
   if (params.fulfillmentType !== 'delivery') return legacy
   return JSON.stringify({ legacy, fulfillmentType: 'delivery',
