@@ -33,14 +33,14 @@ export function buildCustomerApi({ baseURL, adapter = xhrAdapter }) {
       crypto.getRandomValues(bytes)
       return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
     },
-    async request({ method = 'get', path, body, shopId, csrfToken }) {
+    async request({ method = 'get', path, body, shopId, csrfToken, tableSessionToken }) {
       try {
         const response = await transport.request({
           method,
           url: `/baseurl/api/v1${path}`,
           params: shopId == null ? undefined : { shopId },
           data: body,
-          headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+          headers: { ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}), ...(tableSessionToken ? { 'X-Table-Session': tableSessionToken } : {}) },
         })
         if (!response.data || response.data.success !== true) throw new Error('Invalid response')
         return response.data.data

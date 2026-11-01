@@ -41,6 +41,26 @@ test('personal loyalty retains cart/table and uses customer csrf without staff c
   assert.equal(JSON.stringify(f.rootState.cart), before)
   assert.equal(f.state.member.id, 'member')
 })
+test('only a table QR context accompanies personal loyalty enrollment and consent is explicit', async () => {
+  const f = fixture()
+  f.rootState.users.user = { shopid: 7, session_subject: 'service_point', order_source: 'table_qr', token: 'signed-table' }
+  await f.dispatch('enroll', { marketingConsent: true })
+  assert.equal(f.calls[0].tableSessionToken, 'signed-table')
+  assert.deepEqual(f.calls[0].body, { marketingConsent: true })
+  f.rootState.users.user.order_source = 'borne'
+  await f.dispatch('loadMember')
+  assert.equal(f.calls[1].tableSessionToken, undefined)
+})
+test('customer transport sends a table credential only when explicitly supplied', async () => {
+  const { buildCustomerApi } = load('plugins/customerApi.client.js')
+  const received = []
+  const api = buildCustomerApi({ baseURL: 'https://api.example.test', adapter: config => { received.push(config); return Promise.resolve({ data: { success: true, data: {} }, status: 200, config, headers: {} }) } })
+  await api.request({ method: 'post', path: '/customer/loyalty', shopId: 7, csrfToken: 'csrf', tableSessionToken: 'signed-table', body: {} })
+  await api.request({ path: '/customer/addresses', shopId: 7 })
+  assert.equal(received[0].headers['X-Table-Session'], 'signed-table')
+  assert.equal(received[1].headers['X-Table-Session'], undefined)
+  assert.equal(received[0].headers.Authorization, undefined)
+})
 test('late replies cannot restore another restaurants member', async () => {
   let finish
   const f = fixture(() => new Promise(resolve => { finish = resolve }))
