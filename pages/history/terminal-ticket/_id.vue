@@ -107,8 +107,13 @@ export default {
         const historyAccess = this.canViewHistory
         const result = await this.$store.dispatch(historyAccess ? 'terminalPayments/getAttachments' : 'terminalPayments/getPayment', id)
         if (generation !== this.requestVersion || scope !== this.userScope) return
-        const payment = historyAccess ? result && result.payment : result
+        let payment = historyAccess ? result && result.payment : result
         if (!payment || payment.id !== id || payment.paymentKind !== 'standalone') throw new Error('MISSING_PAYMENT')
+        if (historyAccess && payment.status === 'succeeded') {
+          const cardTicket = await this.$store.dispatch('terminalPayments/getCardTicket', id)
+          if (generation !== this.requestVersion || scope !== this.userScope) return
+          if (cardTicket && cardTicket.terminalPaymentId === id) payment = { ...payment, cardTicket }
+        }
         this.payment = payment
         if (this.ticketPayload) this.generatePdf()
       } catch (_) {

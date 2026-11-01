@@ -29,7 +29,7 @@ const buildReceiptBundle = ({
     .forEach((payload) => {
       tickets.push({
         kind: 'card_ticket',
-        ticketType: 'carte',
+        ticketType: 'caisse',
         payload,
       })
     })

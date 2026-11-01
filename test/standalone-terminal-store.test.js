@@ -34,6 +34,12 @@ const run = async () => {
   const previousPayment = h.current.activePayment
   await h.call('getPayment', 21)
   assert.strictEqual(h.current.activePayment, previousPayment, 'Receipt reads must not replace the active collection')
+  const cardTicket = { terminalPaymentId: 21, amountCents: 5000, brand: 'visa', last4: '4242' }
+  const receipt = make(() => Promise.resolve(ok(cardTicket)))
+  assert.deepStrictEqual(await receipt.call('getCardTicket', 21), cardTicket)
+  assert.strictEqual(receipt.calls[0].args[0], '/baseurl/api/v1/stripe/terminal/history/21/card-ticket')
+  assert.strictEqual(receipt.current.activePayment, null, 'Card receipt recovery must not change a collection')
+  assert.strictEqual(await receipt.call('getCardTicket', 22), false, 'Reject a card ticket from another payment')
   const invalid = make()
   assert.strictEqual(await invalid.call('startPayment', { amountCents: 49, attemptKey }), false)
   assert.strictEqual(invalid.calls.length, 0)

@@ -74,6 +74,10 @@ export const state = () => ({ activePayment: null, loading: false, error: null }
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
 export const actions = {
+  getCardTicket(context, id) {
+    return run(context, () => this.$axios.get(`${baseUrl}/history/${requiredId(id)}/card-ticket`, config()),
+      result => Boolean(result && result.terminalPaymentId === id && Number.isSafeInteger(result.amountCents) && result.amountCents >= 0))
+  },
   startPayment(context, input) {
     return run(context, () => {
       if (!input || !validAmount(input.amountCents) || !validAttemptKey(input.attemptKey)) invalid()
