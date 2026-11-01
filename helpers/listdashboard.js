@@ -151,6 +151,14 @@ const listdashboard = {
           isAdmin: true,
         },
         {
+          icon: 'mdi-card-account-details-outline',
+          title: 'Fidélité',
+          routeName: 'fidelite',
+          to: '/fidelite',
+          moduleKey: 'loyalty',
+          isAdmin: true,
+        },
+        {
           icon: 'mdi-receipt-text-check-outline',
           title: 'Ticket de caisse',
           routeName: 'history-ticket-id',

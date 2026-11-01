@@ -118,6 +118,7 @@ const canAccessModule = (
   isPrimaryAdmin = false,
   legacyModuleKey = moduleKey
 ) => {
+  if (moduleKey === 'loyalty') return access != null && Number(access) === ACCESS.ADMIN
   if (Number(access) === ACCESS.COURIER) return false
   if (moduleKey === 'delivery') return access != null && (Number(access) === ACCESS.ADMIN ||
     (Number(access) === ACCESS.CASHIER && Array.isArray(modulePermissions) && modulePermissions.includes('delivery')))
