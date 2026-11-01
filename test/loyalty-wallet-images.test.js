@@ -6,7 +6,7 @@ test('wallet image export produces the three actual PNG variants and crops to th
   assert.equal(typeof images.buildWalletImageVariants, 'function')
   const draws = []
   const variants = await images.buildWalletImageVariants(new Blob(['image']), { kind: 'strip',
-    decodeImage: async () => ({ width: 1600, height: 900 }),
+    decodeImage: () => Promise.resolve({ width: 1600, height: 900 }),
     createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage: (...args) => draws.push(args) }),
       toBlob(callback, mime) { callback(new Blob([JSON.stringify([this.width, this.height])], { type: mime })) } }),
   })

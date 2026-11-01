@@ -1,7 +1,7 @@
 <template>
   <section aria-label="Clients adhérents">
     <div class="d-flex flex-wrap align-center mb-4">
-      <v-text-field v-model="search" outlined dense clearable hide-details label="Nom, téléphone ou numéro de carte" maxlength="128" prepend-inner-icon="mdi-magnify" />
+      <v-text-field v-model="search" class="se-search-field" outlined dense clearable hide-details label="Nom, téléphone ou numéro de carte" maxlength="128" prepend-inner-icon="mdi-magnify" />
       <v-btn text class="text-none ml-3" :loading="loyalty.membersBusy" @click="load">Actualiser</v-btn>
     </div>
     <v-alert v-if="loyalty.membersError" type="error" text role="alert">{{ loyalty.membersError }}</v-alert>
