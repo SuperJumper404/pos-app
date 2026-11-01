@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:loyalty": "node test/loyalty-ui.test.js && node test/loyalty-kiosk-ui.test.js && node test/loyalty-wallet-images.test.js && node test/loyalty-admin.test.js",
+    "test:loyalty": "node test/loyalty-ui.test.js && node test/loyalty-kiosk-ui.test.js && node test/loyalty-terminal-flow.test.js && node test/loyalty-wallet-images.test.js && node test/loyalty-admin.test.js",
     "predev": "node scripts/ensure-dev-port-free.js",
     "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=local nuxt",
     "network": "cross-env NODE_OPTIONS=--openssl-legacy-provider ENV=network nuxt",
@@ -59,4 +59,3 @@
     "prettier": "^2.2.1"
   }
 }
-

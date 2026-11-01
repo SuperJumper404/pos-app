@@ -38,6 +38,21 @@ const terminalPaymentMessage = (payment) => {
 }
 
 const TERMINAL_ERROR_MESSAGES = {
+  LOYALTY_REQUOTE_REQUIRED: 'Confirmez à nouveau la récompense et son coût en points.',
+  LOYALTY_INSUFFICIENT_POINTS: 'Votre solde disponible a changé. Retrouvez votre carte.',
+  LOYALTY_REWARD_UNAVAILABLE: 'Cette récompense n’est plus disponible.',
+  LOYALTY_REWARD_CONDITIONS: 'La commande ne remplit plus les conditions de cette récompense.',
+  LOYALTY_NOT_STACKABLE: 'Cette récompense ne peut pas être cumulée avec cette remise.',
+  LOYALTY_DISABLED: 'Le programme de fidélité est suspendu.',
+  LOYALTY_NOT_FOUND: 'Cette carte de fidélité est introuvable.',
+  LOYALTY_UNAVAILABLE: 'La fidélité est momentanément indisponible.',
+  LOYALTY_COUNTER_PAYMENT_REQUIRED: 'Ce montant doit être réglé au comptoir.',
+  LOYALTY_FORBIDDEN: 'Cette carte ne peut pas être utilisée pour cette commande.',
+  LOYALTY_PAYMENT_ACTIVE: 'Un paiement est déjà en cours.',
+  LOYALTY_ALREADY_RESERVED: 'Une récompense est déjà réservée.',
+  LOYALTY_ORDER_ASSIGNED: 'Cette commande est associée à une autre carte.',
+  LOYALTY_INVALID: 'Vérifiez la sélection de fidélité.',
+  LOYALTY_CONFIRMATION_REQUIRED: 'Confirmez l’utilisation de vos points.',
   TERMINAL_INVALID_INPUT: 'Parametres du terminal invalides.',
   TERMINAL_FORBIDDEN: 'Acces au terminal refuse.',
   TERMINAL_INVALID_ASSIGNEE: 'Le compte assigne doit etre un employe actif du restaurant.',

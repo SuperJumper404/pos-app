@@ -6,7 +6,7 @@ const { test } = require('node:test')
 const { buildKioskCheckoutPayload } = require('../helpers/kioskCheckout')
 const { buildCheckoutIntentSignature } = require('../helpers/counterCheckout')
 const memberId = '00000000-0000-4000-8000-000000000001'
-const selection = { memberId, cardNumber: '0001234567890123', rewardId: 'coffee', confirmed: true, expectedDiscountCents: 200, totalCents: 800 }
+const selection = { memberId, cardNumber: '0001234567890123', rewardId: 'coffee', confirmed: true, expectedDiscountCents: 200, expectedPointsCost: 30, programVersion: 1, totalCents: 800 }
 const params = { customer: 'Client', phone: '0612345678', servicePointId: 5, total: 10, payment: 'À encaisser', dataCart: [{ id: 21, qty: 1, price: 10 }] }
 
 function loadComponent(relative = 'components/loyalty/LoyaltyKiosk.vue') {
@@ -35,8 +35,12 @@ test('kiosk checkout includes identified loyalty and the exact confirmed discoun
   const terminal = buildKioskCheckoutPayload({ ...params, terminal: true, clientOrderToken: 'attempt', loyaltySelection: selection })
   assert.equal(terminal.loyalty_member_id, memberId); assert.equal(terminal.loyalty_expected_discount_cents, 200)
   assert.equal(terminal.expected_total, 10); assert.equal(terminal.loyalty_confirmed, true)
+  assert.equal(terminal.loyalty_expected_points_cost, 30); assert.equal(terminal.loyalty_program_version, 1)
   const counter = buildKioskCheckoutPayload({ ...params, loyaltySelection: selection })
   assert.equal(counter.loyaltyMemberId, memberId); assert.equal(counter.loyaltyRewardId, 'coffee')
+  assert.throws(() => buildKioskCheckoutPayload({ ...params, terminal: true, loyaltySelection: { ...selection, programVersion: undefined } }), { code: 'LOYALTY_REQUOTE_REQUIRED' })
+  assert.notEqual(buildCheckoutIntentSignature(counter), buildCheckoutIntentSignature({ ...counter, loyaltyExpectedPointsCost: 40 }))
+  assert.notEqual(buildCheckoutIntentSignature(counter), buildCheckoutIntentSignature({ ...counter, loyaltyProgramVersion: 2 }))
   const unconfirmed = buildKioskCheckoutPayload({ ...params, loyaltySelection: { ...selection, confirmed: false } })
   assert.equal(unconfirmed.loyaltyRewardId, undefined)
   assert.notEqual(buildCheckoutIntentSignature({ ...params, loyaltyMemberId: memberId }), buildCheckoutIntentSignature({ ...params, loyaltyMemberId: '00000000-0000-4000-8000-000000000002' }))
@@ -46,7 +50,7 @@ test('kiosk lookup emits accumulation intent and explicit redemption without req
   const { ctx, events } = component((action, payload) => {
     calls.push({ action, payload })
     return action === 'loyalty/lookupKiosk' ? { id: memberId, cardNumber: selection.cardNumber, available: 50, rewards: [{ id: 'coffee', name: 'Café', points: 30, available: true }] }
-      : { grossCents: 1000, discountCents: payload.rewardId ? 200 : 0, totalCents: payload.rewardId ? 800 : 1000, pointsCost: payload.rewardId ? 30 : 0 }
+      : { grossCents: 1000, discountCents: payload.rewardId ? 200 : 0, totalCents: payload.rewardId ? 800 : 1000, pointsCost: payload.rewardId ? 30 : 0, programVersion: 1 }
   })
   ctx.value = '0612345678'; await ctx.lookup()
   assert.equal(ctx.member.id, memberId)
@@ -55,7 +59,14 @@ test('kiosk lookup emits accumulation intent and explicit redemption without req
   assert.equal(events.filter(event => event.name === 'change').at(-1).payload.rewardId, null, 'preview must not spend')
   ctx.confirmReward()
   assert.equal(events.at(-1).payload.rewardId, 'coffee'); assert.equal(events.at(-1).payload.expectedDiscountCents, 200)
+  assert.equal(events.at(-1).payload.expectedPointsCost, 30); assert.equal(events.at(-1).payload.programVersion, 1)
   assert(calls.every(call => !/auth|code|challenge|enroll/i.test(call.action)))
+})
+test('an incomplete preview cannot display a confirmation or silently fall back to a full-price payment', async () => {
+  const { ctx } = component(() => ({ grossCents: 1000, discountCents: 200, totalCents: 800, pointsCost: 30 }))
+  ctx.member = { id: memberId }; ctx.rewardId = 'coffee'
+  await ctx.previewReward()
+  assert.equal(ctx.confirming, false); assert.equal(ctx.quote, null); assert(ctx.error)
 })
 test('kiosk reset discards a previous customer lookup arriving late', async () => {
   let finish

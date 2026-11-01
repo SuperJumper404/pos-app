@@ -50,6 +50,8 @@ Les anciennes cartes reçoivent un numéro à 16 chiffres sans changement du QR 
 
 La recherche est limitée à 30/minute par borne et 60/minute par membre du personnel dans chaque restaurant. Un téléphone libre d'une fiche client ne constitue pas une identité vérifiée ; une recherche ambiguë ne choisit aucun compte.
 
+La confirmation borne transporte la remise, le coût en points et la version du programme issus de l'aperçu. Le serveur les revérifie dans la transaction ; une modification impose un nouvel aperçu. Le frontend et le backend doivent être mis à jour ensemble ; un ancien écran en cache peut devoir être rechargé.
+
 Carte Wallet : importer et recadrer logo/bandeau, puis publier les variantes PNG. Les images sont versionnées et les anciennes cartes sont mises à jour. Les icônes et certificats restent à préparer sur le serveur. L'aperçu web est indicatif.
 
 Notifications : consentement distinct, désactivé par défaut et modifiable depuis la page personnelle. La préparation fige l'audience consentante ayant un appareil Apple enregistré, affiche son nombre puis exige une confirmation. Un envoi par restaurant toutes les cinq minutes. Le worker revérifie le consentement ; « traité » ne signifie jamais « lu ». Aucun point n'est modifié.

@@ -39,6 +39,8 @@
 
 ## Contrats communs
 
+- Complément de revue finale : `loyalty_expected_points_cost` / `loyaltyExpectedPointsCost` et `loyalty_program_version` / `loyaltyProgramVersion` lient la confirmation au coût et à la version de l'offre dans la transaction et l'idempotence. Un aperçu incomplet est refusé avant confirmation/paiement. Voir le rapport de validation pour les régressions et la décision.
+
 - `LookupInput = { kind: 'phone'|'card'|'qr', value: string, countryCode?: string }`. Téléphone : normalisation existante avec pays explicite, `FR` par défaut dans l'interface. Carte : 16 chiffres, espaces/tirets de présentation acceptés, conservation des zéros initiaux. QR : 64 caractères hexadécimaux existants. Accepter l'ancien corps `{ qr }` caisse comme alternative exclusive.
 - `MemberSummary = { id, cardNumber, balance, reserved, available, program, rewards }` ; aucun historique/jeton/coordonnée complète sur borne. Le DTO personnel conserve les champs existants et ajoute `cardNumber`, `marketingConsent` et `canEnroll` lorsque non adhérent.
 - Les nouvelles routes gardent l'enveloppe existante `{ success, data }`, `Cache-Control: no-store` et les erreurs `LOYALTY_*`. Le restaurant est issu d'une session contrôlée, jamais du corps fourni comme autorité.

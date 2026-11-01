@@ -12,7 +12,8 @@ const buildCheckoutIntentSignature = (params = {}) => {
   const legacy = params.loyaltyRewardId || params.loyaltyMemberId || params.customerSession ? JSON.stringify({ base,
     loyaltyRewardId: params.loyaltyRewardId || null, loyaltyConfirmed: params.loyaltyConfirmed === true,
     customerContextId: params.customerSession ? params.customerSession.customerId : null,
-    ...(params.loyaltyMemberId ? { loyaltyMemberId: params.loyaltyMemberId, loyaltyExpectedDiscountCents: params.loyaltyExpectedDiscountCents } : {}),
+    ...(params.loyaltyMemberId ? { loyaltyMemberId: params.loyaltyMemberId, loyaltyExpectedDiscountCents: params.loyaltyExpectedDiscountCents,
+      loyaltyExpectedPointsCost: params.loyaltyExpectedPointsCost, loyaltyProgramVersion: params.loyaltyProgramVersion } : {}),
   }) : base
   if (params.fulfillmentType !== 'delivery') return legacy
   return JSON.stringify({ legacy, fulfillmentType: 'delivery',
