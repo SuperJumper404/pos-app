@@ -43,3 +43,13 @@ Les suites générales et fidélité des deux dépôts passent après intégrati
 **La validation MySQL n'est plus ignorée pour ce déploiement** : le test a été exécuté avec MySQL 8 dans Docker, dans une base jetable créée puis supprimée par le helper existant. Résultat PASS pour les migrations, recherche/remplissage des numéros, isolation des restaurants, réservations concurrentes, paiement/remboursement/rollback, remise borne/replay et audience figée/retrait de consentement.
 
 Avant modification du staging, une sauvegarde privée de la base `pointofsalestaging`, des sources backend/frontend et de la configuration des conteneurs a été préparée. Le programme du restaurant `demo` reste à configurer par l'utilisateur, conformément à son choix. Aucun client ni programme de démonstration supplémentaire n'est créé, et aucune notification réelle n'est envoyée par le déploiement.
+
+## Déploiement et contrôles publics
+
+Déploiement Docker staging réussi : frontend `ea2014eee79b8d1d4c069fe51a8ff399377c074c` ([exécution](https://github.com/SuperJumper404/pos-app/actions/runs/41353730270)), backend `7c27fb669c599e1db49f865d117ca4bd3eaa5d62` ([exécution](https://github.com/SuperJumper404/express-pos/actions/runs/41353591265)). Les jobs PM2 ont été ignorés ; production inchangée. Les deux conteneurs sont actifs, sans redémarrage après démarrage, et les 56 migrations backend sont appliquées sans attente.
+
+Les fichiers publics du frontend correspondent au build du conteneur (empreinte SHA-256 du HTML `ab22f06255ba422a1ad442ea545fd998162291ae6a3d3e104f6c3ec711bab7be`), avec bundles accessibles en HTTP 200, interface fidélité/Wallet/campagnes et API staging. Le navigateur atteint le formulaire normal de connexion en ouvrant `/fidelite`. Les routes privées restent protégées ; l'origine client staging et les en-têtes de session/CSRF sont autorisés par CORS.
+
+La signature Apple a été vérifiée de nouveau avec le code déployé et les vrais certificats : génération en mémoire, manifeste, signature PKCS#7 et chaîne Apple valides, mention TEST et URL HTTPS correctes. Ce contrôle utilise un dépôt fictif sans écriture SQL ni requête fournisseur ; aucun client ou pass réel n'a été créé.
+
+Le programme reste à configurer et activer par l'utilisateur dans Fidélité. L'essai sur iPhone depuis un QR de table, l'ajout effectif à Wallet et la réception d'une mise à jour/notification APNs restent à réaliser. Aucun SMS, aucune notification et aucun paiement réel n'ont été déclenchés. Les commits de ce compte rendu n'exigent pas un nouveau déploiement applicatif.
