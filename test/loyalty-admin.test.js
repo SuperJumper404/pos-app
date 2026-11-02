@@ -151,7 +151,7 @@ test('campaign form refuses a missing title or a title and message longer than 2
   ctx.title = 'x'.repeat(80); ctx.message = 'y'.repeat(120); await options.methods.preview.call(ctx); assert.equal(calls, 0)
   Object.defineProperty(ctx, 'messageLimit', { get: () => options.computed.messageLimit.call(ctx) })
   ctx.title = 'Offre'; ctx.message = 'Du jour'; assert.equal(options.computed.canPrepare.call(ctx), true)
-  for (const title of ['A\u0085B', 'A\u009fB', 'A\u2028B', 'A\u2029B']) {
+  for (const title of ['A\u0085B', 'A\u009FB', 'A\u2028B', 'A\u2029B']) {
     ctx.title = title; await options.methods.preview.call(ctx); assert.equal(calls, 0)
     assert.equal(options.computed.canPrepare.call(ctx), false)
   }
