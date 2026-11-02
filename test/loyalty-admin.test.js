@@ -120,9 +120,33 @@ test('all new admin components compile and a campaign uses the previewed draft f
     calls.push({ action, input }); return action === 'loyalty/createCampaignDraft' ? { id: '12', recipientCount: 3, message: input.message } : { id: '12', status: 'queued' }
   } } }
   for (const [name, fn] of Object.entries(options.methods)) ctx[name] = fn.bind(ctx)
-  ctx.message = 'Une nouvelle offre vous attend.'; await ctx.preview()
+  ctx.title = 'Offre du jour'; ctx.message = 'Une nouvelle offre vous attend.'; await ctx.preview()
   assert.equal(ctx.draft.recipientCount, 3)
   await ctx.send()
   assert.equal(calls.find(call => call.action === 'loyalty/sendCampaign').input.campaignId, '12')
   assert.equal(calls.find(call => call.action === 'loyalty/sendCampaign').input.confirmed, true)
+})
+
+test('campaign preview carries the title and changing it invalidates a frozen or late draft', async () => {
+  const options = load('components/loyalty/LoyaltyCampaigns.vue').default; let resolveDraft; let sent
+  const ctx = { ...options.data(), recipient: null, loyalty: { busy: false }, $store: { dispatch: (action, input) => {
+    assert.equal(action, 'loyalty/createCampaignDraft'); sent = input; return new Promise(resolve => { resolveDraft = resolve })
+  } } }
+  for (const [name, fn] of Object.entries(options.methods)) ctx[name] = fn.bind(ctx)
+  ctx.title = 'Nouvelle offre'; ctx.message = 'Un dessert offert.'
+  const pending = ctx.preview()
+  assert.equal(sent.title, 'Nouvelle offre'); assert.equal(sent.message, 'Un dessert offert.')
+  ctx.title = 'Autre titre'; options.watch.title.call(ctx)
+  resolveDraft({ id: '12', recipientCount: 1, message: 'Nouvelle offre\nUn dessert offert.' }); await pending
+  assert.equal(ctx.draft, null)
+  ctx.draft = { id: '12' }; options.watch.title.call(ctx); assert.equal(ctx.draft, null); assert.equal(ctx.requestId, '')
+  const source = fs.readFileSync(path.join(__dirname, '../components/loyalty/LoyaltyCampaigns.vue'), 'utf8')
+  assert.match(source, /Titre de la notification/)
+})
+
+test('campaign form refuses a missing title or a title and message longer than 200 characters', async () => {
+  const options = load('components/loyalty/LoyaltyCampaigns.vue').default; let calls = 0
+  const ctx = { ...options.data(), recipient: null, loyalty: { busy: false }, $store: { dispatch: () => { calls++; return null } } }
+  ctx.message = 'Message'; await options.methods.preview.call(ctx); assert.equal(calls, 0)
+  ctx.title = 'x'.repeat(80); ctx.message = 'y'.repeat(120); await options.methods.preview.call(ctx); assert.equal(calls, 0)
 })
