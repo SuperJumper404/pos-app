@@ -7,11 +7,10 @@ async function decodeBlob(blob) {
   } finally { URL.revokeObjectURL(url) }
 }
 async function buildWalletImageVariants(blob, { kind, decodeImage = decodeBlob, createCanvas = () => document.createElement('canvas') } = {}) {
-  if (!['logo', 'strip'].includes(kind)) throw new Error('Type de visuel invalide.')
+  if (!['icon', 'logo', 'strip'].includes(kind)) throw new Error('Type de visuel invalide.')
   const image = await decodeImage(blob)
   if (!image.width || !image.height) throw new Error('Image invalide.')
-  const width = kind === 'logo' ? 160 : 375
-  const height = kind === 'logo' ? 50 : 144
+  const [width, height] = { icon: [38, 38], logo: [160, 50], strip: [375, 144] }[kind]
   const result = []
   for (let scale = 1; scale <= 3; scale++) {
     const canvas = createCanvas(); canvas.width = width * scale; canvas.height = height * scale

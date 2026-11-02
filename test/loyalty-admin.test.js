@@ -55,6 +55,38 @@ test('missing administrator credentials never send an anonymous Wallet upload', 
   assert(s.state.assetsError)
   assert.equal(s.state.assetsBusy, false)
 })
+
+test('notification icons have authenticated previews and old artwork without an icon stays usable', async () => {
+  const calls = []
+  const s = store({ $axios: { request: input => { calls.push(input); return Promise.reject(Object.assign(new Error('Not found'), { response: { status: 404 } })) } } })
+  const preview = await s.run('loadWalletAssetPreview', '/baseurl/api/v1/loyalty/wallet/assets/00000000-0000-4000-8000-000000000001/icon.png')
+  assert.equal(preview, null)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].headers.Authorization, 'Bearer staff-admin-token')
+  assert.equal(s.state.assetsError, '')
+})
+
+test('editor publishes a notification icon without requiring another logo or banner', async () => {
+  const options = load('components/loyalty/LoyaltyCardEditor.vue').default
+  const ctx = { ...options.data.call({ program: {} }), working: false, icon: new Blob(['icon']),
+    $emit() {}, $store: { dispatch: (action, body) => {
+      assert.equal(action, 'loyalty/uploadWalletAssets')
+      assert.deepEqual([...body.keys()], ['icon', 'icon2x', 'icon3x'])
+      return { assetVersion: 'new-icon' }
+    } },
+  }
+  const oldImage = global.Image; const oldDocument = global.document
+  global.Image = class { constructor() { this.width = 600; this.height = 600 } get src() { return this.source } set src(value) { this.source = value; this.onload() } }
+  global.document = { createElement: () => ({ getContext: () => ({ drawImage() {} }), toBlob: callback => callback(new Blob(['png'])) }) }
+  try {
+    await options.methods.publish.call(ctx)
+    assert.match(ctx.message, /Visuel publié/)
+    assert.equal(ctx.publishing, false)
+  } finally { global.Image = oldImage; global.document = oldDocument }
+  const source = fs.readFileSync(path.join(__dirname, '../components/loyalty/LoyaltyCardEditor.vue'), 'utf8')
+  assert.match(source, /Icône des notifications Apple Wallet/)
+  assert.match(source, /Logo Google Wallet/)
+})
 test('a late administrator list result cannot replace a newer filter or a different restaurant', async () => {
   const replies = []
   const s = store({ $deliveryApi: { request: input => new Promise(resolve => replies.push({ input, resolve })) } })

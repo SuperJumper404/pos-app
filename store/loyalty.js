@@ -214,7 +214,7 @@ export const actions = {
   },
   uploadWalletAssets(context, data) { return adminTransfer(this, context, { path: '/baseurl/api/v1/loyalty/wallet/assets', data }) },
   loadWalletAssetPreview(context, path) {
-    if (typeof path !== 'string' || !/^\/baseurl\/api\/v1\/loyalty\/wallet\/assets\/[a-f0-9-]{36}\/(?:logo|strip)(?:@2x|@3x)?\.png$/.test(path)) return null
+    if (typeof path !== 'string' || !/^\/baseurl\/api\/v1\/loyalty\/wallet\/assets\/[a-f0-9-]{36}\/(?:icon|logo|strip)(?:@2x|@3x)?\.png$/.test(path)) return null
     return adminTransfer(this, context, { path, responseType: 'blob' })
   },
   createCampaignDraft(context, body) { return request(this, context, { method: 'post', path: '/loyalty/campaigns', body }) },

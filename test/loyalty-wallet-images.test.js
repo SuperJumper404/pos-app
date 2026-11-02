@@ -15,3 +15,14 @@ test('wallet image export produces the three actual PNG variants and crops to th
   assert(variants.every(v => v.blob.type === 'image/png'))
   assert(draws[0][2] > 0, 'portrait overflow is cropped from the center')
 })
+
+test('notification icon export produces three square PNGs at Apple icon sizes', async () => {
+  const variants = await images.buildWalletImageVariants(new Blob(['icon']), { kind: 'icon',
+    decodeImage: () => Promise.resolve({ width: 600, height: 600 }),
+    createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {} }),
+      toBlob(callback, mime) { callback(new Blob([JSON.stringify([this.width, this.height])], { type: mime })) } }),
+  })
+  assert.deepEqual(variants.map(v => v.name), ['icon', 'icon2x', 'icon3x'])
+  assert.deepEqual(await Promise.all(variants.map(async v => JSON.parse(await v.blob.text()))), [[38, 38], [76, 76], [114, 114]])
+  assert(variants.every(v => v.blob.type === 'image/png'))
+})
