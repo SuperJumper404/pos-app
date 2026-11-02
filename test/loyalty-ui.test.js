@@ -29,8 +29,55 @@ function fixture(reply) {
   const host = { $customerApi: { request: request => { calls.push(request); return Promise.resolve(reply ? reply(request) : { id: 'member', balance: 20 }) } },
     $deliveryApi: { request: request => { calls.push(request); return Promise.resolve({ data: { success: true, data: { id: 'member', balance: 20 } } }) } } }
   const dispatch = (name, payload) => module.actions[name].call(host, context, payload)
-  return { state, rootState, calls, dispatch }
+  return { state, rootState, calls, dispatch, actions: module.actions }
 }
+
+const phoneSession = { subject: 'loyalty', shopId: 7, customerId: '12', memberId: '00000000-0000-4000-8000-000000000012', csrfToken: 'a'.repeat(64), expiresAt: '2099-01-01T00:00:00Z' }
+test('phone enrolment and Wallet need only the table and loyalty session, never a customer email login', async () => {
+  const f = fixture(request => request.path.startsWith('/shopInfo/') ? { shop_name: 'Restaurant' } :
+    request.path.includes('/wallet/') ? { provider: 'apple', passBase64: 'fake' } :
+    { member: { id: phoneSession.memberId, balance: 20 }, program: { enabled: true }, session: phoneSession, canEnroll: true })
+  assert.equal(typeof f.actions.loadPhoneMember, 'function')
+  f.rootState.customer.session = null
+  f.rootState.users.user = { shopid: 7, session_subject: 'service_point', order_source: 'table_qr', token: 'signed-table' }
+  const originalCart = JSON.stringify(f.rootState.cart)
+  await f.dispatch('loadPhoneMember', { shopId: 7 })
+  await f.dispatch('enrollPhone', { shopId: 7, phone: '06 12 34 56 78', marketingConsent: false })
+  const posted = f.calls.find(call => call.method === 'post' && call.path === '/customer/loyalty/phone')
+  assert.deepEqual(posted.body, { phone: '06 12 34 56 78', countryCode: 'FR', marketingConsent: false })
+  assert.equal(posted.tableSessionToken, 'signed-table'); assert.equal(posted.shopId, 7)
+  assert.equal(f.rootState.customer.session, null); assert.equal(f.state.member.id, phoneSession.memberId)
+  await f.dispatch('phoneWallet', 'apple')
+  assert.equal(f.calls.at(-1).csrfToken, phoneSession.csrfToken)
+  assert.equal(f.calls.at(-1).path, '/customer/loyalty/phone/wallet/apple')
+  assert.equal(JSON.stringify(f.rootState.cart), originalCart)
+  assert(!f.calls.some(call => /customer-auth|challenges|verify/.test(call.path)))
+})
+
+test('phone enrolment is absent on the kiosk and late replies cannot restore another table context', async () => {
+  let finish
+  const f = fixture(() => new Promise(resolve => { finish = resolve }))
+  assert.equal(typeof f.actions.enrollPhone, 'function')
+  f.rootState.users.user = { shopid: 7, session_subject: 'service_point', order_source: 'borne', token: 'signed-kiosk' }
+  assert.equal(await f.dispatch('enrollPhone', { shopId: 7, phone: '0612345678' }), null); assert.equal(f.calls.length, 0)
+  f.rootState.users.user.order_source = 'table_qr'
+  const pending = f.dispatch('loadPhoneMember', { shopId: 7 })
+  await f.dispatch('reset'); f.rootState.users.user.shopid = 8
+  finish({ member: { id: phoneSession.memberId }, session: phoneSession, program: { enabled: true } })
+  assert.equal(await pending, null); assert.equal(f.state.member, null)
+})
+
+test('phone entry is the sole enrolment form in loyalty screens and submits no email or code', async () => {
+  const file = path.join(root, 'components/loyalty/LoyaltyPhoneAccess.vue'); assert(fs.existsSync(file))
+  const options = load('components/loyalty/LoyaltyPhoneAccess.vue').default; const calls = []
+  const ctx = { ...options.data(), phone: '0612345678', shopId: 7, marketingConsent: false, disabled: false, loyalty: { busy: false },
+    $refs: { form: { validate: () => true } }, $emit() {}, $store: { dispatch: (...args) => { calls.push(args); return Promise.resolve({ id: phoneSession.memberId }) } } }
+  await options.methods.submit.call(ctx)
+  assert.equal(calls[0][0], 'loyalty/enrollPhone'); assert.deepEqual(calls[0][1], { shopId: 7, phone: '0612345678', countryCode: 'FR', marketingConsent: false })
+  for (const relative of ['pages/compte/fidelite.vue', 'components/loyalty/LoyaltyCheckout.vue']) {
+    const source = fs.readFileSync(path.join(root, relative), 'utf8'); assert.doesNotMatch(source, /CustomerCodeLogin|customer-code-login|customer\/loadSession/)
+  }
+})
 test('personal loyalty retains cart/table and uses customer csrf without staff credentials', async () => {
   const f = fixture()
   const before = JSON.stringify(f.rootState.cart)
@@ -90,13 +137,13 @@ test('saving a displayed program never submits server-owned version metadata', a
 test('checkout reward emits spending intent only after its explicit dialog confirmation', () => {
   const { methods } = load('components/loyalty/LoyaltyCheckout.vue').default
   const events = []
-  const context = { confirming: false, disabled: false, chosenReward: { id: 'reward', points: 15 }, $emit: (...event) => events.push(event) }
+  const context = { confirming: false, disabled: false, chosenReward: { id: 'reward', points: 15 }, loyalty: { member: { program: { version: 3 } } }, $emit: (...event) => events.push(event) }
   methods.confirmReward.call(context)
   assert.equal(events.length, 0)
   context.confirming = true
   methods.confirmReward.call(context)
   assert.equal(events[0][0], 'reward')
-  assert.deepEqual(events[0][1], { rewardId: 'reward', confirmed: true })
+  assert.deepEqual(events[0][1], { rewardId: 'reward', confirmed: true, pointsCost: 15, programVersion: 3 })
   methods.removeReward.call(context)
   assert.equal(events[1][1], null)
 })

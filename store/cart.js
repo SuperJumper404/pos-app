@@ -126,6 +126,8 @@ const readAuthToken = () =>
   typeof localStorage === 'undefined' ? '' : localStorage.getItem('token')
 
 const buildCheckoutPayload = (params, clientOrderToken) => ({
+  ...(params.customerSession && params.customerSession.subject === 'loyalty' ? { loyalty_phone: true,
+    ...(params.loyaltyRewardId ? { loyalty_expected_points_cost: params.loyaltyExpectedPointsCost, loyalty_program_version: params.loyaltyProgramVersion } : {}) } : {}),
   ...(params.loyaltyMemberId ? { loyalty_member_id: params.loyaltyMemberId,
     ...(params.loyaltyRewardId ? { loyalty_expected_discount_cents: params.loyaltyExpectedDiscountCents,
       loyalty_expected_points_cost: params.loyaltyExpectedPointsCost, loyalty_program_version: params.loyaltyProgramVersion } : {}) } : {}),
@@ -174,10 +176,11 @@ const buildCheckoutAttemptPayload = (params, publicPayload) => ({
   } } : {}),
   ...(params.customerSession ? { customerContextId: params.customerSession.customerId,
     customerContextShopId: params.customerSession.shopId } : {}),
+  ...(params.customerSession && params.customerSession.subject === 'loyalty' ? { customerContextSubject: 'loyalty', loyaltyContextMemberId: params.customerSession.memberId } : {}),
 })
 
 const publicAttemptPayload = (payload) => {
-  const { dataCart, stripe, customerContextId, customerContextShopId, deliveryAddressSnapshot, ...body } = payload
+  const { dataCart, stripe, customerContextId, customerContextShopId, customerContextSubject, loyaltyContextMemberId, deliveryAddressSnapshot, ...body } = payload
   return JSON.parse(JSON.stringify(body))
 }
 
@@ -324,6 +327,13 @@ export const actions = {
     if (deliveryAttempt && (liveDeliveryCheckouts.has(state) ||
       (previousAttemptStatus === 'pending' && params.retryOriginal !== true))) return unresolvedCheckoutResult(state)
     if (params.customerSession && params.customerSession.shopId !== rootState.users?.user?.shopid) return unresolvedCheckoutResult(state)
+    if (params.customerSession && params.customerSession.subject === 'loyalty') {
+      const user = rootState.users && rootState.users.user || {}
+      const current = rootState.loyalty && rootState.loyalty.phoneSession
+      if (params.fulfillmentType === 'delivery' || user.session_subject !== 'service_point' || (user.source || user.order_source) !== 'table_qr'
+        || !current || current.customerId !== params.customerSession.customerId || current.memberId !== params.customerSession.memberId
+        || current.shopId !== params.customerSession.shopId || !current.csrfToken) return unresolvedCheckoutResult(state)
+    }
     const isFirstAttempt =
       previousAttemptStatus === 'idle' &&
       !state.clientOrderToken &&
@@ -476,8 +486,10 @@ export const actions = {
     let session = null
     if (payload.customerContextId) {
       const shopId = rootState.users.user.shopid
-      session = customer && customer.shopId === shopId ? customer.session : null
-      if (!session || session.subject !== 'customer' || session.shopId !== shopId || payload.customerContextShopId !== shopId ||
+      const subject = payload.customerContextSubject || 'customer'
+      session = subject === 'loyalty' ? rootState.loyalty && rootState.loyalty.phoneSession : customer && customer.shopId === shopId ? customer.session : null
+      if (!session || session.subject !== subject || session.shopId !== shopId || payload.customerContextShopId !== shopId ||
+        (subject === 'loyalty' && session.memberId !== payload.loyaltyContextMemberId) ||
         session.customerId !== payload.customerContextId || !session.csrfToken) return unresolvedCheckoutResult(state)
     }
     return dispatch('checkoutOrder', { retryOriginal: true, stripe: payload.stripe === true, customerSession: session })

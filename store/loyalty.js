@@ -1,7 +1,7 @@
 import { buildDeliveryApi } from './delivery'
 
 export const namespaced = true
-export const state = () => ({ member: null, program: null, canEnroll: false, members: [], membersTotal: 0, membersBusy: false, membersError: '', assetsBusy: false, assetsError: '', campaigns: [], campaignsTotal: 0, selected: null, busy: false, error: '', epoch: 0 })
+export const state = () => ({ member: null, program: null, canEnroll: false, phoneShopId: null, phoneShop: null, phoneSession: null, members: [], membersTotal: 0, membersBusy: false, membersError: '', assetsBusy: false, assetsError: '', campaigns: [], campaignsTotal: 0, selected: null, busy: false, error: '', epoch: 0 })
 const initial = state
 const staffIdentity = root => JSON.stringify(root.users && root.users.user)
 const personalIdentity = root => {
@@ -15,6 +15,10 @@ const errors = {
   LOYALTY_LOOKUP_AMBIGUOUS: 'Plusieurs cartes correspondent à ce téléphone. Utilisez le numéro de carte.',
   LOYALTY_RATE_LIMITED: 'Trop de recherches. Patientez une minute avant de réessayer.',
   LOYALTY_TABLE_REQUIRED: 'Scannez le QR de votre table pour rejoindre le programme.',
+  LOYALTY_PHONE_REQUIRED: 'Actualisez la page et renseignez votre numéro de téléphone pour rejoindre la fidélité.',
+  LOYALTY_SESSION_INVALID: 'Retrouvez votre carte avec votre numéro de téléphone depuis le QR de votre table.',
+  LOYALTY_CSRF_FORBIDDEN: 'Actualisez votre carte puis réessayez.',
+  CUSTOMER_DESTINATION_INVALID: 'Saisissez un numéro de téléphone valide, avec son indicatif pour un numéro étranger.',
   LOYALTY_IMAGE_INVALID: 'Le visuel est invalide. Choisissez une image PNG ou JPEG et recadrez-la avant de publier.',
   LOYALTY_CAMPAIGN_EMPTY: 'Aucun adhérent ayant accepté les offres ne dispose actuellement d’une carte Apple Wallet enregistrée.',
   LOYALTY_CAMPAIGN_RATE_LIMITED: 'Patientez cinq minutes entre deux envois.',
@@ -46,6 +50,14 @@ export const mutations = {
     current.canEnroll = !!(result && result.canEnroll)
   },
   PROGRAM(current, program) { current.program = program },
+  PHONE_SHOP_ID(current, shopId) { current.phoneShopId = shopId },
+  PHONE_SHOP(current, shop) { current.phoneShop = shop && shop.shop_name ? { shop_name: shop.shop_name, shop_profile_image: shop.shop_profile_image || '' } : null },
+  PHONE_RESULT(current, result) {
+    current.member = result && result.member || null
+    current.program = result && result.program || current.member && current.member.program || null
+    current.phoneSession = result && result.session || null
+    if (result && typeof result.canEnroll === 'boolean') current.canEnroll = result.canEnroll
+  },
   MEMBERS(current, result) { current.members = Array.isArray(result) ? result : result && result.items || []; current.membersTotal = Array.isArray(result) ? result.length : result && result.total || 0 },
   MEMBERS_BUSY(current, value) { current.membersBusy = value },
   MEMBERS_ERROR(current, value) { current.membersError = value },
@@ -104,6 +116,33 @@ async function kioskRequest(host, context, path, body) {
   }
 }
 const memberRequests = new WeakMap()
+const tableCredential = (rootState, shopId) => {
+  const user = rootState.users && rootState.users.user || {}
+  return user.session_subject === 'service_point' && (user.source || user.order_source) === 'table_qr' && Number(user.shopid) === shopId ? user.token : undefined
+}
+async function phoneRequest(host, context, { shopId = context.state.phoneShopId, method = 'get', path = '/customer/loyalty/phone', body, membership = false } = {}) {
+  const { state, rootState, commit } = context
+  if (!Number.isInteger(shopId) || shopId < 1 || state.busy) return null
+  const epoch = state.epoch; const identity = staffIdentity(rootState)
+  const current = () => epoch === state.epoch && shopId === state.phoneShopId && identity === staffIdentity(rootState)
+  commit('PHONE_SHOP_ID', shopId); commit('BUSY', true); commit('ERROR', '')
+  try {
+    const result = await host.$customerApi.request({ method, path, body, shopId, csrfToken: state.phoneSession && state.phoneSession.csrfToken,
+      ...(tableCredential(rootState, shopId) ? { tableSessionToken: tableCredential(rootState, shopId) } : {}) })
+    if (!current()) return null
+    if (membership) {
+      if (result && result.session && (result.session.subject !== 'loyalty' || result.session.shopId !== shopId || !result.member || result.session.memberId !== result.member.id)) throw new Error('Invalid loyalty session')
+      commit('PHONE_RESULT', result)
+    }
+    return result
+  } catch (error) {
+    if (current()) {
+      if (error.status === 401) commit('PHONE_RESULT', { member: null, session: null, program: state.program })
+      commit('ERROR', errorMessage(error))
+    }
+    return null
+  } finally { if (current()) commit('BUSY', false) }
+}
 async function adminTransfer(host, context, { path, data, responseType }) {
   const { state, rootState, commit } = context
   const epoch = state.epoch; const identity = staffIdentity(rootState)
@@ -121,6 +160,29 @@ async function adminTransfer(host, context, { path, data, responseType }) {
 }
 export const actions = {
   reset({ commit }) { commit('RESET') },
+  async loadPhoneMember(context, { shopId = context.state.phoneShopId } = {}) {
+    const result = await phoneRequest(this, context, { shopId, membership: true })
+    if (!result) return null
+    const epoch = context.state.epoch; const identity = staffIdentity(context.rootState)
+    try {
+      const shop = await this.$customerApi.request({ path: `/shopInfo/click-and-collect/${shopId}` })
+      if (epoch === context.state.epoch && shopId === context.state.phoneShopId && identity === staffIdentity(context.rootState)) context.commit('PHONE_SHOP', shop)
+    } catch (_) { /* A missing public logo does not block the loyalty card. */ }
+    return result.member || result
+  },
+  async enrollPhone(context, { shopId = context.state.phoneShopId, phone, countryCode = 'FR', marketingConsent = false } = {}) {
+    if (!tableCredential(context.rootState, shopId)) { context.commit('ERROR', errors.LOYALTY_TABLE_REQUIRED); return null }
+    const result = await phoneRequest(this, context, { shopId, method: 'post', body: { phone, countryCode, marketingConsent }, membership: true })
+    return result && result.member
+  },
+  phoneWallet(context, provider) {
+    if (!['apple', 'google'].includes(provider) || !context.state.phoneSession) return null
+    return phoneRequest(this, context, { method: 'post', path: `/customer/loyalty/phone/wallet/${provider}`, body: {} })
+  },
+  setPhoneMarketingConsent(context, marketingConsent) {
+    if (typeof marketingConsent !== 'boolean' || !context.state.phoneSession) return null
+    return phoneRequest(this, context, { method: 'patch', path: '/customer/loyalty/phone/preferences', body: { marketingConsent }, membership: true })
+  },
   loadMember(context) { return request(this, context, { personal: true, tableContext: true, path: '/customer/loyalty', mutation: 'MEMBER' }) },
   enroll(context, { marketingConsent = false } = {}) { return request(this, context, { personal: true, tableContext: true, method: 'post', path: '/customer/loyalty', body: { marketingConsent }, mutation: 'MEMBER' }) },
   setMarketingConsent(context, marketingConsent) { return request(this, context, { personal: true, method: 'patch', path: '/customer/loyalty/preferences', body: { marketingConsent }, mutation: 'MEMBER' }) },

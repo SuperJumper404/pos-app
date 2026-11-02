@@ -163,7 +163,7 @@
           <Loading />
         </v-card>
         <v-card v-else outlined class="pa-2 overflow-x-hidden overflow-y-auto">
-          <LoyaltyCheckout v-if="[2, 3].includes(access) && dataCart && !isOrderEditActive" :shop-id="checkoutShopId" :disabled="loadingBtn || stripePreparing || deliveryAttemptLocked" @reward="loyaltyReward = $event" />
+          <LoyaltyCheckout v-if="[2, 3].includes(access) && !isSiteCheckout && dataCart && !isOrderEditActive" ref="loyaltyCheckout" :shop-id="checkoutShopId" :disabled="loadingBtn || stripePreparing || deliveryAttemptLocked" @reward="loyaltyReward = $event" />
           <DeliveryCheckout
             v-if="deliveryContext && dataCart && !isOrderEditActive"
             ref="deliveryCheckout"
@@ -606,6 +606,11 @@ export default {
     isDelivery() { return this.fulfillmentType === 'delivery' },
     deliveryDiscount() { return this.$store.state.delivery && this.$store.state.delivery.discount || { type: 'none', value: 0 } },
     deliverySession() {
+      const user = this.$store.state.users && this.$store.state.users.user || {}
+      if (user.session_subject === 'service_point' && (user.source || user.order_source) === 'table_qr' && !this.isDelivery) {
+        const loyalty = this.$store.state.loyalty
+        return loyalty && loyalty.member && loyalty.phoneSession && loyalty.phoneSession.shopId === this.checkoutShopId ? loyalty.phoneSession : null
+      }
       const customer = this.$store.state.customer
       if (this.deliveryAttemptLocked && !this.$store.get('cart/clientOrderPayload').customerContextId) return null
       return (this.isSiteCheckout || [2, 3].includes(this.access)) && customer && customer.shopId === this.checkoutShopId ? customer.session : null
@@ -1243,6 +1248,13 @@ export default {
     handleCheckoutError(error, flow, paymentMethod) {
       if (!error) return
       this.checkoutErrorMessage = error.message || 'Commande impossible.'
+      if (this.deliverySession && this.deliverySession.subject === 'loyalty' && ['LOYALTY_REQUOTE_REQUIRED', 'LOYALTY_REWARD_UNAVAILABLE', 'LOYALTY_INSUFFICIENT_POINTS', 'LOYALTY_REWARD_CONDITIONS', 'LOYALTY_NOT_STACKABLE', 'LOYALTY_DISABLED'].includes(error.code)) {
+        this.loyaltyReward = null
+        this.$refs.loyaltyCheckout?.removeReward()
+        this.$store.dispatch('loyalty/loadPhoneMember', { shopId: this.checkoutShopId })
+        this.checkoutErrorMessage = 'Votre fidélité a changé. Choisissez et confirmez de nouveau votre récompense.'
+        return
+      }
       if (error.code === 'DELIVERY_QUOTE_CHANGED') {
         this.deliveryConfirmed = false
         this.resetStripePaymentElement()
@@ -1634,7 +1646,8 @@ export default {
       return {
         ...(this.deliveryContext ? { fulfillmentType: this.fulfillmentType } : {}),
         ...(this.isSiteCheckout || [2, 3].includes(this.access) ? { customerSession: this.deliverySession } : {}),
-        ...(this.loyaltyReward && this.deliverySession ? { loyaltyRewardId: this.loyaltyReward.rewardId, loyaltyConfirmed: this.loyaltyReward.confirmed === true } : {}),
+        ...(this.loyaltyReward && this.deliverySession ? { loyaltyRewardId: this.loyaltyReward.rewardId, loyaltyConfirmed: this.loyaltyReward.confirmed === true,
+          loyaltyExpectedPointsCost: this.loyaltyReward.pointsCost, loyaltyProgramVersion: this.loyaltyReward.programVersion } : {}),
         ...(this.isDelivery ? {
           deliveryQuoteToken: this.deliveryQuote && this.deliveryQuote.quoteToken,
           addressResolutionToken: this.deliveryResolution && this.deliveryResolution.addressResolutionToken,

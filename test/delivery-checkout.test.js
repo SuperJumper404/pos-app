@@ -614,6 +614,41 @@ test('I3 mounted POS profile/address plus unrelated personal session and lost re
   } finally { page.$destroy() }
 })
 
+test('phone loyalty checkout freezes its own identity, uses its CSRF and never falls back to email on retry', async () => {
+  const f = fixture(() => ({ lost: true }))
+  const phone = { subject: 'loyalty', shopId: 7, customerId: '12', memberId: '00000000-0000-4000-8000-000000000012', csrfToken: 'a'.repeat(64) }
+  f.store.state.users.user.session_subject = 'service_point'; f.store.state.users.user.order_source = 'table_qr'
+  f.store.registerModule('loyalty', { namespaced: true, state: { phoneSession: phone } })
+  await f.store.dispatch('cart/checkoutOrder', { customer: 'Phone guest', total: 25, payment: 'cash', dataCart: cart, customerSession: phone,
+    loyaltyRewardId: 'coffee', loyaltyConfirmed: true, loyaltyExpectedPointsCost: 30, loyaltyProgramVersion: 2 })
+  assert.equal(f.calls[0].body.loyalty_phone, true); assert.equal(f.calls[0].body.loyalty_expected_points_cost, 30)
+  assert.equal(f.calls[0].headers['X-CSRF-Token'], phone.csrfToken); assert.equal(f.calls[0].credentials, true)
+  assert.equal(f.store.state.cart.clientOrderPayload.customerContextSubject, 'loyalty')
+  assert.equal(f.calls[0].body.customerContextSubject, undefined); const body = copy(f.calls[0].body)
+  for (const session of [null, { ...phone, customerId: '13' }, { ...phone, memberId: 'other-card' }, { ...phone, shopId: 8 }, { ...phone, subject: 'customer' }, { ...phone, csrfToken: '' }]) {
+    f.store.state.loyalty.phoneSession = session
+    f.store.commit('customer/RESET', 7); f.store.commit('customer/SESSION', { ...phone, subject: 'customer' })
+    assert.equal((await f.store.dispatch('cart/retryCheckout')).error.code, 'CHECKOUT_ATTEMPT_UNRESOLVED'); assert.equal(f.calls.length, 1)
+  }
+  f.store.state.loyalty.phoneSession = { ...phone, csrfToken: 'b'.repeat(64) }
+  await f.store.dispatch('cart/retryCheckout'); assert.equal(f.calls.length, 2)
+  assert.deepEqual(f.calls[1].body, body); assert.equal(f.calls[1].headers['X-CSRF-Token'], 'b'.repeat(64))
+})
+
+test('a changed phone reward leaves a safe retry and asks for a fresh confirmation', async () => {
+  const f = fixture(() => ({ status: 409, data: { code: 'LOYALTY_REQUOTE_REQUIRED' } }))
+  const phone = { subject: 'loyalty', shopId: 7, customerId: '12', memberId: '00000000-0000-4000-8000-000000000012', csrfToken: 'a'.repeat(64) }
+  f.store.state.users.user.session_subject = 'service_point'; f.store.state.users.user.order_source = 'table_qr'
+  f.store.registerModule('loyalty', { namespaced: true, state: { phoneSession: phone } })
+  const result = await f.store.dispatch('cart/checkoutOrder', { customer: 'Phone guest', total: 25, payment: 'cash', dataCart: cart, customerSession: phone,
+    loyaltyRewardId: 'coffee', loyaltyConfirmed: true, loyaltyExpectedPointsCost: 30, loyaltyProgramVersion: 2 })
+  assert.equal(f.store.state.cart.clientOrderStatus, 'prewrite_rejected')
+  let removed = false; const calls = []
+  const ctx = { deliverySession: phone, checkoutShopId: 7, loyaltyReward: { rewardId: 'coffee' }, $refs: { loyaltyCheckout: { removeReward() { removed = true } } }, $store: { dispatch: (...args) => calls.push(args) } }
+  load('pages/cart.vue').default.methods.handleCheckoutError.call(ctx, result.error, 'order', 'cash')
+  assert.equal(ctx.loyaltyReward, null); assert.equal(removed, true); assert.equal(calls[0][0], 'loyalty/loadPhoneMember')
+})
+
 test('I3 personal retry requires the original verified owner/shop and current CSRF, never a selected contact', async () => {
   const f = fixture(() => ({ lost: true }))
   f.store.commit('customer/RESET', 7)

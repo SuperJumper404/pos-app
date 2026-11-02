@@ -2,7 +2,7 @@
   <v-app light class="customer-layout">
     <header class="customer-header">
       <img :src="logo" :alt="shop ? shop.shop_name : 'Smart Eat'" width="52" height="52" @error="imageFailed = true">
-      <div class="customer-wrap"><strong>{{ shop ? shop.shop_name : 'Smart Eat' }}</strong><p>Mon compte</p></div>
+      <div class="customer-wrap"><strong>{{ shop ? shop.shop_name : 'Smart Eat' }}</strong><p>{{ isLoyaltyPage ? 'Ma fidélité' : 'Mon compte' }}</p></div>
     </header>
     <v-main><div class="customer-container"><nuxt /></div></v-main>
   </v-app>
@@ -12,7 +12,8 @@
 export default {
   data() { return { imageFailed: false } },
   computed: {
-    shop() { return this.$store.state.customer.shop },
+    isLoyaltyPage() { return !!this.$route && /^\/compte\/fidelite\/?$/.test(this.$route.path) },
+    shop() { return this.isLoyaltyPage ? this.$store.state.loyalty.phoneShop : this.$store.state.customer.shop },
     logo() {
       return this.shop && this.shop.shop_profile_image && !this.imageFailed
         ? `${process.env.privateURL}/api/v1/imgprofile/${encodeURIComponent(this.shop.shop_profile_image)}` : '/logo.png'
