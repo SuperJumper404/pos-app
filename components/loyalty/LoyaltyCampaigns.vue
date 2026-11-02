@@ -32,7 +32,7 @@ export default {
   computed: {
     loyalty() { return this.$store.state.loyalty }, working() { return this.preparing || this.sending || this.loyalty.busy },
     messageLimit() { return 199 - this.title.trim().length },
-    canPrepare() { return !!this.title.trim() && this.title.trim().length <= 80 && !!this.message.trim() && this.message.trim().length <= this.messageLimit },
+    canPrepare() { return !!this.title.trim() && this.title.trim().length <= 80 && !/[\x00-\x1f\x7f-\x9f\u2028\u2029]/.test(this.title) && !!this.message.trim() && this.message.trim().length <= this.messageLimit },
   },
   watch: {
     title() { this.draft = null; this.requestId = ''; this.notice = '' },
@@ -45,7 +45,7 @@ export default {
     date(value) { return value ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '' },
     status(item) { return Number(item.retrying) ? 'À réessayer' : { draft: 'Préparé', queued: 'En attente', processed: 'Traité' }[item.status] || item.status },
     async preview() {
-      if (this.preparing || this.sending || this.loyalty.busy || !this.title.trim() || this.title.trim().length > 80
+      if (this.preparing || this.sending || this.loyalty.busy || !this.title.trim() || this.title.trim().length > 80 || /[\x00-\x1f\x7f-\x9f\u2028\u2029]/.test(this.title)
         || !this.message.trim() || this.title.trim().length + this.message.trim().length + 1 > 200) return
       if (!this.requestId) this.requestId = crypto.randomUUID()
       const requestId = this.requestId
