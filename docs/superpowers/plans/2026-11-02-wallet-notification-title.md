@@ -32,13 +32,13 @@
 
 **Interfaces:** `buildWalletPayload({shopName,...})` fournit `restaurantName`, lu dans `buildSqlWalletRepository.readMember`. `createDraft({title='',message,...})` stocke `title.trim() + '\n' + message.trim()` ou le message seul. Le contrôleur accepte `title`, le résultat conserve `message` comme texte complet immuable.
 
-- [ ] Tests de nom, validation et reprise de brouillon, aperçu du titre et modification tardive : observer RED, puis GREEN.
-- [ ] Implémenter les changements ciblés et vérifier les suites existantes, lint, SQL réel jetable et signature locale.
-- [ ] Commit ciblé dans les deux dépôts.
+- [x] Tests de nom, validation et reprise de brouillon, aperçu du titre et modification tardive : observer RED, puis GREEN.
+- [x] Implémenter les changements ciblés et vérifier les suites existantes, lint, SQL réel jetable et signature locale.
+- [x] Commit ciblé dans les deux dépôts.
 
 ### Task 2: Revue et déploiement
 
-- [ ] Revue fraîche globale, une passe RED/GREEN pour les défauts bloquants, sans seconde revue.
-- [ ] Sauvegarder staging, pousser puis déployer Docker backend et frontend.
-- [ ] Vérifier versions, migrations inchangées, fichier signé réel, titre dans l'éditeur, aperçu sans envoi, index et scripts publics.
-- [ ] Conserver le compte rendu et communiquer le parcours de test et les limites iPhone.
+- [x] Revue fraîche globale, une passe RED/GREEN pour les défauts bloquants, sans seconde revue.
+- [x] Sauvegarder staging, pousser puis déployer Docker backend et frontend.
+- [x] Vérifier versions, migrations inchangées, fichier signé réel, titre dans l'éditeur, aperçu sans envoi, index et scripts publics.
+- [x] Conserver le compte rendu et communiquer le parcours de test et les limites iPhone.
