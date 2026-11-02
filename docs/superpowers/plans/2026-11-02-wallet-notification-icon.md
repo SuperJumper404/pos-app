@@ -32,14 +32,14 @@
 
 **Interfaces:** `buildWalletImageVariants(blob,{kind:'icon'})` donne icon/icon2x/icon3x. Le multipart accepte neuf fichiers au maximum et le lecteur preview accepte icon.png/@2x/@3x. Le service conserve le groupe dans le dossier versionné ; la réponse peut contenir `iconPreviewUrl`.
 
-- [ ] Écrire les tests de variantes carrées, publication partielle/invalides et aperçu/auth HTTP ; observer RED.
-- [ ] Étendre la chaîne d'images et l'éditeur avec le groupe icon ; clarifier le champ Google.
-- [ ] Vérifier GREEN, suites fidélité, lint et génération staging ; confirmer les icônes personnalisées dans un paquet signé.
-- [ ] Commit ciblé dans les deux dépôts.
+- [x] Écrire les tests de variantes carrées, publication partielle/invalides et aperçu/auth HTTP ; observer RED.
+- [x] Étendre la chaîne d'images et l'éditeur avec le groupe icon ; clarifier le champ Google.
+- [x] Vérifier GREEN, suites fidélité, lint et génération staging ; confirmer les icônes personnalisées dans un paquet signé.
+- [x] Commit ciblé dans les deux dépôts.
 
 ### Task 2: Revue et staging
 
-- [ ] Revue globale fraîche après les tests ; traiter les défauts bloquants une seule fois en RED/GREEN.
-- [ ] Sauvegarder la base/configuration/sources staging avant déploiement ; ne publier aucun visuel pour le client.
-- [ ] Publier et déployer Docker ; vérifier les versions, HTTP 200 et empreintes des fichiers servis.
-- [ ] Contrôler le nouveau champ dans l'interface et conserver un compte rendu ; expliquer la publication de l'icône puis la vérification iPhone.
+- [x] Revue globale fraîche après les tests ; traiter les défauts bloquants une seule fois en RED/GREEN.
+- [x] Sauvegarder la base/configuration/sources staging avant déploiement ; ne publier aucun visuel pour le client.
+- [x] Publier et déployer Docker ; vérifier les versions, HTTP 200 et empreintes des fichiers servis.
+- [x] Contrôler le nouveau champ dans l'interface et conserver un compte rendu ; expliquer la publication de l'icône puis la vérification iPhone.
