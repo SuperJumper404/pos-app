@@ -66,6 +66,21 @@ test('notification icons have authenticated previews and old artwork without an 
   assert.equal(s.state.assetsError, '')
 })
 
+test('an optional missing icon stays harmless through the real Axios and Nuxt error interceptor', async () => {
+  const http = require('http'); const client = require('axios').create()
+  const server = http.createServer((req, res) => { res.writeHead(404); res.end('Not Found') })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  // Nuxt Axios invokes onError callbacks before the caller receives a rejection.
+  client.onError = fn => client.interceptors.response.use(undefined, error => fn(error) || Promise.reject(error))
+  load('plugins/axios.js').default({ $axios: client, redirect() {}, store: { dispatch() {} } })
+  const s = store({ $axios: { request: input => client.request({ ...input, url: `http://127.0.0.1:${server.address().port}` }) } })
+  try {
+    const result = await s.run('loadWalletAssetPreview', '/baseurl/api/v1/loyalty/wallet/assets/00000000-0000-4000-8000-000000000001/icon.png')
+    assert.equal(result, null)
+    assert.equal(s.state.assetsError, '', 'a missing optional icon must not show an unavailable-program alert')
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) }
+})
+
 test('editor publishes a notification icon without requiring another logo or banner', async () => {
   const options = load('components/loyalty/LoyaltyCardEditor.vue').default
   const ctx = { ...options.data.call({ program: {} }), working: false, icon: new Blob(['icon']),

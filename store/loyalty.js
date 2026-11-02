@@ -152,8 +152,10 @@ async function adminTransfer(host, context, { path, data, responseType }) {
   if (typeof token !== 'string' || !token.trim()) { commit('ASSETS_ERROR', errors.LOYALTY_FORBIDDEN); return null }
   if (data) { commit('ASSETS_BUSY', true); commit('ASSETS_ERROR', '') }
   try {
-    const response = await host.$axios.request({ method: data ? 'post' : 'get', url: `${process.env.privateURL}${path}`, headers: { Authorization: `Bearer ${token}` }, ...(data ? { data } : {}), ...(responseType ? { responseType } : {}), skipGlobalErrorNotification: true })
+    const response = await host.$axios.request({ method: data ? 'post' : 'get', url: `${process.env.privateURL}${path}`, headers: { Authorization: `Bearer ${token}` }, ...(data ? { data } : {}), ...(responseType ? { responseType, validateStatus: status => (status >= 200 && status < 300) || status === 404 } : {}), skipGlobalErrorNotification: true })
     if (!current()) return null
+    // Old artwork may omit an icon. Handle its 404 before the global Axios error interceptor.
+    if (responseType === 'blob' && response.status === 404) return null
     return responseType === 'blob' ? response.data : response.data && response.data.data
   } catch (error) { if (responseType === 'blob' && error.response && error.response.status === 404) return null; if (current()) commit('ASSETS_ERROR', errorMessage(error)); return null }
   finally { if (data && current()) commit('ASSETS_BUSY', false) }
