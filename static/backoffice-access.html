@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Cache-Control" content="no-store"><title>Connexion au restaurant · SmartEat</title>
+<style>body{margin:0;background:#f5f7f8;color:#172a35;font:16px system-ui,sans-serif;display:grid;min-height:100vh;place-items:center}main{max-width:430px;margin:24px;padding:32px;border:1px solid #e0e7eb;border-radius:16px;background:white}h1{font-size:24px;margin:0 0 14px}p{line-height:1.6;color:#526471}a{color:#176248}</style></head>
+<body><main><h1>Ouverture du restaurant</h1><p id="status" role="status">Connexion depuis le backoffice SmartEat…</p><p id="error" role="alert" hidden></p><a href="/login">Revenir à la connexion</a></main>
+<script>
+(()=>{
+ 'use strict';
+ const allowedOrigins=['http://192.168.1.99:3005','http://localhost:5173','http://127.0.0.1:5173'];
+ const params=new URLSearchParams(location.hash.slice(1)),channel=params.get('channel'),origin=params.get('origin'),peer=window.opener;
+ history.replaceState(null,'',location.pathname);
+ const status=document.getElementById('status'),error=document.getElementById('error');let receiving=false,interval,timer;
+ function fail(){clearInterval(interval);clearTimeout(timer);status.hidden=true;error.hidden=false;error.textContent='Connexion impossible. Revenez au backoffice et cliquez à nouveau sur « Ouvrir ce restaurant ».';}
+ if(!peer||!allowedOrigins.includes(origin)||!channel||!/^[a-zA-Z0-9_-]{16,100}$/.test(channel)){fail();return;}
+ const ready=()=>peer.postMessage({type:'smarteat-support-ready',channel},origin);
+ window.addEventListener('message',async event=>{
+  if(receiving||event.source!==peer||event.origin!==origin||event.data?.type!=='smarteat-support-session'||event.data.channel!==channel)return;
+  const supplied=event.data.user;
+  if(!supplied||!Number.isSafeInteger(supplied.shopid)||!Number.isSafeInteger(supplied.id)||typeof supplied.token!=='string'||supplied.token.length>8192)return;
+  receiving=true;clearInterval(interval);clearTimeout(timer);
+  try{
+   const response=await fetch('https://api.smarteat.fr/baseurl/api/v1/user/me',{headers:{Authorization:'Bearer '+supplied.token},cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(15000)});
+   const body=await response.json(),user=body.data?.[0];
+   if(!response.ok||body.success!==true||!user||Number(user.id)!==supplied.id||Number(user.shopid)!==supplied.shopid||Number(user.access)!==0||!user.is_primary_admin||user.platform_support!==true)throw Error('Invalid session');
+   const values={idUser:String(user.id),access:'0',token:supplied.token,shopid:String(user.shopid),module_permissions:'null',is_primary_admin:'1',session_subject:'staff',service_point_id:'',service_point_name:'',order_source:'',service_point_printer_ip:'',service_point_smart_print_app:'0'};
+   const keys=[...Object.keys(values),'table_access_token'];
+   const previous=new Map(keys.map(key=>[key,localStorage.getItem(key)]));
+   try{for(const [key,value]of Object.entries(values))localStorage.setItem(key,value);localStorage.removeItem('table_access_token');}
+   catch(error){for(const [key,value]of previous){try{value===null?localStorage.removeItem(key):localStorage.setItem(key,value);}catch{}}throw error;}
+   peer.postMessage({type:'smarteat-support-opened',channel},origin);window.opener=null;location.replace('/');
+  }catch{fail();}
+ });
+ interval=setInterval(ready,300);timer=setTimeout(fail,30000);ready();
+})();
+</script></body></html>
