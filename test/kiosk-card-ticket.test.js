@@ -1,6 +1,8 @@
 const assert = require('assert')
 const {
   buildCardTicketPayload,
+  buildCardTicketEscPos,
+  buildCardTicketCloudXml,
   buildCardTicketData,
   sendCardTicket,
 } = require('../helpers/cardTicket')
@@ -14,6 +16,7 @@ const payload = buildCardTicketPayload({
     cardTicket: {
       brand: 'visa',
       last4: '4242',
+      funding: 'debit',
       network: 'cartes_bancaires',
       networkTransactionId: 'net_123',
       readMethod: 'contactless_emv',
@@ -72,46 +75,29 @@ assert.strictEqual(payload.chargeId, 'ch_terminal')
 assert.strictEqual(payload.terminalPaymentId, 41)
 
 const ticketDataText = JSON.stringify(buildCardTicketData(payload))
-assert.match(ticketDataText, /Ticket carte/)
 assert.match(ticketDataText, /B100/)
-assert.match(ticketDataText, /Carte : VISA/)
-assert.match(ticketDataText, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)
-assert.match(ticketDataText, /Ref. reseau : net_123/)
-assert.match(ticketDataText, /Autorisation : 123456/)
-assert.match(ticketDataText, /R. autorisation : 00/)
-assert.match(ticketDataText, /Application : CB/)
-assert.match(ticketDataText, /AID : A0000000421010/)
-assert.match(ticketDataText, /AC : 9F2608ABCDEF12345678/)
-assert.match(ticketDataText, /TVR : 8000008000/)
-assert.match(ticketDataText, /TSI : E800/)
-assert.match(ticketDataText, /CVM : online_pin/)
-;[
-  'Commande : B100',
-  'Date :',
+const expectedLines = [
+  'Terminal : TPE',
+  'Référence : 41',
+  'Date : 04/10/2026 a 12:30',
   'Carte : VISA',
+  'Type : Débit',
   'PAN : ************4242',
   'Montant : 20,00 EUR',
-  'Lecture : contactless_emv',
-  'Reseau : cartes_bancaires',
-  'Ref. reseau : net_123',
-  'Autorisation : 123456',
-  'R. autorisation : 00',
-  'Application : CB',
-  'AID : A0000000421010',
-  'AC : 9F2608ABCDEF12345678',
-  'TVR : 8000008000',
-  'TSI : E800',
-  'CVM : online_pin',
-  'Compte : credit',
-  'Paiement accepte',
-].reduce((previousIndex, expectedLine) => {
-  const currentIndex = ticketDataText.indexOf(expectedLine)
-  assert.ok(
-    currentIndex > previousIndex,
-    `TPE card ticket line "${expectedLine}" must be present in the expected order`
-  )
-  return currentIndex
-}, -1)
+  'Paiement accepté',
+]
+assert.deepStrictEqual(
+  buildCardTicketData(payload).render.sections.flatMap(section => section.lines)
+    .filter(line => line.type === 'text').map(line => line.text),
+  expectedLines,
+  'standalone card tickets must only print the requested payment fields'
+)
+const escPosText = buildCardTicketEscPos(payload).toString('latin1')
+const cloudXml = buildCardTicketCloudXml(payload)
+for (const rendered of [escPosText, cloudXml]) {
+  for (const line of expectedLines) assert.ok(rendered.includes(line), `missing ${line}`)
+  assert.doesNotMatch(rendered, /Ticket carte|Le Comptoir|Commande :|Lecture :|Reseau :|Ref\. reseau|Autorisation|autorisation|Application :|AID :|AC :|TVR :|TSI :|CVM :|Compte :/)
+}
 assert.doesNotMatch(ticketDataText, /Paiement :/)
 assert.doesNotMatch(ticketDataText, /Charge/)
 assert.doesNotMatch(ticketDataText, /Paiement terminal/)
@@ -151,6 +137,6 @@ assert.strictEqual(cloudCalls.length, 1)
 assert.strictEqual(cloudCalls[0].action, 'printing/postPrintingJob')
 assert.strictEqual(cloudCalls[0].params.ticketType, 'caisse')
 assert.strictEqual(cloudCalls[0].params.orderId, 100)
-assert.match(cloudCalls[0].params.requete, /Ticket carte/)
+assert.match(cloudCalls[0].params.requete, /Paiement accepté/)
 
 console.log('kiosk card ticket tests passed')

@@ -126,8 +126,8 @@ export default {
     generatePdf() {
       const payload = this.ticketPayload
       if (!payload) return
-      const lines = [[this.shopInfo.shop_name || '', true], [payload.ticketTitle, true],
-        ...cardTicketLines(payload).map(([label, value]) => [`${label} : ${value}`, false]), ['Paiement accepté', true]]
+      const lines = [...cardTicketLines(payload).map(([label, value]) => [`${label} : ${value}`, false]),
+        ['Paiement accepté', true]]
       const measure = new JSPDF({ unit: 'mm', format: [58, 100] })
       measure.setFont('courier', 'normal')
       measure.setFontSize(8)

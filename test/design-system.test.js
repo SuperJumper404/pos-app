@@ -98,7 +98,7 @@ const searchSurfaces = [
   'components/history/TerminalPaymentAttachments.vue',
   'components/loyalty/LoyaltyMembers.vue',
   'components/products/ProductImageLibraryPicker.vue',
-  'pages/clients.vue',
+  'components/clients/ClientDirectory.vue',
   'pages/history/index.vue',
   'pages/orders/index.vue',
   'pages/stocks/index.vue',
@@ -112,7 +112,7 @@ searchSurfaces.forEach((filePath) => {
   assert.doesNotMatch(source, /\slabel="Rechercher/)
 })
 
-assert.match(read('pages/clients.vue'), /clients-search-field/)
+assert.match(read('components/clients/ClientDirectory.vue'), /clients-search-field/)
 
 function listVueFiles(directory) {
   const absoluteDirectory = path.join(root, directory)

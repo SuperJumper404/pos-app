@@ -855,18 +855,11 @@ export default {
         .forEach((ticket) => {
           y += 6
           drawLine()
-          write('Ticket carte', {
-            align: 'center',
-            x: center,
-            fontSize: 8,
-            style: 'bold',
-            gap: 4,
-          })
           cardTicketLines(ticket.payload)
             .filter((line) => this.safePdfText(line[1]).trim())
             .forEach(([label, value]) => write(`${label} : ${value}`, { fontSize: 7.5 }))
           drawLine()
-          write('Paiement accepte', {
+          write('Paiement accepté', {
             align: 'center',
             x: center,
             fontSize: 8,

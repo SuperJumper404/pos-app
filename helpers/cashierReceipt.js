@@ -532,11 +532,11 @@ const buildCashierEscPos = (payload) => {
     push(esc('* TVA non applicable, art. 293 B du CGI\n'))
   }
   normalizeCardTicketPayloads(payload).forEach((cardPayload) => {
-    push(line(), alignCenter(), boldOn(), esc('Ticket carte\n'), boldOff())
+    push(line())
     cardTicketLines(cardPayload).forEach(([label, value]) => {
       push(alignLeft(), esc(`${label} : ${value}\n`))
     })
-    push(line(), alignCenter(), boldOn(), esc('Paiement accepte\n'), boldOff())
+    push(line(), alignCenter(), boldOn(), esc('Paiement accepté\n'), boldOff())
   })
   push(esc('\n\n\n\n'), cut())
   return Buffer.concat(output)
@@ -643,14 +643,13 @@ const buildCashierCloudXml = (payload) => {
     normalizeCardTicketPayloads(payload)
       .map((cardPayload) => (
         '<feed line="1"/><text>--------------------------------</text><feed line="1"/>' +
-        '<text em="true" align="center">Ticket carte</text><feed line="1"/>' +
         cardTicketLines(cardPayload)
           .map(([label, value]) => (
             `<text align="left">${xmlEscape(label)} : ${xmlEscape(value)}</text><feed line="1"/>`
           ))
           .join('') +
         '<text>--------------------------------</text><feed line="1"/>' +
-        '<text em="true" align="center">Paiement accepte</text><feed line="1"/>'
+        '<text em="true" align="center">Paiement accepté</text><feed line="1"/>'
       ))
       .join('') +
     '<feed line="3"/><cut/></epos-print></PrintData></ePOSPrint></PrintRequestInfo>'
@@ -837,12 +836,11 @@ const buildCashierTicketData = (payload = {}) => {
       id: `card_ticket_${index + 1}`,
       lines: [
         renderSeparator(),
-        renderText('Ticket carte', { align: 'center', bold: true }),
         ...cardTicketLines(cardPayload).map(([label, value]) =>
           renderText(`${label} : ${value}`)
         ),
         renderSeparator(),
-        renderText('Paiement accepte', { align: 'center', bold: true }),
+        renderText('Paiement accepté', { align: 'center', bold: true }),
       ],
     })
   })

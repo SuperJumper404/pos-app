@@ -303,7 +303,7 @@
               <v-btn
                 v-if="showOrderWithoutPaymentButton"
                 :disabled="
-                  !isValue || loadingBtn || !checkoutPayloadMatchesBoundAttempt
+                  !isValue || loadingBtn || stripePreparing || !checkoutPayloadMatchesBoundAttempt
                 "
                 :loading="loadingBtn && selectedCheckoutFlow === 'counter'"
                 block
@@ -311,7 +311,7 @@
                 class="mt-2 text-none font-weight-bold"
                 @click="orderWithoutPayment"
               >
-                Payer au comptoir
+                Commander
                 <v-icon small right>mdi-cash-register</v-icon>
               </v-btn>
             </div>
@@ -356,7 +356,7 @@
               <v-btn
                 v-if="showFooterCheckoutButton"
                 :disabled="primaryActionDisabled"
-                :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
+                :loading="loadingBtn && (selectedCheckoutFlow !== 'counter' || !showOrderWithoutPaymentButton)"
                 type="submit"
                 color="success"
                 class="
@@ -367,6 +367,19 @@
                 >{{ checkoutButtonLabel }}
                 <v-icon small right>{{ checkoutButtonIcon }}</v-icon></v-btn
               >
+
+              <v-btn
+                v-if="showOrderWithoutPaymentButton && !showStripePaymentPanel"
+                :disabled="primaryActionDisabled || stripePreparing"
+                :loading="loadingBtn && selectedCheckoutFlow === 'counter'"
+                type="button"
+                color="primary"
+                class="cart-checkout-btn cart-checkout-btn--submit text-none font-weight-bold"
+                @click="orderWithoutPayment"
+              >
+                Commander
+                <v-icon small right>mdi-silverware-fork-knife</v-icon>
+              </v-btn>
 
               <v-btn
                 color="red lighten-1"
@@ -661,12 +674,17 @@ export default {
     isFlexibleQrCheckout() {
       return this.isQrClient && isCounterPaymentAllowed(this.qrPaymentMode)
     },
+    isQrStripeAvailable() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/stripe_charges_enabled')
+      )
+    },
     isStripeCheckout() {
       if (this.isDelivery && this.isSiteCheckout) return this.deliveryPayment === 'online' && isStripePaymentRequired(this.qrPaymentMode)
       return (
         this.isQrClient &&
-        isStripePaymentRequired(this.qrPaymentMode) &&
-        this.selectedCheckoutFlow !== 'counter'
+        this.isQrStripeAvailable === true &&
+        !['counter', 'order'].includes(this.selectedCheckoutFlow)
       )
     },
     isOrderEditActive() {
@@ -728,7 +746,7 @@ export default {
       return (
         !this.isOrderEditActive &&
         this.isFlexibleQrCheckout &&
-        this.stripePaymentReady
+        this.isStripeCheckout
       )
     },
     showFooterCheckoutButton() {
@@ -1077,6 +1095,9 @@ export default {
       if (!payload || typeof payload !== 'object') return
 
       this.restoringCheckoutPayload = true
+      if (this.isQrClient && payload.fulfillment_type !== 'delivery') {
+        this.selectedCheckoutFlow = payload.stripe === true ? 'stripe' : 'order'
+      }
       if (payload.fulfillment_type === 'delivery') {
         this.$store.dispatch('delivery/setDiscount', { type: payload.discount_type || 'none', value: payload.discount_value || 0 })
         this.fulfillmentType = 'delivery'
@@ -1323,6 +1344,7 @@ export default {
       if (this.isDelivery) return false
       if (this.isOrderEditActive) return false
       if (this.repriceDialog || this.customizationDialog) return false
+      if (this.isFlexibleQrCheckout && this.selectedCheckoutFlow !== 'stripe') return false
       return shouldAutoPrepareStripeCheckout({
         isQrClient: this.isQrClient,
         isStripeCheckout: this.isStripeCheckout,
@@ -1567,15 +1589,19 @@ export default {
       await this.submitOrderWithoutStripe(this.formuser.payment)
     },
     async orderWithoutPayment() {
+      if (this.loadingBtn || this.stripePreparing) return
       if (this.isDelivery) {
         if (this.guardDeliveryPayment()) await this.submitOrderWithoutStripe('Paiement a la livraison')
         return
       }
       if (!this.stripeOrderId) {
+        this.clearStripeAutoPrepareTimeout()
         if (!this.checkoutPayloadCanStart) {
           this.guardCheckoutConfirmation()
           return
         }
+        this.selectedCheckoutFlow = 'counter'
+        this.formuser.payment = 'Paiement au comptoir'
         await this.submitOrderWithoutStripe('Paiement au comptoir')
         return
       }
