@@ -1,6 +1,6 @@
 # Fiche client à la saisie du téléphone
 
-Date : 9 novembre 2026. Statut : proposition à valider.
+Date : 9 novembre 2026. Statut : approuvé par « Valider et réaliser ».
 
 ## Demande et décisions confirmées
 
