@@ -75,7 +75,7 @@ const smartTicketText = JSON.stringify(smartPrintCalls[0].body)
 assert.deepStrictEqual(
   smartPrintCalls[0].body.ticketData.render.sections.find(section => section.id === 'card_ticket_1')
     .lines.filter(line => line.type === 'text').map(line => line.text),
-  ['Terminal : TPE', 'Référence : 91', 'Date : 07/10/2026 a 12:00', 'Carte : VISA',
+  ['Ticket de paiement', 'Terminal : TPE', 'Référence : 91', 'Date : 07/10/2026 a 12:00', 'Carte : VISA',
     'Type : Débit', 'PAN : ************4242', 'Montant : 12,50 EUR', 'Paiement accepté']
 )
 assert.match(smartTicketText, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)
@@ -83,6 +83,8 @@ assert.doesNotMatch(smartTicketText, /Paiement terminal|Charge/)
 for (const printed of [smartPrintCalls[0].body.dataFormatXML,
   Buffer.from(smartPrintCalls[0].body.dataFormatESCPOS, 'base64').toString('latin1')]) {
   assert.doesNotMatch(printed, /Ticket carte|Lecture :|Reseau :|Autorisation :/)
+  assert.match(printed, /Ticket de paiement/)
+  assert.ok(printed.indexOf('Ticket de paiement') < printed.indexOf('Terminal :'))
   assert.match(printed, /Paiement accepté/)
 }
 
@@ -104,5 +106,6 @@ assert.deepStrictEqual(
 )
 assert.ok(cloudCalls.every((call) => call.action === 'printing/postPrintingJob'))
 assert.doesNotMatch(cloudCalls[0].params.requete, /Ticket carte|Lecture :|Reseau :|Autorisation :/)
+assert.match(cloudCalls[0].params.requete, /Ticket de paiement/)
 assert.match(cloudCalls[0].params.requete, /Paiement accepté/)
 assert.match(cloudCalls[0].params.requete, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)

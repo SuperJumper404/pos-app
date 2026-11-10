@@ -29,7 +29,7 @@
       <div class="terminal-ticket-workspace">
         <section class="terminal-ticket-preview" aria-label="Aperçu du ticket de paiement">
           <h2>Aperçu ticket</h2>
-          <p>Ticket carte · Format thermique 58 mm</p>
+          <p>Ticket de paiement · Format thermique 58 mm</p>
           <iframe v-if="urlPDF" ref="preview" :src="urlPDF" title="Aperçu du ticket de paiement TPE" @load="previewReady = true"></iframe>
         </section>
         <aside class="terminal-ticket-print">
@@ -50,7 +50,7 @@
 const { jsPDF: JSPDF } = require('jspdf')
 const { canAccessModule } = require('@/helpers/staffRoles')
 const { attemptStorageKey, positiveId, formatTerminalAmount } = require('@/helpers/standaloneTerminal')
-const { buildCardTicketPayload, cardTicketLines, sendCardTicket } = require('@/helpers/cardTicket')
+const { CARD_TICKET_TITLE, buildCardTicketPayload, cardTicketLines, sendCardTicket } = require('@/helpers/cardTicket')
 
 export default {
   middleware: 'auth',
@@ -126,7 +126,8 @@ export default {
     generatePdf() {
       const payload = this.ticketPayload
       if (!payload) return
-      const lines = [...cardTicketLines(payload).map(([label, value]) => [`${label} : ${value}`, false]),
+      const lines = [[CARD_TICKET_TITLE, true],
+        ...cardTicketLines(payload).map(([label, value]) => [`${label} : ${value}`, false]),
         ['Paiement accepté', true]]
       const measure = new JSPDF({ unit: 'mm', format: [58, 100] })
       measure.setFont('courier', 'normal')

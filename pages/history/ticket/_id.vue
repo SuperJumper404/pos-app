@@ -196,6 +196,7 @@ import {
   receiptDeliveryLines,
 } from '@/helpers/cashierReceipt'
 import {
+  CARD_TICKET_TITLE,
   buildCardTicketPayload,
   cardTicketLines,
 } from '@/helpers/cardTicket'
@@ -855,6 +856,9 @@ export default {
         .forEach((ticket) => {
           y += 6
           drawLine()
+          write(CARD_TICKET_TITLE, {
+            align: 'center', x: center, fontSize: 8, style: 'bold', gap: 4,
+          })
           cardTicketLines(ticket.payload)
             .filter((line) => this.safePdfText(line[1]).trim())
             .forEach(([label, value]) => write(`${label} : ${value}`, { fontSize: 7.5 }))

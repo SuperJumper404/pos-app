@@ -2,7 +2,7 @@ const moment = require('moment')
 const { normalizeVatBreakdown, normalizeDeliveryCharge, deliveryChargeFor } = require('./vat')
 const { formatPrice, parsePrice, roundPrice } = require('./price-functions')
 const { groupCustomizationSelections } = require('./customizations')
-const { cardTicketLines } = require('./cardTicket')
+const { CARD_TICKET_TITLE, cardTicketLines } = require('./cardTicket')
 const { terminalReaderLabel } = require('./stripeTerminal')
 
 const receiptPaymentMethod = (order = {}, fallback) => {
@@ -533,6 +533,7 @@ const buildCashierEscPos = (payload) => {
   }
   normalizeCardTicketPayloads(payload).forEach((cardPayload) => {
     push(line())
+    push(alignCenter(), boldOn(), esc(`${CARD_TICKET_TITLE}\n`), boldOff())
     cardTicketLines(cardPayload).forEach(([label, value]) => {
       push(alignLeft(), esc(`${label} : ${value}\n`))
     })
@@ -643,6 +644,7 @@ const buildCashierCloudXml = (payload) => {
     normalizeCardTicketPayloads(payload)
       .map((cardPayload) => (
         '<feed line="1"/><text>--------------------------------</text><feed line="1"/>' +
+        `<text align="center" em="true">${CARD_TICKET_TITLE}</text><feed line="1"/>` +
         cardTicketLines(cardPayload)
           .map(([label, value]) => (
             `<text align="left">${xmlEscape(label)} : ${xmlEscape(value)}</text><feed line="1"/>`
@@ -836,6 +838,7 @@ const buildCashierTicketData = (payload = {}) => {
       id: `card_ticket_${index + 1}`,
       lines: [
         renderSeparator(),
+        renderText(CARD_TICKET_TITLE, { align: 'center', bold: true }),
         ...cardTicketLines(cardPayload).map(([label, value]) =>
           renderText(`${label} : ${value}`)
         ),

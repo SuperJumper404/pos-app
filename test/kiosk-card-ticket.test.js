@@ -49,7 +49,7 @@ const payload = buildCardTicketPayload({
   },
 })
 
-assert.strictEqual(payload.ticketTitle, 'Ticket carte')
+assert.strictEqual(payload.ticketTitle, 'Ticket de paiement')
 assert.strictEqual(payload.ticketType, 'caisse')
 assert.strictEqual(payload.paymentMethod, 'TPE')
 assert.strictEqual(payload.orderId, 100)
@@ -77,6 +77,7 @@ assert.strictEqual(payload.terminalPaymentId, 41)
 const ticketDataText = JSON.stringify(buildCardTicketData(payload))
 assert.match(ticketDataText, /B100/)
 const expectedLines = [
+  'Ticket de paiement',
   'Terminal : TPE',
   'Référence : 41',
   'Date : 04/10/2026 a 12:30',
@@ -96,6 +97,7 @@ const escPosText = buildCardTicketEscPos(payload).toString('latin1')
 const cloudXml = buildCardTicketCloudXml(payload)
 for (const rendered of [escPosText, cloudXml]) {
   for (const line of expectedLines) assert.ok(rendered.includes(line), `missing ${line}`)
+  assert.ok(rendered.indexOf('Ticket de paiement') < rendered.indexOf('Terminal :'))
   assert.doesNotMatch(rendered, /Ticket carte|Le Comptoir|Commande :|Lecture :|Reseau :|Ref\. reseau|Autorisation|autorisation|Application :|AID :|AC :|TVR :|TSI :|CVM :|Compte :/)
 }
 assert.doesNotMatch(ticketDataText, /Paiement :/)

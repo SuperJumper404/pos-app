@@ -2,6 +2,7 @@ const moment = require('moment')
 const { formatPrice, roundPrice } = require('./price-functions')
 
 const { terminalReaderLabel } = require('./stripeTerminal')
+const CARD_TICKET_TITLE = 'Ticket de paiement'
 
 const xmlEscape = (value) =>
   String(value == null ? '' : value)
@@ -39,7 +40,7 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
     ? card.amountCents
     : payment.amountCents
   return {
-    ticketTitle: 'Ticket carte',
+    ticketTitle: CARD_TICKET_TITLE,
     ticketType: 'caisse',
     orderId,
     orderNumber: payment.orderNumber || order.ordernumber || order.orderNumber || orderId || '',
@@ -93,6 +94,7 @@ const buildCardTicketEscPos = (payload = {}) => {
   const push = (...buffers) => buffers.forEach((buffer) => output.push(buffer))
 
   push(Buffer.from([0x1b, 0x40]), Buffer.from([0x1b, 0x74, 0x10]))
+  push(alignCenter(), boldOn(), esc(`${CARD_TICKET_TITLE}\n`), boldOff())
   cardLines(payload).forEach(([label, value]) => {
     push(alignLeft(), esc(`${label} : ${value}\n`))
   })
@@ -111,6 +113,7 @@ const buildCardTicketCloudXml = (payload = {}) => {
     '<?xml version="1.0" encoding="utf-8" ?>' +
     '<PrintRequestInfo><ePOSPrint><Parameter><devid>local_printer</devid><timeout>10000</timeout></Parameter><PrintData>' +
     '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
+    `<text align="center" em="true">${CARD_TICKET_TITLE}</text><feed line="1"/>` +
     lines +
     '<text>--------------------------------</text><feed line="1"/>' +
     '<text em="true" align="center">Paiement accepté</text><feed line="4"/><cut/>' +
@@ -163,6 +166,10 @@ const buildCardTicketData = (payload = {}) => ({
   render: {
     paperWidth: 32,
     sections: [
+      {
+        id: 'header',
+        lines: [renderText(CARD_TICKET_TITLE, { align: 'center', bold: true })],
+      },
       {
         id: 'card',
         lines: cardLines(payload).map(([label, value]) => renderText(`${label} : ${value}`)),
@@ -249,6 +256,7 @@ const sendCardTicket = ({
 }
 
 module.exports = {
+  CARD_TICKET_TITLE,
   buildCardTicketPayload,
   buildCardTicketEscPos,
   buildCardTicketCloudXml,
