@@ -567,7 +567,13 @@ test('late mutation after courier/shop change cannot republish private details o
 test('mounted courier page keeps authority failure visible after clearing denied private scope', async t => {
   const f = await fixture(t, () => ({ status: 403 }))
   const page = f.mount('pages/livreur/index.vue').component
-  await page.refresh(); await drain()
+  // Await the refresh started by mounted instead of racing it with a second read.
+  await new Promise(resolve => {
+    const stop = page.$watch('refreshing', (value, previous) => {
+      if (previous && !value) { stop(); resolve() }
+    })
+  })
+  await drain()
   assert.equal(f.store.state.courier.missions.length, 0)
   assert.equal(page.$el.textContent.includes('Lecture impossible'), true)
 })
