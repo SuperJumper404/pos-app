@@ -54,6 +54,8 @@ const normalizePaymentMethod = (method, provider) => {
   const candidate = method && typeof method === 'object'
     ? method.value || method.text || method.name
     : method
+  if (['stripe_terminal', 'stripe terminal'].includes(normalizeText(provider)) ||
+    normalizeText(candidate).includes('tpe stripe') || normalizeText(candidate).includes('stripe terminal')) return 'TPE Stripe'
   if (normalizeText(provider).includes('stripe')) return 'Stripe'
   if (normalizeText(candidate).includes('stripe')) return 'Stripe'
   if (normalizeText(candidate) === 'autre') return 'Carte bancaire'

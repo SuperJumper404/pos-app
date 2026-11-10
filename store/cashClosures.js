@@ -5,6 +5,7 @@ const authHeaders = () => ({
 })
 
 export const cashClosureCanClose = (closure = {}) => Number(closure.orders_count || 0) > 0 ||
+  Number(closure.standalone_terminal_summary?.count || 0) > 0 ||
   ['remittances_count', 'adjustments_count', 'refunds_count'].some(key => Number(closure.courier_cash?.[key] || 0) > 0)
 
 export const cashClosureRows = (closure = {}) => {
@@ -54,11 +55,11 @@ export const actions = {
         return false
       })
   },
-  closeCurrent({ dispatch }) {
+  closeCurrent({ dispatch }, declaration = {}) {
     return this.$axios
       .post(
         '/baseurl/api/v1/reports/z/close',
-        {},
+        declaration,
         {
           headers: authHeaders(),
           skipGlobalErrorNotification: true,
