@@ -2022,13 +2022,13 @@ export default {
   border-top: 1px solid #dedede;
 }
 
-@media (min-width: 600px) and (max-width: 1263px) {
+@media (min-width: 601px) and (max-width: 1263px) {
   .cart-checkout-actions {
     padding-left: 4px;
     padding-right: 4px;
   }
 
-  .cart-checkout-btn {
+  .cart-checkout-actions .cart-checkout-btn {
     font-size: 0.78rem !important;
     padding-left: 8px !important;
     padding-right: 8px !important;
