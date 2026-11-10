@@ -71,7 +71,7 @@ const validKioskReader = (reader) => reader === null || (
 const validCardTicket = (ticket) => ticket === null || (
   validObject(ticket) &&
   Object.keys(ticket).every((key) => [
-    'brand', 'last4', 'network', 'networkTransactionId', 'readMethod', 'authorizationCode',
+    'brand', 'last4', 'funding', 'network', 'networkTransactionId', 'readMethod', 'authorizationCode',
     'authorizationResponseCode', 'applicationPreferredName', 'dedicatedFileName',
     'applicationCryptogram', 'terminalVerificationResults',
     'transactionStatusInformation', 'cardholderVerificationMethod',
@@ -79,6 +79,7 @@ const validCardTicket = (ticket) => ticket === null || (
   ].includes(key)) &&
   (ticket.brand == null || typeof ticket.brand === 'string') &&
   (ticket.last4 == null || /^[0-9]{4}$/.test(ticket.last4)) &&
+  (ticket.funding == null || ['credit', 'debit', 'prepaid'].includes(ticket.funding)) &&
   [
     'network', 'networkTransactionId', 'readMethod', 'authorizationCode', 'authorizationResponseCode',
     'applicationPreferredName', 'dedicatedFileName', 'applicationCryptogram',

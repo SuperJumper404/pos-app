@@ -2,6 +2,7 @@ const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
+const { buildTerminalCardTicket } = require('../../express-pos/src/helpers/stripeTerminalCardTicket')
 
 const root = path.resolve(__dirname, '..')
 const storePath = path.join(root, 'store', 'stripeTerminal.js')
@@ -115,6 +116,39 @@ const run = async () => {
   }
   const settled = { ...payment, status: 'succeeded', allocations: [{ orderId: 3, amountCents: 1250 }] }
   assert.deepStrictEqual(await harness({ data: settled }).call('refreshPayment', 13), settled)
+
+  // Use the real backend receipt builder: successful responses include the card type.
+  for (const funding of ['debit', 'credit', 'prepaid']) {
+    const cardTicket = buildTerminalCardTicket({ id: 13, amount_cents: 1250 }, {
+      latest_charge: { id: 'ch_confirmed', payment_method_details: {
+        card_present: { brand: 'visa', last4: '5158', funding },
+      } },
+    })
+    const confirmed = { ...settled, cardTicket }
+    let checks = 0
+    const h = harness(null, null, () => Promise.resolve(ok(checks++ === 0
+      ? { ...confirmed, cardTicket: { ...cardTicket, unexpected: true } }
+      : confirmed)))
+    h.current.activePayment = payment
+    assert.strictEqual(await h.call('refreshPayment', 13), false)
+    assert.strictEqual(h.current.error.code, 'TERMINAL_INVALID_RESPONSE')
+    for (let check = 0; check < 2; check++) {
+      assert.deepStrictEqual(await h.call('refreshPayment', 13), confirmed,
+        `Rechecking an accepted ${funding} payment must recognize the backend confirmation`)
+      assert.deepStrictEqual(h.current.activePayment, confirmed)
+      assert.strictEqual(h.current.error, null)
+    }
+    assert.strictEqual(h.calls.length, 3)
+    h.calls.forEach(call => assertRequest(call, 'get', `${base}/payments/13`))
+
+    for (const invalidFunding of ['unknown', 'DEBIT', 1, {}]) {
+      const malformed = harness({ data: { ...confirmed, cardTicket: { ...cardTicket, funding: invalidFunding } } })
+      malformed.current.activePayment = payment
+      assert.strictEqual(await malformed.call('refreshPayment', 13), false)
+      assert.strictEqual(malformed.current.error.code, 'TERMINAL_INVALID_RESPONSE')
+      assert.deepStrictEqual(malformed.current.activePayment, payment)
+    }
+  }
 
   const routes = [
     ['getReaders', undefined, 'get', `${base}/readers`, undefined, [reader], 'readers'],

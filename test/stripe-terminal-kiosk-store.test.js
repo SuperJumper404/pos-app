@@ -111,6 +111,7 @@ const run = async () => {
     outcome: 'paid',
     cardTicket: {
       brand: 'visa',
+      funding: 'debit',
       last4: '4242',
       network: 'cartes_bancaires',
       networkTransactionId: 'net_123',
@@ -134,6 +135,11 @@ const run = async () => {
   assertRequest(refresh.calls[0], 'get', `${base}/kiosk/payments/41`)
   assert.deepStrictEqual(refresh.current.activePayment, paid)
 
+  const legacyTicket = { ...paid.cardTicket }
+  delete legacyTicket.funding
+  assert.deepStrictEqual(await harness({ ...paid, cardTicket: legacyTicket }).call('refreshKioskPayment', 41),
+    { ...paid, cardTicket: legacyTicket }, 'Older confirmed payments without a card type remain readable')
+
   const canceled = harness({ ...kioskPayment, status: 'canceled', outcome: 'canceled' })
   assert.strictEqual((await canceled.call('cancelKioskPayment', 41)).outcome, 'canceled')
   assertRequest(canceled.calls[0], 'post', `${base}/kiosk/payments/41/cancel`, {})
@@ -143,6 +149,7 @@ const run = async () => {
     { ...kioskPayment, outcome: 'unknown' },
     { ...kioskPayment, cardTicket: { brand: 'visa', fullPan: '4242424242424242' } },
     { ...kioskPayment, cardTicket: { brand: 'visa', rawStripePayload: { secret: true } } },
+    { ...paid, cardTicket: { ...paid.cardTicket, funding: 'unknown' } },
   ]) {
     const malformed = harness(invalid)
     assert.strictEqual(await malformed.call('startKioskPayment', checkoutPayload), false)
