@@ -37,7 +37,7 @@ jobs:
           username: smarteatprod
           password: root
           port: 22
-          script_stop: true
+          script_stop: false
           script: |
             set -e
 
@@ -58,20 +58,14 @@ jobs:
                 fi
               done
               df -h /home/smarteatprod/smarteat
+              for source_file in /home/smarteatprod/smarteat/backend/src/routers/r_users.js /home/smarteatprod/smarteat/backend/src/helpers/platformSupport.js /home/smarteatprod/smarteat/frontend/static/backoffice-access.html; do
+                if [ -f "$source_file" ]; then sha256sum "$source_file"; fi
+              done
               for wallet in /home/smarteatprod/.smarteat/apple-wallet/production/compose-wallet.sh /home/smarteatprod/.smarteat/apple-wallet/prod/compose-wallet.sh; do
                 if [ -x "$wallet" ]; then echo "Wallet Compose wrapper: $wallet"; fi
               done
               if docker ps --format '{{.Names}}' | grep -qx express_pos_app_production; then
-                docker exec -i express_pos_app_production node <<'NODE'
-            const mysql = require('mysql2/promise');
-            (async () => {
-              const c = await mysql.createConnection(process.env.DATABASE_URL);
-              const [versions] = await c.query('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 4');
-              const [tables] = await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('customers','loyalty_members','customer_directory_contacts')");
-              console.log(JSON.stringify({ schemaVersions: versions.map(r => r.version), featureTables: tables.map(r => r.table_name || r.TABLE_NAME) }));
-              await c.end();
-            })().catch(e => { console.error('Production database preflight:', e.code || 'unavailable'); process.exitCode = 1; });
-            NODE
+                docker exec express_pos_app_production node -e 'const mysql=require("mysql2/promise");(async()=>{const c=await mysql.createConnection(process.env.DATABASE_URL);const [v]=await c.query("SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 4");const [t]=await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN (?,?,?)",["customers","loyalty_members","customer_directory_contacts"]);console.log(JSON.stringify({schemaVersions:v.map(r=>r.version),featureTables:t.map(r=>r.table_name||r.TABLE_NAME)}));await c.end()})().catch(e=>{console.error("Production database preflight:",e.code||"unavailable");process.exitCode=1})'
                 docker inspect express_pos_app_production --format '{{range .Mounts}}{{.Type}} {{.Source}} -> {{.Destination}}{{println}}{{end}}'
               else
                 echo 'Production app container not present under the expected name.'
@@ -80,14 +74,27 @@ jobs:
             fi
 
 
+            umask 077
+            BACKUP_DIR=/home/smarteatprod/smarteat-backups/frontend-$(date -u +%Y%m%d-%H%M%S)-$$
+            mkdir -p "$BACKUP_DIR"
+            test "$APP_DIR" = /home/smarteatprod/smarteat/frontend
+            if [ -d "$APP_DIR" ]; then
+              git -C "$APP_DIR" rev-parse HEAD > "$BACKUP_DIR/previous.sha"
+              if [ -f "$APP_DIR/.env.production" ]; then cp "$APP_DIR/.env.production" "$BACKUP_DIR/runtime.env.production"; fi
+              tar -czf "$BACKUP_DIR/source.tar.gz" --exclude=node_modules --exclude=.git --exclude=.nuxt -C "$APP_DIR" .
+            fi
+            echo "PRODUCTION_BACKUP_PATH=$BACKUP_DIR"
+
             rm -rf "$APP_DIR"
             git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 
             cd "$APP_DIR"
 
-            SUPABASE_URL="$(grep -m1 '^SUPABASE_URL=' .env.production | cut -d= -f2-)"
-            SUPABASE_ANON_KEY="$(grep -m1 '^SUPABASE_ANON_KEY=' .env.production | cut -d= -f2-)"
-            SUPABASE_BUCKET="$(grep -m1 '^SUPABASE_BUCKET=' .env.production | cut -d= -f2-)"
+            PUBLIC_ENV_SOURCE=.env.production
+            if [ -s "$BACKUP_DIR/runtime.env.production" ]; then PUBLIC_ENV_SOURCE="$BACKUP_DIR/runtime.env.production"; fi
+            SUPABASE_URL="$(grep -m1 '^SUPABASE_URL=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
+            SUPABASE_ANON_KEY="$(grep -m1 '^SUPABASE_ANON_KEY=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
+            SUPABASE_BUCKET="$(grep -m1 '^SUPABASE_BUCKET=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
 
             cat > .env.production <<EOF
             ENV=production
@@ -106,10 +113,15 @@ jobs:
             . ./.env.production
             set +a
 
-            docker compose --env-file .env.production -f "$COMPOSE_FILE" down --remove-orphans || true
             docker compose --env-file .env.production -f "$COMPOSE_FILE" up -d --force-recreate
-
             docker compose --env-file .env.production -f "$COMPOSE_FILE" ps
+            ready=0
+            for attempt in $(seq 1 120); do
+              if curl --silent --fail --max-time 3 http://127.0.0.1:3000/clients/ -o /dev/null; then ready=1; break; fi
+              sleep 3
+            done
+            test "$ready" = 1
+            echo "PRODUCTION_FRONTEND_COMMIT=$(git rev-parse HEAD)"
 
   deploy-pm2:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'pm2' && inputs.operation != 'preflight' }}

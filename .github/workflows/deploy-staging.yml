@@ -28,7 +28,7 @@ jobs:
           username: vscodeserver
           password: roottoorroot
           port: 22
-          script_stop: true
+          script_stop: false
           script: |
             set -e
 
@@ -37,14 +37,27 @@ jobs:
             REPO_URL=https://github.com/SuperJumper404/pos-app.git
             COMPOSE_FILE=compose.yml
 
+            umask 077
+            BACKUP_DIR=/home/vscodeserver/smarteat-backups/frontend-$(date -u +%Y%m%d-%H%M%S)-$$
+            mkdir -p "$BACKUP_DIR"
+            test "$APP_DIR" = /home/vscodeserver/smarteat/frontend
+            if [ -d "$APP_DIR" ]; then
+              git -C "$APP_DIR" rev-parse HEAD > "$BACKUP_DIR/previous.sha"
+              if [ -f "$APP_DIR/.env.staging" ]; then cp "$APP_DIR/.env.staging" "$BACKUP_DIR/runtime.env.staging"; fi
+              tar -czf "$BACKUP_DIR/source.tar.gz" --exclude=node_modules --exclude=.git --exclude=.nuxt -C "$APP_DIR" .
+            fi
+            echo "STAGING_BACKUP_PATH=$BACKUP_DIR"
+
             rm -rf "$APP_DIR"
             git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 
             cd "$APP_DIR"
 
-            SUPABASE_URL="$(grep -m1 '^SUPABASE_URL=' .env.staging | cut -d= -f2-)"
-            SUPABASE_ANON_KEY="$(grep -m1 '^SUPABASE_ANON_KEY=' .env.staging | cut -d= -f2-)"
-            SUPABASE_BUCKET="$(grep -m1 '^SUPABASE_BUCKET=' .env.staging | cut -d= -f2-)"
+            PUBLIC_ENV_SOURCE=.env.staging
+            if [ -s "$BACKUP_DIR/runtime.env.staging" ]; then PUBLIC_ENV_SOURCE="$BACKUP_DIR/runtime.env.staging"; fi
+            SUPABASE_URL="$(grep -m1 '^SUPABASE_URL=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
+            SUPABASE_ANON_KEY="$(grep -m1 '^SUPABASE_ANON_KEY=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
+            SUPABASE_BUCKET="$(grep -m1 '^SUPABASE_BUCKET=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
 
             cat > .env.staging <<EOF
             ENV=staging
@@ -63,10 +76,16 @@ jobs:
             . ./.env.staging
             set +a
 
-            docker compose --env-file .env.staging -f "$COMPOSE_FILE" down --remove-orphans || true
             docker compose --env-file .env.staging -f "$COMPOSE_FILE" up -d --force-recreate
 
             docker compose --env-file .env.staging -f "$COMPOSE_FILE" ps
+            ready=0
+            for attempt in $(seq 1 120); do
+              if curl --silent --fail --max-time 3 http://127.0.0.1:3000/clients/ -o /dev/null; then ready=1; break; fi
+              sleep 3
+            done
+            test "$ready" = 1
+            echo "STAGING_FRONTEND_COMMIT=$(git rev-parse HEAD)"
 
   deploy-pm2:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'pm2' }}

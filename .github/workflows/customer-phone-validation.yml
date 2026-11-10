@@ -1,0 +1,48 @@
+name: Customer Phone Frontend Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/clients-staging-20261106
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: pos-app
+      - uses: actions/checkout@v4
+        with:
+          repository: SuperJumper404/express-pos
+          ref: codex/clients-docker-staging-20261106
+          path: express-pos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            pos-app/package-lock.json
+            express-pos/package-lock.json
+      - run: npm ci --include=dev
+        working-directory: express-pos
+      - run: npm ci --include=dev
+        working-directory: pos-app
+      - run: npm test
+        working-directory: pos-app
+      - run: npm run test:loyalty
+        working-directory: pos-app
+      - run: npm run lint
+        working-directory: pos-app
+      - name: Generate staging with the deployed Docker Node version
+        run: |
+          docker run --rm \
+            --env-file "$PWD/pos-app/.env.staging" -e ENV=staging -e NODE_ENV=staging \
+            -e HOME=/tmp -e NPM_CONFIG_CACHE=/tmp/.npm -e NUXT_TELEMETRY_DISABLED=1 \
+            -v "$PWD/pos-app:/app" -v /app/node_modules -w /app \
+            node:18-bullseye-slim sh -c 'npm ci --include=dev && npm run generate'
