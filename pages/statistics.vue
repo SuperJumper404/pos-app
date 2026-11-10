@@ -104,6 +104,12 @@
       </v-btn>
     </v-card>
 
+    <p v-if="metrics.standalonePaymentsCount" class="mt-4 mb-0 text-body-2">
+      Dont {{ metrics.standalonePaymentsCount }} paiement(s) TPE autonome(s) :
+      {{ formatCurrency(metrics.standalonePaymentsRevenue) }}.
+      Le nombre de commandes et le panier moyen concernent les commandes uniquement.
+    </p>
+
     <v-row class="mt-5" dense>
       <v-col
         v-for="card in kpiCards"

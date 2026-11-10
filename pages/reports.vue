@@ -7,7 +7,7 @@
         </div>
         <div>
           <h1>Clôture Z</h1>
-          <p>Ticket Z courant, paiements, TVA et historique des clôtures.</p>
+          <p>Ticket X de la période ouverte et historique des clôtures Z.</p>
         </div>
       </div>
 
@@ -22,6 +22,10 @@
         Actualiser
       </v-btn>
     </div>
+
+    <v-alert v-if="reportsError" type="error" text role="alert" class="mt-4">
+      {{ reportsError }} Utilisez « Actualiser » pour réessayer.
+    </v-alert>
 
     <v-row class="reports-summary" dense>
       <v-col
@@ -58,7 +62,7 @@
               <div>
                 <div class="reports-panel__title">
                   <v-icon color="primary" left>mdi-receipt-text-clock</v-icon>
-                  Ticket Z courant
+                  Ticket X courant
                 </div>
                 <div class="reports-panel__subtitle">
                   Aperçu de la période encore ouverte
@@ -87,14 +91,23 @@
               </div>
             </div>
 
+            <p v-if="currentClosure.standalone_terminal_summary" class="px-5 text-body-2">
+              {{ currentClosure.standalone_terminal_summary.count }} paiement(s) TPE autonome(s) ·
+              {{ formatCurrency(currentClosure.standalone_terminal_summary.total) }}
+            </p>
+
             <v-card-actions class="reports-current__actions">
+              <v-btn outlined color="primary" class="text-none" :disabled="Boolean(reportsError)" @click="showCurrentTicket">
+                <v-icon small left>mdi-receipt-text</v-icon>
+                Voir le Ticket X
+              </v-btn>
               <v-btn
                 color="primary"
                 class="reports-close-action text-none"
                 depressed
                 :loading="closingClosure"
                 :disabled="closingClosure || !canCloseClosure"
-                @click="closeClosureDialog = true"
+                @click="openClosureDialog"
               >
                 <v-icon small left>mdi-lock-check</v-icon>
                 Clôturer la caisse
@@ -114,7 +127,7 @@
                       Paiements
                     </div>
                     <div class="reports-panel__subtitle">
-                      Répartition du Ticket Z courant
+                      Répartition de la période ouverte
                     </div>
                   </div>
                 </div>
@@ -244,18 +257,52 @@
       </v-card>
     </template>
 
-    <v-dialog v-model="closeClosureDialog" max-width="520">
+    <v-dialog v-model="closeClosureDialog" max-width="640" :persistent="closingClosure" scrollable>
       <v-card class="reports-dialog">
         <v-card-title class="reports-dialog__title se-modal-title">
           <v-icon color="primary" left>mdi-lock-check</v-icon>
           Clôturer la caisse
         </v-card-title>
         <v-card-text class="reports-dialog__copy">
-          Cette action va creer un Ticket Z fige pour la periode courante.
+          <p>Saisissez les montants constatés en fin de période. Vous pouvez les corriger avant de confirmer le Ticket Z définitif.</p>
+          <v-alert v-if="closingError" type="error" text role="alert">
+            {{ closingError }}
+            <v-btn small text :disabled="closingClosure" @click="refreshReports">Actualiser les montants calculés</v-btn>
+          </v-alert>
+          <v-text-field
+            v-model="declarationCash"
+            label="Espèces présentes en caisse"
+            suffix="€"
+            inputmode="decimal"
+            outlined
+            :disabled="closingClosure"
+            :error-messages="declarationSubmitted && cashDeclarationCents === null ? 'Saisissez un montant positif ou nul, avec deux décimales maximum.' : []"
+          />
+          <v-text-field
+            v-model="declarationCard"
+            label="Total carte constaté en fin de période"
+            suffix="€"
+            inputmode="decimal"
+            outlined
+            :disabled="closingClosure"
+            :error-messages="declarationSubmitted && cardDeclarationCents === null ? 'Saisissez un montant positif ou nul, avec deux décimales maximum.' : []"
+          />
+          <v-simple-table dense class="reports-reconciliation">
+            <thead><tr><th>Moyen</th><th>Calculé</th><th>Déclaré</th><th>Écart</th></tr></thead>
+            <tbody>
+              <tr v-for="row in declarationRows" :key="row.key">
+                <th scope="row">{{ row.label }}</th>
+                <td>{{ formatCountAmount(row.expected) }}</td>
+                <td>{{ formatCountAmount(row.declared) }}</td>
+                <td>{{ formatCountAmount(row.difference) }}</td>
+              </tr>
+            </tbody>
+          </v-simple-table>
+          <p class="text-caption mt-3 mb-0">Espèces calculées : mouvements de la période, hors fonds initial et espèces restant chez les livreurs. Carte : carte au comptoir et TPE, hors paiements en ligne. Écart = déclaré − calculé.</p>
         </v-card-text>
         <v-card-actions class="reports-dialog__actions">
           <v-spacer></v-spacer>
-          <v-btn text class="text-none" @click="closeClosureDialog = false">
+          <v-btn text class="text-none" :disabled="closingClosure" @click="closeClosureDialog = false">
             Annuler
           </v-btn>
           <v-btn
@@ -265,7 +312,7 @@
             :loading="closingClosure"
             @click="confirmCloseClosure"
           >
-            Confirmer
+            Confirmer le Ticket Z
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -276,19 +323,19 @@
         <div class="reports-detail__header">
           <div>
             <div class="reports-detail__title se-modal-heading">
-              Ticket Z #{{ selectedClosureDetail.closure_number || '-' }}
+              {{ detailTicketType === 'X' ? 'Ticket X — période ouverte' : `Ticket Z #${selectedClosureDetail.closure_number || '-'}` }}
             </div>
             <div class="reports-detail__subtitle">
-              Date de cloture :
+              {{ detailTicketType === 'X' ? 'Situation au :' : 'Date de cloture :' }}
               {{ formatClosureDate(selectedClosureDetail.closed_at) }}
             </div>
           </div>
-          <v-btn icon class="se-modal-icon" aria-label="Fermer le ticket Z" @click="closureDetailDialog = false">
+          <v-btn icon class="se-modal-icon" aria-label="Fermer le rapport" @click="closureDetailDialog = false">
             <v-icon small>mdi-close</v-icon>
           </v-btn>
         </div>
 
-        <v-card-text class="reports-detail__body">
+        <v-card-text ref="ticketBody" class="reports-detail__body">
           <div class="reports-detail-summary">
             <div>
               <span>Période</span>
@@ -308,6 +355,27 @@
                 {{ formatCurrency(selectedClosureDetail.total_revenue || 0) }}
               </strong>
             </div>
+          </div>
+
+          <p v-if="selectedClosureDetail.standalone_terminal_summary" class="mt-4 mb-2 text-body-2">
+            TPE autonomes : {{ selectedClosureDetail.standalone_terminal_summary.count }} paiement(s),
+            {{ formatCurrency(selectedClosureDetail.standalone_terminal_summary.total) }} inclus dans le total.
+          </p>
+          <p v-if="selectedClosureDetail.standalone_terminal_summary && selectedClosureDetail.standalone_terminal_summary.count" class="text-caption">
+            Les montants TPE autonomes n'ont pas de ventilation de TVA. Les commandes jointes sont informatives.
+          </p>
+          <div v-if="selectedReconciliationRows.length" class="mt-4">
+            <h2 class="text-subtitle-1 mb-2">Rapprochement de caisse</h2>
+            <v-simple-table dense class="reports-reconciliation">
+              <thead><tr><th>Moyen</th><th>Calculé</th><th>Déclaré</th><th>Écart</th></tr></thead>
+              <tbody>
+                <tr v-for="row in selectedReconciliationRows" :key="row.key">
+                  <th scope="row">{{ row.label }}</th>
+                  <td>{{ formatCountAmount(row.expected) }}</td><td>{{ formatCountAmount(row.declared) }}</td><td>{{ formatCountAmount(row.difference) }}</td>
+                </tr>
+              </tbody>
+            </v-simple-table>
+            <p class="text-caption mt-2">Espèces : mouvements hors fonds initial. Carte : hors paiements en ligne. Écart = déclaré − calculé.</p>
           </div>
 
           <v-simple-table v-if="closureCashRows(selectedClosureDetail).length" dense class="mt-4">
@@ -392,6 +460,7 @@ import formatdate from '@/helpers/formatdate'
 import price from '@/helpers/price'
 import { normalizePaymentSummary } from '@/helpers/paymentMethods'
 import { cashClosureCanClose, cashClosureRows } from '@/store/cashClosures'
+import { parseDeclarationCents, reconciliationRows } from '@/helpers/cashReconciliation'
 
 export default {
   mixins: [formatdate, price],
@@ -404,6 +473,12 @@ export default {
       closureDetailDialog: false,
       loadingClosureDetail: null,
       selectedClosureDetail: {},
+      detailTicketType: 'Z',
+      declarationCash: '',
+      declarationCard: '',
+      declarationSubmitted: false,
+      closingError: '',
+      reportsError: '',
       paymentHeaders: [
         { text: 'Methode', value: 'payment' },
         { text: 'Total', value: 'total', sortable: false },
@@ -439,7 +514,27 @@ export default {
       return this.$store.get('cashClosures/detail') || {}
     },
     canCloseClosure() {
-      return cashClosureCanClose(this.currentClosure)
+      return !this.loadPage && !this.reportsError && cashClosureCanClose(this.currentClosure)
+    },
+    cashDeclarationCents() {
+      return parseDeclarationCents(this.declarationCash)
+    },
+    cardDeclarationCents() {
+      return parseDeclarationCents(this.declarationCard)
+    },
+    declarationRows() {
+      const current = this.currentClosure.reconciliation
+      if (!current) return []
+      const cash = this.cashDeclarationCents
+      const card = this.cardDeclarationCents
+      return reconciliationRows({ ...current,
+        declared_cash_cents: cash, declared_card_cents: card,
+        cash_difference_cents: cash === null ? null : cash - current.expected_cash_cents,
+        card_difference_cents: card === null ? null : card - current.expected_card_cents,
+      })
+    },
+    selectedReconciliationRows() {
+      return reconciliationRows(this.selectedClosureDetail.reconciliation)
     },
     paymentRows() {
       return normalizePaymentSummary(this.currentClosure.payments_summary || [])
@@ -506,7 +601,11 @@ export default {
       return Promise.all([
         this.$store.dispatch('cashClosures/getCurrent'),
         this.$store.dispatch('cashClosures/getHistory'),
-      ]).finally(() => {
+      ]).then((results) => {
+        this.reportsError = results.every(Boolean) ? '' : 'Impossible de charger tous les rapports.'
+      }).catch(() => {
+        this.reportsError = 'Impossible de charger les rapports.'
+      }).finally(() => {
         this.loadPage = false
       })
     },
@@ -515,7 +614,7 @@ export default {
       return new Date(value).toLocaleString('fr-FR')
     },
     formatClosurePeriod(closure) {
-      if (!closure || !closure.opened_at) return 'Aucune commande à clôturer'
+      if (!closure || !closure.opened_at) return 'Aucun encaissement sur la période'
       const openedAt = this.formatClosureDate(closure.opened_at)
       const closedAt = closure.closed_at
         ? this.formatClosureDate(closure.closed_at)
@@ -537,12 +636,43 @@ export default {
       return Math.min(100, ((Number(value) || 0) / this.maxPaymentTotal) * 100)
     },
     printClosureDetail() {
-      if (process.client) window.print()
+      if (!process.client || !this.$refs.ticketBody) return
+      const root = document.createElement('section')
+      root.className = 'reports-print-root'
+      const title = document.createElement('h1')
+      title.textContent = this.detailTicketType === 'X' ? 'Ticket X — période ouverte' : `Ticket Z #${this.selectedClosureDetail.closure_number}`
+      root.appendChild(title)
+      const body = this.$refs.ticketBody.$el || this.$refs.ticketBody
+      root.appendChild(body.cloneNode(true))
+      document.body.appendChild(root)
+      document.body.classList.add('reports-printing')
+      try {
+        window.print()
+      } finally {
+        document.body.classList.remove('reports-printing')
+        root.remove()
+      }
+    },
+    formatCountAmount(value) {
+      return value === null || value === undefined ? '—' : this.formatCurrency(value / 100)
+    },
+    showCurrentTicket() {
+      this.detailTicketType = 'X'
+      this.selectedClosureDetail = JSON.parse(JSON.stringify(this.currentClosure))
+      this.closureDetailDialog = true
+    },
+    openClosureDialog() {
+      this.declarationCash = ''
+      this.declarationCard = ''
+      this.declarationSubmitted = false
+      this.closingError = ''
+      this.closeClosureDialog = true
     },
     async showClosureDetail(closure) {
       this.loadingClosureDetail = closure.id
       const ok = await this.$store.dispatch('cashClosures/getDetail', closure.id)
       if (ok) {
+        this.detailTicketType = 'Z'
         this.selectedClosureDetail = this.closureDetail
         this.closureDetailDialog = true
       }
@@ -550,13 +680,29 @@ export default {
     },
     async confirmCloseClosure() {
       if (this.closingClosure || !this.canCloseClosure) return
+      this.declarationSubmitted = true
+      const cash = parseDeclarationCents(this.declarationCash)
+      const card = parseDeclarationCents(this.declarationCard)
+      if (cash === null || card === null) return
+      this.closingError = ''
       this.closingClosure = true
-      const ok = await this.$store.dispatch('cashClosures/closeCurrent')
-      if (ok) {
-        this.closeClosureDialog = false
-        await this.refreshReports()
+      try {
+        const ok = await this.$store.dispatch('cashClosures/closeCurrent', {
+          declared_cash_cents: cash,
+          declared_card_cents: card,
+          expected_last_closure_id: this.currentClosure.last_closure_id || null,
+        })
+        if (ok) {
+          this.closeClosureDialog = false
+          await this.refreshReports()
+        } else {
+          this.closingError = this.$store.get('cashClosures/message') || 'Impossible de clôturer. Réessayez.'
+        }
+      } catch (error) {
+        this.closingError = 'Impossible de clôturer. Vos montants sont conservés ; réessayez.'
+      } finally {
+        this.closingClosure = false
       }
-      this.closingClosure = false
     },
   },
 }
@@ -566,6 +712,16 @@ export default {
 .reports-page {
   background: #f7f9fc;
   min-height: calc(100vh - 64px);
+}
+
+.reports-current__actions {
+  flex-wrap: wrap;
+  gap: var(--se-space-2);
+}
+
+.reports-reconciliation td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .reports-hero {
@@ -895,6 +1051,12 @@ export default {
 }
 
 @media (max-width: 720px) {
+  .reports-reconciliation th,
+  .reports-reconciliation td {
+    padding: 0 4px !important;
+    font-size: var(--se-font-meta);
+  }
+
   .reports-hero,
   .reports-hero__title,
   .reports-panel__header {
@@ -933,6 +1095,49 @@ export default {
 
   .reports-close-action:hover {
     transform: translateY(-1px);
+  }
+}
+</style>
+
+<style>
+.reports-print-root {
+  display: none;
+}
+
+@media print {
+  body.reports-printing > :not(.reports-print-root) {
+    display: none !important;
+  }
+
+  body.reports-printing .reports-print-root {
+    display: block !important;
+    color: #000;
+    background: #fff;
+    font-size: 12px;
+  }
+
+  .reports-print-root table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .reports-print-root th,
+  .reports-print-root td {
+    padding: 6px;
+    text-align: left;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .reports-print-root .v-data-table__wrapper {
+    overflow: visible;
+  }
+
+  .reports-print-root .row {
+    display: block;
+  }
+
+  .reports-print-root .col-md-6 {
+    max-width: 100%;
   }
 }
 </style>
