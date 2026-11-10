@@ -733,6 +733,8 @@
                   prepend-inner-icon="mdi-phone-outline"
                 />
               </div>
+              <p v-if="clientPhonePoints !== null" class="mt-2 mb-2 text-body-2" role="status">{{ clientPhonePoints }} points disponibles</p>
+              <p v-else-if="clientPhoneMessage" class="mt-2 mb-2 text-body-2 text--secondary" role="status">{{ clientPhoneMessage }}</p>
               <v-textarea
                 v-model="expressRemark"
                 :disabled="expressIsDelivery && expressDeliveryLocked"
@@ -1221,6 +1223,7 @@ import { calculateDiscount } from '@/helpers/discount'
 import DeliveryOrderDialog from '@/components/delivery/DeliveryOrderDialog.vue'
 import cashierDelivery from '@/mixins/cashierDelivery'
 import terminalCheckout from '@/mixins/terminalCheckout'
+import { phoneLookupMixin } from '@/helpers/clientPhone'
 // import * as config from '@/nuxt.config'
 const productTracksStock = (product = {}) =>
   [true, 1, '1'].includes(product.track_stock)
@@ -1230,7 +1233,7 @@ export default {
     ProductCustomizationWizard,
     DeliveryOrderDialog,
   },
-  mixins: [price, cashierDelivery, terminalCheckout],
+  mixins: [price, cashierDelivery, terminalCheckout, phoneLookupMixin],
   async beforeRouteLeave(to, from, next) {
     if (
       this.isOrderEditActive &&
@@ -1310,6 +1313,9 @@ export default {
   }),
 
   computed: {
+    phoneLookupInput() { return this.expressPhone },
+    phoneLookupName() { return this.expressCustomer },
+    phoneLookupEnabled() { return this.isAdminView && !this.expressIsDelivery && !this.isOrderEditActive },
     categories() {
       const items = this.dataProduct
         .map((x) => String(x.category || '').trim())
@@ -1611,6 +1617,9 @@ export default {
   },
 
   methods: {
+    onClientPhoneResolved(result) {
+      if (!String(this.expressCustomer || '').trim() && result && result.status === 'resolved' && result.customer && result.customer.name) this.expressCustomer = result.customer.name
+    },
     ensureActiveMobileCategory() {
       if (!this.categories.length) {
         this.activeMobileCategory = null

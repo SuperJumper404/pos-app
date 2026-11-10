@@ -539,7 +539,7 @@ const loadComponentOptions = (source, dependencyNames, dependencies) => {
     .replace('export default', 'return')
 
   // eslint-disable-next-line no-new-func
-  return new Function(...dependencyNames, 'terminalCheckout', executable)(...dependencies, {})
+  return new Function(...dependencyNames, 'terminalCheckout', 'phoneLookupMixin', 'matchingFrozenPhoneSession', executable)(...dependencies, {}, require('../helpers/clientPhone').phoneLookupMixin, require('../helpers/clientPhone').matchingFrozenPhoneSession)
 }
 
 const wizardOptions = loadComponentOptions(
@@ -1793,6 +1793,8 @@ const cartOptions = new Function(
   'buildCheckoutPayloadSignature',
   'shouldAutoPrepareStripeCheckout',
   'terminalCheckout',
+  'phoneLookupMixin',
+  'matchingFrozenPhoneSession',
   cartExecutable
 )(
   () => null,
@@ -1808,7 +1810,9 @@ const cartOptions = new Function(
   (mode) => mode === 'stripe_before_order',
   buildCheckoutPayloadSignature,
   () => false,
-  {}
+  {},
+  require('../helpers/clientPhone').phoneLookupMixin,
+  require('../helpers/clientPhone').matchingFrozenPhoneSession
 )
 
 const cartEditVm = {

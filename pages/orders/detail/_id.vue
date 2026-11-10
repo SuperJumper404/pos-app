@@ -81,6 +81,19 @@
         </v-card-text>
       </v-card>
 
+      <v-card v-if="clientProfile" outlined class="mb-3">
+        <v-card-title class="subtitle-1">Fiche client</v-card-title>
+        <v-card-text>
+          <p class="mb-1 font-weight-medium">{{ clientProfile.customer.name || 'Client sans nom' }}</p>
+          <p class="mb-1">{{ clientProfile.customer.phone }}</p>
+          <p v-if="clientProfile.customer.email" class="mb-1">{{ clientProfile.customer.email }}</p>
+          <template v-if="clientProfile.loyalty">
+            <p class="mb-1">Carte de fidélité {{ clientProfile.loyalty.cardNumber }}</p>
+            <p class="mb-0">{{ clientProfile.loyalty.available }} points disponibles · {{ clientProfile.loyalty.balance }} points au total<span v-if="clientProfile.loyalty.reserved"> · {{ clientProfile.loyalty.reserved }} réservés</span></p>
+          </template>
+          <p v-else class="mb-0">Sans carte de fidélité · 0 point disponible</p>
+        </v-card-text>
+      </v-card>
       <LoyaltyPos v-if="orderSummary && [0, 1].includes(userAccess) && !['paid', 'refunded', 'canceled'].includes(orderSummary.payment_status)" :order-id="orderSummary.id" />
       <v-card outlined class="order-detail-list-card">
         <div class="order-detail-list">
@@ -665,6 +678,13 @@ export default {
   },
 
   computed: {
+    clientProfile() {
+      const user = this.$store.state.users && this.$store.state.users.user || {}
+      const order = this.orderSummary
+      if (this.$store.state.authenticated === false || user.session_subject !== 'staff' || user.access == null || ![0, 1, 4, 5].includes(Number(user.access)) || !order || Number(user.shopid) !== Number(order.shopid)) return null
+      const profile = order.clientProfile
+      return profile && profile.customer && Number(profile.customer.shopId) === Number(user.shopid) ? profile : null
+    },
     trackingScope() {
       const user = this.$store.state.users?.user || {}
       return JSON.stringify([user.shopid, user.id, user.access, user.session_subject, this.orderSummary?.delivery_id])

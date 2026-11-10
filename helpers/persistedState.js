@@ -39,6 +39,7 @@ const sanitizePersistedState = (state) => {
   delete nextState.customer
   delete nextState.loyalty
   delete nextState.clients
+  delete nextState.clientPhone
   delete nextState.delivery
   delete nextState.courier
   if (nextState.cart) nextState.cart = persistCart(nextState.cart)

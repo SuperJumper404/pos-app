@@ -99,10 +99,12 @@ function fixture(reply = () => null, { fetchBoundary = false } = {}) {
   const delivery = load('store/delivery.js')
   const cartModule = load('store/cart.js')
   const customer = load('store/customer.js')
+  const clientPhone = load('store/clientPhone.js', { imports: { './delivery': delivery } })
   const easy = require('vuex-easy-access').default
   const store = new Vuex.Store({ state: { staticURL: 'http://fixture.invalid' }, modules: {
     delivery: { ...delivery, state: delivery.state() },
     customer: { ...customer, state: customer.state() },
+    clientPhone: { ...clientPhone, state: clientPhone.state() },
     cart: { ...cartModule, namespaced: true, state: cartModule.state() },
     users: { namespaced: true, state: { user: { shopid: 7, session_subject: 'staff', order_source: 'pos' } } },
     shop: { namespaced: true, state: { shop_name: 'Staff shop' }, actions: { getCurrentShopInfo() {} } },
@@ -633,6 +635,59 @@ test('phone loyalty checkout freezes its own identity, uses its CSRF and never f
   f.store.state.loyalty.phoneSession = { ...phone, csrfToken: 'b'.repeat(64) }
   await f.store.dispatch('cart/retryCheckout'); assert.equal(f.calls.length, 2)
   assert.deepEqual(f.calls[1].body, body); assert.equal(f.calls[1].headers['X-CSRF-Token'], 'b'.repeat(64))
+})
+
+test('frozen QR loyalty remount restores only matching proof and actually retries the same checkout', async () => {
+  const phone = { subject: 'loyalty', shopId: 7, customerId: '12', memberId: '00000000-0000-4000-8000-000000000012', csrfToken: 'a'.repeat(64) }
+  for (const scenario of ['matching', 'in-memory', 'stripe-prepared', 'old-cookie', 'edited', 'owner-changed']) {
+    const f = fixture(() => ({ lost: true }))
+    Object.assign(f.store.state.users.user, { shopid: 7, access: 2, session_subject: 'service_point', order_source: 'table_qr', service_point_id: 9, token: 'table' })
+    const loyalty = load('store/loyalty.js', { imports: { './delivery': { buildDeliveryApi() {} } } })
+    f.store.registerModule('loyalty', { ...loyalty, state: { ...loyalty.state(), phoneSession: phone, member: { id: phone.memberId, rewards: [] } } })
+    await f.store.dispatch('cart/checkoutOrder', { customer: 'Phone guest', phone: '0612345678', total: 25, payment: 'cash', dataCart: cart, customerSession: phone, servicePointId: 9 })
+    assert.equal(f.store.state.cart.clientOrderStatus, 'uncertain')
+    const original = copy(f.calls[0].body)
+    // A reload retains the frozen cart but intentionally does not persist private proof.
+    if (scenario !== 'in-memory') f.store.commit('loyalty/RESET')
+    else {
+      // Exercise the real payload restoration method and its synchronous phone watcher.
+      const options = load('pages/cart.vue').default
+      const page = new Vue({ store: f.store, mixins: [load('helpers/clientPhone.js').phoneLookupMixin],
+        data: () => ({ formuser: { phone: '' }, restoringCheckoutPayload: false, loyaltyReward: null }),
+        computed: { phoneLookupInput() { return this.formuser.phone }, phoneLookupEnabled() { return true }, checkoutShopId() { return 7 }, isQrClient() { return true } },
+        methods: { restoreCheckoutAttemptPayload: options.methods.restoreCheckoutAttemptPayload, invalidatePhoneLoyalty: options.methods.invalidatePhoneLoyalty, roundPrice: Number },
+      })
+      await page.restoreCheckoutAttemptPayload(f.store.state.cart.clientOrderPayload)
+      assert.equal(f.store.state.loyalty.phoneSession.memberId, phone.memberId, 'Programmatic restore must keep matching proof through its sync watcher')
+      // Do not tear down this parent until after retry; destruction intentionally clears proof.
+      f.restoredPage = page
+    }
+    if (scenario === 'stripe-prepared') f.store.state.cart.clientOrderStatus = 'stripe_prepared'
+    const response = deferred()
+    const options = load('components/loyalty/LoyaltyCheckout.vue').default
+    const component = new Vue({ ...options, store: f.store, propsData: { shopId: 7, phone: '0612345678', hidePoints: true },
+      beforeCreate() { this.$customerApi = { request: () => response.promise } }, render: h => h('div') })
+    component.$mount(document.createElement('div')); await drainVue()
+    if (scenario === 'edited') {
+      component.phone = '0676543210'
+      const page = load('pages/cart.vue').default
+      page.methods.invalidatePhoneLoyalty.call({ $store: f.store, $refs: {}, phoneLookupEnabled: true, checkoutShopId: 7 })
+    }
+    if (scenario === 'owner-changed') f.store.state.users.user.token = 'another-table-token'
+    const restored = scenario === 'old-cookie' ? { ...phone, memberId: 'other-card' } : phone
+    response.resolve({ member: { id: restored.memberId, rewards: [] }, session: restored, program: { enabled: true }, canEnroll: true })
+    await drainVue()
+    const result = await f.store.dispatch('cart/retryCheckout')
+    if (['matching', 'in-memory', 'stripe-prepared'].includes(scenario)) {
+      assert.equal(f.store.state.loyalty.phoneSession.memberId, phone.memberId)
+      assert.equal(f.calls.length, 2, 'Matching frozen proof must allow the actual retry action to reach HTTP')
+      assert.deepEqual(f.calls[1].body, original)
+    } else {
+      assert.equal(result.error.code, 'CHECKOUT_ATTEMPT_UNRESOLVED'); assert.equal(f.calls.length, 1)
+    }
+    component.$destroy()
+    f.restoredPage?.$destroy()
+  }
 })
 
 test('a changed phone reward leaves a safe retry and asks for a fresh confirmation', async () => {

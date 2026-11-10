@@ -163,7 +163,7 @@
           <Loading />
         </v-card>
         <v-card v-else outlined class="pa-2 overflow-x-hidden overflow-y-auto">
-          <LoyaltyCheckout v-if="[2, 3].includes(access) && !isSiteCheckout && dataCart && !isOrderEditActive" ref="loyaltyCheckout" :shop-id="checkoutShopId" :disabled="loadingBtn || stripePreparing || deliveryAttemptLocked" @reward="loyaltyReward = $event" />
+          <LoyaltyCheckout v-if="[2, 3].includes(access) && !isSiteCheckout && dataCart && !isOrderEditActive" ref="loyaltyCheckout" :shop-id="checkoutShopId" :phone="phoneLookupEnabled ? formuser.phone : null" :hide-points="phoneLookupEnabled" :disabled="loadingBtn || stripePreparing || deliveryAttemptLocked" @reward="loyaltyReward = $event" />
           <DeliveryCheckout
             v-if="deliveryContext && dataCart && !isOrderEditActive"
             ref="deliveryCheckout"
@@ -232,12 +232,14 @@
                 label="Numéro de téléphone"
                 :rules="[
                   (v) =>
-                    /^[0-9]+$/.test(v) || 'Seuls les chiffres sont autorisés',
+                    /^[+\d ()-]+$/.test(v) || 'Saisissez un numéro de téléphone valide',
                 ]"
                 placeholder="Saisir le numéro de téléphone"
                 class="mb-5"
                 required
               ></v-text-field>
+              <p v-if="clientPhonePoints !== null" class="mt-n4 mb-4 text-body-2" role="status">{{ clientPhonePoints }} points disponibles</p>
+              <p v-else-if="clientPhoneMessage" class="mt-n4 mb-4 text-body-2 text--secondary" role="status">{{ clientPhoneMessage }}</p>
               <v-checkbox
                 v-if="!deliveryContext"
                 v-model="formuser.isTakeaway"
@@ -483,6 +485,7 @@ import price from '@/helpers/price'
 import { buildCheckoutIntentSignature as buildCheckoutPayloadSignature, buildCounterPayBeforePayment, getCounterPayBeforeMethod } from '@/helpers/counterCheckout'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
 import terminalCheckout from '@/mixins/terminalCheckout'
+import { phoneLookupMixin, matchingFrozenPhoneSession } from '@/helpers/clientPhone'
 import {
   applyServerQuoteToCart,
   findCartTargetForCheckoutError,
@@ -503,7 +506,7 @@ export default {
     DeliveryCheckout: () => import('@/components/delivery/DeliveryCheckout.vue'),
     LoyaltyCheckout: () => import('@/components/loyalty/LoyaltyCheckout.vue'),
   },
-  mixins: [price, terminalCheckout],
+  mixins: [price, terminalCheckout, phoneLookupMixin],
   async beforeRouteLeave(to, from, next) {
     if (this.deliveryAttemptLocked && to.path === '/compte') { next(); return }
     if (this.$store.get('cart/clientOrderAuthRedirect')) {
@@ -611,6 +614,11 @@ export default {
     items: ['Carte Bleu ', 'Espèce', 'Ticket Restaurant'],
   }),
   computed: {
+    phoneLookupInput() { return this.formuser.phone },
+    phoneLookupEnabled() {
+      const user = this.$store.state.users && this.$store.state.users.user || {}
+      return user.session_subject === 'service_point' && (user.source || user.order_source) === 'table_qr' && !this.isSiteCheckout && !this.isDelivery && !this.isOrderEditActive
+    },
     checkoutShopId() { return Number(this.$store.state.users && this.$store.state.users.user.shopid || localStorage.getItem('shopid')) },
     deliveryTrackingScope() { return [this.$store.state.cart, this.$store.state.cart?.deliveryTrackingGeneration,
       this.checkoutShopId, this.fulfillmentType] },
@@ -891,6 +899,22 @@ export default {
     this.clearStripeAutoPrepareTimeout()
   },
   methods: {
+    invalidatePhoneLoyalty() {
+      const user = this.$store.state.users && this.$store.state.users.user || {}
+      if (!this.phoneLookupEnabled && user.session_subject !== 'service_point') return
+      // RESET advances loyalty's epoch, so an old enrollment cannot restore its proof.
+      const loyalty = this.$store.state.loyalty
+      if (this.restoringCheckoutPayload && matchingFrozenPhoneSession(this.$store.state, {
+        phone: this.formuser.phone, shopId: this.checkoutShopId, session: loyalty && loyalty.phoneSession, member: loyalty && loyalty.member,
+      })) return
+      const program = loyalty && loyalty.program
+      const canEnroll = loyalty && loyalty.canEnroll
+      this.$store.dispatch('loyalty/reset')
+      this.$store.commit('loyalty/MEMBER', { program, canEnroll })
+      this.$store.commit('loyalty/PHONE_SHOP_ID', this.checkoutShopId)
+      this.loyaltyReward = null
+      this.$refs.loyaltyCheckout?.removeReward()
+    },
     invalidateDeliveryTracking() {
       this.deliveryTrackingRequest++
       this.deliveryTrackingPublication++

@@ -156,6 +156,7 @@ const listdashboard = {
           routeName: 'fidelite',
           to: '/fidelite',
           moduleKey: 'loyalty',
+          hiddenFromMainNavigation: true,
           isAdmin: true,
         },
         {
@@ -169,6 +170,7 @@ const listdashboard = {
           routeName: 'stocks',
           to: '/stocks',
           moduleKey: 'stocks',
+          hiddenFromMainNavigation: true,
           isAdmin: false,
         },
         {
