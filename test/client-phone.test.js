@@ -113,6 +113,31 @@ test('client summary requires authenticated same-shop staff, including paid orde
   ctx.$store.state.users.user.shopid = 8; assert.equal(options.computed.clientProfile.call(ctx), null)
   ctx.$store.state.users.user = { shopid: 7, access: 2, session_subject: 'service_point' }; assert.equal(options.computed.clientProfile.call(ctx), null)
 })
+
+test('paid and archived staff details retain the order contact when canonical contact fields are empty', async () => {
+  const source = fs.readFileSync(path.join(root, 'pages/orders/detail/_id.vue'), 'utf8')
+  const template = source.match(/<v-card v-if="clientProfile"[\s\S]*?<\/v-card>/)[0]
+  const compiled = require('vue-template-compiler').compile(template)
+  assert.deepEqual(compiled.errors, [])
+  const options = load('pages/orders/detail/_id.vue').default
+  const renderer = require('vue-server-renderer').createRenderer()
+  for (const archived of [false, true]) {
+    for (const hasContact of [false, true]) {
+      const profile = { customer: { id: '12', shopId: 7, name: hasContact ? 'Canonical name' : '', phone: hasContact ? '+33611111111' : '', email: 'contact@example.invalid' }, loyalty: null }
+      const before = JSON.stringify(profile)
+      const order = { shopid: 7, customer: 'Order contact', phone: '+33622222222', payment_status: 'paid', archived, clientProfile: profile }
+      const store = { state: { authenticated: true, users: { user: { shopid: 7, access: 4, session_subject: 'staff' } } } }
+      const page = new Vue({ data: () => ({ orderSummary: order }), computed: { clientProfile: options.computed.clientProfile },
+        beforeCreate() { this.$store = store }, render: vm.compileFunction(compiled.render, []), staticRenderFns: compiled.staticRenderFns.map(code => vm.compileFunction(code, [])) })
+      const html = await renderer.renderToString(page)
+      assert(html.includes(hasContact ? 'Canonical name' : 'Order contact'))
+      assert(html.includes(hasContact ? '+33611111111' : '+33622222222'))
+      assert(html.includes('contact@example.invalid'))
+      assert.equal(JSON.stringify(profile), before, 'display fallbacks do not update the canonical profile')
+      page.$destroy()
+    }
+  }
+})
 test('client lookup is never persisted and old caches are sanitized', () => {
   const persisted = require('../helpers/persistedState')
   assert.equal(persisted.sanitizePersistedState({ clientPhone: { result: member } }).clientPhone, undefined)
@@ -167,8 +192,49 @@ test('QR metadata never adopts a previous member cookie and ignores a restaurant
     await request
     assert(!calls.some(call => call[0] === 'loyalty/loadPhoneMember' || call[0] === 'loyalty/PHONE_RESULT'))
     assert.equal(calls.filter(call => call[0] === 'loyalty/MEMBER').length, changeShop ? 0 : 1)
-    if (!changeShop) assert.deepEqual(calls.find(call => call[0] === 'loyalty/MEMBER')[1], { program: { enabled: true }, canEnroll: true })
+    if (!changeShop) assert.deepEqual(calls.find(call => call[0] === 'loyalty/MEMBER')[1], { member: undefined, program: { enabled: true }, canEnroll: true })
   }
+})
+
+test('editing the QR phone during metadata loading retains programme enrollment without adopting stale proof', async () => {
+  const options = load('components/loyalty/LoyaltyCheckout.vue').default
+  const loyalty = load('store/loyalty.js')
+  const pending = deferred(); const calls = []
+  const store = new Vuex.Store({ state: { authenticated: true, cart: {
+    clientOrderToken: 'accepted-checkout', clientOrderStatus: 'uncertain',
+    clientOrderPayload: { phone: '0612345678', customerContextSubject: 'loyalty', customerContextShopId: 7, customerContextId: '12', loyaltyContextMemberId: 'old' },
+  } }, modules: {
+    users: { state: { user: { shopid: 7, access: 2, session_subject: 'service_point', order_source: 'table_qr', token: 'table' } } },
+    loyalty: { ...loyalty, state: loyalty.state() },
+  } })
+  const program = { enabled: true, version: 1 }
+  const currentMember = { id: 'new', available: 0, rewards: [], program }
+  const api = { request: input => {
+    calls.push(input)
+    return calls.length === 1 ? pending.promise : Promise.resolve({ member: currentMember, session: { subject: 'loyalty', shopId: 7, customerId: '22', memberId: 'new', csrfToken: 'new-proof' }, program, canEnroll: true })
+  } }
+  store.$customerApi = api
+  const checkout = new Vue({ ...options, propsData: { phone: '0612345678', shopId: 7 }, beforeCreate() { this.$store = store; this.$customerApi = api } })
+  const request = checkout.initialize()
+  checkout.phone = '0676543210'
+  const cart = load('pages/cart.vue').default
+  cart.methods.invalidatePhoneLoyalty.call({ $store: store, $refs: {}, phoneLookupEnabled: true, checkoutShopId: 7 })
+  // Returning to the original text must not revive proof invalidated by either edit.
+  checkout.phone = '0612345678'
+  cart.methods.invalidatePhoneLoyalty.call({ $store: store, $refs: {}, phoneLookupEnabled: true, checkoutShopId: 7 })
+  pending.finish({ member: { id: 'old', available: 37, rewards: [] }, session: { subject: 'loyalty', shopId: 7, customerId: '12', memberId: 'old', csrfToken: 'stale-proof' }, program, canEnroll: true })
+  await request
+  assert.deepEqual(JSON.parse(JSON.stringify(store.state.loyalty.program)), program)
+  assert.equal(store.state.loyalty.canEnroll, true)
+  assert.equal(store.state.loyalty.member, null)
+  assert.equal(store.state.loyalty.phoneSession, null)
+  assert.equal(calls.length, 1, 'metadata loading never enrolls automatically')
+  checkout.identify()
+  await checkout.enrollCheckoutPhone()
+  assert.equal(calls[1].body.phone, '0612345678')
+  assert.equal(store.state.loyalty.member.id, 'new')
+  assert.equal(checkout.joined, true)
+  checkout.$destroy()
 })
 test('real Vue QR input invalidates immediately and a shop switch cannot publish the old lookup', async () => {
   let timer

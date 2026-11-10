@@ -29,7 +29,8 @@ test('loyalty administration navigation is exclusive to administrators and keeps
   for (const role of [null, 1, 2, 3, 4, 5, 6]) assert.equal(canAccessModule(role, 'loyalty', ['loyalty'], true), false)
   const items = load('helpers/listdashboard.js').default.computed.list.call({ shopId: 7, shop_name: 'Restaurant' })
   const visible = getAccessibleNavigationItems(0, items, [], true)
-  assert(visible.some(item => item.to === '/fidelite'))
+  assert(visible.some(item => item.to === '/clients'))
+  assert(visible.every(item => item.to !== '/fidelite'))
   assert(visible.every(item => !['categories', 'customizations', 'stocks'].includes(item.moduleKey)))
 })
 test('admin upload preserves FormData and artwork previews use an authenticated Blob request', async () => {

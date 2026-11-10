@@ -82,10 +82,12 @@ export default {
         const user = this.$store.state.users && this.$store.state.users.user || {}
         try {
           const result = await this.$customerApi.request({ path: '/customer/loyalty/phone', shopId, tableSessionToken: user.token })
-          if (this._isDestroyed || initialization !== this.initialization || shopId !== this.shopId || owner !== phoneOwner(this.$store.state) ||
-            enrollmentSequence !== this.enrollmentSequence || epoch !== this.loyalty.epoch) return
-          if (matchingFrozenPhoneSession(this.$store.state, { phone: this.phone, shopId, session: result.session, member: result.member })) this.$store.commit('loyalty/PHONE_RESULT', result)
-          else if (!keepProof) this.$store.commit('loyalty/MEMBER', { program: result.program, canEnroll: result.canEnroll })
+          if (this._isDestroyed || initialization !== this.initialization || shopId !== this.shopId || owner !== phoneOwner(this.$store.state)) return
+          const proofCurrent = enrollmentSequence === this.enrollmentSequence && epoch === this.loyalty.epoch
+          if (proofCurrent && matchingFrozenPhoneSession(this.$store.state, { phone: this.phone, shopId, session: result.session, member: result.member })) this.$store.commit('loyalty/PHONE_RESULT', result)
+          // Phone edits invalidate proof, while same-table programme metadata stays usable.
+          // Keep a member accepted by a newer explicit enrollment while this read was pending.
+          else if (!keepProof || !proofCurrent) this.$store.commit('loyalty/MEMBER', { member: this.loyalty.member, program: this.loyalty.program || result.program, canEnroll: result.canEnroll })
           this.$store.commit('loyalty/PHONE_SHOP_ID', shopId)
         } catch (_) { /* Checkout remains available without programme metadata. */ }
         return

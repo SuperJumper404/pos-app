@@ -84,8 +84,8 @@
       <v-card v-if="clientProfile" outlined class="mb-3">
         <v-card-title class="subtitle-1">Fiche client</v-card-title>
         <v-card-text>
-          <p class="mb-1 font-weight-medium">{{ clientProfile.customer.name || 'Client sans nom' }}</p>
-          <p class="mb-1">{{ clientProfile.customer.phone }}</p>
+          <p class="mb-1 font-weight-medium">{{ clientProfile.customer.name || orderSummary.customer || 'Client sans nom' }}</p>
+          <p class="mb-1">{{ clientProfile.customer.phone || orderSummary.phone }}</p>
           <p v-if="clientProfile.customer.email" class="mb-1">{{ clientProfile.customer.email }}</p>
           <template v-if="clientProfile.loyalty">
             <p class="mb-1">Carte de fidélité {{ clientProfile.loyalty.cardNumber }}</p>
