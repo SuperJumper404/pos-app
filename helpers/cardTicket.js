@@ -106,7 +106,7 @@ const buildCardTicketEscPos = (payload = {}) => {
 const buildCardTicketCloudXml = (payload = {}) => {
   const lines = cardLines(payload)
     .map(([label, value]) =>
-      `<text align="left">${xmlEscape(label)} : ${xmlEscape(value)}</text><feed line="1"/>`
+      `<text align="left" em="false">${xmlEscape(label)} : ${xmlEscape(value)}</text><feed line="1"/>`
     )
     .join('')
   return (

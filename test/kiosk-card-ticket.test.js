@@ -95,6 +95,8 @@ assert.deepStrictEqual(
 )
 const escPosText = buildCardTicketEscPos(payload).toString('latin1')
 const cloudXml = buildCardTicketCloudXml(payload)
+assert.match(cloudXml, /<text align="center" em="true">Ticket de paiement<\/text>/)
+assert.match(cloudXml, /<text align="left" em="false">Terminal : TPE<\/text>/)
 for (const rendered of [escPosText, cloudXml]) {
   for (const line of expectedLines) assert.ok(rendered.includes(line), `missing ${line}`)
   assert.ok(rendered.indexOf('Ticket de paiement') < rendered.indexOf('Terminal :'))

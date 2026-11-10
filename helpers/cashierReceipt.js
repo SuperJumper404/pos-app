@@ -647,7 +647,7 @@ const buildCashierCloudXml = (payload) => {
         `<text align="center" em="true">${CARD_TICKET_TITLE}</text><feed line="1"/>` +
         cardTicketLines(cardPayload)
           .map(([label, value]) => (
-            `<text align="left">${xmlEscape(label)} : ${xmlEscape(value)}</text><feed line="1"/>`
+            `<text align="left" em="false">${xmlEscape(label)} : ${xmlEscape(value)}</text><feed line="1"/>`
           ))
           .join('') +
         '<text>--------------------------------</text><feed line="1"/>' +

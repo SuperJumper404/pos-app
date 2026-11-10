@@ -107,5 +107,6 @@ assert.deepStrictEqual(
 assert.ok(cloudCalls.every((call) => call.action === 'printing/postPrintingJob'))
 assert.doesNotMatch(cloudCalls[0].params.requete, /Ticket carte|Lecture :|Reseau :|Autorisation :/)
 assert.match(cloudCalls[0].params.requete, /Ticket de paiement/)
+assert.match(cloudCalls[0].params.requete, /<text align="left" em="false">Terminal : TPE<\/text>/)
 assert.match(cloudCalls[0].params.requete, /Paiement accepté/)
 assert.match(cloudCalls[0].params.requete, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)
