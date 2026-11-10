@@ -288,7 +288,7 @@
                 :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
                 block
                 color="success"
-                class="mt-4 text-none font-weight-bold"
+                class="cart-checkout-btn mt-4 text-none font-weight-bold"
                 @click="confirmStripePayment"
               >
                 Confirmer le paiement
@@ -310,7 +310,7 @@
                 :loading="loadingBtn && selectedCheckoutFlow === 'counter'"
                 block
                 color="primary"
-                class="mt-2 text-none font-weight-bold"
+                class="cart-checkout-btn mt-2 text-none font-weight-bold"
                 @click="orderWithoutPayment"
               >
                 Commander
@@ -2036,6 +2036,22 @@ export default {
 }
 
 @media (max-width: 600px) {
+  .cart-checkout-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cart-checkout-btn.v-btn {
+    min-height: 44px;
+    width: 100%;
+    font-size: 1rem;
+  }
+
+  .cart-checkout-actions .cart-checkout-btn {
+    flex: 0 0 auto;
+    margin: 0 !important;
+  }
+
   .cart-checkout-actions--embedded {
     grid-template-areas: 'save' 'menu' 'cancel';
     grid-template-columns: 1fr;
@@ -2064,12 +2080,5 @@ export default {
     width: 34px !important;
   }
 
-  .cart-checkout-actions {
-    flex-direction: column;
-  }
-
-  .cart-checkout-btn {
-    width: 100%;
-  }
 }
 </style>
