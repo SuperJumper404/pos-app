@@ -24,6 +24,47 @@ function store(host) {
   const context = { state, rootState, commit: (name, value) => module.mutations[name](state, value) }
   return { state, rootState, run: (name, input) => module.actions[name].call(host, context, input) }
 }
+
+test('Wallet preview derives an illustrative balance from configured rewards without inventing or mutating a programme', () => {
+  const editor = load('components/loyalty/LoyaltyCardEditor.vue').default
+  assert.equal(typeof editor.computed.cardPreview, 'function')
+  const rewards = Object.freeze([Object.freeze({ name: 'Menu', points: 80 }), Object.freeze({ name: 'Dessert offert', points: 30 })])
+  const result = editor.computed.cardPreview.call({ program: Object.freeze({ rewards }) })
+  assert.equal(result.balance, 20)
+  assert.equal(result.rewardText, 'Dessert offert — 20 / 30 points')
+  assert.deepEqual(result.progress, { value: 20, max: 30, ratio: 2 / 3, rewardName: 'Dessert offert' })
+  for (const empty of [[], [{ name: 'Ancienne offre', points: 30, expiresAt: '2000-01-01T00:00:00Z' }], [{ name: 'Invalide', points: 0 }]]) {
+    const preview = editor.computed.cardPreview.call({ program: { rewards: empty } })
+    assert.equal(preview.balance, 0); assert.equal(preview.progress, null)
+  }
+})
+
+test('the rendered Wallet preview exposes numeric progress and preserves the restaurant banner', async () => {
+  const Vue = require('vue')
+  const compiler = require('vue-template-compiler')
+  const definition = load('components/loyalty/LoyaltyCardEditor.vue').default
+  const template = compiler.parseComponent(fs.readFileSync(path.join(__dirname, '../components/loyalty/LoyaltyCardEditor.vue'), 'utf8')).template.content
+  const compiled = compiler.compileToFunctions(template)
+  const render = async rewards => {
+    const instance = new Vue({ ...definition, ...compiled,
+      components: { ImageCropper: { render: h => h('div') } },
+      propsData: { program: { name: 'Le Bistrot', backgroundColor: '#173A32', foregroundColor: '#FFFFFF', rewards } },
+      beforeCreate() { this.$store = { state: { loyalty: {} }, dispatch: () => Promise.resolve(null) } },
+    })
+    instance.stripPreview = 'https://example.test/original-restaurant-banner.png'
+    try { return await require('vue-server-renderer').createRenderer().renderToString(instance) }
+    finally { instance.$destroy() }
+  }
+  const html = await render([{ name: 'Dessert offert', points: 30 }])
+  assert.match(html, /role="progressbar"/)
+  assert.match(html, /aria-valuenow="20"/); assert.match(html, /aria-valuemax="30"/)
+  assert.match(html, /original-restaurant-banner\.png/)
+  assert.match(html, /Dessert offert — 20 \/ 30 points/)
+  assert(!html.includes('Prochain palier'))
+  const empty = await render([])
+  assert(!empty.includes('role="progressbar"'))
+  assert.match(empty, /récompense active/)
+})
 test('loyalty administration navigation is exclusive to administrators and keeps hidden catalog modules hidden', () => {
   assert.equal(canAccessModule(0, 'loyalty', [], false), true)
   for (const role of [null, 1, 2, 3, 4, 5, 6]) assert.equal(canAccessModule(role, 'loyalty', ['loyalty'], true), false)
