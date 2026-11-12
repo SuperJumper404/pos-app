@@ -28,21 +28,23 @@
 **Files:** backend `src/services/loyaltyWallet.js`, new `src/services/loyaltyWalletProgress.js`, `package.json`, `package-lock.json`; tests `test/loyalty-wallet-progress.test.js`, `test/loyalty-wallet-signing.test.js`.
 **Interfaces:** consumes reward configuration and available points; produces `payload.appleProgress` (value, max, ratio, rewardName) or null and `renderWalletProgress({images,progress,backgroundColor})` returning three strip PNG buffers.
 
-- [ ] Add failing tests for 20/30, reservations, multiple/expired/invalid/no rewards and completed goals; generated field layout and stable barcode/identity.
-- [ ] Add failing pixel tests for source preservation, ratios, alpha, scales, no banner and bounded invalid input.
-- [ ] Implement metadata, one bounded PNG renderer and locked pure-JS dependency; keep Google fields unchanged. Move points into header, remove next/card auxiliary duplication, retain usable offer at back.
-- [ ] Run new tests, actual OpenSSL signing and full backend general/loyalty suites. Expected: zero failures.
-- [ ] Commit backend changes; record base/head and RED/GREEN evidence.
+- [x] Add failing tests for 20/30, reservations, multiple/expired/invalid/no rewards and completed goals; generated field layout and stable barcode/identity.
+- [x] Add failing pixel tests for source preservation, ratios, alpha, scales, no banner and bounded invalid input.
+- [x] Implement metadata, one bounded PNG renderer and locked pure-JS dependency; keep Google fields unchanged. Move points into header, remove next/card auxiliary duplication, retain usable offer at back.
+- [x] Run new tests, actual OpenSSL signing and full backend general/loyalty suites. Expected: zero failures.
+- [x] Commit backend changes; record base/head and RED/GREEN evidence.
 
 ### Task 2: Matching preview, review and Docker rollout
 
 **Files:** frontend `components/loyalty/LoyaltyCardEditor.vue`, new `helpers/loyaltyWalletPreview.js`, tests in `test/loyalty-admin.test.js`; design/plan and validation report.
 **Interfaces:** consumes programme rewards/artwork and colors; produces explicitly illustrative matching header/banner/reward preview, with no changes to save/upload APIs.
 
-- [ ] Add failing preview tests for a configured goal, expiry, no goal, matching ratio and preservation of image/import paths.
-- [ ] Implement preview composition and numeric reward; no new configuration controls or invented rewards.
-- [ ] Run frontend general/loyalty suites, lint and one detector pass. Expected: zero test/lint errors; review existing warnings separately.
-- [ ] Render bounded empty/partial/complete examples and perform one batched inspection; one fix/confirmation round if required.
-- [ ] Obtain one fresh read-only review of both repositories. Address Important/Critical findings in one verified fix pass.
-- [ ] Merge/push with current staging/master heads preserved; run existing Docker workflows on staging then production. Verify actual public builds and signed pass layout with fake repository/network disabled; no SQL writes or messages.
-- [ ] Record workflow IDs, actual revisions, private backups, physical-iPhone limitation and remaining findings; restore any temporary operations workflow.
+- [x] Add failing preview tests for a configured goal, expiry, no goal, matching ratio and preservation of image/import paths.
+- [x] Implement preview composition and numeric reward; no new configuration controls or invented rewards.
+- [x] Run frontend general/loyalty suites, lint and one detector pass. Expected: zero test/lint errors; review existing warnings separately.
+- [x] Render bounded empty/partial/complete examples and perform one batched inspection; one fix/confirmation round if required.
+- [x] Obtain one fresh read-only review of both repositories. Address Important/Critical findings in one verified fix pass.
+- [x] Merge/push with current staging/master heads preserved; run existing Docker workflows on staging then production. Verify actual public builds and signed pass layout with fake repository/network disabled; no SQL writes or messages.
+- [x] Record workflow IDs, actual revisions, private backups, physical-iPhone limitation and remaining findings; restore any temporary operations workflow.
+
+Evidence and rollout details: [validation report](../reviews/2026-11-12-wallet-progress-validation.md).
