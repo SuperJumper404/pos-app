@@ -1,123 +1,35 @@
-name: Deploy Frontend to Staging
-
+name: Isolated frontend integration build
 on:
-  # push:
-  #   branches:
-  #     - staging
-
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Mode de déploiement'
-        required: true
         type: choice
-        options:
-          - compose
-          - pm2
-
+        default: compose
+        options: [compose]
+permissions:
+  contents: read
 jobs:
-  deploy-compose:
-    if: ${{ github.event_name == 'push' || inputs.mode == 'compose' }}
+  verify-build:
     runs-on: smarteat-runner
-
+    timeout-minutes: 20
     steps:
-      - name: Deploy on server with Docker Compose
-        uses: appleboy/ssh-action@v1.0.3
+      - uses: actions/checkout@v4
         with:
-          host: 192.168.1.99
-          username: vscodeserver
-          password: roottoorroot
-          port: 22
-          script_stop: false
-          script: |
-            set -e
-
-            APP_DIR=/home/vscodeserver/smarteat/frontend
-            BRANCH=staging
-            REPO_URL=https://github.com/SuperJumper404/pos-app.git
-            COMPOSE_FILE=compose.yml
-
-            umask 077
-            BACKUP_DIR=/home/vscodeserver/smarteat-backups/frontend-$(date -u +%Y%m%d-%H%M%S)-$$
-            mkdir -p "$BACKUP_DIR"
-            test "$APP_DIR" = /home/vscodeserver/smarteat/frontend
-            if [ -d "$APP_DIR" ]; then
-              git -C "$APP_DIR" rev-parse HEAD > "$BACKUP_DIR/previous.sha"
-              if [ -f "$APP_DIR/.env.staging" ]; then cp "$APP_DIR/.env.staging" "$BACKUP_DIR/runtime.env.staging"; fi
-              tar -czf "$BACKUP_DIR/source.tar.gz" --exclude=node_modules --exclude=.git --exclude=.nuxt -C "$APP_DIR" .
-            fi
-            echo "STAGING_BACKUP_PATH=$BACKUP_DIR"
-
-            rm -rf "$APP_DIR"
-            git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
-
-            cd "$APP_DIR"
-
-            PUBLIC_ENV_SOURCE=.env.staging
-            if [ -s "$BACKUP_DIR/runtime.env.staging" ]; then PUBLIC_ENV_SOURCE="$BACKUP_DIR/runtime.env.staging"; fi
-            SUPABASE_URL="$(grep -m1 '^SUPABASE_URL=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
-            SUPABASE_ANON_KEY="$(grep -m1 '^SUPABASE_ANON_KEY=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
-            SUPABASE_BUCKET="$(grep -m1 '^SUPABASE_BUCKET=' "$PUBLIC_ENV_SOURCE" | cut -d= -f2-)"
-
-            cat > .env.staging <<EOF
-            ENV=staging
-            NODE_ENV=staging
-            APP_PORT=3000
-            PORT=3000
-            HOST=0.0.0.0
-            CONTAINER_NAME=frontend_smart_eat_staging
-            SUPABASE_URL=${SUPABASE_URL}
-            SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-            SUPABASE_BUCKET=${SUPABASE_BUCKET}
-            EOF
-
-
-            set -a
-            . ./.env.staging
-            set +a
-
-            docker compose --env-file .env.staging -f "$COMPOSE_FILE" up -d --force-recreate
-
-            docker compose --env-file .env.staging -f "$COMPOSE_FILE" ps
-            ready=0
-            for attempt in $(seq 1 120); do
-              if curl --silent --fail --max-time 3 http://127.0.0.1:3000/clients/ -o /dev/null; then ready=1; break; fi
-              sleep 3
-            done
-            test "$ready" = 1
-            echo "STAGING_FRONTEND_COMMIT=$(git rev-parse HEAD)"
-
-  deploy-pm2:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'pm2' }}
-    runs-on: smarteat-runner
-
-    steps:
-      - name: Deploy on server with PM2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 192.168.1.179
-          username: webserversmarteat
-          password: root
-          port: 22
-          script_stop: true
-          script: |
-            set -e
-
-            APP_DIR=/home/webserversmarteat/smarteat/frontend
-            APP_NAME=frontend_smart_eat_staging
-            BRANCH=staging
-            REPO_URL=https://github.com/SuperJumper404/pos-app.git
-
-            rm -rf "$APP_DIR"
-            git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
-
-            cd "$APP_DIR"
-
-            npm install
-
-            export ENV=staging
+          persist-credentials: false
+      - name: Verify source and generate frontend in an ephemeral Docker container
+        shell: bash
+        run: |
+          set -eu
+          git diff --exit-code 3bb0d8bc15dec0ffcc8f621bebe91e7704245938 HEAD -- . ':!.github/workflows/deploy-staging.yml'
+          echo 'INTEGRATION_SOURCE=3bb0d8bc15dec0ffcc8f621bebe91e7704245938'
+          docker run --rm --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/source,readonly" -e ENV=staging -e NODE_ENV=production node:18-bullseye-slim sh -c '
+            set -eu
+            mkdir /work
+            cp -a /source/. /work/
+            cd /work
+            npm ci --include=dev --no-audit --no-fund
             npm run generate
-
-            pm2 delete "$APP_NAME" || true
-            pm2 start ecosystem.config.js --env staging --name "$APP_NAME"
-            pm2 save
+            test -s dist/index.html
+            sha256sum dist/index.html
+            echo INTEGRATION_FRONTEND_BUILD=passed
+          '
