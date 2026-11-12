@@ -475,11 +475,18 @@
         </v-card>
       </v-dialog>
 
-      <v-dialog v-model="customizationDialog" max-width="920" persistent>
-        <div v-if="selectedProduct">
+      <v-dialog
+        v-model="customizationDialog"
+        max-width="920"
+        content-class="customization-dialog"
+        persistent
+      >
+        <div v-if="selectedProduct" class="customization-dialog__content">
           <ProductCustomizationWizard
             v-model="selectedChoices"
             :product="selectedProduct"
+            :product-image="selectedProduct.image ? productImageSrc(selectedProduct.image) : ''"
+            show-product-details
             @confirm="confirmCustomization"
             @cancel="closeCustomization"
           />
@@ -1076,13 +1083,9 @@ export default {
       ) {
         return
       }
-      if ((product.customization_steps || []).length > 0) {
-        this.selectedProduct = product
-        this.selectedChoices = []
-        this.customizationDialog = true
-        return
-      }
-      this.addToCart(buildKioskCartLine(product))
+      this.selectedProduct = product
+      this.selectedChoices = []
+      this.customizationDialog = true
     },
     confirmCustomization(customization) {
       if (!this.selectedProduct || this.checkoutInteractionLocked) return

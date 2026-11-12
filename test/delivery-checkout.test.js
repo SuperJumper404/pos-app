@@ -163,6 +163,7 @@ async function mountCheckout(f, { site = false } = {}) {
     components: { ...options.components, DeliveryCheckout: checkout },
     beforeCreate() { this.$router = { push() {} } },
   })
+  if (site) page.formuser.phone = '0700000000'
   page.$mount(document.createElement('div'))
   await drainVue()
   return { page, mountedPayments }

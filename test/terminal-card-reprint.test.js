@@ -6,6 +6,30 @@ const payload = buildCardTicketPayload({ payment: {
   id: 81, amountCents: 1200, cardTicket: { brand: 'visa', last4: '4242', funding: 'debit' },
 } })
 
+const pdfLines = async url => {
+  const buffer = Buffer.from(await (await fetch(url)).arrayBuffer())
+  return [...buffer.toString('latin1').matchAll(/\(([^\r\n]*)\) Tj/g)]
+    .map(match => match[1].replace(/\\([\\()])/g, '$1'))
+}
+
+test('standalone PDF preserves its payment heading, seven fields and acceptance', async () => {
+  const Vue = require('vue')
+  const { component } = require('./helpers/vue-component')('pages/history/terminal-ticket/_id.vue')
+  const values = { 'shop/shop_name': 'Le Comptoir' }
+  const instance = new Vue({ ...component, beforeCreate() { this.$store = { get: key => values[key] } } })
+  try {
+    instance.payment = { id: 50, status: 'succeeded', amountCents: 800, confirmedAt: '2026-11-01 12:42:00',
+      cardTicket: { brand: 'mastercard', last4: '9695', funding: 'debit', network: 'mastercard',
+        readMethod: 'contactless_emv', authorizationCode: '754615', accountType: 'checking' } }
+    instance.generatePdf()
+    assert.deepEqual(await pdfLines(instance.urlPDF), [
+      'Ticket de paiement',
+      'Terminal : TPE', 'Référence : 50', 'Date : 01/11/2026 a 12:42', 'Carte : MASTERCARD',
+      'Type : Débit', 'PAN : ************9695', 'Montant : 8,00 EUR', 'Paiement accepté',
+    ])
+  } finally { if (instance.urlPDF) URL.revokeObjectURL(instance.urlPDF); instance.$destroy() }
+})
+
 test('standalone card tickets use the cashier printer route in SmartEat and cloud', async () => {
   for (const checked of [false, true]) {
     let body
@@ -64,6 +88,14 @@ test('archived order reprints recover card data while retaining the amount alloc
     assert.ok(instance.urlPDF.startsWith('blob:'))
     assert.equal(instance.cardTicketPayload.brand, 'VISA')
     assert.equal(instance.cardTicketPayload.amountCents, 1200)
+    const lines = await pdfLines(instance.urlPDF)
+    assert.ok(lines.includes('Le Comptoir'), 'the cashier receipt still contains the shop header')
+    assert.ok(lines.some(line => line.includes('Menu')), 'the cashier receipt still contains its products')
+    assert.doesNotMatch(lines.join('\n'), /Ticket carte|Lecture :|Reseau :|Autorisation :/)
+    const start = lines.findIndex(line => line.startsWith('Terminal :'))
+    assert.ok(start >= 0)
+    assert.deepEqual(lines.slice(start).filter(line => !/^-+$/.test(line)).map(line => line.split(' : ')[0]),
+      ['Terminal', 'Référence', 'Date', 'Carte', 'Type', 'PAN', 'Montant', 'Paiement accepté'])
     instance.printReceiptCloud()
     const job = calls.find(call => call.name === 'printing/postPrintingJob').params
     assert.equal(job.ticketType, 'caisse')

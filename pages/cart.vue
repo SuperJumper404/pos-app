@@ -228,15 +228,14 @@
                 v-model="formuser.phone"
                 :disabled="deliveryAttemptLocked"
                 type="tel"
+                inputmode="tel"
+                autocomplete="tel"
                 prepend-inner-icon="mdi-phone"
                 label="Numéro de téléphone"
-                :rules="[
-                  (v) =>
-                    /^[+\d ()-]+$/.test(v) || 'Saisissez un numéro de téléphone valide',
-                ]"
+                :rules="customerPhoneRules"
                 placeholder="Saisir le numéro de téléphone"
                 class="mb-5"
-                required
+                :required="customerPhoneRequired"
               ></v-text-field>
               <p v-if="clientPhonePoints !== null" class="mt-n4 mb-4 text-body-2" role="status">{{ clientPhonePoints }} points disponibles</p>
               <p v-else-if="clientPhoneMessage" class="mt-n4 mb-4 text-body-2 text--secondary" role="status">{{ clientPhoneMessage }}</p>
@@ -484,6 +483,7 @@ import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { buildCheckoutIntentSignature as buildCheckoutPayloadSignature, buildCounterPayBeforePayment, getCounterPayBeforeMethod } from '@/helpers/counterCheckout'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
+import { validateCustomerPhone } from '@/helpers/customerPhone'
 import terminalCheckout from '@/mixins/terminalCheckout'
 import { phoneLookupMixin, matchingFrozenPhoneSession } from '@/helpers/clientPhone'
 import {
@@ -678,6 +678,12 @@ export default {
     },
     isQrClient() {
       return isQrClientAccess(this.access)
+    },
+    customerPhoneRequired() {
+      return this.isQrClient || this.isSiteCheckout
+    },
+    customerPhoneRules() {
+      return this.customerPhoneRequired ? [validateCustomerPhone] : []
     },
     isFlexibleQrCheckout() {
       return this.isQrClient && isCounterPaymentAllowed(this.qrPaymentMode)
@@ -1271,6 +1277,13 @@ export default {
       if (!payload) return
       return this.restoreCheckoutAttemptPayload(payload)
     },
+    guardCustomerPhone() {
+      if (!this.customerPhoneRequired || this.isOrderEditActive) return true
+      const result = validateCustomerPhone(this.formuser.phone)
+      if (result === true) return true
+      this.checkoutErrorMessage = result
+      return false
+    },
     guardCheckoutConfirmation() {
       if (this.isOrderEditActive) {
         if (this.orderEditDirty) {
@@ -1283,6 +1296,7 @@ export default {
           Number(this.stripeOrderId) === Number(this.orderEditId)
         )
       }
+      if (this.customerPhoneRequired && !this.guardCustomerPhone()) return false
       if (this.checkoutPayloadMatchesBoundAttempt) return true
 
       this.checkoutErrorMessage =
@@ -1653,6 +1667,7 @@ export default {
       this.$router.push('/ordersStatuses')
     },
     async submitOrderWithoutStripe(paymentMethod, repriceConfirmation = false) {
+      if (this.customerPhoneRequired && !this.guardCustomerPhone()) return
       this.loadingBtn = true
       try {
         const terminal = this.isCheckoutTerminalMethod(paymentMethod)
@@ -1743,6 +1758,7 @@ export default {
       force = false,
       repriceConfirmation = false
     ) {
+      if (this.customerPhoneRequired && !this.guardCustomerPhone()) return
       if (this.stripePreparationPromise) {
         return this.stripePreparationPromise
       }

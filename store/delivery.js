@@ -273,8 +273,8 @@ export const actions = {
     try {
       const result = unwrap(await api(this).request({ method: 'patch', path: `/delivery/couriers/${courierId}/availability`, body: { available } }))
       if (identity !== operatorIdentity(rootState)) return null
-      await dispatch('operatorLoad', { resource: 'couriers' })
-      return identity === operatorIdentity(rootState) ? result : null
+      const couriers = await dispatch('operatorLoad', { resource: 'couriers' })
+      return identity === operatorIdentity(rootState) && Array.isArray(couriers) ? result : null
     } catch (failure) { if (identity !== operatorIdentity(rootState)) return null; await dispatch('operatorLoad', { resource: 'couriers' }); throw asError(failure) }
   },
   async operatorSaveSettings({ rootState, state, dispatch, commit }, settings) {
