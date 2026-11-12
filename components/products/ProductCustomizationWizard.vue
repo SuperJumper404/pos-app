@@ -3,14 +3,14 @@
     <v-card-title class="customization-wizard__header d-flex align-center se-modal-title">
       <div class="se-modal-title__copy">
         <div class="se-modal-title__text">{{ product.name || 'Personnalisation' }}</div>
-        <div v-if="!isSummary" class="text-caption grey--text">
+        <div v-if="!isProductOnly && !isSummary" class="text-caption grey--text">
           Étape {{ currentStepNumber }} / {{ visibleStepCount }}
         </div>
-        <div v-else class="text-caption grey--text">Résumé</div>
+        <div v-else-if="!isProductOnly" class="text-caption grey--text">Résumé</div>
       </div>
       <v-spacer></v-spacer>
       <div class="se-modal-title__meta text-right mr-2">
-        <div class="text-caption grey--text">Prix actuel</div>
+        <div class="text-caption grey--text">{{ isProductOnly ? 'Prix' : 'Prix actuel' }}</div>
         <div class="font-weight-bold primary--text">
           {{ formatCurrency(previewUnitPrice) }}
         </div>
@@ -21,12 +21,44 @@
     </v-card-title>
 
     <v-progress-linear
+      v-if="!isProductOnly"
       :value="progressValue"
       color="primary"
       height="6"
     ></v-progress-linear>
 
-    <v-card-text class="customization-wizard__body">
+    <v-card-text
+      v-if="!isProductOnly || showProductIntroduction"
+      class="customization-wizard__body"
+    >
+      <section
+        v-if="showProductIntroduction"
+        aria-label="Présentation du produit"
+        class="customization-wizard__product"
+        :class="{ 'customization-wizard__product--standalone': isProductOnly }"
+      >
+        <v-img
+          v-if="productImage"
+          :src="productImage"
+          :alt="product.name || 'Produit'"
+          contain
+          class="customization-wizard__product-image"
+        />
+        <div v-if="productDescription" class="customization-wizard__product-copy">
+          <p class="customization-wizard__description">{{ displayedDescription }}</p>
+          <v-btn
+            v-if="descriptionCanExpand"
+            text
+            color="primary"
+            class="customization-wizard__description-toggle text-none px-0"
+            :aria-expanded="String(descriptionExpanded)"
+            @click="descriptionExpanded = !descriptionExpanded"
+          >
+            {{ descriptionExpanded ? 'Voir moins' : 'Voir plus' }}
+          </v-btn>
+        </div>
+      </section>
+
       <template v-if="currentStep && !isSummary">
         <h2 class="se-modal-section-title mb-1">{{ currentStep.name || 'Étape' }}</h2>
         <p v-if="currentStep.description" class="grey--text mb-2">
@@ -55,7 +87,7 @@
         </div>
       </template>
 
-      <template v-else>
+      <template v-else-if="!isProductOnly">
         <h2 class="se-modal-section-title mb-4">Votre sélection</h2>
         <CustomizationSummary
           :groups="summaryGroups"
@@ -139,14 +171,45 @@ export default {
       type: [Number, String],
       default: null,
     },
+    showProductDetails: {
+      type: Boolean,
+      default: false,
+    },
+    productImage: {
+      type: String,
+      default: '',
+    },
   },
   data() {
     return {
       selectedChoiceIds: [],
       currentStepIndex: 0,
+      descriptionExpanded: false,
     }
   },
   computed: {
+    productDescription() {
+      return String(this.product.description || '').trim()
+    },
+    descriptionCanExpand() {
+      return this.productDescription.length > 200
+    },
+    displayedDescription() {
+      if (this.descriptionExpanded || !this.descriptionCanExpand) {
+        return this.productDescription
+      }
+      return `${this.productDescription.slice(0, 200).trim()}…`
+    },
+    isProductOnly() {
+      return this.showProductDetails && this.visibleStepCount === 0
+    },
+    showProductIntroduction() {
+      return (
+        this.showProductDetails &&
+        Boolean(this.productDescription || this.productImage) &&
+        (this.isProductOnly || (!this.isSummary && this.currentStepNumber === 1))
+      )
+    },
     summaryGroups() {
       return groupCustomizationSelections(this.selections)
     },
@@ -186,7 +249,7 @@ export default {
       return (this.currentStepNumber / this.visibleStepCount) * 100
     },
     backButtonLabel() {
-      return this.currentStepNumber <= 1 && !this.isSummary
+      return this.isProductOnly || (this.currentStepNumber <= 1 && !this.isSummary)
         ? 'Annuler'
         : 'Retour'
     },
@@ -321,6 +384,7 @@ export default {
     product: {
       immediate: true,
       handler() {
+        this.descriptionExpanded = false
         this.selectedChoiceIds = this.sanitizeSelection(this.value)
         this.resetWizardPosition()
       },
@@ -508,7 +572,67 @@ export default {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
 
+.customization-wizard__product {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--se-color-border-soft);
+}
+
+.customization-wizard__product--standalone {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.customization-wizard__product-image {
+  flex: 0 0 112px;
+  width: 112px;
+  max-width: 112px;
+  height: 112px;
+  border-radius: var(--se-radius-md);
+  background: var(--se-color-surface-muted);
+}
+
+.customization-wizard__product-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.customization-wizard__description {
+  margin-bottom: 0;
+  color: var(--se-color-text-body);
+  font-size: 1rem;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.customization-wizard__description-toggle {
+  min-height: 44px;
+}
+
 @media (max-width: 599px) {
+  .customization-wizard__product {
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+  }
+
+  .customization-wizard__product--standalone {
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .customization-wizard__product-image {
+    flex-basis: 80px;
+    width: 80px;
+    max-width: 80px;
+    height: 80px;
+  }
+
   .customization-wizard__body {
     padding-left: 12px;
     padding-right: 12px;

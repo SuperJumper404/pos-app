@@ -241,4 +241,6 @@ assert.match(
   /const printerIp =[\s\S]*this\.shopInfo\.service_point_printer_ip \|\| this\.shopInfo\.shop_printer_ip/
 )
 
+require('./kiosk-product-details.test')
+
 console.log('kiosk page tests passed')
