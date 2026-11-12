@@ -35,6 +35,9 @@ const sanitizePersistedState = (state) => {
     delete nextState.history.entries
     delete nextState.history.entriesTotal
     delete nextState.history.entriesOwner
+    delete nextState.history.cashRegisterSettlement
+    delete nextState.history.cashRegisterSettlementOwner
+    delete nextState.history.cashRegisterSettlementStatus
   }
   delete nextState.customer
   delete nextState.loyalty

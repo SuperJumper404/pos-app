@@ -194,6 +194,23 @@ const isReleasedStripeOrder = (order = {}) =>
 const isCashRegisterOrderArchivable = (order = {}) =>
   !isReleasedStripeOrder(order)
 
+const buildTableSettlementCandidate = (finishedOrders = []) => {
+  const eligibleOrdersById = new Map()
+  finishedOrders.forEach((order) => {
+    const orderId = Number(order && order.id)
+    if (Number(order && order.status) !== 3 ||
+      !Number.isSafeInteger(orderId) || orderId <= 0 ||
+      !isCashRegisterOrderArchivable(order) || isCashRegisterOrderPaid(order) ||
+      eligibleOrdersById.has(orderId)) return
+    eligibleOrdersById.set(orderId, order)
+  })
+  const orderIds = [...eligibleOrdersById.keys()]
+  const dueAmount = [...eligibleOrdersById.values()].reduce(
+    (total, order) => total + toAmount(order.subtotal), 0
+  )
+  return { orderIds, dueAmount, hasEligibleOrders: orderIds.length > 0 }
+}
+
 const resolveRetryDueOrderIds = ({
   failedOrderIds,
   fallbackDueOrderIds,
@@ -307,6 +324,7 @@ const buildCashRegisterCustomerRows = (orders = []) => {
 module.exports = {
   archiveOrdersSafely,
   buildCashRegisterCustomerRows,
+  buildTableSettlementCandidate,
   getCashRegisterPaymentSummary,
   isCashRegisterOrderArchivable,
   isCashRegisterOrderPaid,

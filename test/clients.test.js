@@ -8,6 +8,27 @@ const {
 
 assert.strictEqual(normalizeClientPhone('06 00-00.00.00'), '0600000000')
 
+const sameSettlementOrders = buildArchivedClientRows([
+  {
+    id: 101,
+    cash_register_settlement_id: 77,
+    customer: 'Alice',
+    phone: '0600000000',
+    subtotal: 12,
+    created: '2026-08-10T10:00:00.000Z',
+  },
+  {
+    id: 102,
+    cash_register_settlement_id: 77,
+    customer: 'Alice',
+    phone: '0600000000',
+    subtotal: 18,
+    created: '2026-08-10T10:05:00.000Z',
+  },
+])
+assert.strictEqual(sameSettlementOrders[0].orderCount, 2)
+assert.strictEqual(sameSettlementOrders[0].totalSpent, 30)
+
 const rows = buildArchivedClientRows(
   [
     {

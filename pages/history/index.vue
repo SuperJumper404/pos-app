@@ -73,19 +73,36 @@
         :disable-sort="$vuetify.breakpoint.smAndDown"
       >
         <template #[`item.data-table-expand`]="{ item, expand, isExpanded }">
-          <v-btn v-if="item.entryType === 'order'" icon class="history-touch-button" :aria-label="`Détails de la commande ${item.ordernumber}`" :aria-expanded="String(isExpanded)" @click="expandOrder(item, expand, isExpanded)"><v-icon>{{ isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon></v-btn>
+          <v-btn v-if="item.entryType === 'order' || item.entryType === 'settlement'" icon class="history-touch-button" :aria-label="item.entryType === 'settlement' ? `Commandes de ${item.historyLabel}` : `Détails de la commande ${item.ordernumber}`" :aria-expanded="String(isExpanded)" @click="expandOrder(item, expand, isExpanded)"><v-icon>{{ isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon></v-btn>
         </template>
         <template #[`item.ordernumber`]="{ item }">
           <template v-if="item.entryType === 'terminal_payment'">
             <div class="history-terminal-label"><v-icon small color="primary">mdi-contactless-payment</v-icon><strong>Paiement TPE</strong></div>
             <div class="text-caption">{{ item.ordernumber || `TPE #${item.id}` }} · {{ item.readerLabel || `Terminal #${item.terminalPayment.readerId}` }}</div>
           </template>
+          <div v-else-if="item.entryType === 'settlement'" class="font-weight-medium">{{ item.historyLabel }}</div>
           <template v-else>
             <div>#{{ item.ordernumber }}</div>
             <TakeawayChip :value="item.is_takeaway" :fulfillment-type="item.fulfillment_type" />
           </template>
         </template>
         <template #expanded-item="{ item }">
+          <td v-if="item.entryType === 'settlement'" :colspan="headers.length + 1">
+            <div class="py-3">
+              <v-btn
+                v-for="order in item.archivedOrders"
+                :key="order.id"
+                :to="`/history/ticket/${order.id}`"
+                outlined
+                small
+                color="primary"
+                class="text-none mr-2 mb-2 history-action-button"
+              >
+                Commande #{{ order.ordernumber || order.id }}
+                <v-icon small right>mdi-open-in-new</v-icon>
+              </v-btn>
+            </div>
+          </td>
           <td v-if="item.entryType === 'order'" :colspan="headers.length + 1">
             <v-progress-linear v-if="detailsLoadingIds.includes(item.id)" indeterminate color="primary" aria-label="Chargement des détails de commande" />
             <v-alert v-if="detailsErrorIds.includes(item.id)" type="error" text dense>Les détails de cette commande sont indisponibles. <v-btn small text @click="loadOrderDetails(item)">Réessayer</v-btn></v-alert>
@@ -281,7 +298,7 @@
                 small
                 color="primary"
                 class="text-none history-action-button"
-                @click="showInvoice(item.id)"
+                @click="showInvoice(item)"
                 >Ticket <v-icon small right>mdi-invoice-text</v-icon>
               </v-btn>
             </div>
@@ -460,7 +477,7 @@ export default {
       this.errMsg = !result
       if (!result) return
       this.appliedSearch = this.searchFilter.trim()
-      this.expanded = this.expanded.filter(item => this.historyEntries.some(row => row.rowKey === item.rowKey && row.entryType === 'order'))
+      this.expanded = this.expanded.filter(item => this.historyEntries.some(row => row.rowKey === item.rowKey && ['order', 'settlement'].includes(row.entryType)))
       this.selectedOrders = this.selectedOrders.filter(item => item.entryType === 'order')
     },
     historyRowClass(item) {
@@ -482,9 +499,9 @@ export default {
       this.attachmentsDialog = true
     },
     expandOrder(item, expand, isExpanded) {
-      if (item.entryType !== 'order') return
+      if (!['order', 'settlement'].includes(item.entryType)) return
       expand(!isExpanded)
-      if (!isExpanded) this.loadOrderDetails(item)
+      if (!isExpanded && item.entryType === 'order') this.loadOrderDetails(item)
     },
     async loadOrderDetails(item) {
       if (item.entryType !== 'order' || this.detailsLoadingIds.includes(item.id) || this.detailsLoadedIds.includes(item.id)) return
@@ -518,13 +535,18 @@ export default {
         .filter((x) => Number(x.orderid || x.orderId) === Number(id))
       return result
     },
-    showInvoice(id) {
+    showInvoice(item) {
+      if (item.entryType === 'settlement') {
+        this.$router.push(`/history/settlement/${item.cash_register_settlement_id}`)
+        return
+      }
+      const id = item.id
       this.$store.dispatch('history/getDetailArchivedOrder', id)
 
       // this.$store.dispatch('history/getReceiptTokenByOrder', id).finally(() => {
       //   console.log('Archived Token')
       // })
-      this.$router.push(`history/ticket/${id}`)
+      this.$router.push(`/history/ticket/${id}`)
     },
     searchData() {
       this.$store.dispatch('orders/getAllOrder')

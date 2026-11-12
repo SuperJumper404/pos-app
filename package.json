@@ -13,7 +13,7 @@
     "start": "nuxt start",
     "start:static": "node serve-dist-folder.js",
     "generate": "cross-env NODE_OPTIONS=--openssl-legacy-provider  nuxt generate",
-    "pretest": "npm run test:reports && node --test test/staff-pin-visibility.test.js && npm run test:image-library && npm run test:standalone-terminal && node --test test/terminal-card-reprint.test.js",
+    "pretest": "node test/history-settlement-pagination.test.js && node test/history-settlement-isolation.test.js && node test/history-settlement.test.js && node test/cash-register-settlement-receipt.test.js && npm run test:reports && node --test test/staff-pin-visibility.test.js && npm run test:image-library && npm run test:standalone-terminal && node --test test/terminal-card-reprint.test.js",
     "test:standalone-terminal": "node test/standalone-terminal.test.js && node test/standalone-terminal-store.test.js && node test/standalone-terminal-dialog.test.js && node test/standalone-terminal-navigation.test.js && node test/terminal-payment-history-store.test.js && node test/terminal-payment-history-ui.test.js && node test/terminal-payment-ticket.test.js && node test/terminal-checkout.test.js && node test/terminal-checkout-ui.test.js && node test/terminal-checked-print.test.js",
     "test:delivery": "node test/customer-account.test.js && node test/delivery-checkout.test.js && node test/delivery-operator.test.js && node test/courier-mobile.test.js && node test/delivery-tracking.test.js && node test/delivery-receipts.test.js",
     "test:image-library": "node test/product-image-library.test.js && node test/product-image-library-ui.test.js && node test/product-image-library-search.test.js",

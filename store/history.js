@@ -2,6 +2,7 @@ import EasyAccess, { defaultMutations } from 'vuex-easy-access'
 const { sortArchivedOrdersByArchiveDate, validHistoryPage } = require('@/helpers/history')
 const { attemptStorageKey } = require('@/helpers/standaloneTerminal')
 const entryRequests = new WeakMap()
+const settlementRequests = new WeakMap()
 const historyIdentity = rootState => {
   const user = rootState && rootState.users && rootState.users.user
   return { key: attemptStorageKey(user), token: user && user.token }
@@ -18,6 +19,9 @@ export const state = () => ({
   metrics: '',
   // AllDetailOrders: [],
   lastCreatedOrder: null,
+  cashRegisterSettlement: null,
+  cashRegisterSettlementStatus: 'idle',
+  cashRegisterSettlementOwner: null,
 })
 export const mutations = { ...defaultMutations(state()) }
 export const plugins = [EasyAccess()]
@@ -97,6 +101,52 @@ export const actions = {
         dispatch('set/dataArchivedOrders', [])
         return false
       })
+  },
+  clearCashRegisterSettlement({ state, dispatch }) {
+    settlementRequests.set(state, (settlementRequests.get(state) || 0) + 1)
+    dispatch('set/cashRegisterSettlement', null)
+    dispatch('set/cashRegisterSettlementOwner', null)
+    dispatch('set/cashRegisterSettlementStatus', 'idle')
+  },
+  async getCashRegisterSettlement({ state, rootState, dispatch }, input) {
+    const owner = historyIdentity(rootState)
+    const generation = (settlementRequests.get(state) || 0) + 1
+    settlementRequests.set(state, generation)
+    const fresh = () => settlementRequests.get(state) === generation && historyIdentity(rootState).key === owner.key &&
+      historyIdentity(rootState).token === owner.token
+    dispatch('set/cashRegisterSettlement', null)
+    dispatch('set/cashRegisterSettlementOwner', owner.key)
+    const id = Number(input)
+    if (!owner.key || !/^[1-9]\d*$/.test(String(input)) || !Number.isSafeInteger(id)) {
+      dispatch('set/cashRegisterSettlementStatus', owner.key ? 'not-found' : 'idle')
+      return false
+    }
+    dispatch('set/cashRegisterSettlementStatus', 'loading')
+    try {
+      const response = await this.$axios.get(`/baseurl/api/v1/cash-register/settlements/${id}`, {
+        skipGlobalErrorNotification: true,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+      if (!fresh()) return false
+      const settlement = response && response.data && response.data.data
+      if (!settlement || settlement.id !== id || !Array.isArray(settlement.archivedOrders)) throw new Error('Invalid settlement response')
+      dispatch('set/cashRegisterSettlement', settlement)
+      dispatch('set/cashRegisterSettlementStatus', 'success')
+      return true
+    } catch (error) {
+      if (fresh()) {
+        const status = error && error.response && error.response.status
+        const requestStatus = status === 404
+          ? 'not-found'
+          : status === 403
+            ? 'forbidden'
+            : 'error'
+        dispatch('set/cashRegisterSettlementStatus', requestStatus)
+      }
+      return false
+    }
   },
   // getArchivedOrdersByUserId({ dispatch }, params) {
   //   return this.$axios

@@ -19,15 +19,21 @@ export const actions = {
   },
   postPrintingJob({ dispatch }, params) {
     dispatch('notifications/success', 'Impression envoyée.', { root: true })
+    const { awaitResult = false, ...printJob } = params
     try {
-      Promise.resolve(
-        this.$axios.post('/baseurl/api/v1/pushprintingjob', params, {
+      const request = this.$axios.post(
+        '/baseurl/api/v1/pushprintingjob',
+        printJob,
+        {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-        })
-      ).catch(() => {})
+        }
+      )
+      if (awaitResult) return Promise.resolve(request)
+      Promise.resolve(request).catch(() => {})
     } catch (error) {
+      if (awaitResult) return Promise.reject(error)
       // The job was attempted; printer transport errors are intentionally ignored.
     }
     return true
