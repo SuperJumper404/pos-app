@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: 3bb0d8bc15dec0ffcc8f621bebe91e7704245938
       - name: Verify source and generate frontend in an ephemeral Docker container
         shell: bash
         run: |
