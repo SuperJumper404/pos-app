@@ -40,7 +40,7 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
     : payment.amountCents
   return {
     ticketTitle: 'Ticket carte',
-    ticketType: 'carte',
+    ticketType: 'caisse',
     orderId,
     orderNumber: payment.orderNumber || order.ordernumber || order.orderNumber || orderId || '',
     created,
@@ -50,7 +50,8 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
     amountCents,
     amount: centsToAmount(amountCents),
     brand: normalizeBrand(card.brand),
-    last4: typeof card.last4 === 'string' ? card.last4 : null,
+    last4: /^[0-9]{4}$/.test(String(card.last4 || '')) ? String(card.last4) : null,
+    funding: ['credit', 'debit', 'prepaid'].includes(card.funding) ? card.funding : null,
     maskedPan: maskPan(card.last4),
     network: cardText(card.network),
     networkTransactionId: cardText(card.networkTransactionId),
@@ -73,23 +74,11 @@ const buildCardTicketPayload = ({ payment = {}, order = {}, shopInfo = {} } = {}
 const cardLines = (payload = {}) => [
   ['Terminal', payload.readerLabel || payload.paymentMethod],
   ['Référence', payload.terminalPaymentId],
-  ['Commande', payload.orderNumber],
   ['Date', payload.currentDate],
   ['Carte', payload.brand],
+  ['Type', { credit: 'Crédit', debit: 'Débit', prepaid: 'Prépayée' }[payload.funding]],
   ['PAN', payload.maskedPan],
   ['Montant', `${formatAmount(payload.amount)} EUR`],
-  ['Lecture', payload.readMethod],
-  ['Reseau', payload.network],
-  ['Ref. reseau', payload.networkTransactionId],
-  ['Autorisation', payload.authorizationCode],
-  ['R. autorisation', payload.authorizationResponseCode],
-  ['Application', payload.applicationPreferredName],
-  ['AID', payload.dedicatedFileName],
-  ['AC', payload.applicationCryptogram],
-  ['TVR', payload.terminalVerificationResults],
-  ['TSI', payload.transactionStatusInformation],
-  ['CVM', payload.cardholderVerificationMethod],
-  ['Compte', payload.accountType],
 ].filter((line) => optionalText(line[1]))
 
 const buildCardTicketEscPos = (payload = {}) => {
@@ -98,27 +87,21 @@ const buildCardTicketEscPos = (payload = {}) => {
   const alignCenter = () => Buffer.from([0x1b, 0x61, 1])
   const boldOn = () => Buffer.from([0x1b, 0x45, 1])
   const boldOff = () => Buffer.from([0x1b, 0x45, 0])
-  const doubleOn = () => Buffer.from([0x1d, 0x21, 0x11])
-  const doubleOff = () => Buffer.from([0x1d, 0x21, 0x00])
   const line = () => esc('--------------------------------\n')
   const cut = () => Buffer.from([0x1d, 0x56, 0x00])
   const output = []
   const push = (...buffers) => buffers.forEach((buffer) => output.push(buffer))
-  const shop = payload.shopInfo || {}
 
   push(Buffer.from([0x1b, 0x40]), Buffer.from([0x1b, 0x74, 0x10]))
-  push(alignCenter(), boldOn(), doubleOn(), esc(`${shop.shop_name || ''}\n`), doubleOff())
-  push(esc(`${payload.ticketTitle || 'Ticket carte'}\n`), boldOff(), line())
   cardLines(payload).forEach(([label, value]) => {
     push(alignLeft(), esc(`${label} : ${value}\n`))
   })
-  push(line(), alignCenter(), boldOn(), esc('Paiement accepte\n'), boldOff())
+  push(line(), alignCenter(), boldOn(), esc('Paiement accepté\n'), boldOff())
   push(esc('\n\n\n\n'), cut())
   return Buffer.concat(output)
 }
 
 const buildCardTicketCloudXml = (payload = {}) => {
-  const shop = payload.shopInfo || {}
   const lines = cardLines(payload)
     .map(([label, value]) =>
       `<text align="left">${xmlEscape(label)} : ${xmlEscape(value)}</text><feed line="1"/>`
@@ -128,12 +111,9 @@ const buildCardTicketCloudXml = (payload = {}) => {
     '<?xml version="1.0" encoding="utf-8" ?>' +
     '<PrintRequestInfo><ePOSPrint><Parameter><devid>local_printer</devid><timeout>10000</timeout></Parameter><PrintData>' +
     '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
-    `<text em="true" align="center" width="2" height="2">${xmlEscape(shop.shop_name || '')}</text><feed line="1"/>` +
-    `<text em="true" align="center">${xmlEscape(payload.ticketTitle || 'Ticket carte')}</text><feed line="1"/>` +
-    '<text>--------------------------------</text><feed line="1"/>' +
     lines +
     '<text>--------------------------------</text><feed line="1"/>' +
-    '<text em="true" align="center">Paiement accepte</text><feed line="4"/><cut/>' +
+    '<text em="true" align="center">Paiement accepté</text><feed line="4"/><cut/>' +
     '</epos-print></PrintData></ePOSPrint></PrintRequestInfo>'
   )
 }
@@ -164,6 +144,7 @@ const buildCardTicketData = (payload = {}) => ({
     amountCents: payload.amountCents,
     amount: payload.amount,
     brand: payload.brand,
+    funding: payload.funding,
     last4: payload.last4,
     maskedPan: payload.maskedPan,
     network: payload.network,
@@ -183,20 +164,13 @@ const buildCardTicketData = (payload = {}) => ({
     paperWidth: 32,
     sections: [
       {
-        id: 'header',
-        lines: [
-          renderText((payload.shopInfo || {}).shop_name || '', { align: 'center', bold: true, size: 'double' }),
-          renderText(payload.ticketTitle || 'Ticket carte', { align: 'center', bold: true }),
-        ],
-      },
-      {
         id: 'card',
         lines: cardLines(payload).map(([label, value]) => renderText(`${label} : ${value}`)),
       },
       {
         id: 'footer',
         lines: [
-          renderText('Paiement accepte', { align: 'center', bold: true }),
+          renderText('Paiement accepté', { align: 'center', bold: true }),
           { type: 'feed', lines: 4 },
           { type: 'cut' },
         ],
@@ -224,7 +198,7 @@ const sendCardTicket = ({
       return Promise.resolve().then(() => requestFetch(`http://${printerIp}:8989/print`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticketType: 'carte',
+          ticketType: 'caisse',
           dataFormatESCPOS: buildCardTicketEscPos(payload).toString('base64'),
           dataFormatXML: buildCardTicketCloudXml(payload),
           ticketData: buildCardTicketData(payload),
@@ -239,7 +213,7 @@ const sendCardTicket = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticketType: 'carte',
+          ticketType: 'caisse',
           dataFormatESCPOS: buildCardTicketEscPos(payload).toString('base64'),
           dataFormatXML: buildCardTicketCloudXml(payload),
           ticketData: buildCardTicketData(payload),
@@ -257,7 +231,7 @@ const sendCardTicket = ({
   }
   if (checked) {
     return Promise.resolve().then(() => dispatch('printing/postPrintingJobChecked', {
-      requete: buildCardTicketCloudXml(payload), ticketType: 'carte',
+      requete: buildCardTicketCloudXml(payload), ticketType: 'caisse',
       ...(payload.orderId ? { orderId: payload.orderId } : { terminalPaymentId: payload.terminalPaymentId }),
     })).then(sent => {
       if (sent !== true) throw new Error("L'impression n'a pas pu être envoyée.")
@@ -267,7 +241,7 @@ const sendCardTicket = ({
   Promise.resolve(
     dispatch('printing/postPrintingJob', {
       requete: buildCardTicketCloudXml(payload),
-      ticketType: 'carte',
+      ticketType: 'caisse',
       ...(payload.orderId ? { orderId: payload.orderId } : { terminalPaymentId: payload.terminalPaymentId }),
     })
   ).catch(() => {})

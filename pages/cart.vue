@@ -228,15 +228,14 @@
                 v-model="formuser.phone"
                 :disabled="deliveryAttemptLocked"
                 type="tel"
+                inputmode="tel"
+                autocomplete="tel"
                 prepend-inner-icon="mdi-phone"
                 label="Numéro de téléphone"
-                :rules="[
-                  (v) =>
-                    /^[0-9]+$/.test(v) || 'Seuls les chiffres sont autorisés',
-                ]"
+                :rules="customerPhoneRules"
                 placeholder="Saisir le numéro de téléphone"
                 class="mb-5"
-                required
+                :required="customerPhoneRequired"
               ></v-text-field>
               <v-checkbox
                 v-if="!deliveryContext"
@@ -303,7 +302,7 @@
               <v-btn
                 v-if="showOrderWithoutPaymentButton"
                 :disabled="
-                  !isValue || loadingBtn || !checkoutPayloadMatchesBoundAttempt
+                  !isValue || loadingBtn || stripePreparing || !checkoutPayloadMatchesBoundAttempt
                 "
                 :loading="loadingBtn && selectedCheckoutFlow === 'counter'"
                 block
@@ -311,7 +310,7 @@
                 class="mt-2 text-none font-weight-bold"
                 @click="orderWithoutPayment"
               >
-                Payer au comptoir
+                Commander
                 <v-icon small right>mdi-cash-register</v-icon>
               </v-btn>
             </div>
@@ -356,7 +355,7 @@
               <v-btn
                 v-if="showFooterCheckoutButton"
                 :disabled="primaryActionDisabled"
-                :loading="loadingBtn && selectedCheckoutFlow !== 'counter'"
+                :loading="loadingBtn && (selectedCheckoutFlow !== 'counter' || !showOrderWithoutPaymentButton)"
                 type="submit"
                 color="success"
                 class="
@@ -367,6 +366,19 @@
                 >{{ checkoutButtonLabel }}
                 <v-icon small right>{{ checkoutButtonIcon }}</v-icon></v-btn
               >
+
+              <v-btn
+                v-if="showOrderWithoutPaymentButton && !showStripePaymentPanel"
+                :disabled="primaryActionDisabled || stripePreparing"
+                :loading="loadingBtn && selectedCheckoutFlow === 'counter'"
+                type="button"
+                color="primary"
+                class="cart-checkout-btn cart-checkout-btn--submit text-none font-weight-bold"
+                @click="orderWithoutPayment"
+              >
+                Commander
+                <v-icon small right>mdi-silverware-fork-knife</v-icon>
+              </v-btn>
 
               <v-btn
                 color="red lighten-1"
@@ -469,6 +481,7 @@ import CustomizationSummary from '@/components/products/CustomizationSummary'
 import price from '@/helpers/price'
 import { buildCheckoutIntentSignature as buildCheckoutPayloadSignature, buildCounterPayBeforePayment, getCounterPayBeforeMethod } from '@/helpers/counterCheckout'
 import { getPaymentMethodOptions } from '@/helpers/paymentMethods'
+import { validateCustomerPhone } from '@/helpers/customerPhone'
 import terminalCheckout from '@/mixins/terminalCheckout'
 import {
   applyServerQuoteToCart,
@@ -653,15 +666,26 @@ export default {
     isQrClient() {
       return isQrClientAccess(this.access)
     },
+    customerPhoneRequired() {
+      return this.isQrClient || this.isSiteCheckout
+    },
+    customerPhoneRules() {
+      return this.customerPhoneRequired ? [validateCustomerPhone] : []
+    },
     isFlexibleQrCheckout() {
       return this.isQrClient && isCounterPaymentAllowed(this.qrPaymentMode)
+    },
+    isQrStripeAvailable() {
+      return [true, 1, '1', 'true'].includes(
+        this.$store.get('shop/stripe_charges_enabled')
+      )
     },
     isStripeCheckout() {
       if (this.isDelivery && this.isSiteCheckout) return this.deliveryPayment === 'online' && isStripePaymentRequired(this.qrPaymentMode)
       return (
         this.isQrClient &&
-        isStripePaymentRequired(this.qrPaymentMode) &&
-        this.selectedCheckoutFlow !== 'counter'
+        this.isQrStripeAvailable === true &&
+        !['counter', 'order'].includes(this.selectedCheckoutFlow)
       )
     },
     isOrderEditActive() {
@@ -723,7 +747,7 @@ export default {
       return (
         !this.isOrderEditActive &&
         this.isFlexibleQrCheckout &&
-        this.stripePaymentReady
+        this.isStripeCheckout
       )
     },
     showFooterCheckoutButton() {
@@ -1072,6 +1096,9 @@ export default {
       if (!payload || typeof payload !== 'object') return
 
       this.restoringCheckoutPayload = true
+      if (this.isQrClient && payload.fulfillment_type !== 'delivery') {
+        this.selectedCheckoutFlow = payload.stripe === true ? 'stripe' : 'order'
+      }
       if (payload.fulfillment_type === 'delivery') {
         this.$store.dispatch('delivery/setDiscount', { type: payload.discount_type || 'none', value: payload.discount_value || 0 })
         this.fulfillmentType = 'delivery'
@@ -1221,6 +1248,13 @@ export default {
       if (!payload) return
       return this.restoreCheckoutAttemptPayload(payload)
     },
+    guardCustomerPhone() {
+      if (!this.customerPhoneRequired || this.isOrderEditActive) return true
+      const result = validateCustomerPhone(this.formuser.phone)
+      if (result === true) return true
+      this.checkoutErrorMessage = result
+      return false
+    },
     guardCheckoutConfirmation() {
       if (this.isOrderEditActive) {
         if (this.orderEditDirty) {
@@ -1233,6 +1267,7 @@ export default {
           Number(this.stripeOrderId) === Number(this.orderEditId)
         )
       }
+      if (this.customerPhoneRequired && !this.guardCustomerPhone()) return false
       if (this.checkoutPayloadMatchesBoundAttempt) return true
 
       this.checkoutErrorMessage =
@@ -1311,6 +1346,7 @@ export default {
       if (this.isDelivery) return false
       if (this.isOrderEditActive) return false
       if (this.repriceDialog || this.customizationDialog) return false
+      if (this.isFlexibleQrCheckout && this.selectedCheckoutFlow !== 'stripe') return false
       return shouldAutoPrepareStripeCheckout({
         isQrClient: this.isQrClient,
         isStripeCheckout: this.isStripeCheckout,
@@ -1555,15 +1591,19 @@ export default {
       await this.submitOrderWithoutStripe(this.formuser.payment)
     },
     async orderWithoutPayment() {
+      if (this.loadingBtn || this.stripePreparing) return
       if (this.isDelivery) {
         if (this.guardDeliveryPayment()) await this.submitOrderWithoutStripe('Paiement a la livraison')
         return
       }
       if (!this.stripeOrderId) {
+        this.clearStripeAutoPrepareTimeout()
         if (!this.checkoutPayloadCanStart) {
           this.guardCheckoutConfirmation()
           return
         }
+        this.selectedCheckoutFlow = 'counter'
+        this.formuser.payment = 'Paiement au comptoir'
         await this.submitOrderWithoutStripe('Paiement au comptoir')
         return
       }
@@ -1591,6 +1631,7 @@ export default {
       this.$router.push('/ordersStatuses')
     },
     async submitOrderWithoutStripe(paymentMethod, repriceConfirmation = false) {
+      if (this.customerPhoneRequired && !this.guardCustomerPhone()) return
       this.loadingBtn = true
       try {
         const terminal = this.isCheckoutTerminalMethod(paymentMethod)
@@ -1680,6 +1721,7 @@ export default {
       force = false,
       repriceConfirmation = false
     ) {
+      if (this.customerPhoneRequired && !this.guardCustomerPhone()) return
       if (this.stripePreparationPromise) {
         return this.stripePreparationPromise
       }

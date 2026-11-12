@@ -48,13 +48,13 @@ assert.match(
 )
 assert.match(
   dashboardSource,
-  /title:\s*['"]Mes clients['"][\s\S]*?routeName:\s*['"]clients['"][\s\S]*?to:\s*['"]\/clients['"][\s\S]*?moduleKey:\s*['"]clients['"]/,
-  'Mes clients doit apparaitre comme module principal'
+  /title:\s*['"]Clients et fidélité['"][\s\S]*?routeName:\s*['"]clients['"][\s\S]*?to:\s*['"]\/clients['"][\s\S]*?moduleKey:\s*['"]clients['"]/,
+  'Clients et fidélité doit apparaitre comme module principal'
 )
 assert.match(
   staffRolesSource,
   /clients:\s*['"]history['"]/,
-  'Mes clients doit reutiliser la permission Historique'
+  'Clients et fidélité doit reutiliser la permission Historique'
 )
 
 assert.match(

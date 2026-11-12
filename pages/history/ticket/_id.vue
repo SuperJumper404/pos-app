@@ -228,6 +228,7 @@ export default {
       printLoading: false,
       printFeedback: 'idle',
       printFeedbackTimer: null,
+      recoveredCardTicket: null,
     }
   },
   computed: {
@@ -324,6 +325,7 @@ export default {
           amountCents,
           cardTicket: {
             ...parseCardReceiptDetails(order.stripe_terminal_card_receipt_details),
+            ...(this.recoveredCardTicket && this.recoveredCardTicket.terminalPaymentId === paymentId ? this.recoveredCardTicket : {}),
             chargeId: order.stripe_terminal_charge_id || null,
             terminalPaymentId: paymentId,
             amountCents,
@@ -464,6 +466,7 @@ export default {
   methods: {
     async loadReceiptData() {
       this.loadPage = true
+      this.recoveredCardTicket = null
       try {
         await Promise.all([
           this.$store.dispatch('history/getAllArchivedOrders'),
@@ -472,6 +475,10 @@ export default {
             this.$route.params.id
           ),
         ])
+        if (this.hasTerminalCardTicket) {
+          const cardTicket = await this.$store.dispatch('terminalPayments/getCardTicket', Number(this.dataArchivedOrder.stripe_terminal_payment_id))
+          if (cardTicket) this.recoveredCardTicket = cardTicket
+        }
         this.generateReceiptPdf()
       } finally {
         this.loadPage = false
@@ -848,18 +855,11 @@ export default {
         .forEach((ticket) => {
           y += 6
           drawLine()
-          write('Ticket carte', {
-            align: 'center',
-            x: center,
-            fontSize: 8,
-            style: 'bold',
-            gap: 4,
-          })
           cardTicketLines(ticket.payload)
             .filter((line) => this.safePdfText(line[1]).trim())
             .forEach(([label, value]) => write(`${label} : ${value}`, { fontSize: 7.5 }))
           drawLine()
-          write('Paiement accepte', {
+          write('Paiement accepté', {
             align: 'center',
             x: center,
             fontSize: 8,

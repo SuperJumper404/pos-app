@@ -10,25 +10,23 @@
       </v-tabs>
       <v-alert v-if="error" type="error" text role="alert">{{ error }}</v-alert>
       <DeliveryDispatch v-show="tab === 0" :key="`dispatch:${actorKey}`" />
-      <DeliveryCouriers v-show="tab === 1" :key="`couriers:${actorKey}`" />
-      <DeliveryCashRemittances v-show="tab === 2" :key="`cash:${actorKey}`" />
-      <DeliverySettings v-if="admin" v-show="tab === 3" :key="`settings:${actorKey}`" />
+      <DeliveryCashRemittances v-show="tab === 1" :key="`cash:${actorKey}`" />
+      <DeliverySettings v-if="admin" v-show="tab === 2" :key="`settings:${actorKey}`" />
     </template>
   </v-container>
 </template>
 
 <script>
 import DeliveryDispatch from '@/components/delivery/DeliveryDispatch.vue'
-import DeliveryCouriers from '@/components/delivery/DeliveryCouriers.vue'
 import DeliveryCashRemittances from '@/components/delivery/DeliveryCashRemittances.vue'
 import DeliverySettings from '@/components/delivery/DeliverySettings.vue'
 import { operatorIdentity } from '@/store/delivery'
 const { isDeliveryAdmin, canOperateDelivery } = require('@/helpers/staffRoles')
 
 export default {
-  components: { DeliveryDispatch, DeliveryCouriers, DeliveryCashRemittances, DeliverySettings },
+  components: { DeliveryDispatch, DeliveryCashRemittances, DeliverySettings },
   middleware: ['auth', 'delivery'],
-  data: () => ({ tab: 0, tabs: [{ value: 'missions', text: 'Commandes' }, { value: 'couriers', text: 'Livreurs' },
+  data: () => ({ tab: 0, tabs: [{ value: 'missions', text: 'Commandes' },
     { value: 'cash', text: "Remises d'especes" }, { value: 'settings', text: 'Reglages' }] }),
   computed: {
     admin() { return isDeliveryAdmin(this.$store.state.users.user) },

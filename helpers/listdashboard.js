@@ -144,7 +144,7 @@ const listdashboard = {
         },
         {
           icon: 'mdi-account-multiple',
-          title: 'Mes clients',
+          title: 'Clients et fidélité',
           routeName: 'clients',
           to: '/clients',
           moduleKey: 'clients',

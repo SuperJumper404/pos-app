@@ -944,7 +944,7 @@ test('Terminal counter receipt also prints the card ticket', async () => {
     ['caisse']
   )
   assert.strictEqual(printJobs[0].payload.orderId, 1)
-  assert.match(printJobs[0].payload.requete, /Ticket carte/)
+  assert.match(printJobs[0].payload.requete, /Paiement accepté/)
   assert.match(printJobs[0].payload.requete, /PAN : \*\*\*\*\*\*\*\*\*\*\*\*4242/)
 })
 
