@@ -26,9 +26,9 @@ const payment = (status = 'processing', extra = {}) => {
   return dto
 }
 const deferred = () => {
-  let settle
-  const promise = new Promise((resolve) => { settle = resolve })
-  return { promise, resolve: settle }
+  let settle, fail
+  const promise = new Promise((resolve, reject) => { settle = resolve; fail = reject })
+  return { promise, resolve: settle, reject: fail }
 }
 const storage = () => {
   const values = new Map()
@@ -262,6 +262,167 @@ test('table settlement Terminal receipt preserves the confirmed bank ticket', as
   assert.strictEqual(printJobs.length, 1)
   assert.match(printJobs[0].payload.requete, /Ticket de paiement/)
   assert.match(printJobs[0].payload.requete, /PAN : \*{12}4242/)
+})
+
+const until = async predicate => {
+  for (let turn = 0; turn < 30 && !predicate(); turn += 1) await Promise.resolve()
+  assert.ok(predicate(), 'Expected the requested asynchronous boundary')
+}
+test('table settlement owner boundary drops old successful POST effects and preserves both drafts', async () => {
+  for (const change of ['cashier', 'token', 'destroy']) {
+    const h = make({ tableMode: true })
+    await h.initialize()
+    h.state.user.token = 'old-token'
+    h.instance.selectedPaymentMethod = 'Espèces'
+    await h.instance.requestReceiptChoice()
+    const post = deferred()
+    h.responses['orders/createTableSettlement'] = () => post.promise
+    const prints = []
+    const drawers = []
+    h.instance.printTableSettlementReceipt = value => prints.push(value)
+    h.instance.openCashDrawerForCashPayment = value => drawers.push(value)
+    const request = h.instance.confirmReceiptChoice(true)
+    await until(() => count(h, 'orders/createTableSettlement') === 1)
+    const oldDraft = h.storage.getItem('cashregister-table-settlement:2:4')
+    if (change === 'cashier') {
+      h.state.user = { id: 99, shopid: 3, token: 'new-token' }
+      h.page.watch.cashierIdentity.call(h.instance)
+    } else if (change === 'token') h.state.user.token = 'new-token'
+    else h.page.beforeDestroy.call(h.instance)
+    const newKey = h.instance.tableSettlementStorageKey
+    h.storage.setItem(newKey, '{"newOwnerDraft":true}')
+    h.instance.tableSettlement = { id: 999 }
+    h.instance.tableSettlementDraft = { settlementKey: 'new-draft' }
+    h.instance.loadingBtn = true
+    const afterChange = h.calls.length
+    post.resolve({ ok: true, settlement: { id: 401, archivedOrders: [{ id: 1 }] } })
+    await request
+    assert.strictEqual(h.instance.tableSettlement.id, 999)
+    assert.strictEqual(h.instance.tableSettlementDraft.settlementKey, 'new-draft')
+    assert.strictEqual(h.instance.loadingBtn, true, 'An old finally must not unlock the new request')
+    assert.deepStrictEqual(prints, [])
+    assert.deepStrictEqual(drawers, [])
+    assert.ok(!h.calls.slice(afterChange).some(call => /notifications|navigate|replace/.test(call.name)))
+    assert.strictEqual(h.storage.getItem(newKey), '{"newOwnerDraft":true}')
+    if (change === 'cashier') assert.strictEqual(h.storage.getItem('cashregister-table-settlement:2:4'), oldDraft)
+  }
+})
+test('table settlement owner boundary stops a changed owner after preflight before POST or draft writes', async () => {
+  for (const loaded of [true, false]) {
+    const h = make({ tableMode: true })
+    await h.initialize()
+    h.instance.selectedPaymentMethod = 'Espèces'
+    await h.instance.requestReceiptChoice()
+    const refresh = deferred()
+    const refreshes = count(h, 'orders/getAllOrder')
+    h.responses['orders/getAllOrder'] = () => refresh.promise
+    const request = h.instance.confirmReceiptChoice(false)
+    await until(() => count(h, 'orders/getAllOrder') > refreshes)
+    h.state.user = { id: 99, shopid: 3, token: 'new-token' }
+    h.page.watch.cashierIdentity.call(h.instance)
+    h.instance.loadingBtn = true
+    const afterChange = h.calls.length
+    refresh.resolve(loaded)
+    await request
+    assert.strictEqual(count(h, 'orders/createTableSettlement'), 0)
+    assert.strictEqual(h.storage.getItem(h.instance.tableSettlementStorageKey), null)
+    assert.strictEqual(h.instance.ordersLoaded, false)
+    assert.strictEqual(h.instance.loadingBtn, true)
+    assert.ok(!h.calls.slice(afterChange).some(call => /notifications|navigate/.test(call.name)))
+  }
+})
+test('table settlement owner boundary ignores stale failure and cleanup in confirmation and both replay callers', async () => {
+  for (const caller of ['confirm', 'initialize', 'retry']) {
+    const h = make({ tableMode: true })
+    if (caller !== 'initialize') await h.initialize()
+    h.instance.selectedPaymentMethod = 'Espèces'
+    h.instance.pendingPaymentMethod = 'Espèces'
+    if (caller !== 'confirm') h.instance.persistTableSettlementDraft(h.instance.buildTableSettlementDraft(false))
+    else await h.instance.requestReceiptChoice()
+    const post = deferred()
+    h.responses['orders/createTableSettlement'] = () => post.promise
+    const request = caller === 'initialize' ? h.initialize()
+      : caller === 'retry' ? h.instance.retryTerminalPayment() : h.instance.confirmReceiptChoice(false)
+    await until(() => count(h, 'orders/createTableSettlement') === 1)
+    h.state.user = { id: 99, shopid: 3, token: 'new-token' }
+    h.page.watch.cashierIdentity.call(h.instance)
+    h.instance.loadingBtn = true
+    h.instance.terminalNotice = 'New request notice'
+    const afterChange = h.calls.length
+    if (caller === 'retry') post.reject(new Error('Old rejected request'))
+    else post.resolve({ ok: false, code: 'TABLE_ORDERS_CHANGED', message: 'Old failure' })
+    await request
+    assert.strictEqual(h.instance.loadingBtn, true, `${caller} must not release another request's lock`)
+    assert.strictEqual(h.instance.terminalNotice, 'New request notice')
+    assert.ok(!h.calls.slice(afterChange).some(call => /notifications|navigate/.test(call.name)))
+  }
+})
+test('table settlement owner boundary discards an old printer result and preserves new loading and dialog state', async () => {
+  for (const result of [false, true]) {
+    const h = make({ tableMode: true })
+    await h.initialize()
+    h.state.user.token = 'old-token'
+    h.instance.selectedPaymentMethod = 'Espèces'
+    await h.instance.requestReceiptChoice()
+    h.responses['orders/createTableSettlement'] = { ok: true, settlement: { id: 401, archivedOrders: [] } }
+    const print = deferred()
+    h.responses['printing/postPrintingJob'] = () => print.promise
+    const request = h.instance.confirmReceiptChoice(true)
+    await until(() => count(h, 'printing/postPrintingJob') === 1)
+    h.state.user.token = 'new-token'
+    h.instance.loadingBtn = true
+    h.instance.receiptPrinting = true
+    h.instance.dialog = true
+    const afterChange = h.calls.length
+    print.resolve(result)
+    await request
+    assert.strictEqual(h.instance.dialog, true)
+    assert.strictEqual(h.instance.loadingBtn, true)
+    assert.strictEqual(h.instance.receiptPrinting, true)
+    assert.ok(!h.calls.slice(afterChange).some(call => /notifications|navigate/.test(call.name)))
+  }
+})
+test('table settlement owner boundary keeps only the latest request for the same cashier and token', async () => {
+  const h = make({ tableMode: true })
+  await h.initialize()
+  h.instance.pendingPaymentMethod = 'Espèces'
+  const draft = h.instance.buildTableSettlementDraft(false)
+  h.instance.persistTableSettlementDraft(draft)
+  const first = deferred()
+  const second = deferred()
+  let requests = 0
+  h.responses['orders/createTableSettlement'] = () => (++requests === 1 ? first.promise : second.promise)
+  const oldRequest = h.instance.finalizeTableSettlement({ draft })
+  const newRequest = h.instance.finalizeTableSettlement({ draft })
+  await until(() => requests === 2)
+  second.resolve({ ok: false, code: 'NETWORK_ERROR', message: 'Latest failure' })
+  assert.strictEqual(await newRequest, false)
+  const savedDraft = h.storage.getItem(h.instance.tableSettlementStorageKey)
+  h.instance.tableSettlement = { id: 999 }
+  h.instance.loadingBtn = true
+  const afterLatest = h.calls.length
+  first.resolve({ ok: true, settlement: { id: 401, archivedOrders: [] } })
+  assert.strictEqual(await oldRequest, false)
+  assert.strictEqual(h.instance.tableSettlement.id, 999)
+  assert.strictEqual(h.instance.loadingBtn, true)
+  assert.strictEqual(h.storage.getItem(h.instance.tableSettlementStorageKey), savedDraft)
+  assert.ok(!h.calls.slice(afterLatest).some(call => /notifications|navigate/.test(call.name)))
+})
+test('table settlement owner boundary binds a restored draft before the initial refresh resolves', async () => {
+  const h = make({ tableMode: true })
+  h.state.user.token = 'old-token'
+  h.instance.pendingPaymentMethod = 'Espèces'
+  h.instance.persistTableSettlementDraft(h.instance.buildTableSettlementDraft(false))
+  const refresh = deferred()
+  h.responses['orders/getAllOrder'] = () => refresh.promise
+  const request = h.initialize()
+  await until(() => count(h, 'orders/getAllOrder') === 1)
+  h.state.user = { id: 99, shopid: 3, token: 'new-token' }
+  refresh.resolve(true)
+  await request
+  assert.strictEqual(count(h, 'orders/createTableSettlement'), 0, 'A new owner must never replay the restored old draft')
+  assert.strictEqual(h.storage.getItem(h.instance.tableSettlementStorageKey), null)
+  assert.ok(h.storage.getItem('cashregister-table-settlement:2:4'))
 })
 
 test('discounted table Terminal reload replays the immutable draft without another start', async () => {

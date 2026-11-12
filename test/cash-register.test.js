@@ -406,7 +406,8 @@ const runAsyncAssertions = async () => {
 
   const ordersStore = loadModule(path.join(root, 'store/orders.js'))
   const posts = []
-  const storeContext = { dispatch: () => {} }
+  const settlementDispatches = []
+  const storeContext = { dispatch: (...args) => settlementDispatches.push(args) }
   const settlement = { id: 71, archivedOrders: [{ id: 31 }] }
   const success = await ordersStore.actions.createTableSettlement.call({
     $axios: { post: (...args) => Promise.resolve().then(() => {
@@ -437,6 +438,7 @@ const runAsyncAssertions = async () => {
   const failure = await ordersStore.actions.createTableSettlement.call({
     $axios: { post: () => Promise.reject(settlementError) },
   }, storeContext, { orderIds: [31] })
+  assert.deepStrictEqual(settlementDispatches, [], 'Settlement failures return to their scoped caller without publishing shared errors')
   assert.deepStrictEqual(JSON.parse(JSON.stringify(failure)), {
     ok: false,
     code: 'TABLE_ORDERS_CHANGED',

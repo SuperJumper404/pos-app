@@ -187,7 +187,7 @@ export const actions = {
         return false
       })
   },
-  createTableSettlement({ dispatch }, params) {
+  createTableSettlement(_, params) {
     return this.$axios
       .post(
         '/baseurl/api/v1/cash-register/settlements',
@@ -208,7 +208,6 @@ export const actions = {
         const message = response.message || error.message ||
           "Impossible d'encaisser toute la table."
         const code = response.data?.code || response.code || null
-        dispatch('set/message', message)
         return { ok: false, code, message }
       })
   },
