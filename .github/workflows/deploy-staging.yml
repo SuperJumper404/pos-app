@@ -16,13 +16,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: 3bb0d8bc15dec0ffcc8f621bebe91e7704245938
+          ref: 2ef78f2541f5dbab03b25406047ca41301f64ce4
       - name: Verify source and generate frontend in an ephemeral Docker container
         shell: bash
         run: |
           set -eu
-          git diff --exit-code 3bb0d8bc15dec0ffcc8f621bebe91e7704245938 HEAD -- . ':!.github/workflows/deploy-staging.yml'
-          echo 'INTEGRATION_SOURCE=3bb0d8bc15dec0ffcc8f621bebe91e7704245938'
+          git diff --exit-code 2ef78f2541f5dbab03b25406047ca41301f64ce4 HEAD -- . ':!.github/workflows/deploy-staging.yml'
+          echo 'INTEGRATION_SOURCE=2ef78f2541f5dbab03b25406047ca41301f64ce4'
           docker run --rm --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/source,readonly" -e ENV=staging -e NODE_ENV=production node:18-bullseye-slim sh -c '
             set -eu
             mkdir /work
