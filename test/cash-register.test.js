@@ -387,9 +387,9 @@ const runAsyncAssertions = async () => {
   const cashRegisterTemplate = compiler.parseComponent(
     fs.readFileSync(path.join(root, 'pages/cashregister/index.vue'), 'utf8')
   ).template.content
-  assert.ok(cashRegisterTemplate.includes('Encaisser toute la table'))
-  assert.ok(cashRegisterTemplate.includes('@click="goToTablePayout(table)"'))
-  assert.ok(cashRegisterTemplate.includes(':loading="tableCheckoutPending"'))
+  assert.ok(!cashRegisterTemplate.includes('Encaisser toute la table'))
+  assert.ok(!cashRegisterTemplate.includes('@click="goToTablePayout(table)"'))
+  assert.ok(cashRegisterTemplate.includes('@click="goToPayout(table)"'))
 
   const failedNavigationCalls = []
   const notifications = []
