@@ -225,7 +225,7 @@
             <v-alert v-if="servicePointError" type="error" dense>
               {{ servicePointError }}
             </v-alert>
-            <LoyaltyKiosk v-if="kioskStep === 'payment'" :key="loyaltyEpoch" :service-point-id="servicePointId" :items="cartItems" :gross-total="total" :is-takeaway="saleMode === 'takeaway'" :attempt-key="loyaltyEpoch" :disabled="Boolean(checkoutLoading) || checkoutInteractionLocked" @change="loyaltySelection = $event" @busy="loyaltyBusy = $event" @idle="resetKiosk" />
+            <LoyaltyKiosk v-if="showKioskLoyaltyForm && kioskStep === 'payment'" :key="loyaltyEpoch" :service-point-id="servicePointId" :items="cartItems" :gross-total="total" :is-takeaway="saleMode === 'takeaway'" :attempt-key="loyaltyEpoch" :disabled="Boolean(checkoutLoading) || checkoutInteractionLocked" @change="loyaltySelection = $event" @busy="loyaltyBusy = $event" @idle="resetKiosk" />
             <v-alert v-if="isKitchenClosed" type="warning" dense>
               La cuisine est fermée. Aucune nouvelle commande n'est possible.
             </v-alert>
@@ -634,6 +634,7 @@ export default {
       activeCategory: '',
       customer: '',
       phone: '',
+      showKioskLoyaltyForm: false,
       loyaltySelection: null,
       loyaltyBusy: false,
       loyaltyEpoch: 0,
