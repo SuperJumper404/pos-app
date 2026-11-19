@@ -177,17 +177,6 @@
 
         <v-card-actions class="cashregister-actions">
           <v-btn
-            outlined
-            color="primary"
-            class="cashregister-action-table text-none"
-            :loading="tableCheckoutPending"
-            :disabled="tableCheckoutPending || !tableHasEligibleOrders(table)"
-            @click="goToTablePayout(table)"
-          >
-            <v-icon small left>mdi-table-check</v-icon>
-            Encaisser toute la table
-          </v-btn>
-          <v-btn
             color="primary"
             class="cashregister-action-main text-none"
             depressed
