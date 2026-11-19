@@ -244,10 +244,13 @@ export default {
           this.$store.set('authenticated', true)
           console.log('SToree', this.$store)
           console.log('Connected')
-          const isBorne =
-            res.session_subject === 'service_point' &&
-            (res.source === 'borne' || res.order_source === 'borne')
-          this.$router.push(isBorne ? '/borne' : '/')
+          const user = this.$store.state.users.user
+          if (user.session_subject === 'service_point' && user.order_source === 'call_display') {
+            this.$router.push('/borne-appel')
+          } else {
+            const isBorne = user.session_subject === 'service_point' && user.order_source === 'borne'
+            this.$router.push(isBorne ? '/borne' : '/')
+          }
         } else {
           const msg = `Votre compte n'est pas encore activé! Vérifiez votre e-mail!`
           if (this.$store.get('users/message') === msg) {

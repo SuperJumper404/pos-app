@@ -69,6 +69,11 @@ export default async function ({ store, redirect, route, router }) {
     )
   }
 
+  const callScreen = route.path.replace(/\/$/, '') === '/borne-appel'
+  const callSession = currentUser.session_subject === 'service_point' &&
+    (currentUser.source || currentUser.order_source) === 'call_display'
+  if (callSession) return callScreen ? undefined : redirect('/borne-appel')
+  if (callScreen) return redirect('/')
   if (courierAccess.isCourierUser(currentUser) && !courierAccess.isCourierRoute(route) && !courierAccess.isPublicDeliveryTracking(route)) {
     return redirect('/livreur')
   }
