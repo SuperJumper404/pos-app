@@ -233,11 +233,14 @@
                 prepend-inner-icon="mdi-phone"
                 label="Numéro de téléphone"
                 :rules="customerPhoneRules"
-                placeholder="Saisir le numéro de téléphone"
+                placeholder="06 12 34 56 78"
+                :hint="phoneLookupEnabled ? 'Votre numéro permet de retrouver votre fiche client.' : ''"
+                :persistent-hint="phoneLookupEnabled"
+                validate-on-blur
                 class="mb-5"
                 :required="customerPhoneRequired"
               ></v-text-field>
-              <p v-if="clientPhonePoints !== null" class="mt-n4 mb-4 text-body-2" role="status">{{ clientPhonePoints }} points disponibles</p>
+              <p v-if="clientPhonePoints !== null" class="mt-n4 mb-4 text-body-2" role="status"><strong>{{ clientPhoneResult.created ? 'Nouvelle fiche client' : (clientPhoneResult.customer && clientPhoneResult.customer.name) || 'Client retrouvé' }}</strong> · {{ clientPhonePoints }} point{{ clientPhonePoints > 1 ? 's' : '' }} disponible{{ clientPhonePoints > 1 ? 's' : '' }}</p>
               <p v-else-if="clientPhoneMessage" class="mt-n4 mb-4 text-body-2 text--secondary" role="status">{{ clientPhoneMessage }}</p>
               <v-checkbox
                 v-if="!deliveryContext"

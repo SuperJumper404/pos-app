@@ -1,8 +1,8 @@
 // This is a completeness gate only. The API remains authoritative for validity.
 const completePhone = value => {
   const input = String(value || '').trim()
-  if (!/^(?:\+|00)?[\d ()-]+$/.test(input)) return ''
-  let phone = input.replace(/[ ()-]/g, '').replace(/^00/, '+')
+  if (!/^(?:\+|00)?[\d\s().-]+$/.test(input)) return ''
+  let phone = input.replace(/[\s().-]/g, '').replace(/^00/, '+')
   if (/^0[1-9]\d{8}$/.test(phone)) phone = `+33${phone.slice(1)}`
   if (phone.startsWith('+33')) return /^\+33[1-9]\d{8}$/.test(phone) ? phone : ''
   if (phone.startsWith('+1')) return /^\+1[2-9]\d{2}[2-9]\d{6}$/.test(phone) ? phone : ''
