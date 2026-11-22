@@ -80,7 +80,9 @@
             <div class="history-terminal-label"><v-icon small color="primary">mdi-contactless-payment</v-icon><strong>Paiement TPE</strong></div>
             <div class="text-caption">{{ item.ordernumber || `TPE #${item.id}` }} · {{ item.readerLabel || `Terminal #${item.terminalPayment.readerId}` }}</div>
           </template>
-          <div v-else-if="item.entryType === 'settlement'" class="font-weight-medium">{{ item.historyLabel }}</div>
+          <div v-else-if="item.entryType === 'settlement'" class="font-weight-medium">
+            Ticket groupé · {{ item.archivedOrders.map(order => '#' + (order.ordernumber || order.id)).join(', ') }}
+          </div>
           <template v-else>
             <div>#{{ item.ordernumber }}</div>
             <TakeawayChip :value="item.is_takeaway" :fulfillment-type="item.fulfillment_type" />
