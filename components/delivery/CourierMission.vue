@@ -26,7 +26,7 @@
         <v-alert v-if="mission.deliveryStatus === 'issue'" type="warning" text>Intervention du restaurant en cours.</v-alert>
         <p v-if="mission.deliveryStatus === 'assigned' && Number(mission.preparationStatus) !== 3">Preparation en cours.</p>
       </template>
-      <CourierPayment :key="mission.id" :mission="mission" />
+      <CourierPayment :key="mission.id" :mission="mission" :has-terminal="hasTerminal" />
       <div v-if="!closed" class="courier-mission-actions">
         <v-btn v-if="can('pickup')" color="primary" :loading="busy" :disabled="blocked" data-action="pickup" @click="command('pickup')"><v-icon left>mdi-package-variant-closed-check</v-icon>Recuperer</v-btn>
         <v-btn v-if="can('deliver')" color="primary" :loading="busy" :disabled="blocked" data-action="deliver" @click="command('deliver')"><v-icon left>mdi-check</v-icon>Confirmer la livraison</v-btn>
@@ -45,7 +45,7 @@ import CourierPayment from '@/components/delivery/CourierPayment.vue'
 import CustomerAddressSummary from '@/components/customer/CustomerAddressSummary.vue'
 export default {
   components: { CourierPayment, CustomerAddressSummary },
-  props: { mission: { type: Object, required: true } },
+  props: { mission: { type: Object, required: true }, hasTerminal: Boolean },
   data: () => ({ issueOpen: false, reason: '' }),
   computed: {
     closed() { return ['delivered', 'failed', 'canceled'].includes(this.mission.deliveryStatus) },

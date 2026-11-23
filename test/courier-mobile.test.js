@@ -104,9 +104,17 @@ async function fixture(t, reply = () => null, options = {}) {
       const call = { method: req.method, path: req.url.replace('/baseurl/api/v1', ''), body: data ? JSON.parse(data) : undefined, headers: req.headers }
       calls.push(call)
       let response = await reply(call, rows)
-      if (!response) response = { data: call.path === '/courier/deliveries' ? copy(rows)
-        : call.path === '/courier/availability' ? { courierId: 11, available: false }
-          : call.path === '/courier/cash-balance' ? balance() : copy(rows.find(row => call.path === `/courier/deliveries/${row.id}`)) }
+      if (!response) {
+        const fixtures = {
+          '/courier/deliveries': rows,
+          '/courier/availability': { courierId: 11, available: false },
+          '/courier/terminal': { assigned: false, label: null, requestedAt: null },
+          '/courier/cash-balance': balance(),
+        }
+        const data = fixtures[call.path] || (call.path.endsWith('/online-payment')
+          ? { status: 'idle' } : rows.find(row => call.path === `/courier/deliveries/${row.id}`))
+        response = { data: data && copy(data) }
+      }
       if (response.lost) return req.socket.destroy()
       res.writeHead(response.status || 200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: !response.status, data: response.data, error: response.code, message: 'Fixture response' }))
@@ -416,8 +424,13 @@ test('compiled payment click reaches HTTP once, stays disabled while pending, an
   f.rows[0] = mission(undefined, { deliveryStatus: 'in_transit', allowedActions: ['collectPayment'] })
   await f.dispatch('loadMissions')
   const component = f.mount('components/delivery/CourierPayment.vue', { mission: f.store.state.courier.missions[0] }).component
+  await new Promise(resolve => {
+    const stop = component.$watch('busy', (value, previous) => {
+      if (previous && !value) { stop(); resolve() }
+    })
+  })
   component.method = 'external_card'; await drain()
-  assert.equal(component.$el.textContent.includes('declaration manuelle'), true)
+  assert.equal(component.$el.textContent.includes('confirmation manuelle'), true)
   const button = action(component, 'collect')
   assert.ok(button.events.click)
   button.events.click({ target: button, currentTarget: button, timeStamp: Date.now() })
@@ -427,6 +440,33 @@ test('compiled payment click reaches HTTP once, stays disabled while pending, an
   hold.resolve()
   await f.dispatch('loadCashBalance'); await drain()
   assert.equal(f.calls.filter(call => call.path.endsWith('/collect-payment')).length, 1)
+})
+
+test('a QR payment restores its active attempt and refreshes the mission after Stripe confirms', async t => {
+  const qr = { method: 'qr', status: 'pending', attemptId: 'cs_test_1',
+    url: 'https://checkout.stripe.com/c/pay/cs_test_1', expiresAt: 1970000000 }
+  const f = await fixture(t, (call, rows) => {
+    if (!call.path.endsWith('/online-payment')) return null
+    if (call.method === 'POST') {
+      rows[0] = { ...rows[0], paymentStatus: 'requires_payment', acceptanceStatus: 'payment_pending', allowedActions: [] }
+      return { data: qr }
+    }
+    return { data: rows[0].paymentStatus === 'paid' ? { status: 'paid' } : qr }
+  })
+  f.rows[0] = mission(undefined, { deliveryStatus: 'in_transit', allowedActions: ['collectPayment'] })
+  await f.dispatch('loadMissions')
+  const request = { deliveryId: f.rows[0].id }
+  const started = await f.dispatch('onlinePayment', { ...request, action: 'start', method: 'qr', amountCents: 1 })
+  assert.deepEqual(copy(started), qr)
+  assert.deepEqual(f.calls.find(call => call.method === 'POST').body, { method: 'qr', expectedVersion: 2 })
+  assert.equal(f.store.state.courier.missions[0].paymentStatus, 'requires_payment')
+  assert.deepEqual(copy(await f.dispatch('onlinePayment', { ...request, action: 'read' })), qr)
+  assert.equal(await f.dispatch('deliver', request), null)
+
+  f.rows[0] = { ...f.rows[0], paymentStatus: 'paid', remainingDueCents: 0, acceptanceStatus: 'accepted', allowedActions: ['deliver'] }
+  await f.dispatch('onlinePayment', { ...request, action: 'read' })
+  assert.equal(f.store.state.courier.missions[0].paymentStatus, 'paid')
+  assert.equal(f.store.state.courier.missions[0].remainingDueCents, 0)
 })
 
 test('unknown issue keeps exact reason/key in memory, same identity refresh preserves it, explicit replay only', async t => {

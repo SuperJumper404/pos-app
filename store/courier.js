@@ -188,6 +188,52 @@ export const actions = {
   loadMissions({ dispatch }) { return dispatch('read', { resource: 'missions' }) },
   loadAvailability({ dispatch }) { return dispatch('read', { resource: 'availability' }) },
   loadCashBalance({ dispatch }) { return dispatch('read', { resource: 'balance' }) },
+  async terminalEquipment({ state, rootState, dispatch }, request = false) {
+    const identity = courierIdentity(rootState)
+    await dispatch('initialize')
+    const epoch = state.epoch
+    if (state.identity !== identity || !authorized(rootState)) return null
+    const result = unwrap(await api(this).request(request
+      ? { method: 'post', path: '/courier/terminal/request' }
+      : { path: '/courier/terminal' }))
+    return state.epoch === epoch && courierIdentity(rootState) === identity && authorized(rootState) ? result : null
+  },
+  async onlinePayment({ state, rootState, commit, dispatch }, { deliveryId, action, method, attemptId }) {
+    const identity = courierIdentity(rootState)
+    await dispatch('initialize')
+    const epoch = state.epoch
+    const current = () => state.identity === identity && state.epoch === epoch &&
+      courierIdentity(rootState) === identity && authorized(rootState)
+    if (!current() || !validId(deliveryId) || !['read', 'start', 'cancel'].includes(action) || state.busy[deliveryId]) return null
+    const row = state.missions.find(item => item.id === deliveryId)
+    if (!row || (action === 'start' && (!canCommand(row, 'collectPayment') || state.pending[deliveryId] || state.recoveryError))) return null
+    const path = `/courier/deliveries/${deliveryId}/online-payment`
+    const request = action === 'read' ? { path } : action === 'start'
+      ? { method: 'post', path, body: { method, expectedVersion: row.version } }
+      : { method: 'post', path: `${path}/cancel`, body: { method, attemptId } }
+    commit('BUSY', { key: deliveryId, value: true })
+    try {
+      const result = unwrap(await api(this).request(request))
+      if (!current()) return null
+      const refresh = result.status === 'paid' ||
+        (result.method === 'qr' && (row.paymentStatus === 'requires_payment') !== ['pending', 'processing'].includes(result.status))
+      if (refresh) await dispatch('read', { resource: 'detail', deliveryId })
+      return current() ? result : null
+    } catch (error) {
+      if (current()) {
+        if (terminalDenial(error)) {
+          commit('RESET', null)
+          commit('ERROR', 'Lecture impossible. Actualisez avant de continuer.')
+        }
+        const failure = new Error(error.response?.data?.message || 'Vérification du paiement impossible. Réessayez.')
+        failure.uncertain = !statusOf(error) || statusOf(error) >= 500
+        throw failure
+      }
+      return null
+    } finally {
+      if (current()) commit('BUSY', { key: deliveryId, value: false })
+    }
+  },
   async setAvailability({ state, rootState, commit, dispatch }, available) {
     const start = courierIdentity(rootState)
     await dispatch('initialize')

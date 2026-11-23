@@ -4,7 +4,7 @@
     <div class="terminal-readers__heading">
       <div>
         <h4 id="terminal-readers-title">Terminaux de paiement</h4>
-        <p class="mb-0 mt-1">Gérez les TPE et leur caissier ou leur borne.</p>
+        <p class="mb-0 mt-1">Affectez les TPE à un caissier, un livreur ou une borne.</p>
       </div>
       <div class="terminal-readers__toolbar">
         <v-tooltip bottom>
@@ -43,7 +43,7 @@
         {{ listError }}
       </v-alert>
       <v-alert v-if="listLoaded && staffLoaded && servicePointsLoaded && !hasAssignableTarget" type="info" text dense class="mt-4 mb-0">
-        Aucun caissier ou borne disponible pour affecter un TPE.
+        Aucun caissier, livreur ou borne disponible pour affecter un TPE.
       </v-alert>
       <v-skeleton-loader v-if="!listLoaded && busy" type="list-item-two-line" class="mt-4" />
       <p v-else-if="listLoaded && !readers.length" class="terminal-readers__empty mb-0 mt-4">
@@ -118,7 +118,7 @@
               :items="cashiers"
               item-text="username"
               item-value="id"
-              label="Caissier"
+              label="Caissier ou livreur"
               dense
               outlined
               hide-details
@@ -212,7 +212,7 @@
               :items="cashiers"
               item-text="username"
               item-value="id"
-              label="Caissier"
+              label="Caissier ou livreur"
               :rules="[required]"
               :disabled="!stripeReady || busy"
               outlined
@@ -313,7 +313,7 @@ export default {
     },
     cashiers() {
       return (this.$store.get('staff/data') || []).filter(
-        (user) => [0, 1].includes(Number(user.access)) && Number(user.status) === 1
+        (user) => [0, 1, 6].includes(Number(user.access)) && Number(user.status) === 1
       )
     },
     servicePoints() {
@@ -329,7 +329,7 @@ export default {
     },
     assignmentTypeItems() {
       return [
-        { text: 'Caissier', value: 'cashier' },
+        { text: 'Caissier ou livreur', value: 'cashier' },
         { text: 'Borne', value: 'kiosk' },
       ]
     },
@@ -461,6 +461,8 @@ export default {
       if (reader.assignedServicePointId) {
         return `Borne : ${this.kioskName(reader.assignedServicePointId)}`
       }
+      const user = (this.$store.get('staff/data') || []).find(item => Number(item.id) === Number(reader.assignedUserId))
+      if (user && Number(user.access) === 6) return `Livreur : ${user.username}`
       return `Caissier : ${this.cashierName(reader.assignedUserId)}`
     },
     openRegistration() {
