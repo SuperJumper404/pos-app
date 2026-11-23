@@ -278,7 +278,6 @@ import TerminalPaymentStatus from '@/components/cashregister/TerminalPaymentStat
 import { calculateDiscount } from '@/helpers/discount'
 import {
   buildCashierReceiptPayload,
-  buildGroupedCashierReceiptPayload,
 } from '@/helpers/cashierReceipt'
 import {
   buildCardTicketPayload,
@@ -365,7 +364,8 @@ export default {
     return {
       id: this.$route.params.id,
       dialog: this.$route.query.modals,
-      tableMode: this.$route.query.mode === 'table',
+      selectionMode: this.$route.query.mode === 'selection',
+      tableMode: ['table', 'selection'].includes(this.$route.query.mode),
       tableId: normalizedRouteTableId(this.$route.query.tableId),
       tableName: this.$route.params.id,
       settlementKey: this.$route.query.settlementKey || null,
@@ -573,6 +573,7 @@ export default {
       )
     },
     actionTitle() {
+      if (this.selectionMode) return 'Encaisser la sélection'
       return this.requiresPaymentMethod
         ? 'Encaisser la table'
         : 'Clôturer la table'
@@ -588,7 +589,7 @@ export default {
       const currentRoute = {
         params: { id: this.id },
         query: {
-          mode: this.tableMode ? 'table' : undefined,
+          mode: this.selectionMode ? 'selection' : this.tableMode ? 'table' : undefined,
           tableId: this.tableId,
           settlementKey: this.settlementKey,
           orders: this.ordersToArchive,
@@ -1244,6 +1245,7 @@ export default {
         try {
           result = await this.$store.dispatch('orders/createTableSettlement', {
             orderIds: settlementDraft.orderIds,
+            ...(this.selectionMode ? { selectionOnly: true } : {}),
             paymentMethod: settlementDraft.paymentMethod,
             discountType: settlementDraft.discountType,
             discountValue: settlementDraft.discountValue,
@@ -1362,28 +1364,22 @@ export default {
       if (!printableOrders.length) return
       this.receiptPrinting = true
       try {
-        const order = printableOrders[0]
-        const payload =
-          printableOrders.length > 1
-            ? buildGroupedCashierReceiptPayload({
-                orders: printableOrders,
-                shopInfo: this.shopInfo,
-                fallbackPaymentMethod: paymentMethod,
-                fallbackTable: this.id,
-              })
-            : buildCashierReceiptPayload({
-                order,
-                details: order.receiptDetails || [],
-                shopInfo: this.shopInfo,
-                fallbackPaymentMethod: paymentMethod || order.payment,
-                fallbackTable: this.id,
-              })
-        sendReceiptBundle({
-          receiptPayload: payload,
-          cardTicketPayloads: this.buildTerminalCardTicketPayloads(printableOrders),
-          smartPrint: this.shopInfo.smart_print_app,
-          printerIp: this.shopInfo.shop_printer_ip,
-          dispatch: this.$store.dispatch,
+        const cardTickets = this.buildTerminalCardTicketPayloads(printableOrders)
+        printableOrders.forEach((order, index) => {
+          const payload = buildCashierReceiptPayload({
+            order,
+            details: order.receiptDetails || [],
+            shopInfo: this.shopInfo,
+            fallbackPaymentMethod: paymentMethod || order.payment,
+            fallbackTable: this.id,
+          })
+          sendReceiptBundle({
+            receiptPayload: payload,
+            cardTicketPayloads: index === 0 ? cardTickets : [],
+            smartPrint: this.shopInfo.smart_print_app,
+            printerIp: this.shopInfo.shop_printer_ip,
+            dispatch: this.$store.dispatch,
+          })
         })
       } catch (error) {
         this.$store.dispatch(

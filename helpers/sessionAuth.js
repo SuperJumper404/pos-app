@@ -40,7 +40,7 @@ const isTokenExpired = (token, now = Date.now()) => {
 }
 
 const isQrSession = (user = {}) =>
-  user.session_subject === QR_SESSION_SUBJECT
+  user.session_subject === QR_SESSION_SUBJECT && (user.order_source || user.source) !== 'call_display'
 
 const clearStoredAuth = (storage, { preserveTableAccessToken = true } = {}) => {
   if (!storage) return

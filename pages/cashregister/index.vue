@@ -131,17 +131,17 @@
 
         <div class="cashregister-table-card__body">
           <v-data-table
-            v-model="selectedOrders"
+            :value="currentSelectedTable === table.tableId ? selectedOrders : []"
+            @input="setOrderSelection(table.tableId, $event)"
             :headers="headers"
             :items="table.customerTotals"
-            item-key="customer"
+            item-key="orderId"
             show-select
             :hide-default-footer="true"
             :disable-sort="$vuetify.breakpoint.smAndDown"
             dense
             class="cashregister-customer-table"
-            no-data-text="Aucun client à encaisser"
-            @item-selected="selectionHandler(table.tableName, $event)"
+            no-data-text="Aucune commande à encaisser"
           >
             <template #[`item.created`]="{ item }">
               <div>
@@ -170,12 +170,19 @@
             <strong>{{ formatCurrency(table.alreadyPaidTotal) }}</strong>
           </div>
           <div>
-            <span>Clients</span>
+            <span>Commandes</span>
             <strong>{{ table.customerTotals.length }}</strong>
           </div>
         </div>
 
         <v-card-actions class="cashregister-actions">
+          <v-btn
+            v-if="canGroupOrders(table)"
+            outlined color="primary" class="text-none"
+            @click="goToGroupedPayout(table)"
+          >
+            Regrouper sur un seul ticket
+          </v-btn>
           <v-btn
             color="primary"
             class="cashregister-action-main text-none"
@@ -190,7 +197,7 @@
                   : 'mdi-check-circle'
               }}
             </v-icon>
-            {{ selectedRowsHaveAmountDue() ? 'Encaisser' : 'Clôturer' }}
+            {{ currentSelectedTable === table.tableId && selectedOrders.length > 1 && selectedRowsHaveAmountDue() ? 'Encaisser · tickets séparés' : selectedRowsHaveAmountDue() ? 'Encaisser' : 'Clôturer' }}
           </v-btn>
           <v-btn
             outlined
@@ -232,6 +239,7 @@ export default {
       selectedOrders: [],
       currentSelectedTable: null,
       headers: [
+        { text: 'Commande', value: 'orderNumber' },
         { text: 'Client', value: 'customer', filterable: true },
         {
           text: 'À encaisser',
@@ -318,7 +326,7 @@ export default {
         {
           label: 'Tables actives',
           value: this.activeTables.length,
-          hint: `${finishedCustomers} client(s) prêt(s)`,
+          hint: `${finishedCustomers} commande(s) prête(s)`,
           icon: 'mdi-table-chair',
           className: 'cashregister-kpi--tables',
         },
@@ -358,11 +366,16 @@ export default {
           (x) => Number(x.service_point_id || x.customerID) === Number(tableId)
         )
         const finishedOrders = tableOrders.filter((x) => x.status === 3)
-        const customerTotalArray = buildCashRegisterCustomerRows(finishedOrders)
+        const customerTotalArray = finishedOrders.flatMap(order =>
+          buildCashRegisterCustomerRows([order]).map(row => ({
+            ...row, orderId: order.id, orderNumber: '#' + (order.ordernumber || order.id),
+          }))
+        )
         const paymentSummary = getCashRegisterPaymentSummary(finishedOrders)
 
         return {
           tableName: this.tableDisplayName(table),
+          pointType: table.type,
           tableId,
           canceled: tableOrders.filter((x) => x.status === 4).length,
           finished: finishedOrders,
@@ -380,7 +393,7 @@ export default {
     },
     canCheckoutTable(table) {
       return (
-        this.currentSelectedTable === table.tableName &&
+        this.currentSelectedTable === table.tableId &&
         this.selectedOrders &&
         this.selectedOrders.length > 0
       )
@@ -388,14 +401,21 @@ export default {
     tableHasEligibleOrders(table) {
       return buildTableSettlementCandidate(table.finished).hasEligibleOrders
     },
-    selectionHandler(tableName, selectionEvent) {
-      if (this.currentSelectedTable !== tableName) {
-        this.currentSelectedTable = tableName
-        this.selectedOrders = selectionEvent?.value
-          ? [selectionEvent.item]
-          : []
-        console.log('TABLE SELECTED', tableName)
-      }
+    setOrderSelection(tableId, rows) {
+      this.currentSelectedTable = tableId
+      this.selectedOrders = rows
+    },
+    canGroupOrders(table) {
+      return (!table.pointType || table.pointType === 'table') && this.canCheckoutTable(table) &&
+        this.selectedOrders.length > 1 && this.selectedOrders.every(row => row.hasAmountDue)
+    },
+    goToGroupedPayout(table) {
+      if (!this.canGroupOrders(table)) return
+      this.$router.push({
+        path: `/cashregister/payout/${table.tableName}`,
+        query: { modals: 'true', mode: 'selection', tableId: table.tableId,
+          orders: this.OrderIdsToArchives(), settlementKey: uuidv4() },
+      })
     },
     goToPayout(table) {
       if (!this.canCheckoutTable(table)) return

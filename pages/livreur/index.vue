@@ -10,6 +10,18 @@
         <v-switch :input-value="courier.available === true" :disabled="courier.available === null || availabilityBusy" :loading="availabilityBusy" hide-details
                   :label="courier.available === null ? 'Disponibilite inconnue' : courier.available ? 'Disponible' : 'Indisponible'" @change="setAvailability" />
       </section>
+      <section class="courier-equipment" aria-labelledby="courier-equipment-title">
+        <h2 id="courier-equipment-title">Terminal de paiement</h2>
+        <p v-if="equipment && equipment.assigned" role="status">{{ equipment.label }} est associé à votre compte.</p>
+        <p v-else-if="equipment && equipment.requestedAt" role="status">Demande envoyée au restaurant.</p>
+        <template v-else-if="equipment">
+          <p>Le restaurant valide et effectue l’achat du terminal.</p>
+          <v-btn outlined :loading="equipmentBusy" :disabled="equipmentBusy" @click="loadEquipment(true)">
+            <v-icon left>mdi-credit-card-plus-outline</v-icon>Commander un TPE
+          </v-btn>
+        </template>
+        <v-alert v-if="equipmentError" type="error" dense text role="alert">{{ equipmentError }}</v-alert>
+      </section>
       <v-alert v-if="courier.recoveryError" type="error" text role="alert">{{ courier.recoveryError }}</v-alert>
       <section v-if="pendingEntries.length" class="courier-recovery" aria-label="Actions a verifier">
         <h2>Actions a verifier</h2>
@@ -28,7 +40,7 @@
             <v-btn icon :disabled="index === 0 || missionBusy" title="Monter la mission" aria-label="Monter la mission" @click="reorder(mission.id, -1)"><v-icon>mdi-arrow-up</v-icon></v-btn>
             <v-btn icon :disabled="index === activeMissions.length - 1 || missionBusy" title="Descendre la mission" aria-label="Descendre la mission" @click="reorder(mission.id, 1)"><v-icon>mdi-arrow-down</v-icon></v-btn>
           </div>
-          <CourierMission :mission="mission" />
+          <CourierMission :mission="mission" :has-terminal="Boolean(equipment && equipment.assigned)" />
         </div>
       </div>
       <section class="courier-cash" aria-label="Solde et remises">
@@ -66,7 +78,7 @@ export default {
   components: { CourierMission },
   layout: 'courier',
   middleware: ['auth', 'courier'],
-  data: () => ({ refreshing: false }),
+  data: () => ({ refreshing: false, equipment: null, equipmentBusy: false, equipmentError: '' }),
   computed: {
     courier() { return this.$store.state.courier },
     actorKey() { return courierIdentity(this.$store.state) },
@@ -82,7 +94,14 @@ export default {
     closedMissions() { return this.courier.missions.filter(row => ['delivered', 'failed', 'canceled'].includes(row.deliveryStatus)) },
     pendingEntries() { return Object.entries(this.courier.pending).filter(([, pending]) => pending.status === 'unresolved').map(([deliveryId, pending]) => ({ deliveryId, pending })) },
   },
-  watch: { actorKey() { this.refresh() } },
+  watch: {
+    actorKey() {
+      this.equipment = null
+      this.equipmentError = ''
+      this.equipmentBusy = false
+      this.refresh()
+    },
+  },
   mounted() { this.refresh() },
   methods: {
     async refresh() {
@@ -96,7 +115,24 @@ export default {
           if (identity !== this.actorKey || this._isDestroyed) return
           await this.$store.dispatch(`courier/${action}`)
         }
+        if (identity === this.actorKey && this.scopeReady && !this._isDestroyed) await this.loadEquipment()
       } finally { if (identity === this.actorKey) this.refreshing = false }
+    },
+    async loadEquipment(request = false) {
+      if (this.equipmentBusy) return
+      const identity = this.actorKey
+      this.equipmentBusy = true
+      this.equipmentError = ''
+      try {
+        const result = await this.$store.dispatch('courier/terminalEquipment', request)
+        if (identity === this.actorKey && !this._isDestroyed && result) this.equipment = result
+      } catch (error) {
+        if (identity === this.actorKey && !this._isDestroyed) this.equipmentError = request
+          ? 'Vérifiez que la demande a été reçue en actualisant la page.'
+          : 'État du terminal indisponible. Actualisez la page.'
+      } finally {
+        if (identity === this.actorKey && !this._isDestroyed) this.equipmentBusy = false
+      }
     },
     setAvailability(value) { return this.$store.dispatch('courier/setAvailability', value) },
     reorder(deliveryId, direction) { return this.$store.dispatch('courier/reorder', { deliveryId, direction }) },
@@ -113,6 +149,7 @@ export default {
 .courier-heading h1 { font-size: 24px; font-weight: 600; overflow-wrap: anywhere; }
 .courier-workspace h2 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
 .courier-availability { margin-bottom: 24px; }
+.courier-equipment { margin-bottom: 24px; }
 .courier-availability ::v-deep .v-input { margin-top: 0; min-height: 44px; }
 .courier-missions { display: grid; gap: 16px; }
 .courier-mission-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; align-items: start; }

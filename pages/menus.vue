@@ -727,13 +727,18 @@
                   :disabled="expressIsDelivery && expressDeliveryLocked"
                   dense
                   outlined
-                  hide-details
-                  label="Téléphone"
-                  placeholder="Optionnel"
+                  :hide-details="!phoneLookupEnabled"
+                  hint="Le numéro complet permet de retrouver la fiche client."
+                  persistent-hint
+                  label="Téléphone (facultatif)"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel"
+                  placeholder="06 12 34 56 78"
                   prepend-inner-icon="mdi-phone-outline"
                 />
               </div>
-              <p v-if="clientPhonePoints !== null" class="mt-2 mb-2 text-body-2" role="status">{{ clientPhonePoints }} points disponibles</p>
+              <p v-if="clientPhonePoints !== null" class="mt-2 mb-2 text-body-2" role="status"><strong>{{ clientPhoneResult.created ? 'Nouvelle fiche client' : (clientPhoneResult.customer && clientPhoneResult.customer.name) || 'Client retrouvé' }}</strong> · {{ clientPhonePoints }} point{{ clientPhonePoints > 1 ? 's' : '' }} disponible{{ clientPhonePoints > 1 ? 's' : '' }}</p>
               <p v-else-if="clientPhoneMessage" class="mt-2 mb-2 text-body-2 text--secondary" role="status">{{ clientPhoneMessage }}</p>
               <v-textarea
                 v-model="expressRemark"

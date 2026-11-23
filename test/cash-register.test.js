@@ -391,6 +391,16 @@ const runAsyncAssertions = async () => {
   assert.ok(!cashRegisterTemplate.includes('@click="goToTablePayout(table)"'))
   assert.ok(cashRegisterTemplate.includes('@click="goToPayout(table)"'))
 
+  pageInstance.setOrderSelection(7, [
+    { ids: [31], hasAmountDue: true }, { ids: [35], hasAmountDue: true },
+  ])
+  pageInstance.goToGroupedPayout({ tableId: 7, tableName: 'Terrasse' })
+  const groupedRoute = navigationCalls[1]
+  assert.strictEqual(groupedRoute.query.mode, 'selection')
+  assert.deepStrictEqual(Array.from(groupedRoute.query.orders), [31, 35])
+  pageInstance.goToGroupedPayout({ tableId: 8, tableName: 'Salle' })
+  assert.strictEqual(navigationCalls.length, 2)
+
   const failedNavigationCalls = []
   const notifications = []
   pageInstance.$router.push = (route) => failedNavigationCalls.push(route)

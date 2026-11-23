@@ -22,6 +22,7 @@
         </v-chip>
       </template>
 
+      <template #[`item.type`]="{ item }">{{ item.type === 'call_display' ? 'Appel' : 'Commande' }}</template>
       <template #[`item.kiosk_login_id`]="{ item }">
         <span class="font-weight-medium">{{ item.kiosk_login_id || 'A generer' }}</span>
       </template>
@@ -81,7 +82,7 @@
         </v-tooltip>
         <v-tooltip top>
           <template #activator="{ on, attrs }">
-            <v-btn icon small color="secondary" v-bind="attrs" v-on="on" @click="copyKioskAccessUrl">
+            <v-btn icon small color="secondary" v-bind="attrs" v-on="on" @click="copyKioskAccessUrl(item)">
               <v-icon small>mdi-content-copy</v-icon>
             </v-btn>
           </template>
@@ -103,7 +104,8 @@
               dense
               autofocus
             />
-            <div class="kiosk-printer-settings">
+            <v-select v-model="form.type" label="Type de borne" :items="kioskTypes" :disabled="!!form.id" outlined dense />
+            <div v-if="form.type === 'kiosk'" class="kiosk-printer-settings">
               <v-text-field
                 v-model.trim="form.printer_ip"
                 label="Adresse IP de l'imprimante"
@@ -165,6 +167,7 @@
 const emptyForm = () => ({
   id: null,
   name: '',
+  type: 'kiosk',
   printer_ip: '',
   smart_print_app: false,
 })
@@ -186,7 +189,9 @@ export default {
         show: false,
         text: '',
       },
+      kioskTypes: [{ text: 'Borne de commande', value: 'kiosk' }, { text: 'Borne d’appel', value: 'call_display' }],
       headers: [
+        { text: 'Type', value: 'type' },
         { text: 'Nom', value: 'name' },
         { text: 'Identifiant', value: 'kiosk_login_id' },
         { text: 'PIN', value: 'pin', sortable: false },
@@ -229,6 +234,7 @@ export default {
     openEdit(item) {
       this.form = {
         id: item.id,
+        type: item.type || 'kiosk',
         name: item.name || '',
         printer_ip: item.printer_ip || '',
         smart_print_app: Number(item.smart_print_app) === 1,
@@ -245,6 +251,7 @@ export default {
       this.submitting = true
       const payload = {
         name: this.form.name,
+        ...(this.form.type === 'call_display' ? { type: this.form.type } : {}),
         printer_ip: this.form.smart_print_app ? this.form.printer_ip : '',
         smart_print_app: this.form.smart_print_app ? 1 : 0,
       }
@@ -286,12 +293,12 @@ export default {
       this.showCredentials({ id: item.id, ...result })
       await this.refresh()
     },
-    kioskAccessUrl() {
+    kioskAccessUrl(item) {
       if (typeof window === 'undefined') return
-      return `${window.location.origin}/borne`
+      return window.location.origin + (item.type === 'call_display' ? '/borne-appel' : '/borne')
     },
-    async copyKioskAccessUrl() {
-      const url = this.kioskAccessUrl()
+    async copyKioskAccessUrl(item) {
+      const url = this.kioskAccessUrl(item)
       if (!url) return
 
       try {

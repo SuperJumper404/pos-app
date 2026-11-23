@@ -99,6 +99,10 @@ const runMiddleware = async (user, route) => {
 }
 
 ;(async () => {
+const display = { access: 2, session_subject: 'service_point', order_source: 'call_display' }
+assert.deepStrictEqual(await runMiddleware(display, { path: '/borne-appel' }), [])
+assert.deepStrictEqual(await runMiddleware(display, { path: '/borne' }), ['/borne-appel'])
+assert.deepStrictEqual(await runMiddleware({ access: 0 }, { path: '/borne-appel' }), ['/'])
 assert.deepStrictEqual(
   await runMiddleware(
     { access: 1, module_permissions: ['orders'], is_primary_admin: false },

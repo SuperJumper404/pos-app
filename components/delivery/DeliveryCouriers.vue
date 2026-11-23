@@ -5,6 +5,15 @@
     <v-data-table :headers="headers" :items="couriers" :loading="busy" :items-per-page="20" dense no-data-text="Aucun compte livreur.">
       <template #[`item.status`]="{ item }"><v-chip small :color="Number(item.status) === 1 ? 'success' : undefined">{{ Number(item.status) === 1 ? 'Actif' : 'Desactive' }}</v-chip></template>
       <template #[`item.available`]="{ item }"><v-switch :input-value="Number(item.available) === 1" :label="Number(item.available) === 1 ? 'Disponible' : 'Indisponible'" :disabled="Number(item.status) !== 1 || saving === item.id" hide-details class="my-2" @change="setAvailable(item, $event)" /></template>
+      <template #[`item.terminal`]="{ item }">
+        <span v-if="item.terminalLabel">{{ item.terminalLabel }}</span>
+        <div v-else-if="item.terminalRequestedAt" class="py-2">
+          <span>Demande de TPE</span>
+          <v-btn v-if="canManageAccounts && Number(item.status) === 1" text small color="primary"
+                 href="https://dashboard.stripe.com/terminal/shop" target="_blank" rel="noopener noreferrer">Commander sur Stripe</v-btn>
+        </div>
+        <span v-else>—</span>
+      </template>
       <template #[`item.actions`]="{ item }"><v-btn v-if="canManageAccounts" icon :to="`/staff?courier=${item.id}`" title="Gerer le compte et le PIN" aria-label="Gerer le compte et le PIN"><v-icon>mdi-account-edit-outline</v-icon></v-btn></template>
     </v-data-table>
   </section>
@@ -14,7 +23,8 @@
 const { isDeliveryAdmin } = require('@/helpers/staffRoles')
 export default {
   data: () => ({ saving: null, error: '', headers: [{ text: 'Livreur', value: 'username' }, { text: 'Compte', value: 'status' },
-    { text: 'Disponibilite manuelle', value: 'available' }, { text: 'Missions affectees', value: 'missionCount' }, { text: 'Compte / PIN', value: 'actions', sortable: false }] }),
+    { text: 'Disponibilite manuelle', value: 'available' }, { text: 'Missions affectees', value: 'missionCount' },
+    { text: 'TPE', value: 'terminal', sortable: false }, { text: 'Compte / PIN', value: 'actions', sortable: false }] }),
   computed: {
     canManageAccounts() { return isDeliveryAdmin(this.$store.state.users.user) },
     couriers() { return this.$store.state.delivery.operator.couriers },
