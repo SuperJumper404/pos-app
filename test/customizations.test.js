@@ -1395,6 +1395,29 @@ testProductAttachments().catch((error) => {
   process.exitCode = 1
 })
 
+const testProductRemovals = async () => {
+  const context = {
+    ...customizationAdmin.methods,
+    productsStep: { id: 10, active: false },
+    productIdsToRemove: [1, 5],
+    productIdsToAttach: [8],
+    $store: {
+      async dispatch(action, payload) {
+        assert.strictEqual(action, 'customizations/removeStepFromProducts')
+        assert.deepStrictEqual(payload, { id: 10, productIds: [1, 5] })
+        return true
+      },
+    },
+  }
+  await context.removeStepFromProducts()
+  assert.deepStrictEqual(context.productIdsToRemove, [])
+  assert.deepStrictEqual(context.productIdsToAttach, [8])
+}
+testProductRemovals().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})
+
 const testProductDuplicationNavigation = async () => {
   const productPage = loadComponentOptions(
     fs.readFileSync(path.join(__dirname, '../pages/products/index.vue'), 'utf8'),
@@ -2145,6 +2168,27 @@ const runReviewRegressionTests = async () => {
   global.localStorage = { getItem: () => 'test-token' }
 
   try {
+    const removalRequests = []
+    const removed = await customizationStoreModule.actions.removeStepFromProducts.call(
+      {
+        $axios: {
+          async request(config) {
+            removalRequests.push(config)
+            return { data: { message: 'Étape retirée.' } }
+          },
+        },
+      },
+      { async dispatch() { return true } },
+      { id: 10, productIds: [1, 5] }
+    )
+    assert.strictEqual(removed, true)
+    assert.deepStrictEqual(removalRequests, [{
+      method: 'delete',
+      url: '/baseurl/api/v1/customization-steps/10/products',
+      data: { product_ids: [1, 5] },
+      headers: { Authorization: 'Bearer test-token' },
+    }])
+
     const refreshDispatches = []
     const savedStepId = await customizationStoreModule.actions.duplicateStep.call(
       {
