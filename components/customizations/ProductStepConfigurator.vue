@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="d-flex align-center justify-space-between mb-3">
+    <div class="d-flex flex-wrap align-center justify-space-between mb-3">
       <div>
         <h2 class="text-h6">Étapes de personnalisation</h2>
         <p class="text-body-2 grey--text text--darken-1 mb-0">
@@ -10,12 +10,12 @@
       </div>
       <v-btn
         color="success"
-        class="text-none"
+        class="text-none my-2"
         :disabled="attachableSteps.length === 0"
-        @click="attachDialog = true"
+        @click="openAttachDialog"
       >
         <v-icon left>mdi-plus</v-icon>
-        Ajouter une étape
+        Ajouter des étapes
       </v-btn>
     </div>
 
@@ -176,18 +176,21 @@
 
     <v-dialog v-model="attachDialog" max-width="520">
       <v-card class="se-modal">
-        <v-card-title class="se-modal-title">Ajouter une étape partagée</v-card-title>
+        <v-card-title class="se-modal-title">Ajouter des étapes partagées</v-card-title>
         <v-card-text>
           <v-select
-            v-model="selectedStepId"
+            v-model="selectedStepIds"
             :items="attachableSteps"
             item-value="id"
             item-text="name"
-            label="Étape"
+            label="Étapes"
+            multiple
+            chips
+            deletable-chips
             clearable
           ></v-select>
           <v-alert v-if="attachableSteps.length === 0" dense text type="info">
-            Toutes les étapes actives sont déjà attachées à ce produit.
+            Aucune étape compatible à ajouter.
           </v-alert>
         </v-card-text>
         <v-card-actions class="se-modal-actions">
@@ -199,8 +202,8 @@
           <v-btn
             color="primary"
             class="se-modal-action se-modal-action--primary text-none"
-            :disabled="!selectedStepId"
-            @click="attachSelectedStep"
+            :disabled="selectedStepIds.length === 0"
+            @click="attachSelectedSteps"
           >
             <v-icon left>mdi-plus</v-icon>
             Ajouter
@@ -227,12 +230,16 @@ export default {
       type: Array,
       default: () => [],
     },
+    productId: {
+      type: [Number, String],
+      default: null,
+    },
   },
   data() {
     return {
       localValue: [],
       attachDialog: false,
-      selectedStepId: null,
+      selectedStepIds: [],
     }
   },
   computed: {
@@ -241,7 +248,14 @@ export default {
     },
     attachableSteps() {
       return this.availableSteps.filter(
-        (step) => step.active && !this.attachedStepIds.has(Number(step.id))
+        (step) =>
+          step.active &&
+          !this.attachedStepIds.has(Number(step.id)) &&
+          !(step.choices || []).some(
+            (choice) =>
+              choice.linked_product_id != null &&
+              Number(choice.linked_product_id) === Number(this.productId)
+          )
       )
     },
     validationErrors() {
@@ -391,33 +405,43 @@ export default {
       this.localValue.splice(index, 1)
       this.configurationChanged()
     },
-    attachSelectedStep() {
-      const step = this.attachableSteps.find(
-        (candidate) => Number(candidate.id) === Number(this.selectedStepId)
+    openAttachDialog() {
+      this.selectedStepIds = []
+      this.attachDialog = true
+    },
+    attachSelectedSteps() {
+      const availableById = new Map(
+        this.attachableSteps.map((step) => [Number(step.id), step])
       )
-      if (!step) return
-      this.localValue.push({
-        step_id: Number(step.id),
-        position: this.localValue.length,
-        minimum_choices: 0,
-        maximum_choices: Math.max(1, (step.choices || []).length),
-        active: true,
-        choices: (step.choices || []).map((choice, choiceIndex) => ({
-          step_choice_id: Number(choice.id),
-          position: choiceIndex,
-          extra_price:
-            choice.default_extra_price == null
-              ? '0.00'
-              : choice.default_extra_price,
-          active: choice.active !== false,
-        })),
-      })
+      const steps = [...new Set(this.selectedStepIds.map(Number))]
+        .map((id) => availableById.get(id))
+        .filter(Boolean)
+      if (steps.length === 0) return
+
+      for (const step of steps) {
+        this.localValue.push({
+          step_id: Number(step.id),
+          position: this.localValue.length,
+          minimum_choices: 0,
+          maximum_choices: Math.max(1, (step.choices || []).length),
+          active: true,
+          choices: (step.choices || []).map((choice, choiceIndex) => ({
+            step_choice_id: Number(choice.id),
+            position: choiceIndex,
+            extra_price:
+              choice.default_extra_price == null
+                ? '0.00'
+                : choice.default_extra_price,
+            active: isActive(choice.active),
+          })),
+        })
+      }
       this.closeAttachDialog()
       this.configurationChanged()
     },
     closeAttachDialog() {
       this.attachDialog = false
-      this.selectedStepId = null
+      this.selectedStepIds = []
     },
   },
 }
