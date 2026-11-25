@@ -382,14 +382,28 @@ export default {
               ])
             )
           )
-          data = serializedConfig.map((step) => ({
-            ...step,
-            choices: step.choices.map((choice) =>
-              originalPrices.get(choice.step_choice_id) === choice.extra_price
-                ? { ...choice, keep_extra_price: true }
-                : choice
-            ),
-          }))
+          const originalSteps = new Map(
+            (initial || []).map((step) => [step.step_id, step])
+          )
+          data = serializedConfig.map((step) => {
+            const previous = originalSteps.get(step.step_id)
+            const keepChoiceOrder =
+              previous &&
+              previous.choices.length === step.choices.length &&
+              previous.choices.every(
+                (choice, index) =>
+                  choice.step_choice_id === step.choices[index].step_choice_id
+              )
+            return {
+              ...step,
+              ...(keepChoiceOrder ? { keep_choice_order: true } : {}),
+              choices: step.choices.map((choice) =>
+                originalPrices.get(choice.step_choice_id) === choice.extra_price
+                  ? { ...choice, keep_extra_price: true }
+                  : choice
+              ),
+            }
+          })
         }
         configurationSaved = await this.$store.dispatch(
           'products/updateProductCustomizationConfig',
