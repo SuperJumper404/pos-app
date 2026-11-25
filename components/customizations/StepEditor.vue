@@ -27,15 +27,18 @@
       auto-grow
     ></v-textarea>
     <v-switch
+      v-if="showActive"
       v-model="form.active"
       label="Étape active"
       color="success"
       inset
     ></v-switch>
+    <slot></slot>
     <div class="d-flex justify-end" :class="{ 'se-modal-actions': showCancel }">
       <v-btn
         v-if="showCancel"
         class="text-none se-modal-action se-modal-action--secondary"
+        :disabled="saving"
         @click="$emit('cancel')"
       >
         <v-icon left>mdi-close</v-icon>
@@ -73,6 +76,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    showActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     return {
@@ -99,14 +106,15 @@ export default {
   },
   methods: {
     submit() {
-      if (!this.$refs.form.validate()) return
-      this.$emit('save', {
+      if (this.saving || !this.$refs.form.validate()) return
+      const data = {
         name: this.form.name.trim(),
         description: this.form.description
           ? this.form.description.trim()
           : null,
-        active: this.form.active,
-      })
+      }
+      if (this.showActive) data.active = this.form.active
+      this.$emit('save', data)
     },
   },
 }

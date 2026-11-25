@@ -1274,6 +1274,125 @@ const customizationAdminPageSource = fs.readFileSync(
   path.join(__dirname, '../pages/customizations/index.vue'),
   'utf8'
 )
+const stepConfiguratorSource = fs.readFileSync(
+  path.join(__dirname, '../components/customizations/ProductStepConfigurator.vue'),
+  'utf8'
+)
+
+const stepConfigurator = loadComponentOptions(stepConfiguratorSource, [], [])
+assert.deepStrictEqual(
+  stepConfigurator.computed.attachableSteps
+    .call({
+      productId: '5',
+      attachedStepIds: new Set([10]),
+      availableSteps: [
+        { id: 10, active: true },
+        { id: 20, active: true, choices: [{ linked_product_id: 5 }] },
+        { id: 30, active: true, choices: [{ linked_product_id: 6 }] },
+        { id: 40, active: false },
+      ],
+    })
+    .map(({ id }) => id),
+  [30]
+)
+const existingStep = {
+  step_id: 10,
+  position: 0,
+  minimum_choices: 1,
+  maximum_choices: 1,
+  active: true,
+  choices: [{ step_choice_id: 50, extra_price: '3.00', position: 0 }],
+}
+const stepEvents = []
+const stepConfiguratorContext = {
+  ...stepConfigurator.methods,
+  localValue: [existingStep],
+  attachDialog: true,
+  selectedStepIds: [30, '20', 30, 10, 99],
+  attachableSteps: [
+    { id: 20, choices: [{ id: 60, default_extra_price: '1.25', active: true }] },
+    { id: 30, choices: [{ id: 61, default_extra_price: null, active: false }] },
+  ],
+  $emit(name, value) {
+    stepEvents.push([name, value])
+  },
+  emitValidity() {},
+}
+stepConfigurator.methods.attachSelectedSteps.call(stepConfiguratorContext)
+assert.deepStrictEqual(stepEvents, [
+  [
+    'input',
+    [
+      existingStep,
+      {
+        step_id: 30,
+        position: 1,
+        minimum_choices: 0,
+        maximum_choices: 1,
+        active: true,
+        choices: [
+          { step_choice_id: 61, position: 0, extra_price: '0.00', active: false },
+        ],
+      },
+      {
+        step_id: 20,
+        position: 2,
+        minimum_choices: 0,
+        maximum_choices: 1,
+        active: true,
+        choices: [
+          { step_choice_id: 60, position: 0, extra_price: '1.25', active: true },
+        ],
+      },
+    ],
+  ],
+])
+assert.strictEqual(stepConfiguratorContext.attachDialog, false)
+assert.deepStrictEqual(stepConfiguratorContext.selectedStepIds, [])
+assert.match(stepConfiguratorSource, /<v-select[^>]*v-model="selectedStepIds"[^>]*\bmultiple\b/)
+
+const customizationAdmin = loadComponentOptions(
+  customizationAdminPageSource,
+  ['ChoiceEditor', 'StepEditor'],
+  [{}, {}]
+)
+const stepUpdateCalls = []
+const stepUpdateContext = {
+  stepToUpdate: {
+    id: 10,
+    choices: [
+      { id: 55, default_extra_price: '1.00' },
+      { id: 56, default_extra_price: '2.00' },
+    ],
+  },
+  stepChoicePrices: { 55: '1.25', 56: '2' },
+  $store: {
+    async dispatch(action, payload) {
+      stepUpdateCalls.push([action, payload])
+      return true
+    },
+  },
+  ...customizationAdmin.methods,
+}
+
+const testStepPriceUpdateForm = async () => {
+  await stepUpdateContext.saveStepUpdate({ name: 'Boissons' })
+  assert.deepStrictEqual(stepUpdateCalls[0], [
+    'customizations/updateStep',
+    {
+      id: 10,
+      data: {
+        name: 'Boissons',
+        choice_prices: [{ choice_id: 55, default_extra_price: '1.25' }],
+      },
+    },
+  ])
+  assert.strictEqual(stepUpdateContext.stepToUpdate, null)
+}
+testStepPriceUpdateForm().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})
 
 assert.ok(
   stepEditorSource.includes('maxlength="255"'),
@@ -2087,6 +2206,49 @@ const runReviewRegressionTests = async () => {
     ),
     'partial saves must use the existing error notification path'
   )
+
+  const initialStep = {
+    step_id: 10,
+    position: 0,
+    minimum_choices: 0,
+    maximum_choices: 1,
+    active: true,
+    choices: [],
+  }
+  const addedStep = { ...initialStep, step_id: 11, position: 1 }
+  viewModel.initialCustomizationConfig = [initialStep]
+  viewModel.customizationConfig = [initialStep, addedStep]
+  dispatched.length = 0
+  await editOptions.methods.submitEditProduct.call(viewModel)
+  assert.deepStrictEqual(dispatched[1], [
+    'products/updateProductCustomizationConfig',
+    { id: 5, data: { steps: [addedStep], append: true } },
+  ])
+
+  viewModel.customizationConfig = [initialStep]
+  dispatched.length = 0
+  await editOptions.methods.submitEditProduct.call(viewModel)
+  assert.ok(
+    dispatched.every(([type]) => type !== 'products/updateProductCustomizationConfig'),
+    'saving unchanged customizations must preserve current server prices'
+  )
+
+  const choice = {
+    step_choice_id: 55,
+    position: 0,
+    extra_price: '1.00',
+    active: true,
+  }
+  viewModel.initialCustomizationConfig = [{ ...initialStep, choices: [choice] }]
+  viewModel.customizationConfig = [
+    { ...initialStep, maximum_choices: 2, choices: [choice] },
+    addedStep,
+  ]
+  dispatched.length = 0
+  await editOptions.methods.submitEditProduct.call(viewModel)
+  assert.deepStrictEqual(dispatched[1][1].data[0].choices, [
+    { ...choice, keep_extra_price: true },
+  ])
 
   let uuidCount = 0
   const cartModule = loadCartModule(() => `checkout-token-${++uuidCount}`)

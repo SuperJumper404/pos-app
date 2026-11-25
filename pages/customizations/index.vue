@@ -1,19 +1,31 @@
 <template>
   <v-container fluid>
     <v-card outlined class="mt-5">
-      <v-toolbar flat color="grey lighten-4">
+      <v-card-title class="step-toolbar grey lighten-4 d-flex flex-wrap align-center">
         <div>
-          <v-toolbar-title>Étapes produits</v-toolbar-title>
+          <h1 class="text-h6">Étapes produits</h1>
           <p class="text-caption mb-0">
             Créez une bibliothèque de choix réutilisable sur plusieurs produits.
           </p>
         </div>
         <v-spacer></v-spacer>
-        <v-btn color="primary" class="text-none" @click="openNewStep">
-          <v-icon left>mdi-plus</v-icon>
-          Nouvelle étape
-        </v-btn>
-      </v-toolbar>
+        <div class="step-toolbar d-flex flex-wrap">
+          <v-btn color="primary" class="text-none" @click="openNewStep">
+            <v-icon left>mdi-plus</v-icon>
+            Nouvelle étape
+          </v-btn>
+          <v-btn
+            outlined
+            color="primary"
+            class="text-none"
+            :disabled="!selectedStep || loadingPage || storeLoading || savingStep"
+            @click="openStepUpdate"
+          >
+            <v-icon left>mdi-pencil-outline</v-icon>
+            Mettre à jour l’étape
+          </v-btn>
+        </div>
+      </v-card-title>
 
       <v-progress-linear
         v-if="loadingPage || storeLoading"
@@ -98,15 +110,6 @@
                 Ajouter un choix
               </v-btn>
             </div>
-
-            <v-card outlined class="pa-4 mb-6">
-              <StepEditor
-                :key="`step-${selectedStep.id}-${stepEditorKey}`"
-                :value="selectedStep"
-                :saving="savingStep"
-                @save="saveSelectedStep"
-              />
-            </v-card>
 
             <div class="d-flex align-center mb-3">
               <h3 class="text-subtitle-1 font-weight-bold mb-0">Choix</h3>
@@ -245,6 +248,41 @@
             @save="createStep"
             @cancel="newStepDialog = false"
           />
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="stepUpdateDialog" max-width="620" persistent scrollable>
+      <v-card class="se-modal">
+        <v-card-title class="se-modal-title">Mettre à jour l’étape</v-card-title>
+        <v-card-text>
+          <StepEditor
+            v-if="stepToUpdate"
+            :value="stepToUpdate"
+            :saving="savingStep"
+            :show-active="false"
+            show-cancel
+            @save="saveStepUpdate"
+            @cancel="closeStepUpdate"
+          >
+            <template v-if="stepToUpdate.choices.length">
+              <h3 class="text-subtitle-1 font-weight-bold">Tarifs des choix</h3>
+              <p class="text-body-2">
+                Chaque tarif modifié remplacera le tarif du choix sur tous les produits qui l’utilisent dans cette étape.
+              </p>
+              <v-text-field
+                v-for="choice in stepToUpdate.choices"
+                :key="choice.id"
+                v-model="stepChoicePrices[choice.id]"
+                :label="choice.name || 'Choix sans nom'"
+                :rules="[validateStepChoicePrice]"
+                :disabled="savingStep"
+                type="number"
+                step="0.01"
+                suffix="€"
+              ></v-text-field>
+            </template>
+          </StepEditor>
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -461,6 +499,7 @@ export default {
       savingChoice: false,
       reordering: false,
       newStepDialog: false,
+      stepUpdateDialog: false,
       choiceDialog: false,
       stepDeactivateDialog: false,
       stepDeleteDialog: false,
@@ -470,9 +509,10 @@ export default {
       choiceToDeactivate: null,
       choiceToDelete: null,
       pendingStepPayload: null,
+      stepToUpdate: null,
+      stepChoicePrices: {},
       stepToDeactivateId: null,
       stepToDeleteId: null,
-      stepEditorKey: 0,
       newStepEditorKey: 0,
       choiceEditorKey: 0,
     }
@@ -594,15 +634,50 @@ export default {
       const created = this.dataSteps.find((step) => !previousIds.has(step.id))
       if (created) this.selectStep(created.id)
     },
-    async saveSelectedStep(payload) {
+    openStepUpdate() {
       if (!this.selectedStep) return
-      if (this.selectedStep.active && payload.active === false) {
-        this.pendingStepPayload = payload
-        this.stepToDeactivateId = this.selectedStep.id
-        this.stepDeactivateDialog = true
-        return
+      this.stepToUpdate = { ...this.selectedStep, choices: this.sortedChoices }
+      this.stepChoicePrices = {}
+      for (const choice of this.stepToUpdate.choices) {
+        this.stepChoicePrices[choice.id] = this.choiceDefaultPrice(choice)
       }
-      await this.updateSelectedStep(payload)
+      this.stepUpdateDialog = true
+    },
+    closeStepUpdate() {
+      this.stepUpdateDialog = false
+      this.stepToUpdate = null
+      this.stepChoicePrices = {}
+    },
+    validateStepChoicePrice(value) {
+      return (
+        (/^-?(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(value) &&
+          Math.abs(Number(value)) <= 99999999.99) ||
+        'Saisissez un prix valide avec deux décimales au maximum.'
+      )
+    },
+    async saveStepUpdate(payload) {
+      if (!this.stepToUpdate || this.savingStep) return
+      const step = this.stepToUpdate
+      const choicePrices = step.choices
+        .filter(
+          (choice) =>
+            Number(this.stepChoicePrices[choice.id]) !==
+            Number(this.choiceDefaultPrice(choice))
+        )
+        .map((choice) => ({
+          choice_id: choice.id,
+          default_extra_price: this.stepChoicePrices[choice.id],
+        }))
+      this.savingStep = true
+      try {
+        const saved = await this.$store.dispatch('customizations/updateStep', {
+          id: step.id,
+          data: { ...payload, choice_prices: choicePrices },
+        })
+        if (saved) this.closeStepUpdate()
+      } finally {
+        this.savingStep = false
+      }
     },
     async updateSelectedStep(payload) {
       this.savingStep = true
@@ -626,7 +701,6 @@ export default {
       this.stepDeactivateDialog = false
       this.pendingStepPayload = null
       this.stepToDeactivateId = null
-      this.stepEditorKey += 1
     },
     async confirmStepDeactivation() {
       if (!this.stepToDeactivateId || this.savingStep) return
@@ -647,7 +721,6 @@ export default {
       this.stepDeactivateDialog = false
       this.pendingStepPayload = null
       this.stepToDeactivateId = null
-      this.stepEditorKey += 1
     },
     reactivateStep() {
       return this.updateSelectedStep({
@@ -844,6 +917,10 @@ export default {
 </script>
 
 <style scoped>
+.step-toolbar {
+  gap: 8px;
+}
+
 .step-list-column {
   border-right: 1px solid rgba(0, 0, 0, 0.12);
   min-height: 640px;
