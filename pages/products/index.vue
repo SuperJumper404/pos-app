@@ -164,6 +164,19 @@
               </v-btn>
 
               <v-btn
+                icon
+                outlined
+                color="primary"
+                title="Dupliquer le produit"
+                aria-label="Dupliquer le produit"
+                :disabled="duplicatingProductId !== null && duplicatingProductId !== items.id"
+                :loading="duplicatingProductId === items.id"
+                @click="duplicateProduct(items)"
+              >
+                <v-icon small>mdi-content-copy</v-icon>
+              </v-btn>
+
+              <v-btn
                 color="red darken-1"
                 dark
                 class="text-none"
@@ -271,6 +284,17 @@
               </v-btn>
 
               <v-btn
+                outlined
+                color="primary"
+                class="text-none"
+                :disabled="duplicatingProductId !== null && duplicatingProductId !== itm.id"
+                :loading="duplicatingProductId === itm.id"
+                @click="duplicateProduct(itm)"
+              >
+                Dupliquer <v-icon small right>mdi-content-copy</v-icon>
+              </v-btn>
+
+              <v-btn
                 color="red darken-1"
                 dark
                 class="text-none"
@@ -321,6 +345,7 @@ export default {
     return {
       loadPage: false,
       visibilityLoadingId: null,
+      duplicatingProductId: null,
       orderLoading: false,
       selectedCategoryIds: [],
       draggedProductId: null,
@@ -401,6 +426,16 @@ export default {
     },
     openCustomizationSteps() {
       this.$router.push('/customizations')
+    },
+    async duplicateProduct(product) {
+      if (this.duplicatingProductId !== null) return
+      this.duplicatingProductId = product.id
+      try {
+        const id = await this.$store.dispatch('products/duplicateProduct', product.id)
+        if (id) this.$router.push(`/products/edit/${id}`)
+      } finally {
+        this.duplicatingProductId = null
+      }
     },
     productImageSrc(image) {
       const fileName = image || 'default.png'
