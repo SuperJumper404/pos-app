@@ -350,14 +350,42 @@
           >
             <v-list-item v-for="product in productsWithStep" :key="product.id">
               <v-list-item-content>
-                <v-list-item-title>{{ product.name }}</v-list-item-title>
-                <v-list-item-subtitle v-if="isArchivedProduct(product)">
-                  Archivé
-                </v-list-item-subtitle>
+                <v-checkbox
+                  v-model="productIdsToRemove"
+                  :value="product.id"
+                  :label="
+                    isArchivedProduct(product)
+                      ? `${product.name} (archivé)`
+                      : product.name
+                  "
+                  :disabled="Boolean(updatingStepProducts)"
+                  class="mt-0"
+                  dense
+                  hide-details
+                ></v-checkbox>
               </v-list-item-content>
             </v-list-item>
           </v-list>
           <p v-else class="text-body-2 mb-4">Aucun produit rattaché.</p>
+          <div v-if="productsWithStep.length" class="mb-4">
+            <v-btn
+              outlined
+              color="error"
+              class="text-none"
+              :disabled="
+                !productIdsToRemove.length || updatingStepProducts === 'attach'
+              "
+              :loading="updatingStepProducts === 'remove'"
+              @click="removeStepFromProducts"
+            >
+              <v-icon left>mdi-link-off</v-icon>
+              Retirer l’étape ({{ productIdsToRemove.length }})
+            </v-btn>
+            <p v-if="productIdsToRemove.length" class="text-caption mt-2 mb-0">
+              Le retrait supprime les réglages de cette étape pour les produits
+              sélectionnés.
+            </p>
+          </div>
           <h3 class="text-subtitle-1 font-weight-bold">
             Sans cette étape ({{ productsWithoutStep.length }})
           </h3>
@@ -367,7 +395,7 @@
             item-text="label"
             item-value="id"
             item-disabled="disabled"
-            :disabled="attachingProducts"
+            :disabled="Boolean(updatingStepProducts)"
             label="Rechercher et sélectionner des produits"
             no-data-text="Aucun produit trouvé"
             multiple
@@ -378,15 +406,15 @@
           <v-alert v-if="!productsStep.active" dense text type="info">
             Activez cette étape pour l’ajouter à des produits.
           </v-alert>
-          <v-alert v-if="attachProductsError" dense text type="error">
-            {{ attachProductsError }}
+          <v-alert v-if="stepProductsError" dense text type="error">
+            {{ stepProductsError }}
           </v-alert>
         </v-card-text>
         <v-card-actions class="se-modal-actions">
           <v-spacer></v-spacer>
           <v-btn
             class="se-modal-action se-modal-action--secondary text-none"
-            :disabled="attachingProducts"
+            :disabled="Boolean(updatingStepProducts)"
             @click="stepProductsDialog = false"
           >
             Fermer
@@ -394,8 +422,12 @@
           <v-btn
             color="primary"
             class="se-modal-action se-modal-action--primary text-none"
-            :disabled="!productsStep.active || !productIdsToAttach.length"
-            :loading="attachingProducts"
+            :disabled="
+              !productsStep.active ||
+              !productIdsToAttach.length ||
+              updatingStepProducts === 'remove'
+            "
+            :loading="updatingStepProducts === 'attach'"
             @click="attachStepToProducts"
           >
             Ajouter aux produits sélectionnés
@@ -636,8 +668,9 @@ export default {
       stepProductsDialog: false,
       productsStepId: null,
       productIdsToAttach: [],
-      attachingProducts: false,
-      attachProductsError: '',
+      productIdsToRemove: [],
+      updatingStepProducts: null,
+      stepProductsError: '',
       duplicatingStep: false,
       choiceDialog: false,
       stepDeactivateDialog: false,
@@ -805,28 +838,40 @@ export default {
     openStepProducts() {
       this.productsStepId = this.selectedStep.id
       this.productIdsToAttach = []
-      this.attachProductsError = ''
+      this.productIdsToRemove = []
+      this.stepProductsError = ''
       this.stepProductsDialog = true
     },
     async attachStepToProducts() {
+      if (!this.productsStep?.active) return
+      await this.updateStepProducts('attach')
+    },
+    async removeStepFromProducts() {
+      await this.updateStepProducts('remove')
+    },
+    async updateStepProducts(operation) {
+      const removing = operation === 'remove'
+      const selection = removing ? 'productIdsToRemove' : 'productIdsToAttach'
       if (
-        !this.productsStep?.active ||
-        !this.productIdsToAttach.length ||
-        this.attachingProducts
+        !this.productsStep ||
+        !this[selection].length ||
+        this.updatingStepProducts
       ) {
         return
       }
-      this.attachingProducts = true
-      this.attachProductsError = ''
+      this.updatingStepProducts = operation
+      this.stepProductsError = ''
       try {
         const saved = await this.$store.dispatch(
-          'customizations/attachStepToProducts',
-          { id: this.productsStep.id, productIds: [...this.productIdsToAttach] }
+          removing
+            ? 'customizations/removeStepFromProducts'
+            : 'customizations/attachStepToProducts',
+          { id: this.productsStep.id, productIds: [...this[selection]] }
         )
-        if (saved) this.productIdsToAttach = []
-        else this.attachProductsError = this.$store.get('customizations/message')
+        if (saved) this[selection] = []
+        else this.stepProductsError = this.$store.get('customizations/message')
       } finally {
-        this.attachingProducts = false
+        this.updatingStepProducts = null
       }
     },
     openNewStep() {

@@ -18,6 +18,33 @@ const getErrorMessage = (error) =>
   (error.response && error.response.data && error.response.data.message) ||
   'Une erreur est survenue.'
 
+const saveStepProducts = async (axios, dispatch, { id, productIds }, method) => {
+  try {
+    const response = await axios.request({
+      method,
+      url: `/baseurl/api/v1/customization-steps/${id}/products`,
+      data: { product_ids: productIds },
+      headers: authorizationHeaders(),
+    })
+    const refreshed = await dispatch(
+      'products/getProducts',
+      { preserveOnError: true },
+      { root: true }
+    )
+    dispatch(
+      refreshed ? 'notifications/success' : 'notifications/warning',
+      refreshed
+        ? response.data.message
+        : 'Modifications enregistrées. Rechargez la page pour voir la liste à jour.',
+      { root: true }
+    )
+    return true
+  } catch (error) {
+    dispatch('set/message', getErrorMessage(error))
+    return false
+  }
+}
+
 const mutationOptions = (params) => ({
   refresh: !params || params.refresh !== false,
   notify: !params || params.notify !== false,
@@ -105,30 +132,12 @@ export const actions = {
     }
   },
 
-  async attachStepToProducts({ dispatch }, { id, productIds }) {
-    try {
-      const response = await this.$axios.post(
-        `/baseurl/api/v1/customization-steps/${id}/products`,
-        { product_ids: productIds },
-        { headers: authorizationHeaders() }
-      )
-      const refreshed = await dispatch(
-        'products/getProducts',
-        { preserveOnError: true },
-        { root: true }
-      )
-      dispatch(
-        refreshed ? 'notifications/success' : 'notifications/warning',
-        refreshed
-          ? response.data.message
-          : 'Rattachements enregistrés. Rechargez la page pour voir la liste à jour.',
-        { root: true }
-      )
-      return true
-    } catch (error) {
-      dispatch('set/message', getErrorMessage(error))
-      return false
-    }
+  attachStepToProducts({ dispatch }, params) {
+    return saveStepProducts(this.$axios, dispatch, params, 'post')
+  },
+
+  removeStepFromProducts({ dispatch }, params) {
+    return saveStepProducts(this.$axios, dispatch, params, 'delete')
   },
 
   async deleteStep({ dispatch }, id) {
