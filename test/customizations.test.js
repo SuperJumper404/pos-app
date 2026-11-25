@@ -1357,6 +1357,71 @@ const customizationAdmin = loadComponentOptions(
   [{}, {}]
 )
 const stepUpdateCalls = []
+const testProductAttachments = async () => {
+  const step = { id: 10, active: true, choices: [{ linked_product_id: 4 }] }
+  const context = {
+    ...customizationAdmin.methods,
+    productsStep: step,
+    productIdsToAttach: [2, 3],
+    dataProducts: [
+      { id: 1, customization_steps: [{ step_id: 10 }] },
+      { id: 2 },
+      { id: 3 },
+      { id: 4 },
+      { id: 5, archived: 1 },
+    ],
+    $store: {
+      async dispatch(action, payload) {
+        assert.strictEqual(action, 'customizations/attachStepToProducts')
+        assert.deepStrictEqual(payload, { id: 10, productIds: [2, 3] })
+        return true
+      },
+    },
+  }
+  context.productsWithStep = customizationAdmin.computed.productsWithStep.call(context)
+  assert.deepStrictEqual(context.productsWithStep.map(({ id }) => id), [1])
+  const available = customizationAdmin.computed.productsWithoutStep.call(context)
+  assert.deepStrictEqual(available.map(({ id, disabled }) => [id, disabled]), [
+    [2, false],
+    [3, false],
+    [4, true],
+    [5, true],
+  ])
+  await context.attachStepToProducts()
+  assert.deepStrictEqual(context.productIdsToAttach, [])
+}
+testProductAttachments().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})
+
+const testProductDuplicationNavigation = async () => {
+  const productPage = loadComponentOptions(
+    fs.readFileSync(path.join(__dirname, '../pages/products/index.vue'), 'utf8'),
+    ['Loading', 'price'],
+    [{}, {}]
+  )
+  const routes = []
+  const context = {
+    duplicatingProductId: null,
+    $store: {
+      async dispatch(action, id) {
+        assert.strictEqual(action, 'products/duplicateProduct')
+        assert.strictEqual(id, 4)
+        return 16
+      },
+    },
+    $router: { push(route) { routes.push(route) } },
+  }
+  await productPage.methods.duplicateProduct.call(context, { id: 4 })
+  assert.deepStrictEqual(routes, ['/products/edit/16'])
+  assert.strictEqual(context.duplicatingProductId, null)
+}
+testProductDuplicationNavigation().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})
+
 const stepUpdateContext = {
   stepToUpdate: {
     id: 10,
@@ -2080,6 +2145,30 @@ const runReviewRegressionTests = async () => {
   global.localStorage = { getItem: () => 'test-token' }
 
   try {
+    const refreshDispatches = []
+    const savedStepId = await customizationStoreModule.actions.duplicateStep.call(
+      {
+        $axios: {
+          async post() {
+            return { data: { message: 'Étape dupliquée.', data: { id: 16 } } }
+          },
+        },
+      },
+      {
+        async dispatch(type, payload) {
+          refreshDispatches.push([type, payload])
+          return false
+        },
+      },
+      10
+    )
+    assert.strictEqual(savedStepId, null)
+    assert.deepStrictEqual(refreshDispatches[0], [
+      'getSteps',
+      { preserveOnError: true },
+    ])
+    assert.strictEqual(refreshDispatches[1][0], 'notifications/warning')
+
     const permanentDeleteCalls = []
     const permanentDeleteDispatches = []
     const permanentDeleteResult =

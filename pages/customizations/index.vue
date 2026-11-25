@@ -76,6 +76,26 @@
               </div>
               <v-spacer></v-spacer>
               <v-btn
+                outlined
+                color="primary"
+                class="text-none mr-2 mb-2"
+                :loading="duplicatingStep"
+                @click="duplicateSelectedStep"
+              >
+                <v-icon left>mdi-content-copy</v-icon>
+                Dupliquer l’étape
+              </v-btn>
+              <v-btn
+                outlined
+                color="primary"
+                class="text-none mr-2 mb-2"
+                :disabled="loadingPage"
+                @click="openStepProducts"
+              >
+                <v-icon left>mdi-package-variant</v-icon>
+                Produits de l’étape ({{ selectedStepProducts.length }})
+              </v-btn>
+              <v-btn
                 v-if="selectedStep.active"
                 outlined
                 color="error"
@@ -314,6 +334,76 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="stepProductsDialog" max-width="700" scrollable persistent>
+      <v-card v-if="productsStep" class="se-modal">
+        <v-card-title class="se-modal-title">
+          Produits de l’étape « {{ productsStep.name }} »
+        </v-card-title>
+        <v-card-text>
+          <h3 class="text-subtitle-1 font-weight-bold">
+            Avec cette étape ({{ productsWithStep.length }})
+          </h3>
+          <v-list
+            v-if="productsWithStep.length"
+            dense
+            class="step-product-list mb-4"
+          >
+            <v-list-item v-for="product in productsWithStep" :key="product.id">
+              <v-list-item-content>
+                <v-list-item-title>{{ product.name }}</v-list-item-title>
+                <v-list-item-subtitle v-if="isArchivedProduct(product)">
+                  Archivé
+                </v-list-item-subtitle>
+              </v-list-item-content>
+            </v-list-item>
+          </v-list>
+          <p v-else class="text-body-2 mb-4">Aucun produit rattaché.</p>
+          <h3 class="text-subtitle-1 font-weight-bold">
+            Sans cette étape ({{ productsWithoutStep.length }})
+          </h3>
+          <v-autocomplete
+            v-model="productIdsToAttach"
+            :items="productsWithoutStep"
+            item-text="label"
+            item-value="id"
+            item-disabled="disabled"
+            :disabled="attachingProducts"
+            label="Rechercher et sélectionner des produits"
+            no-data-text="Aucun produit trouvé"
+            multiple
+            chips
+            deletable-chips
+            clearable
+          ></v-autocomplete>
+          <v-alert v-if="!productsStep.active" dense text type="info">
+            Activez cette étape pour l’ajouter à des produits.
+          </v-alert>
+          <v-alert v-if="attachProductsError" dense text type="error">
+            {{ attachProductsError }}
+          </v-alert>
+        </v-card-text>
+        <v-card-actions class="se-modal-actions">
+          <v-spacer></v-spacer>
+          <v-btn
+            class="se-modal-action se-modal-action--secondary text-none"
+            :disabled="attachingProducts"
+            @click="stepProductsDialog = false"
+          >
+            Fermer
+          </v-btn>
+          <v-btn
+            color="primary"
+            class="se-modal-action se-modal-action--primary text-none"
+            :disabled="!productsStep.active || !productIdsToAttach.length"
+            :loading="attachingProducts"
+            @click="attachStepToProducts"
+          >
+            Ajouter aux produits sélectionnés
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="choiceDialog" max-width="720" persistent>
       <v-card class="se-modal">
         <v-card-title class="se-modal-title">
@@ -543,6 +633,12 @@ export default {
       reordering: false,
       newStepDialog: false,
       stepUpdateDialog: false,
+      stepProductsDialog: false,
+      productsStepId: null,
+      productIdsToAttach: [],
+      attachingProducts: false,
+      attachProductsError: '',
+      duplicatingStep: false,
       choiceDialog: false,
       stepDeactivateDialog: false,
       stepDeleteDialog: false,
@@ -591,6 +687,35 @@ export default {
       if (!this.selectedStep) return []
       return this.productsUsingStep(this.selectedStep)
     },
+    productsStep() {
+      return this.dataSteps.find(
+        (step) => String(step.id) === String(this.productsStepId)
+      )
+    },
+    productsWithStep() {
+      return this.productsStep ? this.productsUsingStep(this.productsStep) : []
+    },
+    productsWithoutStep() {
+      if (!this.productsStep) return []
+      const attached = new Set(this.productsWithStep.map(({ id }) => String(id)))
+      const linked = new Set(
+        (this.productsStep.choices || [])
+          .filter((choice) => choice.linked_product_id != null)
+          .map((choice) => String(choice.linked_product_id))
+      )
+      return this.dataProducts
+        .filter(({ id }) => !attached.has(String(id)))
+        .map((product) => {
+          let reason = ''
+          if (this.isArchivedProduct(product)) reason = 'archivé'
+          else if (linked.has(String(product.id))) reason = 'déjà utilisé comme choix'
+          return {
+            id: product.id,
+            label: reason ? `${product.name} (${reason})` : product.name,
+            disabled: Boolean(reason),
+          }
+        })
+    },
     stepToDelete() {
       return this.dataSteps.find(
         (step) => String(step.id) === String(this.stepToDeleteId)
@@ -636,6 +761,9 @@ export default {
     this.loadingPage = false
   },
   methods: {
+    isArchivedProduct(product) {
+      return [true, 1, '1'].includes(product.archived)
+    },
     productsUsingStep(step) {
       return this.dataProducts.filter((product) =>
         (product.customization_steps || []).some(
@@ -660,6 +788,46 @@ export default {
     },
     selectStep(stepId) {
       this.$store.set('customizations/selectedStepId', stepId)
+    },
+    async duplicateSelectedStep() {
+      if (!this.selectedStep || this.duplicatingStep) return
+      this.duplicatingStep = true
+      try {
+        const id = await this.$store.dispatch(
+          'customizations/duplicateStep',
+          this.selectedStep.id
+        )
+        if (id) this.selectStep(id)
+      } finally {
+        this.duplicatingStep = false
+      }
+    },
+    openStepProducts() {
+      this.productsStepId = this.selectedStep.id
+      this.productIdsToAttach = []
+      this.attachProductsError = ''
+      this.stepProductsDialog = true
+    },
+    async attachStepToProducts() {
+      if (
+        !this.productsStep?.active ||
+        !this.productIdsToAttach.length ||
+        this.attachingProducts
+      ) {
+        return
+      }
+      this.attachingProducts = true
+      this.attachProductsError = ''
+      try {
+        const saved = await this.$store.dispatch(
+          'customizations/attachStepToProducts',
+          { id: this.productsStep.id, productIds: [...this.productIdsToAttach] }
+        )
+        if (saved) this.productIdsToAttach = []
+        else this.attachProductsError = this.$store.get('customizations/message')
+      } finally {
+        this.attachingProducts = false
+      }
     },
     openNewStep() {
       this.newStepEditorKey += 1
@@ -953,6 +1121,11 @@ export default {
 </script>
 
 <style scoped>
+.step-product-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
 .step-toolbar {
   gap: 8px;
 }

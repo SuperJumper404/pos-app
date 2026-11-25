@@ -15,7 +15,7 @@ const getErrorMessage = (error, fallback) =>
   fallback
 
 export const actions = {
-  getProducts({ dispatch }) {
+  getProducts({ dispatch }, options) {
     return this.$axios
       .get(`/baseurl/api/v1/products`, {
         headers: {
@@ -27,8 +27,11 @@ export const actions = {
         return true
       })
       .catch((error) => {
-        dispatch('set/message', error.response.data.data)
-        dispatch('set/dataProduct', [])
+        dispatch(
+          'set/message',
+          getErrorMessage(error, 'Impossible de récupérer les produits.')
+        )
+        if (!options?.preserveOnError) dispatch('set/dataProduct', [])
         return false
       })
   },
@@ -70,6 +73,23 @@ export const actions = {
         )
         return false
       })
+  },
+  async duplicateProduct({ dispatch }, id) {
+    try {
+      const response = await this.$axios.post(
+        `/baseurl/api/v1/product/${id}/duplicate`,
+        null,
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      )
+      dispatch('notifications/success', response.data.message, { root: true })
+      return response.data.data.id
+    } catch (error) {
+      dispatch(
+        'set/message',
+        getErrorMessage(error, 'Impossible de dupliquer le produit.')
+      )
+      return null
+    }
   },
   updateProduct({ dispatch }, params) {
     return this.$axios
