@@ -1366,6 +1366,7 @@ const stepUpdateContext = {
     ],
   },
   stepChoicePrices: { 55: '1.25', 56: '2' },
+  stepUpdateChoices: [{ id: 55 }, { id: 56 }],
   $store: {
     async dispatch(action, payload) {
       stepUpdateCalls.push([action, payload])
@@ -1376,6 +1377,7 @@ const stepUpdateContext = {
 }
 
 const testStepPriceUpdateForm = async () => {
+  stepUpdateContext.moveStepUpdateChoice(1, -1)
   await stepUpdateContext.saveStepUpdate({ name: 'Boissons' })
   assert.deepStrictEqual(stepUpdateCalls[0], [
     'customizations/updateStep',
@@ -1384,10 +1386,21 @@ const testStepPriceUpdateForm = async () => {
       data: {
         name: 'Boissons',
         choice_prices: [{ choice_id: 55, default_extra_price: '1.25' }],
+        choice_order: [56, 55],
       },
     },
   ])
   assert.strictEqual(stepUpdateContext.stepToUpdate, null)
+
+  await customizationAdmin.methods.moveChoice.call(
+    { ...stepUpdateContext, selectedStep: { id: 10 }, sortedChoices: [{ id: 55 }, { id: 56 }] },
+    0,
+    1
+  )
+  assert.deepStrictEqual(stepUpdateCalls[1], [
+    'customizations/updateStep',
+    { id: 10, data: { choice_order: [56, 55] }, notify: false },
+  ])
 }
 testStepPriceUpdateForm().catch((error) => {
   console.error(error)
@@ -2249,6 +2262,7 @@ const runReviewRegressionTests = async () => {
   assert.deepStrictEqual(dispatched[1][1].data[0].choices, [
     { ...choice, keep_extra_price: true },
   ])
+  assert.strictEqual(dispatched[1][1].data[0].keep_choice_order, true)
 
   let uuidCount = 0
   const cartModule = loadCartModule(() => `checkout-token-${++uuidCount}`)

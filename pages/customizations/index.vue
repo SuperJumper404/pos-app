@@ -266,21 +266,48 @@
             @cancel="closeStepUpdate"
           >
             <template v-if="stepToUpdate.choices.length">
-              <h3 class="text-subtitle-1 font-weight-bold">Tarifs des choix</h3>
+              <h3 class="text-subtitle-1 font-weight-bold">
+                Ordre et tarifs des choix
+              </h3>
               <p class="text-body-2">
-                Chaque tarif modifié remplacera le tarif du choix sur tous les produits qui l’utilisent dans cette étape.
+                L’ordre affiché et les tarifs modifiés s’appliqueront à tous
+                les produits qui utilisent cette étape.
               </p>
-              <v-text-field
-                v-for="choice in stepToUpdate.choices"
+              <div
+                v-for="(choice, index) in stepUpdateChoices"
                 :key="choice.id"
-                v-model="stepChoicePrices[choice.id]"
-                :label="choice.name || 'Choix sans nom'"
-                :rules="[validateStepChoicePrice]"
-                :disabled="savingStep"
-                type="number"
-                step="0.01"
-                suffix="€"
-              ></v-text-field>
+                class="d-flex align-start"
+              >
+                <v-text-field
+                  v-model="stepChoicePrices[choice.id]"
+                  :label="`${index + 1}. ${choice.name || 'Choix sans nom'}`"
+                  :rules="[validateStepChoicePrice]"
+                  :disabled="savingStep"
+                  type="number"
+                  step="0.01"
+                  suffix="€"
+                ></v-text-field>
+                <v-btn
+                  icon
+                  class="mt-2 ml-2"
+                  :disabled="savingStep || index === 0"
+                  :aria-label="`Monter ${choice.name || 'le choix'}`"
+                  @click="moveStepUpdateChoice(index, -1)"
+                >
+                  <v-icon>mdi-arrow-up</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  class="mt-2"
+                  :disabled="
+                    savingStep || index === stepUpdateChoices.length - 1
+                  "
+                  :aria-label="`Descendre ${choice.name || 'le choix'}`"
+                  @click="moveStepUpdateChoice(index, 1)"
+                >
+                  <v-icon>mdi-arrow-down</v-icon>
+                </v-btn>
+              </div>
             </template>
           </StepEditor>
         </v-card-text>
@@ -486,6 +513,22 @@
 import ChoiceEditor from '@/components/customizations/ChoiceEditor'
 import StepEditor from '@/components/customizations/StepEditor'
 
+const reorderChoices = (choices, index, direction) => {
+  const target = index + direction
+  if (
+    index < 0 ||
+    index >= choices.length ||
+    target < 0 ||
+    target >= choices.length
+  ) {
+    return null
+  }
+  const reordered = [...choices]
+  const [choice] = reordered.splice(index, 1)
+  reordered.splice(target, 0, choice)
+  return reordered
+}
+
 export default {
   components: {
     ChoiceEditor,
@@ -511,6 +554,7 @@ export default {
       pendingStepPayload: null,
       stepToUpdate: null,
       stepChoicePrices: {},
+      stepUpdateChoices: [],
       stepToDeactivateId: null,
       stepToDeleteId: null,
       newStepEditorKey: 0,
@@ -637,6 +681,7 @@ export default {
     openStepUpdate() {
       if (!this.selectedStep) return
       this.stepToUpdate = { ...this.selectedStep, choices: this.sortedChoices }
+      this.stepUpdateChoices = this.sortedChoices
       this.stepChoicePrices = {}
       for (const choice of this.stepToUpdate.choices) {
         this.stepChoicePrices[choice.id] = this.choiceDefaultPrice(choice)
@@ -647,6 +692,11 @@ export default {
       this.stepUpdateDialog = false
       this.stepToUpdate = null
       this.stepChoicePrices = {}
+      this.stepUpdateChoices = []
+    },
+    moveStepUpdateChoice(index, direction) {
+      const reordered = reorderChoices(this.stepUpdateChoices, index, direction)
+      if (reordered) this.stepUpdateChoices = reordered
     },
     validateStepChoicePrice(value) {
       return (
@@ -672,7 +722,11 @@ export default {
       try {
         const saved = await this.$store.dispatch('customizations/updateStep', {
           id: step.id,
-          data: { ...payload, choice_prices: choicePrices },
+          data: {
+            ...payload,
+            choice_prices: choicePrices,
+            choice_order: this.stepUpdateChoices.map(({ id }) => id),
+          },
         })
         if (saved) this.closeStepUpdate()
       } finally {
@@ -859,42 +913,24 @@ export default {
       return data
     },
     async moveChoice(index, direction) {
-      const targetIndex = index + direction
-      if (targetIndex < 0 || targetIndex >= this.sortedChoices.length) return
-      const reordered = [...this.sortedChoices]
-      const current = reordered[index]
-      reordered[index] = reordered[targetIndex]
-      reordered[targetIndex] = current
-      const updates = reordered
-        .map((choice, position) => ({ choice, position }))
-        .filter(
-          ({ choice, position }) => Number(choice.default_position) !== position
-        )
-
+      if (!this.selectedStep || this.reordering) return
+      const reordered = reorderChoices(this.sortedChoices, index, direction)
+      if (!reordered) return
       this.reordering = true
-      let saved = true
-      for (const update of updates) {
-        const result = await this.$store.dispatch(
-          'customizations/updateChoice',
-          {
-            id: update.choice.id,
-            data: this.choiceUpdateData(update.choice, update.position),
-            refresh: false,
-            notify: false,
-          }
-        )
-        if (!result) {
-          saved = false
-          break
+      try {
+        const saved = await this.$store.dispatch('customizations/updateStep', {
+          id: this.selectedStep.id,
+          data: { choice_order: reordered.map(({ id }) => id) },
+          notify: false,
+        })
+        if (saved) {
+          this.$store.dispatch(
+            'notifications/success',
+            "L’ordre des choix a été enregistré."
+          )
         }
-      }
-      await this.$store.dispatch('customizations/getSteps')
-      this.reordering = false
-      if (saved) {
-        this.$store.dispatch(
-          'notifications/success',
-          "L'ordre des choix a été enregistré."
-        )
+      } finally {
+        this.reordering = false
       }
     },
     choiceImageSrc(choice) {
