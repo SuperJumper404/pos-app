@@ -128,6 +128,7 @@
           <ProductStepConfigurator
             v-model="customizationConfig"
             :available-steps="availableSteps"
+            :product-id="id"
             @validity-change="setConfigurationValidity"
           />
 
@@ -182,6 +183,7 @@ export default {
       configurationValid: true,
       configurationError: '',
       customizationConfig: [],
+      initialCustomizationConfig: null,
       formeditproduct: {
         name: '',
         description: '',
@@ -272,6 +274,13 @@ export default {
           })),
         })
       )
+      try {
+        this.initialCustomizationConfig = serializeProductCustomizationConfig(
+          this.customizationConfig
+        )
+      } catch {
+        this.initialCustomizationConfig = null
+      }
     } else {
       this.stsMsg = true
     }
@@ -332,6 +341,17 @@ export default {
         return
       }
 
+      const initial = this.initialCustomizationConfig
+      const existingStepsUnchanged =
+        initial &&
+        JSON.stringify(serializedConfig.slice(0, initial.length)) ===
+          JSON.stringify(initial)
+      const addedSteps = existingStepsUnchanged
+        ? serializedConfig.slice(initial.length)
+        : []
+      const configurationChanged =
+        !existingStepsUnchanged || addedSteps.length > 0
+
       this.loadingBtn = true
       this.stsMsg = false
       const productSaved = await this.$store.dispatch(
@@ -339,8 +359,8 @@ export default {
         {
           id: this.id,
           data: this.buildProductPayload(),
-          refresh: false,
-          notify: false,
+          refresh: !configurationChanged,
+          notify: !configurationChanged,
         }
       )
 
@@ -350,10 +370,32 @@ export default {
         return
       }
 
-      const configurationSaved = await this.$store.dispatch(
-        'products/updateProductCustomizationConfig',
-        { id: this.id, data: serializedConfig }
-      )
+      let configurationSaved = true
+      if (configurationChanged) {
+        let data = { steps: addedSteps, append: true }
+        if (!existingStepsUnchanged) {
+          const originalPrices = new Map(
+            (initial || []).flatMap((step) =>
+              step.choices.map((choice) => [
+                choice.step_choice_id,
+                choice.extra_price,
+              ])
+            )
+          )
+          data = serializedConfig.map((step) => ({
+            ...step,
+            choices: step.choices.map((choice) =>
+              originalPrices.get(choice.step_choice_id) === choice.extra_price
+                ? { ...choice, keep_extra_price: true }
+                : choice
+            ),
+          }))
+        }
+        configurationSaved = await this.$store.dispatch(
+          'products/updateProductCustomizationConfig',
+          { id: this.id, data }
+        )
+      }
       this.loadingBtn = false
       if (!configurationSaved) {
         this.configurationError = PARTIAL_SAVE_MESSAGE
