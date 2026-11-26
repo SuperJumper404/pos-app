@@ -172,6 +172,7 @@
             :cart="dataCart || []"
             :discount="deliveryDiscount"
             :site="isSiteCheckout"
+            :cashier="!isSiteCheckout"
             :disabled="loadingBtn || stripePreparing"
             :locked="deliveryAttemptLocked"
             @quote="acceptDeliveryQuote"

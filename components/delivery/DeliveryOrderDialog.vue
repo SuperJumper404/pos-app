@@ -11,7 +11,7 @@
           <v-text-field :value="phone" label="Telephone" type="tel" outlined :disabled="locked" required prepend-inner-icon="mdi-phone-outline" @input="$emit('update:phone', $event)" />
         </div>
         <v-textarea :value="remark" label="Note commande" outlined rows="2" auto-grow :disabled="locked" prepend-inner-icon="mdi-note-text-outline" @input="$emit('update:remark', $event)" />
-        <DeliveryCheckout ref="checkout" :shop-id="shopId" :cart="cart" :discount="discount" value="delivery" hide-mode
+        <DeliveryCheckout ref="checkout" :shop-id="shopId" :cart="cart" :discount="discount" value="delivery" hide-mode cashier
           :customer-draft="{ name: customer, contactPhone: phone }" :locked="locked"
           @customer="selectCustomer" @address="$emit('address', $event)" @quote="$emit('quote', $event)" @ready="onReady" />
       </v-card-text>

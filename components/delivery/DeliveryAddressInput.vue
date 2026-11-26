@@ -1,16 +1,33 @@
 <template>
   <div class="delivery-address-input">
-    <v-autocomplete
+    <v-autocomplete v-if="!manual"
       :value="googleChoice || storedChoice" :search-input.sync="query" :items="storedChoice ? [storedChoice] : suggestions" item-text="label" item-value="placeId"
-      return-object no-filter clearable outlined label="Adresse" autocomplete="off" maxlength="255"
+      return-object no-filter clearable outlined label="Rechercher une adresse" autocomplete="off" maxlength="255"
       :disabled="disabled" :loading="searching || resolving" :menu-props="{ maxHeight: 320, contentClass: 'delivery-address-menu' }"
       :no-data-text="searching ? 'Recherche en cours...' : searched ? 'Aucune adresse trouvee' : 'Adresse'"
       @change="chooseSuggestion"
     >
-      <template #item="{ item }"><v-icon class="mr-3">mdi-map-marker-outline</v-icon><span class="customer-wrap">{{ item.label }}</span></template>
-      <template #append-item><div class="google-attribution"><img src="/google-maps-attribution.png" alt="Google Maps" height="18"></div></template>
+      <template #item="{ item }">
+        <v-icon class="mr-3">mdi-map-marker-outline</v-icon>
+        <v-list-item-content><span class="customer-wrap">{{ item.label }}</span></v-list-item-content>
+        <v-list-item-action v-if="Number.isFinite(item.distanceMeters)" class="distance">{{ formatDistance(item.distanceMeters) }}</v-list-item-action>
+      </template>
+      <template #append-item><div v-if="suggestions.some(item => item.provider !== 'ign')" class="google-attribution"><img src="/google-maps-attribution.png" alt="Google Maps" height="18"></div></template>
     </v-autocomplete>
-    <div v-if="googleChoice || (value && value.addressSnapshot && value.addressSnapshot.provider === 'google_places')" class="google-attribution"><img src="/google-maps-attribution.png" alt="Google Maps" height="18"></div>
+    <div v-if="(googleChoice && googleChoice.provider !== 'ign') || (value && value.addressSnapshot && value.addressSnapshot.provider === 'google_places')" class="google-attribution"><img src="/google-maps-attribution.png" alt="Google Maps" height="18"></div>
+    <template v-if="manual">
+      <v-text-field v-model="draft.street" label="Numéro et rue" autocomplete="address-line1" outlined dense maxlength="255" :disabled="disabled" @keydown.enter.prevent="resolve()" />
+      <v-row dense>
+        <v-col cols="5"><v-text-field v-model="draft.postalCode" label="Code postal" autocomplete="postal-code" inputmode="numeric" outlined dense maxlength="5" :disabled="disabled" @keydown.enter.prevent="resolve()" /></v-col>
+        <v-col cols="7"><v-text-field v-model="draft.city" label="Ville" autocomplete="address-level2" outlined dense maxlength="255" :disabled="disabled" @keydown.enter.prevent="resolve()" /></v-col>
+      </v-row>
+      <v-btn text :disabled="disabled || resolving || !complete" :loading="resolving" @click="resolve()">
+        <v-icon left>mdi-map-marker-check-outline</v-icon>Vérifier l’adresse
+      </v-btn>
+    </template>
+    <v-btn v-if="!manual || suggester" text small class="text-none mb-2" :disabled="disabled" @click="toggleManual">
+      {{ manual ? 'Revenir à la recherche' : 'Saisir l’adresse manuellement' }}
+    </v-btn>
     <v-expansion-panels flat>
       <v-expansion-panel>
         <v-expansion-panel-header>Complement et consignes</v-expansion-panel-header>
@@ -51,7 +68,7 @@ export default {
     return { draft: { ...empty(), ...postal(snapshot || {}), country: (snapshot && snapshot.country) || 'FR',
       complement: (snapshot && snapshot.complement) || '', instructions: (snapshot && snapshot.instructions) || '' },
     query: snapshot ? [snapshot.street, snapshot.postalCode, snapshot.city].filter(Boolean).join(', ') || this.value.label || 'Adresse' : '',
-    googleChoice: null, suggestions: [], searching: false, searched: false, sessionToken: null, syncing: false, postalEdited: false, expiryTimer: null,
+    googleChoice: null, suggestions: [], searching: false, searched: false, sessionToken: null, syncing: false, postalEdited: false, expiryTimer: null, manual: false,
     resolution: null, candidates: [], selectedCandidate: null, error: '', resolving: false, sequence: 0, timer: null }
   },
   computed: {
@@ -100,6 +117,15 @@ export default {
   },
   beforeDestroy() { this.invalidate() },
   methods: {
+    formatDistance(meters) { return new Intl.NumberFormat('fr-FR', { style: 'unit', unit: 'kilometer', maximumFractionDigits: 2 }).format(meters / 1000) },
+    toggleManual() {
+      this.invalidate()
+      this.manual = !this.manual
+      this.postalEdited = true
+      this.query = ''
+      this.sessionToken = null
+      this.searched = false
+    },
     invalidate(keepCandidate = false) {
       clearTimeout(this.timer)
       clearTimeout(this.expiryTimer)
@@ -166,10 +192,10 @@ export default {
       this.syncing = false
       return this.resolve()
     },
-    retry() { if (this.suggester && this.query) { this.sessionToken = null; return this.search() } return this.resolve() },
+    retry() { if (!this.manual && this.suggester && this.query) { this.sessionToken = null; return this.search() } return this.resolve() },
     schedule() {
       this.invalidate(Boolean(this.currentCandidateId))
-      if (this.complete && !this.disabled) this.timer = setTimeout(() => this.resolve(), 300)
+      if (!this.manual && this.complete && !this.disabled) this.timer = setTimeout(() => this.resolve(), 300)
     },
     chooseCandidate(candidate) { return this.resolve(candidate.providerId) },
     resolve(candidateId) {
@@ -189,7 +215,7 @@ export default {
       if ((choice || this.unchangedPostal) && this.resolution && Date.parse(this.resolution.expiresAt) > Date.now()) return this.applyPrivate()
       if (choice && this.resolution) { this.invalidate(); this.error = 'Validez de nouveau cette adresse.'; return null }
       if ((!this.complete && !(this.value && this.value.id && this.unchangedPostal) && !choice) || this.disabled || this._isDestroyed) return null
-      if (!choice && this.suggester && this.query && !this.unchangedPostal) return null
+      if (!choice && !this.manual && this.suggester && this.query && !this.unchangedPostal) return null
       const sequence = ++this.sequence
       const { postalKey, contextKey } = this
       const selectedId = typeof candidateId === 'string' ? candidateId : this.currentCandidateId
@@ -245,6 +271,7 @@ export default {
 .delivery-address-input { min-width: 0; }
 .delivery-address-input .v-list-item { min-height: 44px; }
 .delivery-address-input .customer-wrap { overflow-wrap: anywhere; }
+.distance { white-space: nowrap; }
 .google-attribution { padding: 10px 10px 5px; min-height: 33px; text-align: right; }
 .google-attribution img { width: auto; max-width: 100%; display: inline-block; }
 .delivery-address-input ::v-deep .v-expansion-panel-header { min-height: 44px; padding: 12px 0; }

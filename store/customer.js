@@ -196,7 +196,9 @@ export const actions = {
   },
   suggestAddresses(context, payload) {
     if (!context.state.session) return null
-    return scoped(this.$customerApi, context, request => request('post', '/customer/address-suggestions', { input: payload.input, sessionToken: payload.sessionToken }), null,
+    return scoped(this.$customerApi, context, request => request('post', '/customer/address-suggestions', {
+      input: payload.input, sessionToken: payload.sessionToken, ...(payload.includeDistance && { includeDistance: true }),
+    }), null,
       { busy: false, propagate: true, reportError: false })
   },
   async displayAddress(context, payload) {

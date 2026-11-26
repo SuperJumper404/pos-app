@@ -874,6 +874,40 @@ test('R3 one cent discount requires explicit new quote confirmation and blocks o
   } finally { checkout.$destroy() }
 })
 
+test('cashier sees distance with an empty cart, can set a fee, and resets it for another address', async () => {
+  const f = fixture(call => {
+    if (call.path.endsWith('/address-preview')) return { data: { distanceMeters: 2800, inRange: true, suggestedFeeCents: 200, feeOptionsCents: [0, 200, 500] } }
+    if (call.path.endsWith('/quotes')) return { data: { ...quote(call.body.delivery_fee_override_cents ?? 200), suggestedFeeCents: 200 } }
+  })
+  await f.dispatch('resetForShop', 7)
+  await f.dispatch('loadSettings')
+  const checkout = f.component({ value: 'delivery', cashier: true, cart: [] })
+  try {
+    await checkout.onResolved(proof('one'))
+    await drainVue()
+    assert.match(checkout.distanceLabel, /^2,8 km/)
+    assert.match(checkout.feeChoices[0].text, /^2,00\s€ \(suggéré\)$/)
+    assert.ok(checkout.feeChoices.some(choice => choice.text === 'Gratuit' && choice.value === 0))
+    assert.equal(f.calls.some(call => call.path.endsWith('/quotes')), false)
+    checkout.cart = cart
+    await Vue.nextTick()
+    await checkout.selectFee(0)
+    assert.equal(checkout.currentQuote.deliveryFeeCents, 0)
+    await checkout.selectFee('custom')
+    checkout.editCustomFee('3,50')
+    await checkout.applyCustomFee()
+    assert.equal(checkout.currentQuote.grandTotalCents, 2850)
+    await checkout.onResolved(proof('two'))
+    assert.equal(checkout.feeSelection, 'auto')
+    assert.equal(checkout.currentQuote.deliveryFeeCents, 200)
+    assert.equal(f.calls.filter(call => call.path.endsWith('/quotes')).at(-1).body.delivery_fee_override_cents, undefined)
+    checkout.site = true
+    await checkout.selectFee(0)
+    assert.equal(checkout.canChooseFee, false)
+    assert.equal(checkout.currentQuote.deliveryFeeCents, 200)
+  } finally { checkout.$destroy() }
+})
+
 test('lost response retry preserves exact proof/secret/key and rejects refresh or changed address under old key', async () => {
   let lost = true
   const f = fixture(call => /orders\/checkout/.test(call.path) ? lost ? { lost: true } : { data: { orderId: 91 } } : null)

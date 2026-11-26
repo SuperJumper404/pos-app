@@ -33,12 +33,20 @@
         </v-select>
         <DeliveryAddressInput :key="addressContext" ref="addressInput" :value="selectedAddress" :context-key="addressContext" :resolver="resolveAddress" :suggester="suggestAddresses" :disabled="disabled || !available" @resolved="onResolved" />
         <div v-if="distanceLabel" class="mb-3" aria-live="polite">
-          <v-chip small outlined color="primary">{{ distanceLabel }}</v-chip>
+          <v-chip small outlined color="primary" title="Distance à vol d’oiseau">{{ distanceLabel }}</v-chip>
+          <v-chip v-if="preview && !preview.inRange" small outlined color="error" class="ml-2">Hors zone de livraison</v-chip>
         </div>
+        <v-select v-if="canChooseFee && (recommendedFee !== null || (preview && preview.inRange))" :value="feeSelection"
+          :items="feeChoices" label="Frais de livraison" outlined dense :disabled="disabled"
+          @change="selectFee" />
+        <v-text-field v-if="canChooseFee && feeSelection === 'custom' && resolution" :value="customFee"
+          label="Montant des frais TTC" inputmode="decimal" suffix="€" outlined dense :disabled="disabled"
+          :error-messages="customFee && feeOverrideCents === null ? ['Saisissez un montant valide en euros.'] : []"
+          @input="editCustomFee" @change="applyCustomFee" @keydown.enter.prevent="applyCustomFee" />
         <v-btn v-if="selectedAddress && !resolution" text :disabled="disabled || !available || loading" @click="resolveStored"><v-icon left>mdi-map-marker-check-outline</v-icon>Valider cette adresse</v-btn>
         <v-btn v-if="site && session && resolution && !selectedAddressId" text :disabled="disabled || saving" @click="saveAddress"><v-icon left>mdi-content-save-outline</v-icon>Ajouter au carnet</v-btn>
       </template>
-      <v-alert v-if="error" type="error" text role="alert">{{ error }}</v-alert>
+      <v-alert v-if="error || (!currentQuote && previewError)" type="error" text role="alert">{{ error || previewError }}</v-alert>
       <div v-if="currentQuote" class="delivery-totals" aria-live="polite">
         <div><span>Produits</span><span>{{ money(currentQuote.itemsTotalCents) }}</span></div>
         <div v-if="currentQuote.itemsDiscountCents"><span>Remise produits</span><span>-{{ money(currentQuote.itemsDiscountCents) }}</span></div>
@@ -58,6 +66,7 @@ import CustomerCodeLogin from '@/components/customer/CustomerCodeLogin.vue'
 import CustomerAddressSummary from '@/components/customer/CustomerAddressSummary.vue'
 import { operatorIdentity } from '@/store/delivery'
 const { buildAddressDisplayQueue } = require('@/helpers/deliveryAddressDisplay')
+const { parseDeclarationCents } = require('@/helpers/cashReconciliation')
 
 export default {
   components: { DeliveryAddressInput, CustomerCodeLogin, CustomerAddressSummary },
@@ -70,11 +79,13 @@ export default {
     disabled: { type: Boolean, default: false },
     locked: { type: Boolean, default: false },
     hideMode: { type: Boolean, default: false },
+    cashier: { type: Boolean, default: false },
     customerDraft: { type: Object, default: null },
   },
   data: () => ({ resolution: null, currentQuote: null, confirmedBasis: null, sequence: 0, loading: false,
     error: '', loginOpen: false, selectedAddressId: null, profileId: null, customerQuery: '', searching: false,
-    newCustomer: { name: '', contactPhone: '' }, saving: false, expiryTimer: null, actorEpoch: 0 }),
+    newCustomer: { name: '', contactPhone: '' }, saving: false, expiryTimer: null, actorEpoch: 0,
+    preview: null, previewError: '', feeSelection: 'auto', customFee: '', recommendedFee: null }),
   computed: {
     delivery() { return this.$store.state.delivery },
     customerToCreate() { return this.customerDraft || this.newCustomer },
@@ -89,13 +100,28 @@ export default {
     addressOptions() { return [{ id: null, label: 'Nouvelle adresse' }, ...this.addresses] },
     selectedAddress() { return this.addresses.find(address => address.id === this.selectedAddressId) || null },
     distanceLabel() {
-      const meters = this.currentQuote && this.currentQuote.distanceMeters
+      const meters = this.currentQuote?.distanceMeters ?? this.preview?.distanceMeters
       if (typeof meters !== 'number' || !Number.isFinite(meters) || meters < 0) return ''
       return `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(meters / 1000)} km`
     },
+    canChooseFee() { return this.cashier && !this.site },
+    feeOverrideCents() {
+      if (!this.canChooseFee || this.feeSelection === 'auto') return undefined
+      return this.feeSelection === 'custom' ? parseDeclarationCents(this.customFee) : this.feeSelection
+    },
+    feeChoices() {
+      const recommended = this.recommendedFee ?? this.preview?.suggestedFeeCents
+      const amounts = new Set([0, ...(this.preview?.feeOptionsCents || [])])
+      if (Number.isSafeInteger(this.feeSelection)) amounts.add(this.feeSelection)
+      return [
+        { text: recommended == null ? 'Tarif du palier' : this.feeText(recommended) + ' (suggéré)', value: 'auto' },
+        ...[...amounts].sort((a, b) => a - b).map(value => ({ text: this.feeText(value), value })),
+        { text: 'Autre montant…', value: 'custom' },
+      ]
+    },
     bookContext() { return `${this.shopId}:${this.session ? this.account.epoch : this.profileId || 'guest'}:${this.actorEpoch}` },
     addressContext() { return `${this.bookContext}:${this.selectedAddressId || 'new'}` },
-    basis() { return JSON.stringify({ shop: this.shopId, cart: this.cart, discount: this.discount, resolution: this.resolution, account: this.session && this.session.customerId }) },
+    basis() { return JSON.stringify({ shop: this.shopId, cart: this.cart, discount: this.discount, resolution: this.resolution, account: this.session && this.session.customerId, feeOverrideCents: this.feeOverrideCents }) },
     ready() { return Boolean(!this.locked && this.available && !this.loading && this.currentQuote &&
       this.confirmedBasis === this.basis && Date.parse(this.currentQuote.expiresAt) > Date.now()) },
   },
@@ -105,7 +131,7 @@ export default {
     discount: { deep: true, handler() { this.refreshQuote() } },
     shopId() { this.openShop() },
     value(value) { if (value === 'delivery') this.refreshQuote(); else this.invalidate() },
-    session() { if (this.locked) return; this.selectedAddressId = null; this.resolution = null; this.invalidate(); this.loadBook() },
+    session() { if (this.locked) return; this.selectedAddressId = null; this.resolution = null; this.resetAddressPricing(); this.invalidate(); this.loadBook() },
     ready(value) { this.$emit('ready', value) },
   },
   mounted() { this.openShop() },
@@ -121,17 +147,43 @@ export default {
     clearActorContext() {
       this.actorEpoch++; this.sequence++; clearTimeout(this.expiryTimer); this.addressDisplayQueue.clear()
       this.profileId = null; this.selectedAddressId = null; this.resolution = null; this.currentQuote = null; this.confirmedBasis = null
+      this.resetAddressPricing()
       this.customerQuery = ''; this.newCustomer = { name: '', contactPhone: '' }; this.error = ''; this.loading = false
       this.$store.commit('delivery/CLEAR_ADDRESS_CONTEXT')
       if (!this.locked) { this.$emit('address', null); this.$emit('quote', null); this.$emit('ready', false) }
     },
     money(cents) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100) },
+    feeText(cents) { return cents === 0 ? 'Gratuit' : this.money(cents) },
+    resetAddressPricing() {
+      this.preview = null
+      this.previewError = ''
+      this.feeSelection = 'auto'
+      this.customFee = ''
+      this.recommendedFee = null
+    },
+    selectFee(value) {
+      this.feeSelection = value
+      if (value === 'custom') {
+        this.customFee = ''
+        this.invalidate()
+        return
+      }
+      return this.refreshQuote()
+    },
+    editCustomFee(value) {
+      this.customFee = value
+      this.invalidate()
+    },
+    applyCustomFee() {
+      if (this.feeSelection === 'custom' && this.feeOverrideCents !== null && !this.loading && !this.currentQuote) return this.refreshQuote()
+    },
     invalidate() { if (this.locked) return; this.sequence++; this.confirmedBasis = null; this.currentQuote = null; this.loading = false; clearTimeout(this.expiryTimer); this.$emit('quote', null); this.$emit('ready', false) },
     selectMode(mode) { if (!this.locked && (!this.site || mode !== 'dine_in') && (mode !== 'delivery' || this.available)) this.$emit('input', mode) },
     async openShop() {
       if (this.locked) return
       this.invalidate()
       this.resolution = null
+      this.resetAddressPricing()
       this.selectedAddressId = null
       this.profileId = null
       await this.$store.dispatch('delivery/loadSettings', this.shopId)
@@ -159,6 +211,7 @@ export default {
       this.profileId = id
       this.selectedAddressId = null
       this.resolution = null
+      this.resetAddressPricing()
       this.invalidate()
       this.$emit('customer', this.profiles.find(profile => profile.id === id) || null)
       if (id) {
@@ -169,28 +222,55 @@ export default {
     async selectAddress(id) {
       this.selectedAddressId = id
       this.resolution = null
+      this.resetAddressPricing()
       this.invalidate()
       await this.$nextTick()
       if (id) await this.resolveStored()
     },
     resolveStored() { return this.$refs.addressInput && this.$refs.addressInput.resolve() },
-    suggestAddresses(body) { return this.$store.dispatch('delivery/suggestAddresses', { ...body, personal: this.site }) },
+    suggestAddresses(body) { return this.$store.dispatch('delivery/suggestAddresses', { ...body, personal: this.site, includeDistance: true }) },
     displayAddress(address) { return this.addressDisplayQueue.load(address.id) },
     resolveAddress(body) { return this.$store.dispatch('delivery/resolveAddress', { ...body, personal: this.site, ...(body.addressId && !this.session ? { customerId: this.profileId } : {}) }) },
     // The shared input emits resolved(null) on teardown when the attempt locks.
-    onResolved(resolution) { if (this.locked) return null; this.resolution = resolution; this.$emit('address', resolution); return this.refreshQuote() },
+    onResolved(resolution) {
+      if (this.locked) return null
+      const changed = resolution?.addressResolutionToken !== this.resolution?.addressResolutionToken
+      if (changed) this.resetAddressPricing()
+      this.resolution = resolution
+      this.$emit('address', resolution)
+      if (resolution && (changed || !this.preview)) this.loadAddressPreview(resolution.addressResolutionToken)
+      return this.refreshQuote()
+    },
+    async loadAddressPreview(addressResolutionToken) {
+      const shopId = this.shopId
+      const isCurrentAddress = () => !this._isDestroyed && !this.locked && this.shopId === shopId
+        && this.resolution?.addressResolutionToken === addressResolutionToken
+      try {
+        const result = await this.$store.dispatch('delivery/previewAddress', { addressResolutionToken })
+        if (isCurrentAddress()) {
+          this.preview = result
+          this.previewError = ''
+        }
+      } catch (failure) {
+        if (isCurrentAddress() && failure.code === 'DELIVERY_ORIGIN_UNAVAILABLE') {
+          this.previewError = this.site ? failure.message : 'Vérifiez l’adresse de départ dans les réglages de livraison.'
+        }
+      }
+    },
     async refreshQuote() {
       if (this.locked) return null
       this.invalidate()
-      if (this.value !== 'delivery' || !this.available || !this.resolution || !this.cart.length) return null
+      if (this.value !== 'delivery' || !this.available || !this.resolution || !this.cart.length || this.feeOverrideCents === null) return null
       const sequence = this.sequence
       const basis = this.basis
       this.error = ''
       this.loading = true
-      const result = await this.$store.dispatch('delivery/quote', { cart: this.cart, resolution: this.resolution, discount: this.discount })
+      const result = await this.$store.dispatch('delivery/quote', { cart: this.cart, resolution: this.resolution, discount: this.discount,
+        ...(this.feeOverrideCents !== undefined && { deliveryFeeOverrideCents: this.feeOverrideCents }) })
       if (this._isDestroyed || sequence !== this.sequence || basis !== this.basis) return null
       this.loading = false
       this.currentQuote = result
+      if (result) this.recommendedFee = result.suggestedFeeCents ?? result.deliveryFeeCents
       this.error = result ? '' : this.delivery.error || 'Le devis est indisponible. Votre panier est conserve.'
       this.$emit('quote', result)
       return result
@@ -216,6 +296,7 @@ export default {
       this.invalidate()
       if (this.locked || !quote || quote.shopId !== this.shopId) return
       this.currentQuote = quote
+      this.recommendedFee = quote.suggestedFeeCents ?? quote.deliveryFeeCents
       this.$emit('quote', quote)
       this.error = 'Le prix a change. Confirmez le nouveau total avant de payer.'
     },

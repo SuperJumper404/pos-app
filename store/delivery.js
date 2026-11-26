@@ -49,10 +49,12 @@ const asError = failure => {
   const messages = {
     DELIVERY_GEOCODING_UNAVAILABLE: 'La recherche d\'adresse est indisponible. Reessayez.',
     DELIVERY_GEOCODING_RATE_LIMITED: 'La recherche d\'adresse est occupee. Patientez puis reessayez.',
+    DELIVERY_ORIGIN_UNAVAILABLE: 'L’adresse de départ du restaurant est temporairement indisponible.',
     DELIVERY_DISABLED: 'La livraison est suspendue. Votre panier est conserve.',
     DELIVERY_OUT_OF_RANGE: 'Cette adresse est hors du rayon de livraison. Corrigez l\'adresse ou choisissez un autre mode.',
     DELIVERY_MINIMUM_NOT_MET: 'Le minimum de produits pour la livraison n\'est pas atteint. Votre panier est conserve.',
     DELIVERY_ADDRESS_INVALID: 'Validez une adresse postale precise avant de continuer.',
+    DELIVERY_MONEY_INVALID: 'Saisissez des frais de livraison valides.',
     DELIVERY_VERSION_CONFLICT: 'Le dossier a change. Relisez son etat actuel puis confirmez a nouveau.',
     COURIER_CASH_VERSION_CONFLICT: 'Le solde a change. Verifiez le nouvel attendu avant de confirmer.',
     DELIVERY_REFUND_CUSTODY_INSUFFICIENT: 'La source ne detient plus assez d\'especes pour cette restitution complete. Verifiez le solde ; une restitution par la caisse reste distincte.',
@@ -321,7 +323,9 @@ export const actions = {
     const { epoch, shopId } = state
     const identity = operatorIdentity(rootState)
     try {
-      const result = unwrap(await api(this).request({ method: 'post', path: '/delivery/address-suggestions', body: { input: payload.input, sessionToken: payload.sessionToken } }))
+      const result = unwrap(await api(this).request({ method: 'post', path: '/delivery/address-suggestions', body: {
+        input: payload.input, sessionToken: payload.sessionToken, ...(payload.includeDistance && { includeDistance: true }),
+      } }))
       return epoch === state.epoch && shopId === state.shopId && identity === operatorIdentity(rootState) ? result : null
     } catch (failure) {
       if (epoch !== state.epoch || shopId !== state.shopId || identity !== operatorIdentity(rootState)) return null
@@ -350,12 +354,24 @@ export const actions = {
     } catch (failure) { if (!scope.current()) return null; throw asError(failure) }
     finally { scope.stop() }
   },
-  async quote({ state, commit }, { cart, resolution, discount = { type: 'none', value: 0 } }) {
+  async previewAddress({ state, rootState }, { addressResolutionToken }) {
+    const scope = addressScope(this, state, rootState)
+    try {
+      const result = unwrap(await api(this).request({ method: 'post', path: '/delivery/address-preview', body: {
+        address_resolution_token: addressResolutionToken,
+      } }))
+      return scope.current() && result && Number.isFinite(result.distanceMeters) && typeof result.inRange === 'boolean'
+        && Array.isArray(result.feeOptionsCents) ? result : null
+    } catch (failure) { if (scope.current()) throw asError(failure); return null }
+    finally { scope.stop() }
+  },
+  async quote({ state, commit }, { cart, resolution, discount = { type: 'none', value: 0 }, deliveryFeeOverrideCents }) {
     commit('QUOTE_START')
     const { epoch, quoteSequence } = state
     try {
       const result = unwrap(await api(this).request({ method: 'post', path: '/delivery/quotes', body: {
         items: buildCheckoutItems(cart), address_resolution_token: resolution.addressResolutionToken, discount,
+        ...(deliveryFeeOverrideCents !== undefined && { delivery_fee_override_cents: deliveryFeeOverrideCents }),
       } }))
       if (epoch !== state.epoch || quoteSequence !== state.quoteSequence) return null
       if (!result || result.shopId !== state.shopId || !Number.isSafeInteger(result.grandTotalCents)) throw new Error('Devis invalide.')
