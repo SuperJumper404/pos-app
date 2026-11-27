@@ -433,6 +433,7 @@
               <v-icon small right>mdi-credit-card-check</v-icon>
             </v-btn>
             <StripeTerminalReaders v-if="isAdmin" :stripe-ready="stripeReady" :is-admin="isAdmin" />
+            <MollieConnection v-if="isAdmin" />
           </v-card>
         </v-col>
         <v-col cols="12" md="6">
@@ -655,6 +656,7 @@
 <script>
 import Loading from '@/components/loading'
 import StripeTerminalReaders from '@/components/settings/StripeTerminalReaders'
+import MollieConnection from '@/components/settings/MollieConnection'
 import formatdate from '@/helpers/formatdate'
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -671,6 +673,7 @@ export default {
   components: {
     Loading,
     StripeTerminalReaders,
+    MollieConnection,
 
     // QrcodeVue,
   },
